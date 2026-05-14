@@ -273,44 +273,51 @@ export default function Contacto({ dict }: { dict: ContactoDict }) {
               </svg>
             )}
 
-            <div
-              className="absolute flex flex-col items-center gap-1.5"
-              style={{
-                left: "52%",
-                top: "38%",
-                transform: "translate(-50%, -100%)",
-              }}
-            >
-              <div
-                className="bg-gold-grad whitespace-nowrap px-3.5 py-2 font-sans text-[9px] font-bold uppercase tracking-[0.28em] text-carbon"
-                style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
-              >
-                {dict.map.pin}
-              </div>
-              <div
-                className="h-3.5 w-3.5 rounded-full bg-gold-bright"
-                style={{
-                  boxShadow:
-                    "0 0 0 4px rgba(231,170,81,0.25), 0 0 0 10px rgba(231,170,81,0.12)",
-                }}
-              />
-            </div>
+            {/* "Golden · aquí" pin + "Abrir en Google Maps" link are decorative
+                overlays for the SVG mockup. When the real Maps iframe renders
+                it provides its own marker + controls, so we hide these. */}
+            {!mapsEmbedUrl && (
+              <>
+                <div
+                  className="absolute flex flex-col items-center gap-1.5"
+                  style={{
+                    left: "52%",
+                    top: "38%",
+                    transform: "translate(-50%, -100%)",
+                  }}
+                >
+                  <div
+                    className="bg-gold-grad whitespace-nowrap px-3.5 py-2 font-sans text-[9px] font-bold uppercase tracking-[0.28em] text-carbon"
+                    style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
+                  >
+                    {dict.map.pin}
+                  </div>
+                  <div
+                    className="h-3.5 w-3.5 rounded-full bg-gold-bright"
+                    style={{
+                      boxShadow:
+                        "0 0 0 4px rgba(231,170,81,0.25), 0 0 0 10px rgba(231,170,81,0.12)",
+                    }}
+                  />
+                </div>
 
-            <a
-              href={mapsHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-2 no-underline backdrop-blur-md"
-              style={{
-                background: "rgba(20,16,14,0.7)",
-                border: "1px solid rgba(243,236,223,0.12)",
-              }}
-            >
-              <span className="font-display text-[13px] italic text-gold-soft">
-                {dict.map.openIn}
-              </span>
-              <span className="text-gold-bright">↗</span>
-            </a>
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-2 no-underline backdrop-blur-md"
+                  style={{
+                    background: "rgba(20,16,14,0.7)",
+                    border: "1px solid rgba(243,236,223,0.12)",
+                  }}
+                >
+                  <span className="font-display text-[13px] italic text-gold-soft">
+                    {dict.map.openIn}
+                  </span>
+                  <span className="text-gold-bright">↗</span>
+                </a>
+              </>
+            )}
 
             <div
               className="absolute right-4 top-4 font-sans text-[9px] uppercase tracking-[0.3em]"

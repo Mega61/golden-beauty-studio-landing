@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/optimize-logos.mjs && node scripts/build-lookbook-manifest.mjs",
+    "predev": "node scripts/optimize-logos.mjs && node scripts/build-lookbook-manifest.mjs && node scripts/build-favicon.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/optimize-logos.mjs && node scripts/build-lookbook-manifest.mjs",
+    "prebuild": "node scripts/optimize-logos.mjs && node scripts/build-lookbook-manifest.mjs && node scripts/build-favicon.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "optimize-logos": "node scripts/optimize-logos.mjs",
     "build-manifest": "node scripts/build-lookbook-manifest.mjs",
-    "seed-lookbook": "node scripts/seed-lookbook-samples.mjs"
+    "seed-lookbook": "node scripts/seed-lookbook-samples.mjs",
+    "build-favicon": "node scripts/build-favicon.mjs"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.7",
