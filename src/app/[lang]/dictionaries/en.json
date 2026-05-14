@@ -1,0 +1,209 @@
+{
+  "_todo": {
+    "address": "Real Sabaneta address pending — design placeholder in use. Brief confirms Sabaneta, exact address TBD.",
+    "prices": "Prices from the design (PRECIOS sheet of the financial model still pending). Replace with the finalized values once defined.",
+    "fresha": "Fresha link pending setup."
+  },
+  "meta": {
+    "title": "Golden Beauty Studio — Sabaneta",
+    "description": "Specialist nail studio in Sabaneta, Antioquia. Acrylic, polygel, builder gel and dipping by appointment."
+  },
+  "nav": {
+    "items": {
+      "trabajo": "Work",
+      "servicios": "Services",
+      "tecnicas": "Artists",
+      "estudio": "Studio",
+      "contacto": "Contact"
+    },
+    "cta": "Book a visit",
+    "ctaShort": "Book"
+  },
+  "hero": {
+    "eyebrow": "Nail Studio · Sabaneta",
+    "title1": "The art of nails,",
+    "title2_em": "made by hand.",
+    "body": "A specialist studio for built nails — acrylic, polygel and builder gel. Every appointment is a curated space for design, technique and precision.",
+    "ctaPrimary": "Book a visit",
+    "ctaSecondary": "See the work",
+    "metaHours": "Mon – Sat · 9:00 — 8:00",
+    "metaArea": "Sabaneta",
+    "metaStatus": "Openings this week"
+  },
+  "lookbook": {
+    "eyebrow": "Editorial Lookbook · 2025",
+    "title1": "The work,",
+    "title2_em": "curated.",
+    "body": "A selection of recent pieces. Each look notes the technique used and the estimated duration. Tap any image to see it in detail.",
+    "allLabel": "All",
+    "seeAll": "See the full archive"
+  },
+  "servicios": {
+    "eyebrow": "Menu · Prices visible",
+    "title1": "What we offer,",
+    "title2_em": "no fine print.",
+    "body": "Listed prices are the base. Complex designs and nail art are quoted per nail before the appointment starts — always upfront, never at the end.",
+    "categories": [
+      {
+        "label": "Builds",
+        "sub": "New systems · Extension",
+        "items": [
+          { "name": "Sculpted acrylic", "desc": "Custom shape · defined structure", "dur": "2h 30min", "price": "from $180,000 COP" },
+          { "name": "Dual-system polygel", "desc": "Lightweight with natural extension", "dur": "2h 15min", "price": "from $170,000 COP" },
+          { "name": "Dual-system builder gel", "desc": "UV cured · polished finish", "dur": "2h 15min", "price": "from $170,000 COP" },
+          { "name": "Editorial press-on", "desc": "Made-to-measure set · ready to wear", "dur": "—", "price": "from $220,000 COP" }
+        ]
+      },
+      {
+        "label": "Refills",
+        "sub": "System maintenance",
+        "items": [
+          { "name": "Acrylic refill", "desc": "Every 3–4 weeks", "dur": "1h 45min", "price": "$120,000 COP" },
+          { "name": "Polygel refill", "desc": "Every 3–4 weeks", "dur": "1h 45min", "price": "$120,000 COP" },
+          { "name": "Builder gel refill", "desc": "Every 3–4 weeks", "dur": "1h 45min", "price": "$115,000 COP" }
+        ]
+      },
+      {
+        "label": "Overlays",
+        "sub": "Reinforcement, no extension",
+        "items": [
+          { "name": "Polygel overlay", "desc": "On the natural nail", "dur": "1h 30min", "price": "$95,000 COP" },
+          { "name": "Builder gel overlay", "desc": "On the natural nail", "dur": "1h 30min", "price": "$95,000 COP" },
+          { "name": "Dipping", "desc": "Powder system · no lamp", "dur": "1h 15min", "price": "$90,000 COP" },
+          { "name": "Rubber base leveling", "desc": "Structural base coat", "dur": "1h", "price": "$75,000 COP" }
+        ]
+      },
+      {
+        "label": "Simple",
+        "sub": "Manicure · pedicure",
+        "items": [
+          { "name": "Semi-permanent hands", "desc": "Cleanup + gel polish", "dur": "1h", "price": "$55,000 COP" },
+          { "name": "Semi-permanent feet", "desc": "Cleanup + gel polish", "dur": "1h 15min", "price": "$65,000 COP" },
+          { "name": "Hands cleanup only", "desc": "No polish", "dur": "45min", "price": "$35,000 COP" },
+          { "name": "Feet cleanup only", "desc": "No polish", "dur": "1h", "price": "$45,000 COP" }
+        ]
+      }
+    ],
+    "footnote": "Simple designs included. Complex designs from $3,000 COP per nail. External system removal: +$25,000 COP.",
+    "cta": "Book my appointment"
+  },
+  "diccionario": {
+    "eyebrow": "Glossary · Techniques",
+    "title1": "Before you choose,",
+    "title2_em": "know what you're getting.",
+    "body": "Each technique has its own logic, duration and ideal nail type. A quick guide so you arrive at your appointment knowing what to ask for — and why.",
+    "fallback": "We'll walk you through it at your appointment. Ask the artist which system best fits your nail.",
+    "labels": { "duration": "Duration", "ideal": "Best for" },
+    "items": [
+      { "name": "Acrylic", "dur": "3–4 weeks", "ideal": "Defined shape · structure", "body": "A mix of polymer and liquid monomer molded onto the nail. The classic system: maximum strength and sculpted shape via filing. Ideal for long extensions and architectural designs." },
+      { "name": "Polygel", "dur": "3–4 weeks", "ideal": "Lightweight extension", "body": "A moldable paste-gel applied with a dual-form. Lighter than acrylic, feels natural and allows clean extensions. LED-cured — no odor. Recommended for thin nails or anyone seeking discretion." },
+      { "name": "Builder gel", "dur": "3–4 weeks", "ideal": "Reinforcing the natural nail", "body": "A thick gel cured under UV/LED. A structural layer that protects the natural nail without extending it much. Polished finish, high durability and minimal wear on removal." },
+      { "name": "Dipping", "dur": "2–3 weeks", "ideal": "Strength without a lamp", "placeholder": "Dipping" },
+      { "name": "Semi-permanent", "dur": "2–3 weeks", "ideal": "Color on natural nails", "placeholder": "Semi-permanent" },
+      { "name": "Press On", "dur": "Custom", "ideal": "Ready-to-wear · events", "placeholder": "Editorial press-on" }
+    ]
+  },
+  "tecnicas": {
+    "eyebrow": "Meet the artists",
+    "title1": "The difference has",
+    "title2_em": "a name.",
+    "team": [
+      {
+        "name": "Valentina M.",
+        "role": "Founder · Sculpted acrylic",
+        "years": "8 years",
+        "quote": "Technique is learned; the eye is trained appointment by appointment."
+      },
+      {
+        "name": "Laura R.",
+        "role": "Polygel · Editorial design",
+        "years": "5 years",
+        "quote": "Every hand tells a different story. I just frame it."
+      }
+    ],
+    "bookWith": "Book with"
+  },
+  "estudio": {
+    "eyebrow": "05 · The studio",
+    "title1": "A space made",
+    "title2_em": "to sit, look at your hands and breathe.",
+    "leadItalic": "Golden comes from the idea that a well-done nail is a design object. Not an express service, not a chore — a deliberate pause.",
+    "body1": "We work with built techniques — acrylic, polygel, builder gel, dipping — because they hold their shape for three weeks. One technique per appointment, one client at a time, no double-booking.",
+    "body2": "The studio sits in Sabaneta, a small and carefully kept space: two seats, soft light, visible products, sealed tools. Nothing decorative that doesn't serve.",
+    "spaceLamp": "Detail · lamp",
+    "stats": [
+      { "n": "03h", "l": "Average duration", "s": "Per appointment, no overlap" },
+      { "n": "02", "l": "Working stations", "s": "Intimate studio, not a salon" },
+      { "n": "06", "l": "Techniques mastered", "s": "Built + simple" },
+      { "n": "100%", "l": "Sterilized material", "s": "Sealed in front of the client" }
+    ],
+    "hygiene": {
+      "eyebrow": "Hygiene & process",
+      "title1": "Our protocol,",
+      "title2_em": "visible always.",
+      "intro": "What others treat as optional, we treat as non-negotiable. You'll see it every visit.",
+      "items": [
+        ["Autoclave", "Class B autoclave sterilization between clients."],
+        ["Single use", "Disposable files, buffers and sticks, opened in front of you."],
+        ["Sealed products", "Every material is opened in front of the client."],
+        ["Disinfected table", "Surface and UV lamp cleaned between appointments."],
+        ["Premium brands", "Kiara Sky, The Gel Bottle, Akzéntz, Aprés."],
+        ["No nipping", "Zero aggressive cuticle cutting. Push only."]
+      ]
+    }
+  },
+  "contacto": {
+    "eyebrow": "06 · Visit us",
+    "title1": "Find us in",
+    "title2_em": "Sabaneta.",
+    "address": {
+      "label": "Address",
+      "line1": "Cra. 45 #65 Sur — Local 02",
+      "line2": "Sabaneta · Antioquia · Colombia",
+      "line3": "80 m from Parque de Sabaneta, second floor."
+    },
+    "hours": {
+      "label": "Hours",
+      "rows": [
+        ["Monday", "Closed"],
+        ["Tue — Fri", "09:00 — 19:00"],
+        ["Saturday", "08:00 — 17:00"],
+        ["Sunday", "10:00 — 14:00"]
+      ],
+      "closed": "Closed"
+    },
+    "ctaBook": "Book my appointment →",
+    "ctaWhatsapp": "WhatsApp →",
+    "socials": ["Instagram", "Google", "TikTok"],
+    "map": {
+      "park": "Sabaneta Park",
+      "pin": "Golden · here",
+      "openIn": "Open in Google Maps",
+      "coords": "6.156° N · 75.617° W"
+    }
+  },
+  "footer": {
+    "tagline": "Specialist studio for built nails.\nSabaneta · Medellín · Antioquia.",
+    "visit": {
+      "title": "Visit us",
+      "address1": "Cra. 45 #65 Sur — Local 02",
+      "address2": "Sabaneta, Antioquia",
+      "hours": "Mon – Sat · 9:00 – 20:00"
+    },
+    "find": {
+      "title": "Find us",
+      "links": [
+        "Instagram @goldenbeauty",
+        "WhatsApp Business",
+        "Fresha · Bookings",
+        "Google Maps"
+      ]
+    },
+    "copyright": "© 2026 Golden Beauty Studio. All rights reserved.",
+    "legal": ["Privacy", "Terms"]
+  },
+  "floating": {
+    "whatsapp": "WhatsApp",
+    "cta": "Book →"
+  }
+}

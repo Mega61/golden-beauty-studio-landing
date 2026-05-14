@@ -1,0 +1,209 @@
+{
+  "_todo": {
+    "address": "Dirección real en Sabaneta pendiente — placeholder del diseño en uso. Brief confirma Sabaneta, dirección exacta TBD.",
+    "prices": "Precios provienen del diseño (hoja PRECIOS pendiente de finalizar en el modelo financiero). Reemplazar con los valores definitivos cuando estén.",
+    "fresha": "Link a Fresha pendiente de configuración."
+  },
+  "meta": {
+    "title": "Golden Beauty Studio — Sabaneta",
+    "description": "Estudio especializado en uñas construidas en Sabaneta, Antioquia. Acrílico, polygel, builder gel y dipping con cita personalizada."
+  },
+  "nav": {
+    "items": {
+      "trabajo": "Trabajo",
+      "servicios": "Servicios",
+      "tecnicas": "Técnicas",
+      "estudio": "Estudio",
+      "contacto": "Contacto"
+    },
+    "cta": "Agendar cita",
+    "ctaShort": "Agendar"
+  },
+  "hero": {
+    "eyebrow": "Nail Studio · Sabaneta",
+    "title1": "El arte de las uñas,",
+    "title2_em": "hecho a mano.",
+    "body": "Estudio especializado en uñas construidas — acrílico, polygel y builder gel. Cada cita es un espacio curado para diseño, técnica y precisión.",
+    "ctaPrimary": "Agendar cita",
+    "ctaSecondary": "Ver el trabajo",
+    "metaHours": "Lun – Sáb · 9:00 — 8:00",
+    "metaArea": "Sabaneta",
+    "metaStatus": "Citas abiertas esta semana"
+  },
+  "lookbook": {
+    "eyebrow": "Lookbook Editorial · 2025",
+    "title1": "El trabajo,",
+    "title2_em": "curado.",
+    "body": "Una selección de piezas recientes. Cada look incluye la técnica usada y la duración estimada. Toca cualquier imagen para verla en detalle.",
+    "allLabel": "Todos",
+    "seeAll": "Ver el archivo completo"
+  },
+  "servicios": {
+    "eyebrow": "Carta · Precios visibles",
+    "title1": "Lo que ofrecemos,",
+    "title2_em": "sin letra pequeña.",
+    "body": "Los precios indicados son base. Diseños complejos y nail art se cotizan por uña antes de comenzar la cita — siempre antes, nunca al final.",
+    "categories": [
+      {
+        "label": "Montajes",
+        "sub": "Sistemas nuevos · Extensión",
+        "items": [
+          { "name": "Esculpidas en acrílico", "desc": "Forma personalizada · estructura definida", "dur": "2h 30min", "price": "desde $180.000" },
+          { "name": "Dual system polygel", "desc": "Ligereza con extensión natural", "dur": "2h 15min", "price": "desde $170.000" },
+          { "name": "Dual system builder gel", "desc": "Curado UV · acabado pulido", "dur": "2h 15min", "price": "desde $170.000" },
+          { "name": "Press On editorial", "desc": "Set hecho a medida · entrega lista", "dur": "—", "price": "desde $220.000" }
+        ]
+      },
+      {
+        "label": "Retoques",
+        "sub": "Mantenimiento de sistema",
+        "items": [
+          { "name": "Retoque acrílico", "desc": "Cada 3–4 semanas", "dur": "1h 45min", "price": "$120.000" },
+          { "name": "Retoque polygel", "desc": "Cada 3–4 semanas", "dur": "1h 45min", "price": "$120.000" },
+          { "name": "Retoque builder gel", "desc": "Cada 3–4 semanas", "dur": "1h 45min", "price": "$115.000" }
+        ]
+      },
+      {
+        "label": "Forrados",
+        "sub": "Refuerzo sin extensión",
+        "items": [
+          { "name": "Forrado en polygel", "desc": "Sobre uña natural", "dur": "1h 30min", "price": "$95.000" },
+          { "name": "Forrado en builder gel", "desc": "Sobre uña natural", "dur": "1h 30min", "price": "$95.000" },
+          { "name": "Dipping", "desc": "Sistema en polvo · sin lámpara", "dur": "1h 15min", "price": "$90.000" },
+          { "name": "Nivelación rubber base", "desc": "Base estructurante", "dur": "1h", "price": "$75.000" }
+        ]
+      },
+      {
+        "label": "Sencillos",
+        "sub": "Manicura · pedicura",
+        "items": [
+          { "name": "Semipermanente manos", "desc": "Limpieza + esmalte gel", "dur": "1h", "price": "$55.000" },
+          { "name": "Semipermanente pies", "desc": "Limpieza + esmalte gel", "dur": "1h 15min", "price": "$65.000" },
+          { "name": "Solo limpieza manos", "desc": "Sin esmalte", "dur": "45min", "price": "$35.000" },
+          { "name": "Solo limpieza pies", "desc": "Sin esmalte", "dur": "1h", "price": "$45.000" }
+        ]
+      }
+    ],
+    "footnote": "Diseños simples incluidos. Diseños complejos desde $3.000 por uña. Retiro de sistema externo: +$25.000.",
+    "cta": "Reservar mi cita"
+  },
+  "diccionario": {
+    "eyebrow": "Diccionario · Técnicas",
+    "title1": "Antes de elegir,",
+    "title2_em": "entiende.",
+    "body": "Cada técnica tiene su lógica, su duración y su tipo de uña ideal. Esta es una guía rápida para que llegues a tu cita sabiendo qué pedir — y por qué.",
+    "fallback": "Más información durante tu cita. Pregúntale a la técnica cuál sistema se adapta mejor a tu uña.",
+    "labels": { "duration": "Duración", "ideal": "Ideal para" },
+    "items": [
+      { "name": "Acrílico", "dur": "3–4 semanas", "ideal": "Forma definida · estructura", "body": "Mezcla de polímero y monómero líquido que se moldea sobre la uña. Sistema clásico, máxima resistencia y forma esculpida con limado. Ideal para extensiones largas y diseños arquitectónicos." },
+      { "name": "Polygel", "dur": "3–4 semanas", "ideal": "Ligereza con extensión", "body": "Gel en pasta moldeable con dual-form. Pesa menos que el acrílico, se siente natural y permite extensiones limpias. Curado en lámpara LED — sin olor. Recomendado para uñas finas o quien busca discreción." },
+      { "name": "Builder gel", "dur": "3–4 semanas", "ideal": "Refuerzo de uña natural", "body": "Gel viscoso que cura en lámpara UV/LED. Capa estructural que protege la uña natural sin extenderla mucho. Acabado pulido, alta durabilidad y mínimo desgaste al retirar." },
+      { "name": "Dipping", "dur": "2–3 semanas", "ideal": "Resistencia sin lámpara", "placeholder": "Dipping" },
+      { "name": "Semipermanente", "dur": "2–3 semanas", "ideal": "Color sobre uña natural", "placeholder": "Semipermanente" },
+      { "name": "Press On", "dur": "Personalizado", "ideal": "Set listo · eventos", "placeholder": "Press On editorial" }
+    ]
+  },
+  "tecnicas": {
+    "eyebrow": "Conoce a las técnicas",
+    "title1": "La diferencia tiene",
+    "title2_em": "nombre propio.",
+    "team": [
+      {
+        "name": "Valentina M.",
+        "role": "Founder · Acrílico esculpido",
+        "years": "8 años",
+        "quote": "La técnica se aprende; el ojo se entrena cita tras cita."
+      },
+      {
+        "name": "Laura R.",
+        "role": "Polygel · Diseño editorial",
+        "years": "5 años",
+        "quote": "Cada mano cuenta una historia distinta. Yo solo la enmarco."
+      }
+    ],
+    "bookWith": "Agendar con"
+  },
+  "estudio": {
+    "eyebrow": "05 · El estudio",
+    "title1": "Un espacio pensado",
+    "title2_em": "para sentarse, mirar las manos y respirar.",
+    "leadItalic": "Golden nace de la idea de que una uña bien hecha es un objeto de diseño. No un servicio express, no un pasaje obligado: una pausa con criterio.",
+    "body1": "Trabajamos con técnicas construidas — acrílico, polygel, builder gel, dipping — porque permiten durar tres semanas sin que la forma pierda tensión. Cada cita es una sola técnica, una sola clienta, sin doble agenda.",
+    "body2": "El estudio queda en Sabaneta, en un local pequeño y cuidado: dos puestos, luz suave, productos visibles, instrumentos sellados. Nada decorativo que no sirva.",
+    "spaceLamp": "Detalle · lámpara",
+    "stats": [
+      { "n": "03h", "l": "Duración promedio", "s": "Por cita, sin doblar agenda" },
+      { "n": "02", "l": "Puestos atendidos", "s": "Estudio íntimo, no salón" },
+      { "n": "06", "l": "Técnicas dominadas", "s": "Construidas + sencillas" },
+      { "n": "100%", "l": "Material esterilizado", "s": "Sellado frente al cliente" }
+    ],
+    "hygiene": {
+      "eyebrow": "Higiene y proceso",
+      "title1": "Nuestro protocolo,",
+      "title2_em": "visible siempre.",
+      "intro": "Lo que para otros es opcional, para nosotras es no negociable. Lo verás cada visita.",
+      "items": [
+        ["Autoclave", "Esterilización en autoclave clase B entre clientas."],
+        ["Uso único", "Limas, buffers y palillos descartables, abiertos contigo."],
+        ["Productos sellados", "Todo el material se abre frente a la clienta."],
+        ["Mesa desinfectada", "Superficie y lámpara UV limpiadas entre citas."],
+        ["Marcas premium", "Kiara Sky, The Gel Bottle, Akzéntz, Aprés."],
+        ["Sin pulpos", "Cero corte agresivo de cutícula. Solo empuje."]
+      ]
+    }
+  },
+  "contacto": {
+    "eyebrow": "06 · Visítanos",
+    "title1": "Nos encuentras en",
+    "title2_em": "Sabaneta.",
+    "address": {
+      "label": "Dirección",
+      "line1": "Cra. 45 #65 Sur — Local 02",
+      "line2": "Sabaneta · Antioquia · Colombia",
+      "line3": "A 80 m del Parque de Sabaneta, segundo piso."
+    },
+    "hours": {
+      "label": "Horarios",
+      "rows": [
+        ["Lunes", "Cerrado"],
+        ["Mar — Vie", "09:00 — 19:00"],
+        ["Sábado", "08:00 — 17:00"],
+        ["Domingo", "10:00 — 14:00"]
+      ],
+      "closed": "Cerrado"
+    },
+    "ctaBook": "Agendar mi cita →",
+    "ctaWhatsapp": "WhatsApp →",
+    "socials": ["Instagram", "Google", "TikTok"],
+    "map": {
+      "park": "Pq. Sabaneta",
+      "pin": "Golden · aquí",
+      "openIn": "Abrir en Google Maps",
+      "coords": "6.156° N · 75.617° W"
+    }
+  },
+  "footer": {
+    "tagline": "Estudio especializado en uñas construidas.\nSabaneta · Medellín · Antioquia.",
+    "visit": {
+      "title": "Visítanos",
+      "address1": "Cra. 45 #65 Sur — Local 02",
+      "address2": "Sabaneta, Antioquia",
+      "hours": "Lun – Sáb · 9:00 – 20:00"
+    },
+    "find": {
+      "title": "Encuéntranos",
+      "links": [
+        "Instagram @goldenbeauty",
+        "WhatsApp Business",
+        "Fresha · Reservas",
+        "Google Maps"
+      ]
+    },
+    "copyright": "© 2026 Golden Beauty Studio. Todos los derechos reservados.",
+    "legal": ["Privacidad", "Términos"]
+  },
+  "floating": {
+    "whatsapp": "WhatsApp",
+    "cta": "Agendar →"
+  }
+}
