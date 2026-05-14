@@ -153,10 +153,10 @@ function FilterButton({
       aria-disabled={disabled || undefined}
       className={`px-4 py-2 font-sans text-[11px] font-medium uppercase tracking-[0.22em] transition-colors ${
         active
-          ? "bg-ink text-gold-soft"
+          ? "cursor-pointer bg-ink text-gold-soft"
           : disabled
             ? "cursor-not-allowed border border-hair bg-transparent text-ink opacity-40"
-            : "border border-hair bg-transparent text-ink hover:border-gold hover:text-gold"
+            : "cursor-pointer border border-hair bg-transparent text-ink hover:border-gold hover:text-gold"
       }`}
     >
       {label}

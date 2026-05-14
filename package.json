@@ -12,7 +12,8 @@
     "optimize-logos": "node scripts/optimize-logos.mjs",
     "build-manifest": "node scripts/build-lookbook-manifest.mjs",
     "seed-lookbook": "node scripts/seed-lookbook-samples.mjs",
-    "build-favicon": "node scripts/build-favicon.mjs"
+    "build-favicon": "node scripts/build-favicon.mjs",
+    "export-copy": "node scripts/export-copy-template.mjs"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.7",
