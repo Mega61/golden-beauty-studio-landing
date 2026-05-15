@@ -98,8 +98,10 @@ export default function MobileMenu({
           </div>
 
           <nav className="flex flex-col px-6 py-4">
+            {/* Plain <a> for hash anchors — next/link short-circuits repeat
+                clicks when the URL is already at the same pathname+hash. */}
             {items.map((i) => (
-              <Link
+              <a
                 key={i.key}
                 href={i.href}
                 onClick={close}
@@ -107,7 +109,7 @@ export default function MobileMenu({
                 style={{ borderBottom: "1px solid var(--hair)" }}
               >
                 {i.label}
-              </Link>
+              </a>
             ))}
           </nav>
 

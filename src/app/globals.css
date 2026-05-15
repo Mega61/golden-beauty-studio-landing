@@ -45,6 +45,14 @@
     padding: 0;
   }
 
+  /* Smooth scroll for in-page anchor jumps. `scroll-padding-top` offsets the
+     sticky header (~78–83 px tall) so the targeted section's heading isn't
+     hidden behind the nav. */
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 88px;
+  }
+
   body {
     font-family: var(--font-sans);
     color: var(--color-ink);
@@ -162,5 +170,9 @@ a:hover .logo-full-mark {
   .logo-text-mark,
   .logo-full-mark {
     transition: none;
+  }
+
+  html {
+    scroll-behavior: auto;
   }
 }

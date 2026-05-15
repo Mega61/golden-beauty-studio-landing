@@ -12,6 +12,7 @@ import Contacto from "./_components/Contacto";
 import Footer from "./_components/Footer";
 import FloatingActions from "./_components/FloatingActions";
 import BrandDivider from "./_components/BrandDivider";
+import BackToTop from "./_components/BackToTop";
 
 export default async function Page({
   params,
@@ -39,6 +40,7 @@ export default async function Page({
       {sections.contacto && <Contacto dict={dict.contacto} />}
       <Footer dict={dict.footer} />
       <FloatingActions dict={dict.floating} />
+      <BackToTop />
     </>
   );
 }

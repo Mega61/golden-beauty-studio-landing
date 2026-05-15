@@ -81,10 +81,14 @@ export function SecondaryCTA({
   onLight?: boolean;
   className?: string;
 }) {
+  // Plain <a> instead of next/link: this CTA is always an in-page hash
+  // anchor. Next's <Link> short-circuits repeat clicks when the URL is
+  // already at the same pathname+hash, so the browser never re-fires the
+  // anchor jump. Native <a> works on every click.
   return (
-    <Link
+    <a
       href={href}
-      className={`inline-flex items-center gap-3 px-6 py-3.5 md:px-7 md:py-4 font-sans text-[12px] md:text-[13px] font-medium uppercase tracking-[0.24em] no-underline border bg-transparent ${
+      className={`inline-flex cursor-pointer items-center gap-3 px-6 py-3.5 md:px-7 md:py-4 font-sans text-[12px] md:text-[13px] font-medium uppercase tracking-[0.24em] no-underline border bg-transparent ${
         onLight ? "border-hair text-ink" : "text-ivory"
       } ${className}`}
       style={
@@ -92,6 +96,6 @@ export function SecondaryCTA({
       }
     >
       {children}
-    </Link>
+    </a>
   );
 }
