@@ -96,7 +96,7 @@
         }
       }
     },
-    "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería). Otros largos, diseños complejos y nail art se cotizan por aparte antes de tu cita.",
+    "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería). Retiro de un sistema externo: +$25.000 (no se cobra la primera vez).",
     "cta": "Reservar mi cita"
   },
   "diccionario": {
@@ -104,19 +104,19 @@
     "title1": "Antes de elegir,",
     "title2_em": "entiende.",
     "body": "Cada técnica tiene su lógica, su duración y su tipo de uña ideal. Esta es una guía rápida para que sepas qué pedir — y por qué.",
-    "fallback": "Más información durante tu cita. Pregúntale a la técnica cuál sistema se adapta mejor a tu uña.",
+    "fallback": "También puedes escribirnos por WhatsApp si necesitas asesoría personalizada.",
     "labels": { "duration": "Duración", "ideal": "Ideal para" },
     "items": [
       { "name": "Acrílico", "dur": "3–4 semanas", "ideal": "Forma definida · estructura", "body": "Mezcla de polímero y monómero líquido que se moldea sobre la uña. Sistema clásico, máxima resistencia y forma esculpida con limado. Ideal para extensiones largas y diseños arquitectónicos." },
       { "name": "Polygel", "dur": "3–4 semanas", "ideal": "Ligereza con extensión", "body": "Gel en pasta moldeable con dual-form. Pesa menos que el acrílico, se siente natural y permite extensiones limpias. Curado en lámpara LED — sin olor. Recomendado para uñas finas o quien busca discreción." },
       { "name": "Builder gel", "dur": "3–4 semanas", "ideal": "Refuerzo de uña natural", "body": "Gel viscoso que cura en lámpara UV/LED. Capa estructural que protege la uña natural sin extenderla mucho. Acabado pulido, alta durabilidad y mínimo desgaste al retirar." },
-      { "name": "Dipping", "dur": "2–3 semanas", "ideal": "Resistencia sin lámpara", "placeholder": "Dipping" },
-      { "name": "Semipermanente", "dur": "2–3 semanas", "ideal": "Color sobre uña natural", "placeholder": "Semipermanente" },
-      { "name": "Press On", "dur": "Personalizado", "ideal": "Set listo · eventos", "placeholder": "Press On editorial" }
+      { "name": "Dipping", "dur": "2–3 semanas", "ideal": "Larga duración", "body": "Técnica de manicure con polvo acrílico que brinda un acabado resistente, ligero y de larga duración. Ideal para lucir uñas fuertes, brillantes y naturales por semanas." },
+      { "name": "Semipermanente", "dur": "2–3 semanas", "ideal": "Color sobre uña natural", "body": "Esmalte en gel de larga duración que se seca en lámpara UV/LED. Acabado brillante, ligero y natural; mantén tus uñas impecables y realiza desde diseños sencillos hasta nail art creativo." },
+      { "name": "Press On", "dur": "Personalizado", "ideal": "Set listo · eventos", "body": "Uñas listas para aplicar, permiten lograr un manicure rápido con diferentes formas, largos y diseños personalizados, sin necesidad de esculpido." }
     ]
   },
   "tecnicas": {
-    "eyebrow": "Conoce a las técnicas",
+    "eyebrow": "Conoce las artistas",
     "title1": "La diferencia tiene",
     "title2_em": "nombre propio.",
     "team": [
@@ -137,30 +137,30 @@
   },
   "estudio": {
     "eyebrow": "05 · El estudio",
-    "title1": "Un espacio pensado",
-    "title2_em": "para sentarse, mirar las manos y respirar.",
-    "leadItalic": "Golden nace de la idea de que una uña bien hecha es un objeto de diseño. No un servicio express, no un pasaje obligado: una pausa con criterio.",
-    "body1": "Trabajamos con técnicas construidas — acrílico, polygel, builder gel, dipping — porque permiten durar tres semanas sin que la forma pierda tensión. Cada cita es una sola técnica, una sola clienta, sin doble agenda.",
-    "body2": "El estudio queda en Sabaneta, en un local pequeño y cuidado: dos puestos, luz suave, productos visibles, instrumentos sellados. Nada decorativo que no sirva.",
+    "title1": "Un espacio pensado para",
+    "title2_em": "mujeres que aman el lujo en los detalles.",
+    "leadItalic": "Golden nace de la idea de transformar el cuidado personal en una experiencia de comodidad y exclusividad. Hacer que cada mujer se sienta segura, femenina y auténtica.",
+    "body1": "Nuestras nail artists manejan a la perfección cada técnica que ofrecemos: puedes elegir tu favorita con la certeza de que el resultado siempre será deslumbrante.",
+    "body2": "Estamos ubicadas en Sabaneta, en un local moderno, elegante y acogedor, diseñado para brindar una experiencia sofisticada y exclusiva.",
     "spaceLamp": "Detalle · lámpara",
     "stats": [
-      { "n": "03h", "l": "Duración promedio", "s": "Por cita, sin doblar agenda" },
+      { "n": "02h", "l": "Duración promedio", "s": "Por cita, sin doblar agenda" },
       { "n": "02", "l": "Puestos atendidos", "s": "Estudio íntimo, no salón" },
       { "n": "06", "l": "Técnicas dominadas", "s": "Construidas + sencillas" },
-      { "n": "100%", "l": "Material esterilizado", "s": "Sellado frente al cliente" }
+      { "n": "100%", "l": "Material esterilizado", "s": "Abierto frente al cliente" }
     ],
     "hygiene": {
       "eyebrow": "Higiene y proceso",
-      "title1": "Nuestro protocolo,",
-      "title2_em": "visible siempre.",
-      "intro": "Lo que para otros es opcional, para nosotras es no negociable. Lo verás cada visita.",
+      "title1": "Tu salud",
+      "title2_em": "no es negociable.",
+      "intro": "Lo que para otros es opcional, para nosotras es indispensable. Lo verás cada visita.",
       "items": [
-        ["Autoclave", "Esterilización en autoclave clase B entre clientas."],
-        ["Uso único", "Limas, buffers y palillos descartables, abiertos contigo."],
+        ["Esterilización", "Cada herramienta que usamos está estéril."],
+        ["Uso único", "Todos los elementos desechables son descartados."],
         ["Productos sellados", "Todo el material se abre frente a la clienta."],
         ["Mesa desinfectada", "Superficie y lámpara UV limpiadas entre citas."],
-        ["Marcas premium", "Kiara Sky, The Gel Bottle, Akzéntz, Aprés."],
-        ["Sin pulpos", "Cero corte agresivo de cutícula. Solo empuje."]
+        ["Marcas premium", "Lo mejor del mercado para ti."],
+        ["Sin sobreagenda", "Te dedicamos personalmente hasta el último minuto de tu cita."]
       ]
     }
   },
@@ -170,9 +170,9 @@
     "title2_em": "Sabaneta.",
     "address": {
       "label": "Dirección",
-      "line1": "Calle 69 Sur 43a - 41 Primer Piso",
+      "line1": "Calle 69 Sur #43a - 41, Primer Piso",
       "line2": "Sabaneta · Antioquia · Colombia",
-      "line3": "A 200m del Parque de Sabaneta"
+      "line3": "A media cuadra de la Registraduría"
     },
     "hours": {
       "label": "Horarios",
@@ -184,7 +184,7 @@
     },
     "ctaBook": "Agendar mi cita →",
     "ctaWhatsapp": "WhatsApp →",
-    "socials": ["Instagram", "Google", "TikTok"],
+    "socials": ["Instagram", "TikTok"],
     "map": {
       "park": "Pq. Sabaneta",
       "pin": "Golden · aquí",
@@ -193,19 +193,19 @@
     }
   },
   "footer": {
-    "tagline": "Estudio especializado en uñas construidas.\nSabaneta · Medellín · Antioquia.",
+    "tagline": "Estudio especializado en uñas.\nSabaneta · Medellín · Antioquia.",
     "visit": {
       "title": "Visítanos",
-      "address1": "Calle 69 Sur 43a - 41 Primer Piso",
+      "address1": "Calle 69 Sur #43a - 41, Primer Piso",
       "address2": "Sabaneta, Antioquia",
-      "hours": "Lun – Sáb · 9:00 – 19:00"
+      "hours": "Lun – Dom"
     },
     "find": {
       "title": "Encuéntranos",
       "links": [
         "Instagram @goldenbeauty",
         "WhatsApp Business",
-        "Fresha · Reservas",
+        "AgendaPro · Reservas",
         "Google Maps"
       ]
     },

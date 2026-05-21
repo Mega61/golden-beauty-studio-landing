@@ -20,6 +20,9 @@ const whatsappUrl = wppNumber
   ? `https://wa.me/${wppNumber}?text=${encodeURIComponent(wppGreeting)}`
   : null;
 
+const instagramUrl = process.env.NEXT_PUBLIC_INSTAGRAM_URL?.trim() || null;
+const tiktokUrl = process.env.NEXT_PUBLIC_TIKTOK_URL?.trim() || null;
+
 const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim() || null;
 
 const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || null;
@@ -35,6 +38,8 @@ export const siteConfig = {
   siteUrl,
   bookingUrl,
   whatsappUrl,
+  instagramUrl,
+  tiktokUrl,
   gaId,
   mapsEmbedUrl,
   mapsPlaceId,

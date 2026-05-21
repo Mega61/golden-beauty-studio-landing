@@ -1,3 +1,4 @@
+import { siteConfig } from "@/config/site";
 import Logo from "./Logo";
 
 type FooterDict = {
@@ -16,7 +17,37 @@ type FooterDict = {
   legal: string[];
 };
 
+function resolveFindLink(
+  label: string,
+  urls: {
+    instagram: string | null;
+    whatsapp: string | null;
+    booking: string | null;
+    maps: string;
+  }
+): string | null {
+  const l = label.toLowerCase();
+  if (l.includes("instagram")) return urls.instagram;
+  if (l.includes("whatsapp")) return urls.whatsapp;
+  if (l.includes("agendapro") || l.includes("fresha")) return urls.booking;
+  if (l.includes("google") || l.includes("maps")) return urls.maps;
+  return null;
+}
+
 export default function Footer({ dict }: { dict: FooterDict }) {
+  const { instagramUrl, whatsappUrl, bookingUrl, mapsPlaceId } = siteConfig;
+  const addressQuery = encodeURIComponent(
+    [dict.visit.address1, dict.visit.address2].join(", ")
+  );
+  const mapsHref = mapsPlaceId
+    ? `https://www.google.com/maps/search/?api=1&query=${addressQuery}&query_place_id=${mapsPlaceId}`
+    : `https://www.google.com/maps/search/?api=1&query=${addressQuery}`;
+  const findUrls = {
+    instagram: instagramUrl,
+    whatsapp: whatsappUrl,
+    booking: bookingUrl,
+    maps: mapsHref,
+  };
   return (
     <footer
       className="bg-ivory px-5 pb-9 pt-14 md:px-20 md:pb-12 md:pt-24"
@@ -47,17 +78,23 @@ export default function Footer({ dict }: { dict: FooterDict }) {
               {dict.find.title}
             </h4>
             <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-              {dict.find.links.map((l) => (
-                <li key={l}>
-                  <a
-                    href="#"
-                    className="pb-0.5 font-sans text-[14px] text-ink no-underline"
-                    style={{ borderBottom: "1px solid var(--hair)" }}
-                  >
-                    {l} →
-                  </a>
-                </li>
-              ))}
+              {dict.find.links.map((l) => {
+                const href = resolveFindLink(l, findUrls);
+                if (!href) return null;
+                return (
+                  <li key={l}>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="pb-0.5 font-sans text-[14px] text-ink no-underline"
+                      style={{ borderBottom: "1px solid var(--hair)" }}
+                    >
+                      {l} →
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>

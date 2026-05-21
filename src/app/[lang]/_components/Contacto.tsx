@@ -27,13 +27,26 @@ type ContactoDict = {
 };
 
 export default function Contacto({ dict }: { dict: ContactoDict }) {
-  const { bookingUrl, whatsappUrl, mapsEmbedUrl, mapsPlaceId } = siteConfig;
+  const {
+    bookingUrl,
+    whatsappUrl,
+    mapsEmbedUrl,
+    mapsPlaceId,
+    instagramUrl,
+    tiktokUrl,
+  } = siteConfig;
   const addressQuery = encodeURIComponent(
     [dict.address.line1, dict.address.line2].join(", ")
   );
   const mapsHref = mapsPlaceId
     ? `https://www.google.com/maps/search/?api=1&query=${addressQuery}&query_place_id=${mapsPlaceId}`
     : `https://www.google.com/maps/search/?api=1&query=${addressQuery}`;
+
+  const socialUrls: Record<string, string | null> = {
+    instagram: instagramUrl,
+    tiktok: tiktokUrl,
+    google: mapsHref,
+  };
 
   return (
     <section
@@ -147,16 +160,22 @@ export default function Contacto({ dict }: { dict: ContactoDict }) {
               className="mt-5 flex gap-5 pt-5 md:mt-7"
               style={{ borderTop: "1px solid rgba(243,236,223,0.12)" }}
             >
-              {dict.socials.map((s) => (
-                <a
-                  key={s}
-                  href="#"
-                  className="font-sans text-[10px] font-medium uppercase tracking-[0.28em] no-underline"
-                  style={{ color: "rgba(243,236,223,0.6)" }}
-                >
-                  {s} ↗
-                </a>
-              ))}
+              {dict.socials.map((s) => {
+                const href = socialUrls[s.toLowerCase()] ?? null;
+                if (!href) return null;
+                return (
+                  <a
+                    key={s}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-sans text-[10px] font-medium uppercase tracking-[0.28em] no-underline"
+                    style={{ color: "rgba(243,236,223,0.6)" }}
+                  >
+                    {s} ↗
+                  </a>
+                );
+              })}
             </div>
           </div>
 

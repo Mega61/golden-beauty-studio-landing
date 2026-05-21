@@ -96,7 +96,7 @@
         }
       }
     },
-    "footnote": "One-week warranty on product lift (excluding charms or rhinestones). Other lengths, complex designs and nail art are quoted separately before your appointment.",
+    "footnote": "One-week warranty on product lift (excluding charms or rhinestones). Removal of an external system: +$25,000 COP (waived on your first visit).",
     "cta": "Book my appointment"
   },
   "diccionario": {
@@ -104,15 +104,15 @@
     "title1": "Before you choose,",
     "title2_em": "know what you're getting.",
     "body": "Each technique has its own logic, duration and ideal nail type. A quick guide so you know what to ask for — and why.",
-    "fallback": "We'll walk you through it at your appointment. Ask the artist which system best fits your nail.",
+    "fallback": "You can also message us on WhatsApp if you'd like personal advice.",
     "labels": { "duration": "Duration", "ideal": "Best for" },
     "items": [
       { "name": "Acrylic", "dur": "3–4 weeks", "ideal": "Defined shape · structure", "body": "A mix of polymer and liquid monomer molded onto the nail. The classic system: maximum strength and sculpted shape via filing. Ideal for long extensions and architectural designs." },
       { "name": "Polygel", "dur": "3–4 weeks", "ideal": "Lightweight extension", "body": "A moldable paste-gel applied with a dual-form. Lighter than acrylic, feels natural and allows clean extensions. LED-cured — no odor. Recommended for thin nails or anyone seeking discretion." },
       { "name": "Builder gel", "dur": "3–4 weeks", "ideal": "Reinforcing the natural nail", "body": "A thick gel cured under UV/LED. A structural layer that protects the natural nail without extending it much. Polished finish, high durability and minimal wear on removal." },
-      { "name": "Dipping", "dur": "2–3 weeks", "ideal": "Strength without a lamp", "placeholder": "Dipping" },
-      { "name": "Semi-permanent", "dur": "2–3 weeks", "ideal": "Color on natural nails", "placeholder": "Semi-permanent" },
-      { "name": "Press On", "dur": "Custom", "ideal": "Ready-to-wear · events", "placeholder": "Editorial press-on" }
+      { "name": "Dipping", "dur": "2–3 weeks", "ideal": "Long-lasting wear", "body": "A manicure technique using acrylic powder for a resilient, lightweight and long-lasting finish. Ideal for strong, glossy and natural-looking nails for weeks." },
+      { "name": "Semi-permanent", "dur": "2–3 weeks", "ideal": "Color on natural nails", "body": "Long-lasting gel polish cured under a UV/LED lamp. Glossy, lightweight and natural finish — keep your nails flawless from simple designs to creative nail art." },
+      { "name": "Press On", "dur": "Custom", "ideal": "Ready-to-wear · events", "body": "Ready-to-wear nails that deliver a quick manicure in different shapes, lengths and custom designs, with no sculpting required." }
     ]
   },
   "tecnicas": {
@@ -137,30 +137,30 @@
   },
   "estudio": {
     "eyebrow": "05 · The studio",
-    "title1": "A space made",
-    "title2_em": "to sit, look at your hands and breathe.",
-    "leadItalic": "Golden comes from the idea that a well-done nail is a design object. Not an express service, not a chore — a deliberate pause.",
-    "body1": "We work with built techniques — acrylic, polygel, builder gel, dipping — because they hold their shape for three weeks. One technique per appointment, one client at a time, no double-booking.",
-    "body2": "The studio sits in Sabaneta, a small and carefully kept space: two seats, soft light, visible products, sealed tools. Nothing decorative that doesn't serve.",
+    "title1": "A space designed for",
+    "title2_em": "women who love luxury in the details.",
+    "leadItalic": "Golden was born from the idea of turning personal care into an experience of comfort and exclusivity — making every woman feel confident, feminine and authentic.",
+    "body1": "Our nail artists have mastered every technique we offer: choose your favorite knowing the result will always be stunning.",
+    "body2": "We're based in Sabaneta, in a modern, elegant and welcoming space designed for a sophisticated and exclusive experience.",
     "spaceLamp": "Detail · lamp",
     "stats": [
-      { "n": "03h", "l": "Average duration", "s": "Per appointment, no overlap" },
+      { "n": "02h", "l": "Average duration", "s": "Per appointment, no overlap" },
       { "n": "02", "l": "Working stations", "s": "Intimate studio, not a salon" },
       { "n": "06", "l": "Techniques mastered", "s": "Built + simple" },
-      { "n": "100%", "l": "Sterilized material", "s": "Sealed in front of the client" }
+      { "n": "100%", "l": "Sterilized material", "s": "Opened in front of the client" }
     ],
     "hygiene": {
       "eyebrow": "Hygiene & process",
-      "title1": "Our protocol,",
-      "title2_em": "visible always.",
-      "intro": "What others treat as optional, we treat as non-negotiable. You'll see it every visit.",
+      "title1": "Your health",
+      "title2_em": "is non-negotiable.",
+      "intro": "What others treat as optional, we treat as essential. You'll see it every visit.",
       "items": [
-        ["Autoclave", "Class B autoclave sterilization between clients."],
-        ["Single use", "Disposable files, buffers and sticks, opened in front of you."],
+        ["Sterilization", "Every tool we use is sterile."],
+        ["Single use", "Every disposable item is discarded after use."],
         ["Sealed products", "Every material is opened in front of the client."],
         ["Disinfected table", "Surface and UV lamp cleaned between appointments."],
-        ["Premium brands", "Kiara Sky, The Gel Bottle, Akzéntz, Aprés."],
-        ["No nipping", "Zero aggressive cuticle cutting. Push only."]
+        ["Premium brands", "The best on the market, for you."],
+        ["No double-booking", "We're dedicated to you until the last minute of your appointment."]
       ]
     }
   },
@@ -170,23 +170,22 @@
     "title2_em": "Sabaneta.",
     "address": {
       "label": "Address",
-      "line1": "Cra. 45 #65 Sur — Local 02",
+      "line1": "Calle 69 Sur #43a - 41, First Floor",
       "line2": "Sabaneta · Antioquia · Colombia",
-      "line3": "80 m from Parque de Sabaneta, second floor."
+      "line3": "Half a block from the Registraduría"
     },
     "hours": {
       "label": "Hours",
       "rows": [
-        ["Monday", "Closed"],
-        ["Tue — Fri", "09:00 — 19:00"],
-        ["Saturday", "08:00 — 17:00"],
-        ["Sunday", "10:00 — 14:00"]
+        ["Mon — Sat", "09:00 — 19:00"],
+        ["Sunday", "10:00 — 15:00"],
+        ["Holidays", "Closed"]
       ],
       "closed": "Closed"
     },
     "ctaBook": "Book my appointment →",
     "ctaWhatsapp": "WhatsApp →",
-    "socials": ["Instagram", "Google", "TikTok"],
+    "socials": ["Instagram", "TikTok"],
     "map": {
       "park": "Sabaneta Park",
       "pin": "Golden · here",
@@ -195,19 +194,19 @@
     }
   },
   "footer": {
-    "tagline": "Specialist studio for built nails.\nSabaneta · Medellín · Antioquia.",
+    "tagline": "Specialist nail studio.\nSabaneta · Medellín · Antioquia.",
     "visit": {
       "title": "Visit us",
-      "address1": "Cra. 45 #65 Sur — Local 02",
+      "address1": "Calle 69 Sur #43a - 41, First Floor",
       "address2": "Sabaneta, Antioquia",
-      "hours": "Mon – Sat · 9:00 – 20:00"
+      "hours": "Mon – Sun"
     },
     "find": {
       "title": "Find us",
       "links": [
         "Instagram @goldenbeauty",
         "WhatsApp Business",
-        "Fresha · Bookings",
+        "AgendaPro · Bookings",
         "Google Maps"
       ]
     },
