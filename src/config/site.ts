@@ -7,6 +7,10 @@ function bool(v: string | undefined, fallback: boolean): boolean {
   return normalized === "true" || normalized === "1" || normalized === "on";
 }
 
+const DEFAULT_SITE_URL = "https://goldenbeautystudio.com.co";
+const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_SITE_URL;
+const siteUrl = rawSiteUrl.replace(/\/+$/, "");
+
 const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL?.trim() || null;
 
 const wppNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() || null;
@@ -16,17 +20,24 @@ const whatsappUrl = wppNumber
   ? `https://wa.me/${wppNumber}?text=${encodeURIComponent(wppGreeting)}`
   : null;
 
+const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim() || null;
+
 const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || null;
 const mapsQuery = process.env.NEXT_PUBLIC_GOOGLE_MAPS_QUERY?.trim() || null;
+const mapsPlaceId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_PLACE_ID?.trim() || null;
+const embedQ = mapsPlaceId ? `place_id:${mapsPlaceId}` : mapsQuery;
 const mapsEmbedUrl =
-  mapsKey && mapsQuery
-    ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(mapsQuery)}`
+  mapsKey && embedQ
+    ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(embedQ)}`
     : null;
 
 export const siteConfig = {
+  siteUrl,
   bookingUrl,
   whatsappUrl,
+  gaId,
   mapsEmbedUrl,
+  mapsPlaceId,
   sections: {
     lookbook: bool(process.env.NEXT_PUBLIC_SECTION_LOOKBOOK, true),
     servicios: bool(process.env.NEXT_PUBLIC_SECTION_SERVICIOS, true),

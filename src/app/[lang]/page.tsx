@@ -30,7 +30,7 @@ export default async function Page({
       <Nav lang={lang} dict={dict.nav} sections={sections} />
       <Hero dict={dict.hero} />
       {sections.lookbook && <Lookbook lang={typedLang} dict={dict.lookbook} />}
-      {sections.servicios && <Servicios dict={dict.servicios} />}
+      {sections.servicios && <Servicios dict={dict.servicios} lang={typedLang} />}
       {sections.servicios && sections.diccionario && <BrandDivider />}
       {sections.diccionario && <Diccionario dict={dict.diccionario} />}
       {sections.diccionario && sections.tecnicas && <BrandDivider tone="dark" />}

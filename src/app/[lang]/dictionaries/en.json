@@ -1,7 +1,6 @@
 {
   "_todo": {
     "address": "Real Sabaneta address pending — design placeholder in use. Brief confirms Sabaneta, exact address TBD.",
-    "prices": "Prices from the design (PRECIOS sheet of the financial model still pending). Replace with the finalized values once defined.",
     "fresha": "Fresha link pending setup."
   },
   "meta": {
@@ -20,21 +19,21 @@
     "ctaShort": "Book"
   },
   "hero": {
-    "eyebrow": "Nail Studio · Sabaneta",
-    "title1": "The art of nails,",
-    "title2_em": "made by hand.",
-    "body": "A specialist studio for built nails — acrylic, polygel and builder gel. Every appointment is a curated space for design, technique and precision.",
+    "eyebrow": "Nails Studio · Sabaneta",
+    "title1": "With the golden touch,",
+    "title2_em": "luxury in every detail.",
+    "body": "We specialize in nails with flawless finishes and a premium experience that blends beauty, elegance and care into every appointment. -More than nails, we craft details that elevate your essence-",
     "ctaPrimary": "Book a visit",
     "ctaSecondary": "See the work",
-    "metaHours": "Mon – Sat · 9:00 — 8:00",
+    "metaHours": "MON – SUN",
     "metaArea": "Sabaneta",
-    "metaStatus": "Openings this week"
+    "metaStatus": "Bookings open"
   },
   "lookbook": {
-    "eyebrow": "Editorial Lookbook · 2025",
-    "title1": "The work,",
-    "title2_em": "curated.",
-    "body": "A selection of recent pieces. Each look notes the technique used and the estimated duration. Tap any image to see it in detail.",
+    "eyebrow": "Lookbook · 2026",
+    "title1": "Our craft,",
+    "title2_em": "for you",
+    "body": "A selection of recent pieces. Each look notes the technique used and the artist's name. Tap any image to see it in detail.",
     "allLabel": "All",
     "seeAll": "See the full archive"
   },
@@ -42,56 +41,69 @@
     "eyebrow": "Menu · Prices visible",
     "title1": "What we offer,",
     "title2_em": "no fine print.",
-    "body": "Listed prices are the base. Complex designs and nail art are quoted per nail before the appointment starts — always upfront, never at the end.",
-    "categories": [
-      {
+    "body": "Listed prices and times apply to simple designs up to length #3. Other lengths, complex designs and nail art are quoted separately before your appointment.",
+    "labels": {
+      "from": "from",
+      "currencySuffix": " COP"
+    },
+    "categories": {
+      "montajes": {
         "label": "Builds",
         "sub": "New systems · Extension",
-        "items": [
-          { "name": "Sculpted acrylic", "desc": "Custom shape · defined structure", "dur": "2h 30min", "price": "from $180,000 COP" },
-          { "name": "Dual-system polygel", "desc": "Lightweight with natural extension", "dur": "2h 15min", "price": "from $170,000 COP" },
-          { "name": "Dual-system builder gel", "desc": "UV cured · polished finish", "dur": "2h 15min", "price": "from $170,000 COP" },
-          { "name": "Editorial press-on", "desc": "Made-to-measure set · ready to wear", "dur": "—", "price": "from $220,000 COP" }
-        ]
+        "items": {
+          "acrylic-sculpted":  { "name": "Sculpted acrylic",         "desc": "Perfect structure · Standout durability" },
+          "polygel-dual":      { "name": "Dual-system polygel",      "desc": "Luxury precision · Flawless finish" },
+          "builder-gel-dual":  { "name": "Dual-system builder gel",  "desc": "Strength · Delicacy · Perfection" },
+          "press-on":          { "name": "Press-on",                 "desc": "Instant luxury · Style and comfort" }
+        }
       },
-      {
+      "retoques": {
         "label": "Refills",
         "sub": "System maintenance",
-        "items": [
-          { "name": "Acrylic refill", "desc": "Every 3–4 weeks", "dur": "1h 45min", "price": "$120,000 COP" },
-          { "name": "Polygel refill", "desc": "Every 3–4 weeks", "dur": "1h 45min", "price": "$120,000 COP" },
-          { "name": "Builder gel refill", "desc": "Every 3–4 weeks", "dur": "1h 45min", "price": "$115,000 COP" }
-        ]
+        "items": {
+          "acrylic-refill":     { "name": "Acrylic refill",     "desc": "3 refills per build, every 21 days max" },
+          "polygel-refill":     { "name": "Polygel refill",     "desc": "3 refills per build, every 21 days max" },
+          "builder-gel-refill": { "name": "Builder gel refill", "desc": "3 refills per build, every 21 days max" }
+        }
       },
-      {
+      "forrados": {
         "label": "Overlays",
         "sub": "Reinforcement, no extension",
-        "items": [
-          { "name": "Polygel overlay", "desc": "On the natural nail", "dur": "1h 30min", "price": "$95,000 COP" },
-          { "name": "Builder gel overlay", "desc": "On the natural nail", "dur": "1h 30min", "price": "$95,000 COP" },
-          { "name": "Dipping", "desc": "Powder system · no lamp", "dur": "1h 15min", "price": "$90,000 COP" },
-          { "name": "Rubber base leveling", "desc": "Structural base coat", "dur": "1h", "price": "$75,000 COP" }
-        ]
+        "items": {
+          "polygel-overlay":      { "name": "Polygel overlay",      "desc": "On the natural nail" },
+          "builder-gel-overlay":  { "name": "Builder gel overlay",  "desc": "On the natural nail" },
+          "acrylic-overlay":      { "name": "Acrylic overlay",      "desc": "On the natural nail" },
+          "dipping":              { "name": "Dipping",              "desc": "Powder system, no monomer" },
+          "rubber-base-leveling": { "name": "Rubber base leveling", "desc": "Structural base coat" }
+        }
       },
-      {
+      "sencillos": {
         "label": "Simple",
         "sub": "Manicure · pedicure",
-        "items": [
-          { "name": "Semi-permanent hands", "desc": "Cleanup + gel polish", "dur": "1h", "price": "$55,000 COP" },
-          { "name": "Semi-permanent feet", "desc": "Cleanup + gel polish", "dur": "1h 15min", "price": "$65,000 COP" },
-          { "name": "Hands cleanup only", "desc": "No polish", "dur": "45min", "price": "$35,000 COP" },
-          { "name": "Feet cleanup only", "desc": "No polish", "dur": "1h", "price": "$45,000 COP" }
-        ]
+        "items": {
+          "semi-permanent-hands": { "name": "Semi-permanent hands", "desc": "Cleanup + gel polish" },
+          "semi-permanent-feet":  { "name": "Semi-permanent feet",  "desc": "Cleanup + gel polish" },
+          "hands-cleanup-only":   { "name": "Hands cleanup only",   "desc": "No polish" },
+          "feet-cleanup-only":    { "name": "Feet cleanup only",    "desc": "No polish" }
+        }
+      },
+      "extras": {
+        "label": "Extras",
+        "sub": "Add-on services",
+        "items": {
+          "system-removal":  { "name": "External system removal",   "desc": "Waived on your first visit · For nails from another salon" },
+          "design-per-nail": { "name": "Design / decoration per nail", "desc": "Nail art applied on top of your service" }
+        }
       }
-    ],
-    "footnote": "Simple designs included. Complex designs from $3,000 COP per nail. External system removal: +$25,000 COP.",
+    },
+    "footnote": "One-week warranty on product lift (excluding charms or rhinestones). Other lengths, complex designs and nail art are quoted separately before your appointment.",
     "cta": "Book my appointment"
   },
   "diccionario": {
-    "eyebrow": "Glossary · Techniques",
+    "eyebrow": "Understanding the techniques",
     "title1": "Before you choose,",
     "title2_em": "know what you're getting.",
-    "body": "Each technique has its own logic, duration and ideal nail type. A quick guide so you arrive at your appointment knowing what to ask for — and why.",
+    "body": "Each technique has its own logic, duration and ideal nail type. A quick guide so you know what to ask for — and why.",
     "fallback": "We'll walk you through it at your appointment. Ask the artist which system best fits your nail.",
     "labels": { "duration": "Duration", "ideal": "Best for" },
     "items": [

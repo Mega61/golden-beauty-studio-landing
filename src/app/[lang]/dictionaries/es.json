@@ -1,7 +1,6 @@
 {
   "_todo": {
     "address": "Dirección real en Sabaneta pendiente — placeholder del diseño en uso. Brief confirma Sabaneta, dirección exacta TBD.",
-    "prices": "Precios provienen del diseño (hoja PRECIOS pendiente de finalizar en el modelo financiero). Reemplazar con los valores definitivos cuando estén.",
     "fresha": "Link a Fresha pendiente de configuración."
   },
   "meta": {
@@ -20,21 +19,21 @@
     "ctaShort": "Agendar"
   },
   "hero": {
-    "eyebrow": "Nail Studio · Sabaneta",
-    "title1": "El arte de las uñas,",
-    "title2_em": "hecho a mano.",
-    "body": "Estudio especializado en uñas construidas — acrílico, polygel y builder gel. Cada cita es un espacio curado para diseño, técnica y precisión.",
+    "eyebrow": "Nails Studio · Sabaneta",
+    "title1": "Con el toque de oro,",
+    "title2_em": "Lujo en cada detalle.",
+    "body": "Nos especializamos en uñas con acabados impecables y una experiencia premium que combina belleza, elegancia y cuidado en cada cita. -Más que uñas, creamos detalles que elevan tu esencia-",
     "ctaPrimary": "Agendar cita",
     "ctaSecondary": "Ver el trabajo",
-    "metaHours": "Lun – Sáb · 9:00 — 8:00",
+    "metaHours": "LUN - DOM",
     "metaArea": "Sabaneta",
-    "metaStatus": "Citas abiertas esta semana"
+    "metaStatus": "Agenda abierta"
   },
   "lookbook": {
-    "eyebrow": "Lookbook Editorial · 2025",
-    "title1": "El trabajo,",
-    "title2_em": "curado.",
-    "body": "Una selección de piezas recientes. Cada look incluye la técnica usada y la duración estimada. Toca cualquier imagen para verla en detalle.",
+    "eyebrow": "Lookbook · 2026",
+    "title1": "Nuestro arte,",
+    "title2_em": "para ti",
+    "body": "Una selección de piezas recientes. Cada look incluye la técnica usada y el nombre de la artista. Toca cualquier imagen para verla en detalle.",
     "allLabel": "Todos",
     "seeAll": "Ver el archivo completo"
   },
@@ -42,56 +41,69 @@
     "eyebrow": "Carta · Precios visibles",
     "title1": "Lo que ofrecemos,",
     "title2_em": "sin letra pequeña.",
-    "body": "Los precios indicados son base. Diseños complejos y nail art se cotizan por uña antes de comenzar la cita — siempre antes, nunca al final.",
-    "categories": [
-      {
+    "body": "Los precios y tiempos indicados corresponden a diseños simples hasta el largo #3. Otros largos, diseños complejos y nail art se cotizan por aparte antes de tu cita.",
+    "labels": {
+      "from": "desde",
+      "currencySuffix": ""
+    },
+    "categories": {
+      "montajes": {
         "label": "Montajes",
         "sub": "Sistemas nuevos · Extensión",
-        "items": [
-          { "name": "Esculpidas en acrílico", "desc": "Forma personalizada · estructura definida", "dur": "2h 30min", "price": "desde $180.000" },
-          { "name": "Dual system polygel", "desc": "Ligereza con extensión natural", "dur": "2h 15min", "price": "desde $170.000" },
-          { "name": "Dual system builder gel", "desc": "Curado UV · acabado pulido", "dur": "2h 15min", "price": "desde $170.000" },
-          { "name": "Press On editorial", "desc": "Set hecho a medida · entrega lista", "dur": "—", "price": "desde $220.000" }
-        ]
+        "items": {
+          "acrylic-sculpted":  { "name": "Esculpidas en acrílico",  "desc": "Estructura perfecta · Duración que destaca" },
+          "polygel-dual":      { "name": "Dual system polygel",     "desc": "Precisión de lujo · Acabado impecable" },
+          "builder-gel-dual":  { "name": "Dual system builder gel", "desc": "Resistencia · Delicadeza · Perfección" },
+          "press-on":          { "name": "Press on",                "desc": "Lujo instantáneo · Estilo y comodidad" }
+        }
       },
-      {
+      "retoques": {
         "label": "Retoques",
         "sub": "Mantenimiento de sistema",
-        "items": [
-          { "name": "Retoque acrílico", "desc": "Cada 3–4 semanas", "dur": "1h 45min", "price": "$120.000" },
-          { "name": "Retoque polygel", "desc": "Cada 3–4 semanas", "dur": "1h 45min", "price": "$120.000" },
-          { "name": "Retoque builder gel", "desc": "Cada 3–4 semanas", "dur": "1h 45min", "price": "$115.000" }
-        ]
+        "items": {
+          "acrylic-refill":     { "name": "Retoque acrílico",     "desc": "3 retoques por montaje, máximo cada 21 días" },
+          "polygel-refill":     { "name": "Retoque polygel",      "desc": "3 retoques por montaje, máximo cada 21 días" },
+          "builder-gel-refill": { "name": "Retoque builder gel",  "desc": "3 retoques por montaje, máximo cada 21 días" }
+        }
       },
-      {
+      "forrados": {
         "label": "Forrados",
         "sub": "Refuerzo sin extensión",
-        "items": [
-          { "name": "Forrado en polygel", "desc": "Sobre uña natural", "dur": "1h 30min", "price": "$95.000" },
-          { "name": "Forrado en builder gel", "desc": "Sobre uña natural", "dur": "1h 30min", "price": "$95.000" },
-          { "name": "Dipping", "desc": "Sistema en polvo · sin lámpara", "dur": "1h 15min", "price": "$90.000" },
-          { "name": "Nivelación rubber base", "desc": "Base estructurante", "dur": "1h", "price": "$75.000" }
-        ]
+        "items": {
+          "polygel-overlay":      { "name": "Forrado en polygel",     "desc": "Sobre uña natural" },
+          "builder-gel-overlay":  { "name": "Forrado en builder gel", "desc": "Sobre uña natural" },
+          "acrylic-overlay":      { "name": "Forrado en acrílico",    "desc": "Sobre uña natural" },
+          "dipping":              { "name": "Dipping",                "desc": "Sistema en polvo, sin monómero" },
+          "rubber-base-leveling": { "name": "Nivelación rubber base", "desc": "Base estructurante" }
+        }
       },
-      {
+      "sencillos": {
         "label": "Sencillos",
         "sub": "Manicura · pedicura",
-        "items": [
-          { "name": "Semipermanente manos", "desc": "Limpieza + esmalte gel", "dur": "1h", "price": "$55.000" },
-          { "name": "Semipermanente pies", "desc": "Limpieza + esmalte gel", "dur": "1h 15min", "price": "$65.000" },
-          { "name": "Solo limpieza manos", "desc": "Sin esmalte", "dur": "45min", "price": "$35.000" },
-          { "name": "Solo limpieza pies", "desc": "Sin esmalte", "dur": "1h", "price": "$45.000" }
-        ]
+        "items": {
+          "semi-permanent-hands": { "name": "Semipermanente manos", "desc": "Limpieza + esmalte gel" },
+          "semi-permanent-feet":  { "name": "Semipermanente pies",  "desc": "Limpieza + esmalte gel" },
+          "hands-cleanup-only":   { "name": "Solo limpieza manos",  "desc": "Sin esmalte" },
+          "feet-cleanup-only":    { "name": "Solo limpieza pies",   "desc": "Sin esmalte" }
+        }
+      },
+      "extras": {
+        "label": "Extras",
+        "sub": "Servicios adicionales",
+        "items": {
+          "system-removal":  { "name": "Retiro de sistema previo",      "desc": "Gratis en tu primera visita · Para uñas de otro lugar" },
+          "design-per-nail": { "name": "Diseño / decoración por uña",   "desc": "Nail art aplicado sobre tu servicio" }
+        }
       }
-    ],
-    "footnote": "Diseños simples incluidos. Diseños complejos desde $3.000 por uña. Retiro de sistema externo: +$25.000.",
+    },
+    "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería). Otros largos, diseños complejos y nail art se cotizan por aparte antes de tu cita.",
     "cta": "Reservar mi cita"
   },
   "diccionario": {
-    "eyebrow": "Diccionario · Técnicas",
+    "eyebrow": "Entendiendo las técnicas",
     "title1": "Antes de elegir,",
     "title2_em": "entiende.",
-    "body": "Cada técnica tiene su lógica, su duración y su tipo de uña ideal. Esta es una guía rápida para que llegues a tu cita sabiendo qué pedir — y por qué.",
+    "body": "Cada técnica tiene su lógica, su duración y su tipo de uña ideal. Esta es una guía rápida para que sepas qué pedir — y por qué.",
     "fallback": "Más información durante tu cita. Pregúntale a la técnica cuál sistema se adapta mejor a tu uña.",
     "labels": { "duration": "Duración", "ideal": "Ideal para" },
     "items": [
@@ -158,17 +170,15 @@
     "title2_em": "Sabaneta.",
     "address": {
       "label": "Dirección",
-      "line1": "Cra. 45 #65 Sur — Local 02",
+      "line1": "Calle 69 Sur 43a - 41 Primer Piso",
       "line2": "Sabaneta · Antioquia · Colombia",
-      "line3": "A 80 m del Parque de Sabaneta, segundo piso."
+      "line3": "A 200m del Parque de Sabaneta"
     },
     "hours": {
       "label": "Horarios",
       "rows": [
-        ["Lunes", "Cerrado"],
-        ["Mar — Vie", "09:00 — 19:00"],
-        ["Sábado", "08:00 — 17:00"],
-        ["Domingo", "10:00 — 14:00"]
+        ["Lun — Sáb", "09:00 — 19:00"],
+        ["Domingo", "10:00 — 15:00"]
       ],
       "closed": "Cerrado"
     },
@@ -186,9 +196,9 @@
     "tagline": "Estudio especializado en uñas construidas.\nSabaneta · Medellín · Antioquia.",
     "visit": {
       "title": "Visítanos",
-      "address1": "Cra. 45 #65 Sur — Local 02",
+      "address1": "Calle 69 Sur 43a - 41 Primer Piso",
       "address2": "Sabaneta, Antioquia",
-      "hours": "Lun – Sáb · 9:00 – 20:00"
+      "hours": "Lun – Sáb · 9:00 – 19:00"
     },
     "find": {
       "title": "Encuéntranos",

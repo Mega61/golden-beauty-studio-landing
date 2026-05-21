@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Inter, Italianno } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { notFound } from "next/navigation";
 import "../globals.css";
+import { siteConfig } from "@/config/site";
 import { getDictionary, hasLocale, locales, type Locale } from "./dictionaries";
 
 const cormorant = Cormorant_Garamond({
@@ -39,8 +41,17 @@ export async function generateMetadata({
   if (!hasLocale(lang)) return {};
   const dict = await getDictionary(lang);
   return {
+    metadataBase: new URL(siteConfig.siteUrl),
     title: dict.meta.title,
     description: dict.meta.description,
+    alternates: {
+      canonical: `/${lang}`,
+      languages: {
+        es: "/es",
+        en: "/en",
+        "x-default": "/es",
+      },
+    },
   };
 }
 
@@ -61,6 +72,7 @@ export default async function LangLayout({
       className={`${cormorant.variable} ${inter.variable} ${italianno.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-ivory text-ink">{children}</body>
+      {siteConfig.gaId ? <GoogleAnalytics gaId={siteConfig.gaId} /> : null}
     </html>
   );
 }
