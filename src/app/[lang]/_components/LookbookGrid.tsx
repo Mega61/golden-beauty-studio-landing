@@ -3,6 +3,9 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import Placeholder from "./Placeholder";
+import LookbookLightbox, {
+  type LookbookLightboxDict,
+} from "./LookbookLightbox";
 import type { Locale } from "../dictionaries";
 import type {
   LookbookCategory,
@@ -53,6 +56,7 @@ export type LookbookGridProps = {
   items: readonly LookbookItem[];
   categories: readonly LookbookCategory[];
   allLabel: string;
+  lightboxDict: LookbookLightboxDict;
 };
 
 export default function LookbookGrid({
@@ -60,8 +64,15 @@ export default function LookbookGrid({
   items,
   categories,
   allLabel,
+  lightboxDict,
 }: LookbookGridProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
+  // Carries the filter snapshot so re-filtering implicitly closes the lightbox
+  // without needing an effect.
+  const [openState, setOpenState] = useState<{
+    filter: FilterValue;
+    index: number;
+  } | null>(null);
 
   // Count items per category to drive the disabled state on filter buttons.
   const countsByCategory = useMemo(() => {
@@ -76,6 +87,15 @@ export default function LookbookGrid({
     if (filter === "all") return items;
     return items.filter((it) => it.category === filter);
   }, [filter, items]);
+
+  const openIndex =
+    openState && openState.filter === filter ? openState.index : null;
+
+  const openAt = (item: LookbookItem) => {
+    const idx = filteredItems.findIndex((it) => it.src === item.src);
+    if (idx >= 0) setOpenState({ filter, index: idx });
+  };
+  const closeLightbox = () => setOpenState(null);
 
   return (
     <>
@@ -107,11 +127,21 @@ export default function LookbookGrid({
         style={{ animation: "lb-fade-in 220ms ease-out" }}
       >
         {filter === "all" ? (
-          <MosaicGrid items={filteredItems} />
+          <MosaicGrid items={filteredItems} onOpen={openAt} />
         ) : (
-          <UniformGrid items={filteredItems} />
+          <UniformGrid items={filteredItems} onOpen={openAt} />
         )}
       </div>
+
+      {openIndex !== null && (
+        <LookbookLightbox
+          lang={lang}
+          items={filteredItems}
+          startIndex={openIndex}
+          dict={lightboxDict}
+          onClose={closeLightbox}
+        />
+      )}
 
       <style>{`
         @keyframes lb-fade-in {
@@ -164,7 +194,13 @@ function FilterButton({
   );
 }
 
-function MosaicGrid({ items }: { items: readonly LookbookItem[] }) {
+function MosaicGrid({
+  items,
+  onOpen,
+}: {
+  items: readonly LookbookItem[];
+  onOpen: (item: LookbookItem) => void;
+}) {
   // Fill 12 slots; empty slots get a placeholder seal.
   const slots = Array.from({ length: 12 }, (_, i) => items[i] ?? null);
 
@@ -181,47 +217,54 @@ function MosaicGrid({ items }: { items: readonly LookbookItem[] }) {
       {slots.map((item, idx) => {
         const sM = mobileSpec[idx];
         const sD = desktopSpec[idx];
-        return (
-          <figure
-            key={idx}
-            className="lookbook-tile-asym relative m-0 overflow-hidden bg-cream"
-            style={
-              {
-                "--c-mobile": sM.c,
-                "--r-mobile": sM.r,
-                "--c-desktop": sD.c,
-                "--r-desktop": sD.r,
-                gridColumn: `span ${sM.c}`,
-                gridRow: `span ${sM.r}`,
-              } as React.CSSProperties
-            }
-          >
-            {item ? (
-              <>
-                <Image
-                  src={item.src}
-                  alt={item.caption}
-                  fill
-                  sizes="(min-width: 768px) 25vw, 50vw"
-                  className="object-cover"
-                  style={{ filter: "saturate(0.92) contrast(1.02)" }}
-                />
-                <TileCaption item={item} />
-              </>
-            ) : (
+        const tileStyle = {
+          "--c-mobile": sM.c,
+          "--r-mobile": sM.r,
+          "--c-desktop": sD.c,
+          "--r-desktop": sD.r,
+          gridColumn: `span ${sM.c}`,
+          gridRow: `span ${sM.r}`,
+        } as React.CSSProperties;
+        if (!item) {
+          return (
+            <figure
+              key={idx}
+              className="lookbook-tile-asym relative m-0 overflow-hidden bg-cream"
+              style={tileStyle}
+            >
               <Placeholder
                 label="Próximamente"
-                tone={PLACEHOLDER_TONES[idx % PLACEHOLDER_TONES.length] as PlaceholderTone}
+                tone={
+                  PLACEHOLDER_TONES[
+                    idx % PLACEHOLDER_TONES.length
+                  ] as PlaceholderTone
+                }
               />
-            )}
-          </figure>
+            </figure>
+          );
+        }
+        return (
+          <LookbookTileButton
+            key={idx}
+            item={item}
+            sizes="(min-width: 768px) 25vw, 50vw"
+            className="lookbook-tile-asym"
+            style={tileStyle}
+            onOpen={onOpen}
+          />
         );
       })}
     </div>
   );
 }
 
-function UniformGrid({ items }: { items: readonly LookbookItem[] }) {
+function UniformGrid({
+  items,
+  onOpen,
+}: {
+  items: readonly LookbookItem[];
+  onOpen: (item: LookbookItem) => void;
+}) {
   if (items.length === 0) {
     return (
       <div className="flex min-h-[200px] items-center justify-center font-display text-[18px] italic text-ink-mute">
@@ -232,23 +275,52 @@ function UniformGrid({ items }: { items: readonly LookbookItem[] }) {
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3.5">
       {items.map((item) => (
-        <figure
+        <LookbookTileButton
           key={item.src}
-          className="relative m-0 overflow-hidden bg-cream"
+          item={item}
+          sizes="(min-width: 768px) 25vw, 50vw"
           style={{ aspectRatio: "4 / 5" }}
-        >
-          <Image
-            src={item.src}
-            alt={item.caption}
-            fill
-            sizes="(min-width: 768px) 25vw, 50vw"
-            className="object-cover"
-            style={{ filter: "saturate(0.92) contrast(1.02)" }}
-          />
-          <TileCaption item={item} />
-        </figure>
+          onOpen={onOpen}
+        />
       ))}
     </div>
+  );
+}
+
+function LookbookTileButton({
+  item,
+  sizes,
+  className,
+  style,
+  onOpen,
+}: {
+  item: LookbookItem;
+  sizes: string;
+  className?: string;
+  style?: React.CSSProperties;
+  onOpen: (item: LookbookItem) => void;
+}) {
+  const categoryLabel = CATEGORY_LABELS[item.category]?.es ?? item.category;
+  const base =
+    "lookbook-tile group relative m-0 cursor-zoom-in overflow-hidden border-0 bg-cream p-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-ivory";
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(item)}
+      className={className ? `${base} ${className}` : base}
+      style={style}
+      aria-label={`${item.caption} — ${categoryLabel}`}
+    >
+      <Image
+        src={item.src}
+        alt={item.caption}
+        fill
+        sizes={sizes}
+        className="object-cover transition-[filter,transform] duration-300 group-hover:scale-[1.02]"
+        style={{ filter: "saturate(0.92) contrast(1.02)" }}
+      />
+      <TileCaption item={item} />
+    </button>
   );
 }
 

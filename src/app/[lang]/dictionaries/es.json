@@ -35,7 +35,13 @@
     "title2_em": "para ti",
     "body": "Una selección de piezas recientes. Cada look incluye la técnica usada y el nombre de la artista. Toca cualquier imagen para verla en detalle.",
     "allLabel": "Todos",
-    "seeAll": "Ver el archivo completo"
+    "seeAll": "Ver el archivo completo",
+    "lightbox": {
+      "close": "Cerrar",
+      "next": "Siguiente",
+      "previous": "Anterior",
+      "counter": "{current} / {total}"
+    }
   },
   "servicios": {
     "eyebrow": "Carta · Precios visibles",
@@ -96,7 +102,7 @@
         }
       }
     },
-    "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería). Retiro de un sistema externo: +$25.000 (no se cobra la primera vez).",
+    "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería)",
     "cta": "Reservar mi cita"
   },
   "diccionario": {

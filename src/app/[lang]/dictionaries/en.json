@@ -35,7 +35,13 @@
     "title2_em": "for you",
     "body": "A selection of recent pieces. Each look notes the technique used and the artist's name. Tap any image to see it in detail.",
     "allLabel": "All",
-    "seeAll": "See the full archive"
+    "seeAll": "See the full archive",
+    "lightbox": {
+      "close": "Close",
+      "next": "Next",
+      "previous": "Previous",
+      "counter": "{current} / {total}"
+    }
   },
   "servicios": {
     "eyebrow": "Menu · Prices visible",
@@ -96,7 +102,7 @@
         }
       }
     },
-    "footnote": "One-week warranty on product lift (excluding charms or rhinestones). Removal of an external system: +$25,000 COP (waived on your first visit).",
+    "footnote": "One-week warranty on product lift (excluding charms or rhinestones).",
     "cta": "Book my appointment"
   },
   "diccionario": {

@@ -11,6 +11,12 @@ type LookbookDict = {
   body: string;
   allLabel: string;
   seeAll: string;
+  lightbox: {
+    close: string;
+    next: string;
+    previous: string;
+    counter: string;
+  };
 };
 
 export default function Lookbook({
@@ -50,6 +56,7 @@ export default function Lookbook({
           items={LOOKBOOK}
           categories={CATEGORY_ORDER}
           allLabel={dict.allLabel}
+          lightboxDict={dict.lightbox}
         />
 
         <div className="mt-10 text-center md:mt-14">
