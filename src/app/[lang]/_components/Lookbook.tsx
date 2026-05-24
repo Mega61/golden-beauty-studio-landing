@@ -11,6 +11,7 @@ type LookbookDict = {
   body: string;
   allLabel: string;
   seeAll: string;
+  seeLess: string;
   lightbox: {
     close: string;
     next: string;
@@ -56,17 +57,10 @@ export default function Lookbook({
           items={LOOKBOOK}
           categories={CATEGORY_ORDER}
           allLabel={dict.allLabel}
+          seeAllLabel={dict.seeAll}
+          seeLessLabel={dict.seeLess}
           lightboxDict={dict.lightbox}
         />
-
-        <div className="mt-10 text-center md:mt-14">
-          <a
-            href="#all"
-            className="border-b border-gold pb-1 font-sans text-[12px] font-medium uppercase tracking-[0.28em] text-ink no-underline"
-          >
-            {dict.seeAll}
-          </a>
-        </div>
       </div>
     </section>
   );

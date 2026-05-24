@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Placeholder from "./Placeholder";
 
 type Stat = { n: string; l: string; s: string };
 type EstudioDict = {
@@ -9,7 +8,6 @@ type EstudioDict = {
   leadItalic: string;
   body1: string;
   body2: string;
-  spaceLamp: string;
   stats: Stat[];
   hygiene: {
     eyebrow: string;
@@ -79,36 +77,44 @@ export default function Estudio({ dict }: { dict: EstudioDict }) {
           </div>
         </div>
 
-        <div className="mb-10 grid gap-2 md:mb-16 md:grid-cols-[2fr_1fr_1fr] md:gap-3.5">
+        <div className="mb-10 grid gap-2 md:mb-16 md:grid-cols-[2fr_1fr] md:gap-3.5">
           <div
-            className="relative col-span-2 overflow-hidden bg-cream md:col-span-1"
-            style={{ aspectRatio: "4 / 5" }}
+            className="relative overflow-hidden bg-cream"
+            style={{ aspectRatio: "5 / 3" }}
           >
             <Image
               src="/space-01.jpg"
               alt=""
               fill
-              sizes="(min-width: 768px) 50vw, 100vw"
+              sizes="(min-width: 768px) 66vw, 100vw"
               className="object-cover"
             />
           </div>
-          <div
-            className="relative overflow-hidden bg-cream"
-            style={{ aspectRatio: "4 / 5" }}
-          >
-            <Image
-              src="/space-02.jpg"
-              alt=""
-              fill
-              sizes="(min-width: 768px) 25vw, 50vw"
-              className="object-cover"
-            />
-          </div>
-          <div
-            className="relative overflow-hidden"
-            style={{ aspectRatio: "4 / 5" }}
-          >
-            <Placeholder label={dict.spaceLamp} tone="gold" />
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-1 md:gap-3.5">
+            <div
+              className="relative overflow-hidden bg-cream"
+              style={{ aspectRatio: "5 / 3" }}
+            >
+              <Image
+                src="/space-02.jpg"
+                alt=""
+                fill
+                sizes="(min-width: 768px) 33vw, 50vw"
+                className="object-cover"
+              />
+            </div>
+            <div
+              className="relative overflow-hidden bg-cream"
+              style={{ aspectRatio: "5 / 3" }}
+            >
+              <Image
+                src="/space-03.jpg"
+                alt=""
+                fill
+                sizes="(min-width: 768px) 33vw, 50vw"
+                className="object-cover"
+              />
+            </div>
           </div>
         </div>
 

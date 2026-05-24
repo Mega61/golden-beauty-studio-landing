@@ -56,17 +56,24 @@ export type LookbookGridProps = {
   items: readonly LookbookItem[];
   categories: readonly LookbookCategory[];
   allLabel: string;
+  seeAllLabel: string;
+  seeLessLabel: string;
   lightboxDict: LookbookLightboxDict;
 };
+
+const MOSAIC_SLOTS = 12;
 
 export default function LookbookGrid({
   lang,
   items,
   categories,
   allLabel,
+  seeAllLabel,
+  seeLessLabel,
   lightboxDict,
 }: LookbookGridProps) {
   const [filter, setFilter] = useState<FilterValue>("all");
+  const [expanded, setExpanded] = useState(false);
   // Carries the filter snapshot so re-filtering implicitly closes the lightbox
   // without needing an effect.
   const [openState, setOpenState] = useState<{
@@ -97,13 +104,22 @@ export default function LookbookGrid({
   };
   const closeLightbox = () => setOpenState(null);
 
+  const selectFilter = (next: FilterValue) => {
+    setFilter(next);
+    setExpanded(false);
+  };
+
+  const extras =
+    filter === "all" ? filteredItems.slice(MOSAIC_SLOTS) : [];
+  const showToggle = filter === "all" && extras.length > 0;
+
   return (
     <>
       {/* Filter buttons */}
       <div className="mt-6 flex flex-wrap gap-4 md:mt-8">
         <FilterButton
           active={filter === "all"}
-          onClick={() => setFilter("all")}
+          onClick={() => selectFilter("all")}
           label={allLabel}
         />
         {categories.map((cat) => {
@@ -112,7 +128,7 @@ export default function LookbookGrid({
             <FilterButton
               key={cat}
               active={filter === cat}
-              onClick={() => setFilter(cat)}
+              onClick={() => selectFilter(cat)}
               label={CATEGORY_LABELS[cat][lang]}
               disabled={!hasItems}
             />
@@ -132,6 +148,28 @@ export default function LookbookGrid({
           <UniformGrid items={filteredItems} onOpen={openAt} />
         )}
       </div>
+
+      {filter === "all" && expanded && extras.length > 0 && (
+        <div
+          className="mt-2 md:mt-3.5"
+          style={{ animation: "lb-fade-in 220ms ease-out" }}
+        >
+          <UniformGrid items={extras} onOpen={openAt} />
+        </div>
+      )}
+
+      {showToggle && (
+        <div className="mt-10 text-center md:mt-14">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="cursor-pointer border-0 border-b border-gold bg-transparent pb-1 font-sans text-[12px] font-medium uppercase tracking-[0.28em] text-ink"
+          >
+            {expanded ? seeLessLabel : seeAllLabel}
+          </button>
+        </div>
+      )}
 
       {openIndex !== null && (
         <LookbookLightbox

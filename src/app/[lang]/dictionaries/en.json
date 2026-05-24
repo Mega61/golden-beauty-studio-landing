@@ -24,7 +24,7 @@
     "title2_em": "luxury in every detail.",
     "body": "We specialize in nails with flawless finishes and a premium experience that blends beauty, elegance and care into every appointment. -More than nails, we craft details that elevate your essence-",
     "ctaPrimary": "Book a visit",
-    "ctaSecondary": "See the work",
+    "ctaSecondary": "Pricing",
     "metaHours": "MON – SUN",
     "metaArea": "Sabaneta",
     "metaStatus": "Bookings open"
@@ -36,6 +36,7 @@
     "body": "A selection of recent pieces. Each look notes the technique used and the artist's name. Tap any image to see it in detail.",
     "allLabel": "All",
     "seeAll": "See the full archive",
+    "seeLess": "See less",
     "lightbox": {
       "close": "Close",
       "next": "Next",
@@ -148,7 +149,6 @@
     "leadItalic": "Golden was born from the idea of turning personal care into an experience of comfort and exclusivity — making every woman feel confident, feminine and authentic.",
     "body1": "Our nail artists have mastered every technique we offer: choose your favorite knowing the result will always be stunning.",
     "body2": "We're based in Sabaneta, in a modern, elegant and welcoming space designed for a sophisticated and exclusive experience.",
-    "spaceLamp": "Detail · lamp",
     "stats": [
       { "n": "02h", "l": "Average duration", "s": "Per appointment, no overlap" },
       { "n": "02", "l": "Working stations", "s": "Intimate studio, not a salon" },

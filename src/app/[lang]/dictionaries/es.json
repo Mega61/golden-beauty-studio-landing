@@ -24,7 +24,7 @@
     "title2_em": "Lujo en cada detalle.",
     "body": "Nos especializamos en uñas con acabados impecables y una experiencia premium que combina belleza, elegancia y cuidado en cada cita. -Más que uñas, creamos detalles que elevan tu esencia-",
     "ctaPrimary": "Agendar cita",
-    "ctaSecondary": "Ver el trabajo",
+    "ctaSecondary": "Ver Precios",
     "metaHours": "LUN - DOM",
     "metaArea": "Sabaneta",
     "metaStatus": "Agenda abierta"
@@ -36,6 +36,7 @@
     "body": "Una selección de piezas recientes. Cada look incluye la técnica usada y el nombre de la artista. Toca cualquier imagen para verla en detalle.",
     "allLabel": "Todos",
     "seeAll": "Ver el archivo completo",
+    "seeLess": "Ver menos",
     "lightbox": {
       "close": "Cerrar",
       "next": "Siguiente",
@@ -148,7 +149,6 @@
     "leadItalic": "Golden nace de la idea de transformar el cuidado personal en una experiencia de comodidad y exclusividad. Hacer que cada mujer se sienta segura, femenina y auténtica.",
     "body1": "Nuestras nail artists manejan a la perfección cada técnica que ofrecemos: puedes elegir tu favorita con la certeza de que el resultado siempre será deslumbrante.",
     "body2": "Estamos ubicadas en Sabaneta, en un local moderno, elegante y acogedor, diseñado para brindar una experiencia sofisticada y exclusiva.",
-    "spaceLamp": "Detalle · lámpara",
     "stats": [
       { "n": "02h", "l": "Duración promedio", "s": "Por cita, sin doblar agenda" },
       { "n": "02", "l": "Puestos atendidos", "s": "Estudio íntimo, no salón" },

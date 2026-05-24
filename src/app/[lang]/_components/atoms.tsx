@@ -72,7 +72,7 @@ export function PrimaryCTA({
 
 export function SecondaryCTA({
   children,
-  href = "#trabajo",
+  href = "#servicios",
   onLight = true,
   className = "",
 }: {
