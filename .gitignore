@@ -45,5 +45,8 @@ next-env.d.ts
 # generated brand asset rasters — regenerable from public/logos/*.svg
 /public/logos/optimized/
 
+# generated watermarked lookbook — regenerable from public/lookbook/<category>/*
+/public/lookbook-wm/
+
 # generated lookbook manifest — regenerable from public/lookbook/<category>/*
 /src/data/lookbook-manifest.ts

@@ -1,8 +1,11 @@
 // Build-time generator for the Lookbook manifest.
 //
-// Walks `public/lookbook/<category>/*.{jpg,jpeg,png,webp}` and writes
-// `src/data/lookbook-manifest.ts` — a typed, readonly array consumed by the
-// Lookbook component for both the editorial-mosaic and filtered grid views.
+// Walks `public/lookbook/<category>/*.{jpg,jpeg,png,webp}` for the source-of-
+// -truth file list and writes `src/data/lookbook-manifest.ts` — a typed,
+// readonly array consumed by the Lookbook component for both the editorial-
+// -mosaic and filtered grid views. Emitted `src` paths point at the
+// watermarked counterparts under `/lookbook-wm/<category>/<basename>.jpg`
+// (produced by scripts/watermark-lookbook.mjs, which runs before this).
 //
 // Categories are derived from subfolder names (kebab-case). Captions are
 // derived from filenames (kebab-case → "Sentence case").
@@ -62,7 +65,7 @@ async function listImagesIn(category) {
     const basename = path.basename(e.name, ext);
     out.push({
       category,
-      src: `/lookbook/${category}/${e.name}`,
+      src: `/lookbook-wm/${category}/${basename}.jpg`,
       basename,
       caption: captionFromBasename(basename),
       mtime: (await fs.stat(path.join(dir, e.name))).mtimeMs,
