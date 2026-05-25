@@ -199,6 +199,15 @@
       "coords": "6.156° N · 75.617° W"
     }
   },
+  "promos": {
+    "eyebrow": "This season",
+    "title1": "What's happening",
+    "title2_em": "at the studio.",
+    "support": "Events, gifts and limited editions that change with the season — small rituals worth coming back for.",
+    "footerQuote": "Small things that change with the season.",
+    "footerLink": "Get them by email →",
+    "dismissAria": "Dismiss promotion"
+  },
   "footer": {
     "tagline": "Specialist nail studio.\nSabaneta · Medellín · Antioquia.",
     "visit": {
