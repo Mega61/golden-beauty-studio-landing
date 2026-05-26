@@ -201,6 +201,18 @@
       "coords": "6.156° N · 75.617° W"
     }
   },
+  "promos": {
+    "eyebrow": "Esta temporada",
+    "title1": "Lo que está pasando",
+    "title2_em": "en el estudio.",
+    "support": "Eventos, regalos y ediciones limitadas que cambian con la temporada — pequeños rituales para volver al estudio.",
+    "footerQuote": "Pequeñas cosas que cambian con la temporada.",
+    "footerLink": "Recíbelas por correo →",
+    "dismissAria": "Cerrar promoción",
+    "termsEyebrow": "Términos y condiciones",
+    "termsClose": "Cerrar",
+    "termsCloseAria": "Cerrar términos"
+  },
   "footer": {
     "tagline": "Estudio especializado en uñas.\nSabaneta · Medellín · Antioquia.",
     "visit": {
