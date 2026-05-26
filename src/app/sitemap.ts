@@ -4,9 +4,10 @@ import { locales } from "./[lang]/dictionaries";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
-  const languages = Object.fromEntries(
+  const languages: Record<string, string> = Object.fromEntries(
     locales.map((l) => [l, `${siteConfig.siteUrl}/${l}`]),
   );
+  languages["x-default"] = `${siteConfig.siteUrl}/es`;
   return locales.map((lang) => ({
     url: `${siteConfig.siteUrl}/${lang}`,
     lastModified,
