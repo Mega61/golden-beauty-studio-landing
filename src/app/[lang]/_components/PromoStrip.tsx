@@ -85,16 +85,23 @@ export default function PromoStrip({ scenario, dict }: Props) {
           </span>
         </div>
 
-        {/* Until label — hidden on mobile */}
-        <span
-          className={`hidden shrink-0 font-sans text-[10px] font-semibold uppercase tracking-[0.28em] md:inline-flex ${styles.ctaText}`}
-        >
-          {until}
-        </span>
+        {/* Until label — hidden on mobile, omitted entirely when no deadline */}
+        {until && (
+          <span
+            className={`hidden shrink-0 font-sans text-[10px] font-semibold uppercase tracking-[0.28em] md:inline-flex ${styles.ctaText}`}
+          >
+            {until}
+          </span>
+        )}
 
-        {/* CTA */}
+        {/* CTA — external URLs (http(s)://) open in a new tab so the strip's
+            promo doesn't kick the user out of the landing. Hash anchors stay
+            in-tab as usual. */}
         <Link
           href={href}
+          {...(/^https?:\/\//i.test(href)
+            ? { target: "_blank" as const, rel: "noopener noreferrer" }
+            : {})}
           className={`shrink-0 font-sans text-[11px] font-semibold uppercase tracking-[0.24em] underline underline-offset-[5px] md:text-[12px] ${styles.ctaText}`}
         >
           {cta}

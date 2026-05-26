@@ -106,10 +106,14 @@ function CardCTA({
   ctaText: string;
   ruleColor: string;
 }) {
+  const external = /^https?:\/\//i.test(href);
   return (
     <div className="mt-6 pt-4" style={{ borderTop: `1px solid ${ruleColor}` }}>
       <Link
         href={href}
+        {...(external
+          ? { target: "_blank" as const, rel: "noopener noreferrer" }
+          : {})}
         className={`inline-flex items-center gap-2 font-sans text-[11px] font-semibold uppercase tracking-[0.28em] ${ctaText}`}
       >
         {label}
@@ -122,6 +126,7 @@ function CardCTA({
 function FeaturedCard({ item }: { item: PromoItem }) {
   const palette = ACCENT_CARD[item.accent] ?? ACCENT_CARD.gold;
   const isInk = item.accent === "ink";
+  const hasImage = Boolean(item.image_url);
   return (
     <article
       className={`flex h-full flex-col ${palette.text}`}
@@ -130,14 +135,18 @@ function FeaturedCard({ item }: { item: PromoItem }) {
         border: "1px solid var(--hair)",
       }}
     >
-      <div className="relative w-full" style={{ aspectRatio: "16 / 9" }}>
-        {item.image_url ? (
+      {/* Native 16/9 — matches the source framing exactly, no crop at any
+          breakpoint. The photo is always read as the landscape editorial it
+          is, even on narrow screens. */}
+      <div className="relative w-full aspect-[16/9]">
+        {hasImage ? (
           <Image
-            src={item.image_url}
+            src={item.image_url!}
             alt={item.title}
             fill
             sizes="(min-width: 768px) 60vw, 100vw"
             className="object-cover"
+            priority
           />
         ) : (
           // Placeholder: marble texture + carbon wash. Sized identically to
@@ -149,18 +158,20 @@ function FeaturedCard({ item }: { item: PromoItem }) {
             style={{ filter: "saturate(0.85) contrast(1.05)" }}
           />
         )}
-        {/* Legibility wash, always present so badge/ribbon stay readable */}
+        {/* Subtle bottom wash so the ribbon stays readable without dulling
+            the product. Heavier wash kept for the placeholder mármol case. */}
         <div
           aria-hidden
           className="absolute inset-0"
           style={{
-            background:
-              "linear-gradient(180deg, rgba(20,15,12,0) 30%, rgba(20,15,12,0.55) 100%)",
+            background: hasImage
+              ? "linear-gradient(180deg, rgba(20,15,12,0) 55%, rgba(20,15,12,0.42) 100%)"
+              : "linear-gradient(180deg, rgba(20,15,12,0) 30%, rgba(20,15,12,0.55) 100%)",
           }}
         />
 
         {item.badge_day && item.badge_month && (
-          <div className="absolute right-4 top-4 md:right-5 md:top-5">
+          <div className="absolute left-4 top-4 md:left-5 md:top-5">
             <DateBadge day={item.badge_day} month={item.badge_month} />
           </div>
         )}

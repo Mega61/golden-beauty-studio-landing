@@ -1,4 +1,7 @@
 import type { PromosBySlug } from "./promos.types";
+import { siteConfig } from "@/config/site";
+
+const BOOKING = siteConfig.bookingUrl ?? "#contacto";
 
 // Same shape as promos.es.ts. Keeping the slug keys identical so the
 // language-agnostic selector can resolve either locale by the same slug.
@@ -11,27 +14,25 @@ export const PROMOS_DATA: PromosBySlug = {
     starts_at: "2026-06-01T00:00:00.000Z",
     ends_at: "2026-07-15T23:59:59.000Z",
     strip: {
-      tag: "Opening gift",
+      tag: "Opening kit",
       message:
-        "The first 30 clients receive an editorial press-on set with their appointment.",
-      cta: "Claim my spot",
-      href: "#contacto",
-      until: "Until Jul · 15",
+        "The first 100 clients receive the Golden welcome kit with their first appointment.",
+      cta: "Claim my kit",
+      href: "#promos",
       accent: "gold",
     },
     items: [
       {
         id: "opening-gift",
-        eyebrow: "Opening · Vol. 01",
-        title: "A gift for the first 30 clients",
+        eyebrow: "Opening · Edition 01",
+        title: "A welcome kit for the first 100",
         body:
-          "Book your appointment before July 15 and take home an editorial press-on set designed by our artists — built for your next two events without spending the session.",
-        cta_label: "Reserve my spot",
-        cta_href: "#contacto",
-        ribbon: "30 spots · 12 already taken",
+          "Book your first appointment and take home the kit curated by the studio — hand exfoliator, editorial nail file and cuticle oil to keep the result going between sessions. No deadline: valid while the 100 kits last.",
+        cta_label: "Reserve my appointment",
+        cta_href: BOOKING,
+        ribbon: "100 kits · Opening edition",
+        image_url: "/apertura.jpg",
         accent: "gold",
-        badge_day: "15",
-        badge_month: "JUL",
         featured: true,
       },
       {
@@ -43,19 +44,6 @@ export const PROMOS_DATA: PromosBySlug = {
         cta_label: "See details",
         cta_href: "#contacto",
         accent: "mocha",
-        featured: false,
-      },
-      {
-        id: "opening-event",
-        eyebrow: "Launch night",
-        title: "Opening cocktail",
-        body:
-          "Saturday, June 15 · 5pm. Drinks, live demos and an attendee-only discount on the same week's bookings.",
-        cta_label: "Confirm attendance",
-        cta_href: "#contacto",
-        accent: "ink",
-        badge_day: "15",
-        badge_month: "JUN",
         featured: false,
       },
     ],

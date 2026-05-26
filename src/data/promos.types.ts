@@ -11,7 +11,7 @@ export type PromoStrip = {
   message: string;
   cta: string;
   href: string;
-  until: string;
+  until?: string;
   accent: PromoStripAccent;
 };
 

@@ -1,4 +1,9 @@
 import type { PromosBySlug } from "./promos.types";
+import { siteConfig } from "@/config/site";
+
+// Reservation URL lives in NEXT_PUBLIC_BOOKING_URL (siteConfig.bookingUrl). If
+// unset, hashes fall through to the local #contacto section.
+const BOOKING = siteConfig.bookingUrl ?? "#contacto";
 
 // Mock por idioma. Cuando se conecte Strapi, este archivo deja de usarse —
 // `getActiveScenario` (en promos.ts) consultará `?locale=es&populate=deep`.
@@ -12,27 +17,25 @@ export const PROMOS_DATA: PromosBySlug = {
     starts_at: "2026-06-01T00:00:00.000Z",
     ends_at: "2026-07-15T23:59:59.000Z",
     strip: {
-      tag: "Regalo de apertura",
+      tag: "Kit de apertura",
       message:
-        "Las primeras 30 clientas reciben un set Press On editorial con su cita.",
-      cta: "Asegurar cupo",
-      href: "#contacto",
-      until: "Hasta 15 · Jul",
+        "Las primeras 100 clientas reciben el kit de bienvenida Golden con su primera cita.",
+      cta: "Quiero mi kit",
+      href: "#promos",
       accent: "gold",
     },
     items: [
       {
         id: "opening-gift",
-        eyebrow: "Apertura · Vol. 01",
-        title: "Regalo para las 30 primeras",
+        eyebrow: "Apertura · Edición 01",
+        title: "Un kit de bienvenida para las primeras 100",
         body:
-          "Reserva tu cita antes del 15 de julio y llévate un set Press On editorial diseñado por las técnicas — pensado para tus dos próximos eventos sin gastar la sesión.",
-        cta_label: "Reservar mi cupo",
-        cta_href: "#contacto",
-        ribbon: "30 cupos · 12 ya tomados",
+          "Reserva tu primera cita y llévate a casa el kit curado por el estudio — exfoliante de manos, lima editorial y aceite de cutícula para extender el resultado entre sesiones. Sin fecha límite: vale mientras duren los 100 kits.",
+        cta_label: "Reservar mi cita",
+        cta_href: BOOKING,
+        ribbon: "100 kits · Edición de apertura",
+        image_url: "/apertura.jpg",
         accent: "gold",
-        badge_day: "15",
-        badge_month: "JUL",
         featured: true,
       },
       {
@@ -44,19 +47,6 @@ export const PROMOS_DATA: PromosBySlug = {
         cta_label: "Ver detalles",
         cta_href: "#contacto",
         accent: "mocha",
-        featured: false,
-      },
-      {
-        id: "opening-event",
-        eyebrow: "Inauguración",
-        title: "Coctel de apertura",
-        body:
-          "Sábado 15 de junio · 5pm. Bebidas, demos en vivo y descuento exclusivo para asistentes.",
-        cta_label: "Confirmar asistencia",
-        cta_href: "#contacto",
-        accent: "ink",
-        badge_day: "15",
-        badge_month: "JUN",
         featured: false,
       },
     ],
