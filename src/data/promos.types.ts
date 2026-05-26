@@ -30,6 +30,9 @@ export type PromoItem = {
   featured: boolean;
   starts_at?: string;
   ends_at?: string;
+  // When present, the CTA opens an inline dialog with these clauses instead of
+  // navigating away. Each entry is one numbered clause.
+  terms?: string[];
 };
 
 export type PromoScenario = {

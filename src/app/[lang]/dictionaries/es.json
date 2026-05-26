@@ -205,7 +205,10 @@
     "support": "Eventos, regalos y ediciones limitadas que cambian con la temporada — pequeños rituales para volver al estudio.",
     "footerQuote": "Pequeñas cosas que cambian con la temporada.",
     "footerLink": "Recíbelas por correo →",
-    "dismissAria": "Cerrar promoción"
+    "dismissAria": "Cerrar promoción",
+    "termsEyebrow": "Términos y condiciones",
+    "termsClose": "Cerrar",
+    "termsCloseAria": "Cerrar términos"
   },
   "footer": {
     "tagline": "Estudio especializado en uñas.\nSabaneta · Medellín · Antioquia.",

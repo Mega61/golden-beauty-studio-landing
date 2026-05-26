@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { EyebrowLabel } from "./atoms";
+import PromoTermsCTA from "./PromoTermsCTA";
 import type { PromoItem, PromoScenario } from "@/data/promos.types";
 
 type HighlightsDict = {
@@ -10,6 +11,9 @@ type HighlightsDict = {
   support: string;
   footerQuote: string;
   footerLink: string;
+  termsEyebrow: string;
+  termsClose: string;
+  termsCloseAria: string;
 };
 
 type Props = {
@@ -123,7 +127,47 @@ function CardCTA({
   );
 }
 
-function FeaturedCard({ item }: { item: PromoItem }) {
+// Picks the link version or the terms-dialog version based on whether the item
+// carries a `terms[]` array. Items with terms get a button that opens a modal;
+// everything else stays a plain link as before.
+function ItemCTA({
+  item,
+  ctaText,
+  ruleColor,
+  dict,
+}: {
+  item: PromoItem;
+  ctaText: string;
+  ruleColor: string;
+  dict: HighlightsDict;
+}) {
+  if (item.terms && item.terms.length > 0) {
+    return (
+      <PromoTermsCTA
+        label={item.cta_label}
+        ctaText={ctaText}
+        ruleColor={ruleColor}
+        title={item.title}
+        terms={item.terms}
+        dict={{
+          termsEyebrow: dict.termsEyebrow,
+          termsClose: dict.termsClose,
+          termsCloseAria: dict.termsCloseAria,
+        }}
+      />
+    );
+  }
+  return (
+    <CardCTA
+      href={item.cta_href}
+      label={item.cta_label}
+      ctaText={ctaText}
+      ruleColor={ruleColor}
+    />
+  );
+}
+
+function FeaturedCard({ item, dict }: { item: PromoItem; dict: HighlightsDict }) {
   const palette = ACCENT_CARD[item.accent] ?? ACCENT_CARD.gold;
   const isInk = item.accent === "ink";
   const hasImage = Boolean(item.image_url);
@@ -195,11 +239,11 @@ function FeaturedCard({ item }: { item: PromoItem }) {
           {item.body}
         </p>
         <div className="mt-auto">
-          <CardCTA
-            href={item.cta_href}
-            label={item.cta_label}
+          <ItemCTA
+            item={item}
             ctaText={palette.ctaText}
             ruleColor={isInk ? "rgba(231,170,81,0.28)" : "var(--hair)"}
+            dict={dict}
           />
         </div>
       </div>
@@ -207,7 +251,7 @@ function FeaturedCard({ item }: { item: PromoItem }) {
   );
 }
 
-function CompactCard({ item }: { item: PromoItem }) {
+function CompactCard({ item, dict }: { item: PromoItem; dict: HighlightsDict }) {
   const palette = ACCENT_CARD[item.accent] ?? ACCENT_CARD.gold;
   const isInk = item.accent === "ink";
   return (
@@ -244,11 +288,11 @@ function CompactCard({ item }: { item: PromoItem }) {
           </p>
         )}
         <div className="mt-auto">
-          <CardCTA
-            href={item.cta_href}
-            label={item.cta_label}
+          <ItemCTA
+            item={item}
             ctaText={palette.ctaText}
             ruleColor={isInk ? "rgba(231,170,81,0.28)" : "var(--hair)"}
+            dict={dict}
           />
         </div>
       </div>
@@ -305,9 +349,9 @@ export default function Highlights({ scenario, dict }: Props) {
         >
           {all.map((item, idx) =>
             idx === 0 ? (
-              <FeaturedCard key={item.id} item={item} />
+              <FeaturedCard key={item.id} item={item} dict={dict} />
             ) : (
-              <CompactCard key={item.id} item={item} />
+              <CompactCard key={item.id} item={item} dict={dict} />
             ),
           )}
         </div>
