@@ -59,6 +59,7 @@
         "sub": "Sistemas nuevos · Extensión",
         "items": {
           "acrylic-sculpted":  { "name": "Esculpidas en acrílico",  "desc": "Estructura perfecta · Duración que destaca" },
+          "polygel-sculpted":  { "name": "Esculpidas en polygel",   "desc": "Ligereza con extensión · Acabado natural" },
           "polygel-dual":      { "name": "Dual system polygel",     "desc": "Precisión de lujo · Acabado impecable" },
           "builder-gel-dual":  { "name": "Dual system builder gel", "desc": "Resistencia · Delicadeza · Perfección" },
           "press-on":          { "name": "Press on",                "desc": "Lujo instantáneo · Estilo y comodidad" }
@@ -98,8 +99,10 @@
         "label": "Extras",
         "sub": "Servicios adicionales",
         "items": {
-          "system-removal":  { "name": "Retiro de sistema previo",      "desc": "Gratis en tu primera visita · Para uñas de otro lugar" },
-          "design-per-nail": { "name": "Diseño / decoración por uña",   "desc": "Nail art aplicado sobre tu servicio" }
+          "system-removal":         { "name": "Retiro de sistema previo",     "desc": "Gratis en tu primera visita · Para uñas de otro lugar" },
+          "single-sculpted-nail":   { "name": "Esculpido por uña",            "desc": "Reemplazo individual · Cualquier sistema" },
+          "design-per-nail":        { "name": "Diseño / decoración por uña",  "desc": "Nail art aplicado sobre tu servicio" },
+          "in-depth-foot-cleaning": { "name": "Limpieza profunda de pies",    "desc": "Hongos, uñas encarnadas y casos especiales" }
         }
       }
     },

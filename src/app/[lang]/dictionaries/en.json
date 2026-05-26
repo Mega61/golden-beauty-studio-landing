@@ -59,6 +59,7 @@
         "sub": "New systems · Extension",
         "items": {
           "acrylic-sculpted":  { "name": "Sculpted acrylic",         "desc": "Perfect structure · Standout durability" },
+          "polygel-sculpted":  { "name": "Sculpted polygel",         "desc": "Lightweight extension · Natural finish" },
           "polygel-dual":      { "name": "Dual-system polygel",      "desc": "Luxury precision · Flawless finish" },
           "builder-gel-dual":  { "name": "Dual-system builder gel",  "desc": "Strength · Delicacy · Perfection" },
           "press-on":          { "name": "Press-on",                 "desc": "Instant luxury · Style and comfort" }
@@ -98,8 +99,10 @@
         "label": "Extras",
         "sub": "Add-on services",
         "items": {
-          "system-removal":  { "name": "External system removal",   "desc": "Waived on your first visit · For nails from another salon" },
-          "design-per-nail": { "name": "Design / decoration per nail", "desc": "Nail art applied on top of your service" }
+          "system-removal":         { "name": "External system removal",      "desc": "Waived on your first visit · For nails from another salon" },
+          "single-sculpted-nail":   { "name": "Single sculpted nail",         "desc": "Individual replacement · Any system" },
+          "design-per-nail":        { "name": "Design / decoration per nail", "desc": "Nail art applied on top of your service" },
+          "in-depth-foot-cleaning": { "name": "In-depth foot cleaning",       "desc": "Fungus, ingrown nails and special cases" }
         }
       }
     },

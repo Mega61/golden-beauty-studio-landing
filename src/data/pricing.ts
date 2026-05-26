@@ -19,6 +19,7 @@ export const pricing: readonly PriceCategory[] = [
   {
     id: "montajes",
     items: [
+      { id: "polygel-sculpted", priceCOP: 120000, durationMin: 150 },
       { id: "acrylic-sculpted", priceCOP: 115000, durationMin: 150 },
       { id: "polygel-dual", priceCOP: 110000, durationMin: 150 },
       { id: "builder-gel-dual", priceCOP: 105000, durationMin: 150 },
@@ -28,9 +29,9 @@ export const pricing: readonly PriceCategory[] = [
   {
     id: "retoques",
     items: [
-      { id: "acrylic-refill", priceCOP: 95000, durationMin: 120 },
       { id: "polygel-refill", priceCOP: 90000, durationMin: 120 },
       { id: "builder-gel-refill", priceCOP: 85000, durationMin: 120 },
+      { id: "acrylic-refill", priceCOP: 80000, durationMin: 120 },
     ],
   },
   {
@@ -56,7 +57,9 @@ export const pricing: readonly PriceCategory[] = [
     id: "extras",
     items: [
       { id: "system-removal", priceCOP: 20000, durationMin: 30 },
+      { id: "single-sculpted-nail", priceCOP: 10000, durationMin: 10 },
       { id: "design-per-nail", priceCOP: 10000, durationMin: null },
+      { id: "in-depth-foot-cleaning", priceCOP: 15000, durationMin: 10 },
     ],
   },
 ] as const;
