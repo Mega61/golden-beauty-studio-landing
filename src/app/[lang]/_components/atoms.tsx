@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { trackBookingClick, trackPricingClick } from "@/lib/analytics";
 
 export function GoldRule({
   className = "",
@@ -41,11 +44,13 @@ export function PrimaryCTA({
   href,
   dark = false,
   className = "",
+  trackLocation,
 }: {
   children: React.ReactNode;
   href: string | null | undefined;
   dark?: boolean;
   className?: string;
+  trackLocation?: string;
 }) {
   if (!href) return null;
   const external = /^https?:\/\//i.test(href);
@@ -58,6 +63,9 @@ export function PrimaryCTA({
     <Link
       href={href}
       {...linkProps}
+      onClick={
+        trackLocation ? () => trackBookingClick(trackLocation) : undefined
+      }
       className={`${base} ${
         dark
           ? "border border-gold bg-carbon text-gold-soft"
@@ -75,11 +83,13 @@ export function SecondaryCTA({
   href = "#servicios",
   onLight = true,
   className = "",
+  trackLocation,
 }: {
   children: React.ReactNode;
   href?: string;
   onLight?: boolean;
   className?: string;
+  trackLocation?: string;
 }) {
   // Plain <a> instead of next/link: this CTA is always an in-page hash
   // anchor. Next's <Link> short-circuits repeat clicks when the URL is
@@ -88,6 +98,9 @@ export function SecondaryCTA({
   return (
     <a
       href={href}
+      onClick={
+        trackLocation ? () => trackPricingClick(trackLocation) : undefined
+      }
       className={`inline-flex cursor-pointer items-center gap-3 px-6 py-3.5 md:px-7 md:py-4 font-sans text-[12px] md:text-[13px] font-medium uppercase tracking-[0.24em] no-underline border bg-transparent ${
         onLight ? "border-hair text-ink" : "text-ivory"
       } ${className}`}

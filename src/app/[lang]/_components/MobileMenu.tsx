@@ -5,6 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Logo from "./Logo";
 import type { Locale } from "../dictionaries";
+import { trackBookingClick } from "@/lib/analytics";
 
 const noopSubscribe = () => () => {};
 const useIsClient = () =>
@@ -128,7 +129,10 @@ export default function MobileMenu({
                 href={bookingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={close}
+                onClick={() => {
+                  trackBookingClick("mobile_menu_drawer");
+                  close();
+                }}
                 className="bg-gold-grad inline-flex items-center justify-between gap-3 px-5 py-4 font-sans text-[12px] font-semibold uppercase tracking-[0.24em] text-white no-underline"
               >
                 <span>{cta}</span>
@@ -148,6 +152,7 @@ export default function MobileMenu({
             href={bookingUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackBookingClick("mobile_menu_header")}
             className="bg-gold-grad-dark px-3.5 py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-white no-underline"
           >
             {ctaShort}

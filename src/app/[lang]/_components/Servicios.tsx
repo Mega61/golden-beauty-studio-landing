@@ -117,7 +117,9 @@ export default function Servicios({
 
         <div className="mt-10 px-5 text-center md:mt-16 md:px-0">
           <p className="mb-6 font-sans text-[12px] text-ink-mute">{dict.footnote}</p>
-          <PrimaryCTA href={siteConfig.bookingUrl}>{dict.cta}</PrimaryCTA>
+          <PrimaryCTA href={siteConfig.bookingUrl} trackLocation="services">
+            {dict.cta}
+          </PrimaryCTA>
         </div>
       </div>
     </section>

@@ -79,10 +79,12 @@ export default function Hero({ dict }: { dict: HeroDict }) {
             {dict.body}
           </p>
           <div className="mt-7 flex flex-wrap gap-3.5 md:mt-10">
-            <PrimaryCTA href={siteConfig.bookingUrl}>
+            <PrimaryCTA href={siteConfig.bookingUrl} trackLocation="hero">
               {dict.ctaPrimary}
             </PrimaryCTA>
-            <SecondaryCTA onLight={false}>{dict.ctaSecondary}</SecondaryCTA>
+            <SecondaryCTA onLight={false} trackLocation="hero">
+              {dict.ctaSecondary}
+            </SecondaryCTA>
           </div>
         </div>
       </div>

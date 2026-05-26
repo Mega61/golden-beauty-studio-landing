@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { EyebrowLabel } from "./atoms";
+import TrackedBookingLink from "./TrackedBookingLink";
 import { siteConfig } from "@/config/site";
 
 type Member = { name: string; role: string; years: string; quote: string };
@@ -68,14 +69,14 @@ export default function Tecnicas({ dict }: { dict: TecnicasDict }) {
                   &ldquo;{m.quote}&rdquo;
                 </p>
                 {siteConfig.bookingUrl && (
-                  <a
+                  <TrackedBookingLink
                     href={siteConfig.bookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    location="tecnicas"
+                    extra={{ artist: m.name }}
                     className="border-b border-gold pb-1 font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-ink no-underline"
                   >
                     {dict.bookWith} {m.name.split(" ")[0]} →
-                  </a>
+                  </TrackedBookingLink>
                 )}
               </div>
             </article>

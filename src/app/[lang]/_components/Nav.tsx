@@ -75,7 +75,9 @@ export default function Nav({
             {lang.toUpperCase()} <span className="text-ink-mute/60">/</span>{" "}
             <span className="text-ink-mute/60">{otherLang.toUpperCase()}</span>
           </Link>
-          <PrimaryCTA href={bookingUrl}>{dict.cta}</PrimaryCTA>
+          <PrimaryCTA href={bookingUrl} trackLocation="nav">
+            {dict.cta}
+          </PrimaryCTA>
         </div>
 
         <MobileMenu

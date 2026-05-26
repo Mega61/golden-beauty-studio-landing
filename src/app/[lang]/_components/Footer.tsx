@@ -1,5 +1,6 @@
 import { siteConfig } from "@/config/site";
 import Logo from "./Logo";
+import TrackedBookingLink from "./TrackedBookingLink";
 
 type FooterDict = {
   tagline: string;
@@ -81,17 +82,32 @@ export default function Footer({ dict }: { dict: FooterDict }) {
               {dict.find.links.map((l) => {
                 const href = resolveFindLink(l, findUrls);
                 if (!href) return null;
+                const isBooking = href === findUrls.booking;
+                const className =
+                  "pb-0.5 font-sans text-[14px] text-ink no-underline";
+                const style = { borderBottom: "1px solid var(--hair)" };
                 return (
                   <li key={l}>
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="pb-0.5 font-sans text-[14px] text-ink no-underline"
-                      style={{ borderBottom: "1px solid var(--hair)" }}
-                    >
-                      {l} →
-                    </a>
+                    {isBooking ? (
+                      <TrackedBookingLink
+                        href={href}
+                        location="footer"
+                        className={className}
+                        style={style}
+                      >
+                        {l} →
+                      </TrackedBookingLink>
+                    ) : (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={className}
+                        style={style}
+                      >
+                        {l} →
+                      </a>
+                    )}
                   </li>
                 );
               })}

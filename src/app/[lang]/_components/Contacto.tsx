@@ -1,4 +1,5 @@
 import { siteConfig } from "@/config/site";
+import TrackedBookingLink from "./TrackedBookingLink";
 
 type ContactoDict = {
   eyebrow: string;
@@ -133,14 +134,13 @@ export default function Contacto({ dict }: { dict: ContactoDict }) {
             {(bookingUrl || whatsappUrl) && (
               <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-2">
                 {bookingUrl && (
-                  <a
+                  <TrackedBookingLink
                     href={bookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    location="contacto"
                     className="bg-gold-grad-dark px-4 py-4 text-center font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-white no-underline md:px-5 md:py-[18px]"
                   >
                     {dict.ctaBook}
-                  </a>
+                  </TrackedBookingLink>
                 )}
                 {whatsappUrl && (
                   <a
