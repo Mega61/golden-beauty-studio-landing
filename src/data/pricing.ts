@@ -49,6 +49,8 @@ export const pricing: readonly PriceCategory[] = [
     items: [
       { id: "semi-permanent-hands", priceCOP: 50000, durationMin: 60 },
       { id: "semi-permanent-feet", priceCOP: 55000, durationMin: 75 },
+      { id: "traditional-hands", priceCOP: 40000, durationMin: 60 },
+      { id: "traditional-feet", priceCOP: 45000, durationMin: 60 },
       { id: "hands-cleanup-only", priceCOP: 30000, durationMin: 30 },
       { id: "feet-cleanup-only", priceCOP: 35000, durationMin: 45 },
     ],
@@ -57,7 +59,8 @@ export const pricing: readonly PriceCategory[] = [
     id: "extras",
     items: [
       { id: "system-removal", priceCOP: 20000, durationMin: 30 },
-      { id: "single-sculpted-nail", priceCOP: 10000, durationMin: 10 },
+      { id: "single-dual-system-nail", priceCOP: 11000, durationMin: 10 },
+      { id: "single-press-on-nail", priceCOP: 10000, durationMin: 5 },
       { id: "design-per-nail", priceCOP: 10000, durationMin: null },
       { id: "in-depth-foot-cleaning", priceCOP: 15000, durationMin: 10 },
     ],

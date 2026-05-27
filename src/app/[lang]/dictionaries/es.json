@@ -82,27 +82,30 @@
           "builder-gel-overlay":  { "name": "Forrado en builder gel", "desc": "Sobre uña natural" },
           "acrylic-overlay":      { "name": "Forrado en acrílico",    "desc": "Sobre uña natural" },
           "dipping":              { "name": "Dipping",                "desc": "Sistema en polvo, sin monómero" },
-          "rubber-base-leveling": { "name": "Nivelación rubber base", "desc": "Base estructurante" }
+          "rubber-base-leveling": { "name": "Nivelación base rubber", "desc": "Base estructurante" }
         }
       },
       "sencillos": {
         "label": "Sencillos",
         "sub": "Manicura · pedicura",
         "items": {
-          "semi-permanent-hands": { "name": "Semipermanente manos", "desc": "Limpieza + esmalte gel" },
-          "semi-permanent-feet":  { "name": "Semipermanente pies",  "desc": "Limpieza + esmalte gel" },
-          "hands-cleanup-only":   { "name": "Solo limpieza manos",  "desc": "Sin esmalte" },
-          "feet-cleanup-only":    { "name": "Solo limpieza pies",   "desc": "Sin esmalte" }
+          "semi-permanent-hands": { "name": "Semipermanente manos",  "desc": "Limpieza + esmalte gel" },
+          "semi-permanent-feet":  { "name": "Semipermanente pies",   "desc": "Limpieza + esmalte gel" },
+          "traditional-hands":    { "name": "Manicura tradicional",  "desc": "Limpieza + esmalte tradicional" },
+          "traditional-feet":     { "name": "Pedicura tradicional",  "desc": "Limpieza + esmalte tradicional" },
+          "hands-cleanup-only":   { "name": "Solo limpieza manos",   "desc": "Sin esmalte" },
+          "feet-cleanup-only":    { "name": "Solo limpieza pies",    "desc": "Sin esmalte" }
         }
       },
       "extras": {
         "label": "Extras",
         "sub": "Servicios adicionales",
         "items": {
-          "system-removal":         { "name": "Retiro de sistema previo",     "desc": "Gratis en tu primera visita · Para uñas de otro lugar" },
-          "single-sculpted-nail":   { "name": "Esculpido por uña",            "desc": "Reemplazo individual · Cualquier sistema" },
-          "design-per-nail":        { "name": "Diseño / decoración por uña",  "desc": "Nail art aplicado sobre tu servicio" },
-          "in-depth-foot-cleaning": { "name": "Limpieza profunda de pies",    "desc": "Hongos, uñas encarnadas y casos especiales" }
+          "system-removal":           { "name": "Retiro de sistema previo",     "desc": "Gratis en tu primera visita · Para uñas de otro lugar" },
+          "single-dual-system-nail":  { "name": "Uña dual system individual",   "desc": "Reemplazo individual · Sistema dual" },
+          "single-press-on-nail":     { "name": "Press-on individual",          "desc": "Reemplazo individual · Press-on" },
+          "design-per-nail":          { "name": "Diseño / decoración por uña",  "desc": "Nail art aplicado sobre tu servicio" },
+          "in-depth-foot-cleaning":   { "name": "Limpieza profunda de pies",    "desc": "Hongos, uñas encarnadas y casos especiales" }
         }
       }
     },

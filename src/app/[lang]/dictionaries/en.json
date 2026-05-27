@@ -89,20 +89,23 @@
         "label": "Simple",
         "sub": "Manicure · pedicure",
         "items": {
-          "semi-permanent-hands": { "name": "Semi-permanent hands", "desc": "Cleanup + gel polish" },
-          "semi-permanent-feet":  { "name": "Semi-permanent feet",  "desc": "Cleanup + gel polish" },
-          "hands-cleanup-only":   { "name": "Hands cleanup only",   "desc": "No polish" },
-          "feet-cleanup-only":    { "name": "Feet cleanup only",    "desc": "No polish" }
+          "semi-permanent-hands": { "name": "Semi-permanent hands",  "desc": "Cleanup + gel polish" },
+          "semi-permanent-feet":  { "name": "Semi-permanent feet",   "desc": "Cleanup + gel polish" },
+          "traditional-hands":    { "name": "Traditional manicure",  "desc": "Cleanup + regular polish" },
+          "traditional-feet":     { "name": "Traditional pedicure",  "desc": "Cleanup + regular polish" },
+          "hands-cleanup-only":   { "name": "Hands cleanup only",    "desc": "No polish" },
+          "feet-cleanup-only":    { "name": "Feet cleanup only",     "desc": "No polish" }
         }
       },
       "extras": {
         "label": "Extras",
         "sub": "Add-on services",
         "items": {
-          "system-removal":         { "name": "External system removal",      "desc": "Waived on your first visit · For nails from another salon" },
-          "single-sculpted-nail":   { "name": "Single sculpted nail",         "desc": "Individual replacement · Any system" },
-          "design-per-nail":        { "name": "Design / decoration per nail", "desc": "Nail art applied on top of your service" },
-          "in-depth-foot-cleaning": { "name": "In-depth foot cleaning",       "desc": "Fungus, ingrown nails and special cases" }
+          "system-removal":           { "name": "External system removal",      "desc": "Waived on your first visit · For nails from another salon" },
+          "single-dual-system-nail":  { "name": "Single dual-system nail",      "desc": "Individual replacement · Dual system" },
+          "single-press-on-nail":     { "name": "Single press-on nail",         "desc": "Individual replacement · Press-on" },
+          "design-per-nail":          { "name": "Design / decoration per nail", "desc": "Nail art applied on top of your service" },
+          "in-depth-foot-cleaning":   { "name": "In-depth foot cleaning",       "desc": "Fungus, ingrown nails and special cases" }
         }
       }
     },
