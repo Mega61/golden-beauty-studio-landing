@@ -18,8 +18,8 @@ export function generateStaticParams() {
 }
 
 const TAGLINES: Record<string, string> = {
-  es: "Uñas construidas · acrílico, polygel y dipping",
-  en: "Bespoke sculpted nails · acrylic, polygel & dipping",
+  es: "Uñas esculpidas · acrílico, polygel y dipping",
+  en: "Sculpted nails · acrylic, polygel & dipping",
 };
 
 async function loadLogo(): Promise<string | null> {

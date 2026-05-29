@@ -20,7 +20,7 @@ export default function Hero({ dict }: { dict: HeroDict }) {
       <div className="relative h-[620px] overflow-hidden md:h-[760px]">
         <Image
           src="/hero.jpg"
-          alt="Golden Beauty Studio — uñas construidas"
+          alt="Golden Beauty Studio — uñas esculpidas en Sabaneta"
           fill
           priority
           sizes="100vw"

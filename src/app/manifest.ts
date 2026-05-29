@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Golden Beauty Studio",
     short_name: "Golden",
     description:
-      "Estudio especializado en uñas construidas en Sabaneta, Antioquia.",
+      "Estudio especializado en uñas esculpidas en Sabaneta, Antioquia.",
     lang: "es",
     dir: "ltr",
     start_url: "/",

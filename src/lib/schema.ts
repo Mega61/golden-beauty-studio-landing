@@ -56,6 +56,7 @@ export function buildJsonLd(lang: Locale, dict: Dictionary) {
     url: abs(`/${lang}`),
     image: abs(`/${lang}/opengraph-image`),
     description: resolveDescription(dict, lang),
+    keywords: dict.meta.keywords,
     priceRange: business.priceRange,
     currenciesAccepted: "COP",
     areaServed: business.addressLocality,
