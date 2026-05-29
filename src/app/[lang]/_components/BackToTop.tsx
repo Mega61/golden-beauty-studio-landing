@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
  * behavior: 'smooth' })`, so the `prefers-reduced-motion` override in
  * globals.css also disables this button's animation for sensitive users.
  */
-export default function BackToTop() {
+export default function BackToTop({ label }: { label: string }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function BackToTop() {
   return (
     <button
       type="button"
-      aria-label="Volver arriba"
+      aria-label={label}
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       className={`group fixed right-5 z-50 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border bg-ivory text-ink transition-all duration-300 lg:right-7 ${
         visible

@@ -16,6 +16,7 @@ import Footer from "./_components/Footer";
 import FloatingActions from "./_components/FloatingActions";
 import BrandDivider from "./_components/BrandDivider";
 import BackToTop from "./_components/BackToTop";
+import JsonLd from "./_components/JsonLd";
 
 export default async function Page({
   params,
@@ -31,6 +32,7 @@ export default async function Page({
 
   return (
     <>
+      <JsonLd lang={typedLang} dict={dict} />
       <PromoStrip scenario={scenario} dict={dict.promos} />
       <Nav lang={lang} dict={dict.nav} sections={sections} />
       <Hero dict={dict.hero} />
@@ -46,7 +48,7 @@ export default async function Page({
       {sections.contacto && <Contacto dict={dict.contacto} />}
       <Footer dict={dict.footer} />
       <FloatingActions dict={dict.floating} />
-      <BackToTop />
+      <BackToTop label={dict.floating.backToTop} />
     </>
   );
 }

@@ -4,8 +4,20 @@
     "fresha": "Link a Fresha pendiente de configuración."
   },
   "meta": {
-    "title": "Golden Beauty Studio — Sabaneta",
-    "description": "Estudio especializado en uñas construidas en Sabaneta, Antioquia. Acrílico, polygel, builder gel y dipping con cita personalizada."
+    "title": "Golden Beauty Studio | Uñas acrílicas, polygel y dipping en Sabaneta",
+    "description": "Estudio especializado en uñas construidas en Sabaneta, Antioquia: acrílico, polygel, builder gel, dipping y semipermanente con cita personalizada. Desde {priceFrom}.",
+    "keywords": [
+      "uñas Sabaneta",
+      "uñas acrílicas Sabaneta",
+      "polygel Sabaneta",
+      "builder gel",
+      "dipping uñas",
+      "uñas semipermanentes",
+      "nail studio Sabaneta",
+      "manicura Sabaneta",
+      "uñas Medellín",
+      "Golden Beauty Studio"
+    ]
   },
   "nav": {
     "items": {
@@ -97,6 +109,17 @@
           "feet-cleanup-only":    { "name": "Solo limpieza pies",    "desc": "Sin esmalte" }
         }
       },
+      "combos": {
+        "label": "Combos",
+        "sub": "Manos + pies · Dúo",
+        "items": {
+          "polygel-overlay-hands-semi-feet":       { "name": "Forrado polygel manos + semi pies",      "desc": "Forrado en uña natural + esmalte gel en pies" },
+          "builder-gel-overlay-hands-semi-feet":   { "name": "Forrado builder gel manos + semi pies",  "desc": "Forrado en uña natural + esmalte gel en pies" },
+          "acrylic-overlay-hands-semi-feet":       { "name": "Forrado acrílico manos + semi pies",     "desc": "Forrado en uña natural + esmalte gel en pies" },
+          "semi-permanent-hands-feet":             { "name": "Semipermanente manos + pies",            "desc": "Esmalte gel en manos y pies" },
+          "semi-permanent-hands-traditional-feet": { "name": "Semipermanente manos + tradicional pies","desc": "Esmalte gel manos + esmalte tradicional pies" }
+        }
+      },
       "extras": {
         "label": "Extras",
         "sub": "Servicios adicionales",
@@ -155,6 +178,11 @@
     "leadItalic": "Golden nace de la idea de transformar el cuidado personal en una experiencia de comodidad y exclusividad. Hacer que cada mujer se sienta segura, femenina y auténtica.",
     "body1": "Nuestras nail artists manejan a la perfección cada técnica que ofrecemos: puedes elegir tu favorita con la certeza de que el resultado siempre será deslumbrante.",
     "body2": "Estamos ubicadas en Sabaneta, en un local moderno, elegante y acogedor, diseñado para brindar una experiencia sofisticada y exclusiva.",
+    "spaceAlts": [
+      "Interior del estudio de uñas Golden Beauty Studio en Sabaneta",
+      "Estación de manicura en Golden Beauty Studio, Sabaneta",
+      "Detalle del espacio de Golden Beauty Studio en Sabaneta"
+    ],
     "stats": [
       { "n": "02h", "l": "Duración promedio", "s": "Por cita, sin doblar agenda" },
       { "n": "02", "l": "Puestos atendidos", "s": "Estudio íntimo, no salón" },
@@ -233,11 +261,11 @@
         "Google Maps"
       ]
     },
-    "copyright": "© 2026 Golden Beauty Studio. Todos los derechos reservados.",
-    "legal": ["Privacidad", "Términos"]
+    "copyright": "© 2026 Golden Beauty Studio. Todos los derechos reservados."
   },
   "floating": {
     "whatsapp": "WhatsApp",
-    "cta": "Agendar →"
+    "cta": "Agendar →",
+    "backToTop": "Volver arriba"
   }
 }

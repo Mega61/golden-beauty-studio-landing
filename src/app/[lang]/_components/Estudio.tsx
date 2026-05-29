@@ -8,6 +8,7 @@ type EstudioDict = {
   leadItalic: string;
   body1: string;
   body2: string;
+  spaceAlts: string[];
   stats: Stat[];
   hygiene: {
     eyebrow: string;
@@ -84,7 +85,7 @@ export default function Estudio({ dict }: { dict: EstudioDict }) {
           >
             <Image
               src="/space-01.jpg"
-              alt=""
+              alt={dict.spaceAlts[0] ?? ""}
               fill
               sizes="(min-width: 768px) 66vw, 100vw"
               className="object-cover"
@@ -97,7 +98,7 @@ export default function Estudio({ dict }: { dict: EstudioDict }) {
             >
               <Image
                 src="/space-02.jpg"
-                alt=""
+                alt={dict.spaceAlts[1] ?? ""}
                 fill
                 sizes="(min-width: 768px) 33vw, 50vw"
                 className="object-cover"
@@ -109,7 +110,7 @@ export default function Estudio({ dict }: { dict: EstudioDict }) {
             >
               <Image
                 src="/space-03.jpg"
-                alt=""
+                alt={dict.spaceAlts[2] ?? ""}
                 fill
                 sizes="(min-width: 768px) 33vw, 50vw"
                 className="object-cover"

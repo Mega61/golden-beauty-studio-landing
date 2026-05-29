@@ -11,7 +11,7 @@ import type {
   LookbookCategory,
   LookbookItem,
 } from "@/data/lookbook-manifest";
-import { CATEGORY_LABELS } from "@/data/lookbook-categories";
+import { CATEGORY_LABELS, lookbookAlt } from "@/data/lookbook-categories";
 
 type FilterValue = "all" | LookbookCategory;
 
@@ -143,9 +143,9 @@ export default function LookbookGrid({
         style={{ animation: "lb-fade-in 220ms ease-out" }}
       >
         {filter === "all" ? (
-          <MosaicGrid items={filteredItems} onOpen={openAt} />
+          <MosaicGrid items={filteredItems} onOpen={openAt} lang={lang} />
         ) : (
-          <UniformGrid items={filteredItems} onOpen={openAt} />
+          <UniformGrid items={filteredItems} onOpen={openAt} lang={lang} />
         )}
       </div>
 
@@ -154,7 +154,7 @@ export default function LookbookGrid({
           className="mt-2 md:mt-3.5"
           style={{ animation: "lb-fade-in 220ms ease-out" }}
         >
-          <UniformGrid items={extras} onOpen={openAt} />
+          <UniformGrid items={extras} onOpen={openAt} lang={lang} />
         </div>
       )}
 
@@ -235,9 +235,11 @@ function FilterButton({
 function MosaicGrid({
   items,
   onOpen,
+  lang,
 }: {
   items: readonly LookbookItem[];
   onOpen: (item: LookbookItem) => void;
+  lang: Locale;
 }) {
   // Fill 12 slots; empty slots get a placeholder seal.
   const slots = Array.from({ length: 12 }, (_, i) => items[i] ?? null);
@@ -289,6 +291,7 @@ function MosaicGrid({
             className="lookbook-tile-asym"
             style={tileStyle}
             onOpen={onOpen}
+            lang={lang}
           />
         );
       })}
@@ -299,9 +302,11 @@ function MosaicGrid({
 function UniformGrid({
   items,
   onOpen,
+  lang,
 }: {
   items: readonly LookbookItem[];
   onOpen: (item: LookbookItem) => void;
+  lang: Locale;
 }) {
   if (items.length === 0) {
     return (
@@ -319,6 +324,7 @@ function UniformGrid({
           sizes="(min-width: 768px) 25vw, 50vw"
           style={{ aspectRatio: "4 / 5" }}
           onOpen={onOpen}
+          lang={lang}
         />
       ))}
     </div>
@@ -331,14 +337,16 @@ function LookbookTileButton({
   className,
   style,
   onOpen,
+  lang,
 }: {
   item: LookbookItem;
   sizes: string;
   className?: string;
   style?: React.CSSProperties;
   onOpen: (item: LookbookItem) => void;
+  lang: Locale;
 }) {
-  const categoryLabel = CATEGORY_LABELS[item.category]?.es ?? item.category;
+  const categoryLabel = CATEGORY_LABELS[item.category]?.[lang] ?? item.category;
   const base =
     "lookbook-tile group relative m-0 cursor-zoom-in overflow-hidden border-0 bg-cream p-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-ivory";
   return (
@@ -351,19 +359,19 @@ function LookbookTileButton({
     >
       <Image
         src={item.src}
-        alt={item.caption}
+        alt={lookbookAlt(item, lang)}
         fill
         sizes={sizes}
         className="object-cover transition-[filter,transform] duration-300 group-hover:scale-[1.02]"
         style={{ filter: "saturate(0.92) contrast(1.02)" }}
       />
-      <TileCaption item={item} />
+      <TileCaption item={item} lang={lang} />
     </button>
   );
 }
 
-function TileCaption({ item }: { item: LookbookItem }) {
-  const categoryLabel = CATEGORY_LABELS[item.category]?.es ?? item.category;
+function TileCaption({ item, lang }: { item: LookbookItem; lang: Locale }) {
+  const categoryLabel = CATEGORY_LABELS[item.category]?.[lang] ?? item.category;
   return (
     <figcaption
       className="absolute inset-x-0 bottom-0 flex items-baseline justify-between gap-2 px-3 py-2.5 text-gold-soft md:px-4 md:py-3.5"

@@ -46,6 +46,10 @@ next-env.d.ts
 # generated brand asset rasters — regenerable from public/logos/*.svg
 /public/logos/optimized/
 
+# generated PWA icons + OG logo — regenerable via scripts/build-favicon.mjs
+/public/icons/
+/public/og/
+
 # generated watermarked lookbook — regenerable from public/lookbook/<category>/*
 /public/lookbook-wm/
 

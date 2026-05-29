@@ -15,7 +15,6 @@ type FooterDict = {
     links: string[];
   };
   copyright: string;
-  legal: string[];
 };
 
 function resolveFindLink(
@@ -115,22 +114,11 @@ export default function Footer({ dict }: { dict: FooterDict }) {
           </div>
         </div>
         <div
-          className="flex flex-col gap-3 pt-6 md:flex-row md:justify-between"
+          className="pt-6"
           style={{ borderTop: "1px solid var(--hair)" }}
         >
           <span className="font-sans text-[11px] text-ink-mute">
             {dict.copyright}
-          </span>
-          <span className="flex gap-5">
-            {dict.legal.map((l) => (
-              <a
-                key={l}
-                href="#"
-                className="font-sans text-[11px] text-ink-mute no-underline"
-              >
-                {l}
-              </a>
-            ))}
           </span>
         </div>
       </div>

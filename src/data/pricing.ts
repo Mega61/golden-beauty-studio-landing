@@ -56,6 +56,16 @@ export const pricing: readonly PriceCategory[] = [
     ],
   },
   {
+    id: "combos",
+    items: [
+      { id: "polygel-overlay-hands-semi-feet", priceCOP: 135000, durationMin: 150 },
+      { id: "builder-gel-overlay-hands-semi-feet", priceCOP: 130000, durationMin: 150 },
+      { id: "acrylic-overlay-hands-semi-feet", priceCOP: 125000, durationMin: 150 },
+      { id: "semi-permanent-hands-feet", priceCOP: 95000, durationMin: 120 },
+      { id: "semi-permanent-hands-traditional-feet", priceCOP: 87000, durationMin: 120 },
+    ],
+  },
+  {
     id: "extras",
     items: [
       { id: "system-removal", priceCOP: 20000, durationMin: 30 },
@@ -66,3 +76,14 @@ export const pricing: readonly PriceCategory[] = [
     ],
   },
 ] as const;
+
+// Lowest price of a standalone, bookable service — used for the "from $…"
+// hint in the SEO meta description. Excludes the `extras` category (per-nail
+// add-ons / removals are not standalone bookings, so they'd be misleading).
+export function getStartingPriceCOP(): number {
+  return Math.min(
+    ...pricing
+      .filter((cat) => cat.id !== "extras")
+      .flatMap((cat) => cat.items.map((it) => it.priceCOP)),
+  );
+}

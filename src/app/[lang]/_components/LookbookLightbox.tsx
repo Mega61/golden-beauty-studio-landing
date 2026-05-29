@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Locale } from "../dictionaries";
 import type { LookbookItem } from "@/data/lookbook-manifest";
-import { CATEGORY_LABELS } from "@/data/lookbook-categories";
+import { CATEGORY_LABELS, lookbookAlt } from "@/data/lookbook-categories";
 
 export type LookbookLightboxDict = {
   close: string;
@@ -324,9 +324,9 @@ export default function LookbookLightbox({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <CarouselSlot item={prevItem} />
-          <CarouselSlot item={current} priority />
-          <CarouselSlot item={nextItem} />
+          <CarouselSlot item={prevItem} lang={lang} />
+          <CarouselSlot item={current} lang={lang} priority />
+          <CarouselSlot item={nextItem} lang={lang} />
         </div>
 
         {/* Desktop next arrow (md+) */}
@@ -452,9 +452,11 @@ export default function LookbookLightbox({
 
 function CarouselSlot({
   item,
+  lang,
   priority = false,
 }: {
   item: LookbookItem | null;
+  lang: Locale;
   priority?: boolean;
 }) {
   return (
@@ -472,7 +474,7 @@ function CarouselSlot({
         >
           <Image
             src={item.src}
-            alt={item.caption}
+            alt={lookbookAlt(item, lang)}
             fill
             sizes={SIZES_HINT}
             priority={priority}
