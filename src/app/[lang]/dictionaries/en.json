@@ -102,12 +102,13 @@
         "label": "Simple",
         "sub": "Manicure · pedicure",
         "items": {
-          "semi-permanent-hands": { "name": "Semi-permanent hands",  "desc": "Cleanup + gel polish" },
-          "semi-permanent-feet":  { "name": "Semi-permanent feet",   "desc": "Cleanup + gel polish" },
-          "traditional-hands":    { "name": "Traditional manicure",  "desc": "Cleanup + regular polish" },
-          "traditional-feet":     { "name": "Traditional pedicure",  "desc": "Cleanup + regular polish" },
-          "hands-cleanup-only":   { "name": "Hands cleanup only",    "desc": "No polish" },
-          "feet-cleanup-only":    { "name": "Feet cleanup only",     "desc": "No polish" }
+          "semi-permanent-feet":     { "name": "Semi-permanent feet",     "desc": "Cleanup + gel polish" },
+          "semi-permanent-no-color": { "name": "Semi-permanent no color", "desc": "Cleanup + clear gel" },
+          "semi-permanent-hands":    { "name": "Semi-permanent hands",    "desc": "Cleanup + gel polish" },
+          "traditional-feet":        { "name": "Traditional feet",        "desc": "Cleanup + regular polish" },
+          "traditional-hands":       { "name": "Traditional hands",       "desc": "Cleanup + regular polish" },
+          "feet-cleanup-only":       { "name": "Feet cleanup only",       "desc": "No polish" },
+          "hands-cleanup-only":      { "name": "Hands cleanup only",      "desc": "No polish" }
         }
       },
       "combos": {

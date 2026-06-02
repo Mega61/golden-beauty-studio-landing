@@ -47,12 +47,13 @@ export const pricing: readonly PriceCategory[] = [
   {
     id: "sencillos",
     items: [
-      { id: "semi-permanent-hands", priceCOP: 50000, durationMin: 60 },
       { id: "semi-permanent-feet", priceCOP: 55000, durationMin: 75 },
-      { id: "traditional-hands", priceCOP: 40000, durationMin: 60 },
-      { id: "traditional-feet", priceCOP: 45000, durationMin: 60 },
-      { id: "hands-cleanup-only", priceCOP: 30000, durationMin: 30 },
-      { id: "feet-cleanup-only", priceCOP: 35000, durationMin: 45 },
+      { id: "semi-permanent-no-color", priceCOP: 40000, durationMin: 45 },
+      { id: "semi-permanent-hands", priceCOP: 50000, durationMin: 60 },
+      { id: "traditional-feet", priceCOP: 35000, durationMin: 60 },
+      { id: "traditional-hands", priceCOP: 30000, durationMin: 60 },
+      { id: "feet-cleanup-only", priceCOP: 25000, durationMin: 45 },
+      { id: "hands-cleanup-only", priceCOP: 20000, durationMin: 30 },
     ],
   },
   {
@@ -62,7 +63,7 @@ export const pricing: readonly PriceCategory[] = [
       { id: "builder-gel-overlay-hands-semi-feet", priceCOP: 130000, durationMin: 150 },
       { id: "acrylic-overlay-hands-semi-feet", priceCOP: 125000, durationMin: 150 },
       { id: "semi-permanent-hands-feet", priceCOP: 95000, durationMin: 120 },
-      { id: "semi-permanent-hands-traditional-feet", priceCOP: 87000, durationMin: 120 },
+      { id: "semi-permanent-hands-traditional-feet", priceCOP: 77000, durationMin: 120 },
     ],
   },
   {
