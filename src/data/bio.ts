@@ -104,11 +104,12 @@ export async function getBio(lang: Locale): Promise<BioData> {
  *
  * tag   ← scenario.label  (period descriptor)
  * title ← featured item's headline, falling back to the strip message
- * href  ← featured item's CTA, falling back to the strip href
+ * href  ← always the landing's promo section (`/es#promos`)
  *
- * The landing's promo hrefs are in-page hashes (`#promos`, `#contacto`). On the
- * standalone bio page those anchors don't exist, so a bare hash is rewritten to
- * land on the matching section of the localized landing (`/es#promos`).
+ * The banner deliberately ignores each scenario's own CTA (which usually points
+ * at booking or `#contacto`): on the bio — a directory page — it acts as a
+ * teaser that opens the full promo block on the landing, not a direct booking.
+ * `#promos` is the id of the Highlights section the landing strip also targets.
  */
 export function scenarioToBioPromo(
   scenario: PromoScenario | null,
@@ -117,9 +118,8 @@ export function scenarioToBioPromo(
   if (!scenario) return null;
   const featured = scenario.items.find((i) => i.featured) ?? scenario.items[0];
   const title = featured?.title ?? scenario.strip?.message;
-  const raw = featured?.cta_href ?? scenario.strip?.href;
-  if (!title || !raw) return null;
-  const href = raw.startsWith("#") ? `/${lang}${raw}` : raw;
+  if (!title) return null;
+  const href = `/${lang}#promos`;
   return {
     tag: scenario.label,
     title,

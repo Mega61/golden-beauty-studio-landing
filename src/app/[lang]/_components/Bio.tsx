@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Logo from "./Logo";
 import { BioLink, BioView } from "./BioLink";
+import SocialIcon from "./SocialIcon";
 import type { BioData, BioPromo } from "@/data/bio.types";
 
 type Props = {
@@ -356,18 +357,15 @@ export default function Bio({ bio, promo }: Props) {
                   kind="social"
                   external
                   ariaLabel={s.label}
-                  className="flex items-center justify-center rounded-full font-sans no-underline"
+                  className="flex items-center justify-center rounded-full no-underline"
                   style={{
                     width: 44,
                     height: 44,
                     border: "1px solid var(--hair)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: "0.14em",
-                    color: "var(--color-ink-soft)",
+                    color: "var(--color-gold)",
                   }}
                 >
-                  {s.short}
+                  <SocialIcon name={s.key} size={18} />
                 </BioLink>
               ))}
             </div>
