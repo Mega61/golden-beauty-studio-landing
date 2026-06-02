@@ -28,3 +28,10 @@ export function trackBookingClick(
 export function trackPricingClick(location: string): void {
   trackEvent("view_pricing", { location });
 }
+
+export function trackWhatsappClick(
+  location: string,
+  extra?: Record<string, unknown>,
+): void {
+  trackEvent("contact_whatsapp", { location, ...extra });
+}

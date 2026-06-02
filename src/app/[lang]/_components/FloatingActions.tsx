@@ -1,4 +1,5 @@
 import WhatsAppIcon from "./WhatsAppIcon";
+import TrackedWhatsappLink from "./TrackedWhatsappLink";
 import { siteConfig } from "@/config/site";
 
 type FloatingDict = {
@@ -17,10 +18,9 @@ export default function FloatingActions({ dict }: { dict: FloatingDict }) {
   // drawer trigger), so a duplicate mobile-bar version is redundant and was
   // colliding with this WhatsApp button. Only WhatsApp floats now.
   return (
-    <a
+    <TrackedWhatsappLink
       href={whatsappUrl}
-      target="_blank"
-      rel="noopener noreferrer"
+      location="floating"
       aria-label={dict.whatsapp}
       className="group fixed bottom-5 right-5 z-50 flex items-center justify-center rounded-full text-white no-underline lg:bottom-7 lg:right-7 lg:justify-start lg:gap-3"
       style={{
@@ -41,6 +41,6 @@ export default function FloatingActions({ dict }: { dict: FloatingDict }) {
       <span className="hidden font-sans text-[12px] font-semibold uppercase tracking-[0.22em] lg:inline lg:pr-2">
         {dict.whatsapp}
       </span>
-    </a>
+    </TrackedWhatsappLink>
   );
 }

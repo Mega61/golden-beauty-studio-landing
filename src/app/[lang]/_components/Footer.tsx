@@ -1,6 +1,7 @@
 import { siteConfig } from "@/config/site";
 import Logo from "./Logo";
 import TrackedBookingLink from "./TrackedBookingLink";
+import TrackedWhatsappLink from "./TrackedWhatsappLink";
 
 type FooterDict = {
   tagline: string;
@@ -82,6 +83,7 @@ export default function Footer({ dict }: { dict: FooterDict }) {
                 const href = resolveFindLink(l, findUrls);
                 if (!href) return null;
                 const isBooking = href === findUrls.booking;
+                const isWhatsapp = href === findUrls.whatsapp;
                 const className =
                   "pb-0.5 font-sans text-[14px] text-ink no-underline";
                 const style = { borderBottom: "1px solid var(--hair)" };
@@ -96,6 +98,15 @@ export default function Footer({ dict }: { dict: FooterDict }) {
                       >
                         {l} →
                       </TrackedBookingLink>
+                    ) : isWhatsapp ? (
+                      <TrackedWhatsappLink
+                        href={href}
+                        location="footer"
+                        className={className}
+                        style={style}
+                      >
+                        {l} →
+                      </TrackedWhatsappLink>
                     ) : (
                       <a
                         href={href}
