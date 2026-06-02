@@ -102,12 +102,13 @@
         "label": "Sencillos",
         "sub": "Manicura · pedicura",
         "items": {
-          "semi-permanent-hands": { "name": "Semipermanente manos",  "desc": "Limpieza + esmalte gel" },
-          "semi-permanent-feet":  { "name": "Semipermanente pies",   "desc": "Limpieza + esmalte gel" },
-          "traditional-hands":    { "name": "Manicura tradicional",  "desc": "Limpieza + esmalte tradicional" },
-          "traditional-feet":     { "name": "Pedicura tradicional",  "desc": "Limpieza + esmalte tradicional" },
-          "hands-cleanup-only":   { "name": "Solo limpieza manos",   "desc": "Sin esmalte" },
-          "feet-cleanup-only":    { "name": "Solo limpieza pies",    "desc": "Sin esmalte" }
+          "semi-permanent-feet":     { "name": "Semipermanente pies",      "desc": "Limpieza + esmalte gel" },
+          "semi-permanent-no-color": { "name": "Semipermanente sin color", "desc": "Limpieza + gel sin color" },
+          "semi-permanent-hands":    { "name": "Semipermanente manos",     "desc": "Limpieza + esmalte gel" },
+          "traditional-feet":        { "name": "Tradicional pies",         "desc": "Limpieza + esmalte tradicional" },
+          "traditional-hands":       { "name": "Tradicional manos",        "desc": "Limpieza + esmalte tradicional" },
+          "feet-cleanup-only":       { "name": "Solo limpieza pies",       "desc": "Sin esmalte" },
+          "hands-cleanup-only":      { "name": "Solo limpieza manos",      "desc": "Sin esmalte" }
         }
       },
       "combos": {
