@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale, type Locale } from "../dictionaries";
-import { getActiveScenario } from "@/data/promos";
-import { getBio, scenarioToBioPromo } from "@/data/bio";
+import { getActiveScenarios } from "@/data/promos";
+import { getBio, scenariosToBioPromos } from "@/data/bio";
 import Bio from "../_components/Bio";
 
 export async function generateMetadata({
@@ -36,8 +36,8 @@ export default async function BioPage({
   const typedLang: Locale = lang;
 
   const bio = await getBio(typedLang);
-  const scenario = await getActiveScenario(typedLang);
-  const promo = scenarioToBioPromo(scenario, typedLang);
+  const scenarios = await getActiveScenarios(typedLang);
+  const promos = scenariosToBioPromos(scenarios, typedLang);
 
-  return <Bio bio={bio} promo={promo} />;
+  return <Bio bio={bio} promos={promos} />;
 }

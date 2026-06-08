@@ -1,12 +1,13 @@
 import Image from "next/image";
 import Logo from "./Logo";
 import { BioLink, BioView } from "./BioLink";
+import BioPromoBanner from "./BioPromoBanner";
 import SocialIcon from "./SocialIcon";
 import type { BioData, BioPromo } from "@/data/bio.types";
 
 type Props = {
   bio: BioData;
-  promo: BioPromo | null;
+  promos: BioPromo[];
 };
 
 /**
@@ -20,12 +21,13 @@ type Props = {
  * (`BioView`) are the only client pieces. Every clickable funnels through GA4.
  */
 
-export default function Bio({ bio, promo }: Props) {
+export default function Bio({ bio, promos }: Props) {
   const primary = bio.links.find((l) => l.primary) ?? null;
   const rows = bio.links.filter((l) => !l.primary);
 
-  const ctaMt = promo ? 14 : 26;
-  const rowsMt = primary ? 12 : promo ? 14 : 26;
+  const hasPromo = promos.length > 0;
+  const ctaMt = hasPromo ? 14 : 26;
+  const rowsMt = primary ? 12 : hasPromo ? 14 : 26;
 
   return (
     <main
@@ -104,113 +106,10 @@ export default function Bio({ bio, promo }: Props) {
           {bio.tagline}
         </p>
 
-        {/* Pinned promo banner — a photographic hero (omitted when no scenario
-            is active). Eyebrow pinned to the top, headline + CTA to the bottom,
-            over a darkened image + marble soft-light wash. */}
-        {promo && (
-          <BioLink
-            href={promo.href}
-            linkKey="promo"
-            label={promo.tag}
-            kind="promo"
-            external={/^https?:\/\//i.test(promo.href)}
-            className="relative flex w-full flex-col justify-between overflow-hidden no-underline"
-            style={{
-              marginTop: 26,
-              minHeight: 210,
-              padding: 20,
-              background: "var(--color-carbon)",
-              border: "1px solid rgba(231, 170, 81, 0.22)",
-            }}
-          >
-            {promo.image && (
-              <Image
-                src={promo.image}
-                alt=""
-                fill
-                sizes="400px"
-                className="object-cover"
-                style={{
-                  filter: "brightness(0.6) contrast(1.05) saturate(0.95)",
-                }}
-              />
-            )}
-            <span
-              aria-hidden
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(20,15,12,0.4) 0%, rgba(20,15,12,0.18) 42%, rgba(20,15,12,0.85) 100%)",
-              }}
-            />
-            <span
-              aria-hidden
-              className="bg-marble absolute inset-0"
-              style={{ mixBlendMode: "soft-light", opacity: 0.22 }}
-            />
-
-            {/* top — eyebrow + pulse */}
-            <span className="relative flex items-center" style={{ gap: 10 }}>
-              <span
-                aria-hidden
-                className="gbs-pulse inline-block shrink-0 rounded-full"
-                style={{
-                  width: 8,
-                  height: 8,
-                  background: "var(--color-gold-bright)",
-                }}
-              />
-              <span
-                className="font-sans uppercase"
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.3em",
-                  color: "var(--color-gold-bright)",
-                }}
-              >
-                {promo.tag}
-              </span>
-            </span>
-
-            {/* bottom — headline + CTA */}
-            <span className="relative block">
-              <span
-                className="block font-display italic"
-                style={{
-                  fontSize: 23,
-                  lineHeight: 1.1,
-                  color: "var(--color-ivory)",
-                }}
-              >
-                {promo.title}
-              </span>
-              <span
-                className="mt-3 flex items-center justify-between"
-                style={{ gap: 12 }}
-              >
-                <span
-                  className="font-sans uppercase"
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: "0.24em",
-                    color: "var(--color-gold-soft)",
-                  }}
-                >
-                  {promo.cta}
-                </span>
-                <span
-                  aria-hidden
-                  className="shrink-0 font-display italic leading-none"
-                  style={{ fontSize: 24, color: "var(--color-gold-bright)" }}
-                >
-                  →
-                </span>
-              </span>
-            </span>
-          </BioLink>
-        )}
+        {/* Pinned promo band — a photographic hero (omitted when no scenario is
+            active). With 2+ active promos it becomes a rotating carousel,
+            mirroring the landing strip + Highlights. */}
+        <BioPromoBanner promos={promos} />
 
         {/* Primary CTA — the only gold gradient fill on the page */}
         {primary && (

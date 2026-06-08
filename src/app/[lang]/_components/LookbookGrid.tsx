@@ -3,9 +3,9 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import Placeholder from "./Placeholder";
-import LookbookLightbox, {
-  type LookbookLightboxDict,
-} from "./LookbookLightbox";
+import PhotoLightbox, {
+  type PhotoLightboxDict,
+} from "./PhotoLightbox";
 import type { Locale } from "../dictionaries";
 import type {
   LookbookCategory,
@@ -58,7 +58,7 @@ export type LookbookGridProps = {
   allLabel: string;
   seeAllLabel: string;
   seeLessLabel: string;
-  lightboxDict: LookbookLightboxDict;
+  lightboxDict: PhotoLightboxDict;
 };
 
 const MOSAIC_SLOTS = 12;
@@ -172,9 +172,13 @@ export default function LookbookGrid({
       )}
 
       {openIndex !== null && (
-        <LookbookLightbox
-          lang={lang}
-          items={filteredItems}
+        <PhotoLightbox
+          photos={filteredItems.map((it) => ({
+            src: it.src,
+            alt: lookbookAlt(it, lang),
+            caption: it.caption,
+            meta: CATEGORY_LABELS[it.category]?.[lang] ?? it.category,
+          }))}
           startIndex={openIndex}
           dict={lightboxDict}
           onClose={closeLightbox}

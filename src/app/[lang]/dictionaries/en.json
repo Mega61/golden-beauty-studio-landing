@@ -46,7 +46,7 @@
     "eyebrow": "Lookbook · 2026",
     "title1": "Our craft,",
     "title2_em": "for you",
-    "body": "A selection of recent pieces. Each look notes the technique used and the artist's name. Tap any image to see it in detail.",
+    "body": "A selection of recent pieces. Each look notes the technique used. Tap any image to see it in detail.",
     "allLabel": "All",
     "seeAll": "See the full archive",
     "seeLess": "See less",
@@ -185,6 +185,12 @@
       "Manicure station at Golden Beauty Studio, Sabaneta",
       "Detail of the Golden Beauty Studio space in Sabaneta"
     ],
+    "lightbox": {
+      "close": "Close",
+      "next": "Next",
+      "previous": "Previous",
+      "counter": "{current} / {total}"
+    },
     "stats": [
       { "n": "02h", "l": "Average duration", "s": "Per appointment, no overlap" },
       { "n": "02", "l": "Working stations", "s": "Intimate studio, not a salon" },

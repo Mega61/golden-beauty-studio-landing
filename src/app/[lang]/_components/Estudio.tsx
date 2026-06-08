@@ -1,4 +1,5 @@
-import Image from "next/image";
+import EstudioGallery from "./EstudioGallery";
+import type { PhotoLightboxDict } from "./PhotoLightbox";
 
 type Stat = { n: string; l: string; s: string };
 type EstudioDict = {
@@ -9,6 +10,7 @@ type EstudioDict = {
   body1: string;
   body2: string;
   spaceAlts: string[];
+  lightbox: PhotoLightboxDict;
   stats: Stat[];
   hygiene: {
     eyebrow: string;
@@ -78,46 +80,14 @@ export default function Estudio({ dict }: { dict: EstudioDict }) {
           </div>
         </div>
 
-        <div className="mb-10 grid gap-2 md:mb-16 md:grid-cols-[2fr_1fr] md:gap-3.5">
-          <div
-            className="relative overflow-hidden bg-cream"
-            style={{ aspectRatio: "5 / 3" }}
-          >
-            <Image
-              src="/space-01.jpg"
-              alt={dict.spaceAlts[0] ?? ""}
-              fill
-              sizes="(min-width: 768px) 66vw, 100vw"
-              className="object-cover"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-1 md:gap-3.5">
-            <div
-              className="relative overflow-hidden bg-cream"
-              style={{ aspectRatio: "5 / 3" }}
-            >
-              <Image
-                src="/space-02.jpg"
-                alt={dict.spaceAlts[1] ?? ""}
-                fill
-                sizes="(min-width: 768px) 33vw, 50vw"
-                className="object-cover"
-              />
-            </div>
-            <div
-              className="relative overflow-hidden bg-cream"
-              style={{ aspectRatio: "5 / 3" }}
-            >
-              <Image
-                src="/space-03.jpg"
-                alt={dict.spaceAlts[2] ?? ""}
-                fill
-                sizes="(min-width: 768px) 33vw, 50vw"
-                className="object-cover"
-              />
-            </div>
-          </div>
-        </div>
+        <EstudioGallery
+          photos={[
+            { src: "/space-01.jpg", alt: dict.spaceAlts[0] ?? "" },
+            { src: "/space-02.jpg", alt: dict.spaceAlts[1] ?? "" },
+            { src: "/space-03.jpg", alt: dict.spaceAlts[2] ?? "" },
+          ]}
+          dict={dict.lightbox}
+        />
 
         <div
           className="grid grid-cols-2 md:grid-cols-4"

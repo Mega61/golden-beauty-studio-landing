@@ -15,6 +15,7 @@ export const CATEGORY_LABELS: Record<
   polygel: { es: "Polygel", en: "Polygel" },
   "builder-gel": { es: "Builder gel", en: "Builder gel" },
   dipping: { es: "Dipping", en: "Dipping" },
+  rubber: { es: "Rubber", en: "Rubber" },
   semipermanente: { es: "Semi", en: "Semi" },
   "press-on": { es: "Press On", en: "Press On" },
 };
@@ -32,6 +33,7 @@ export const CATEGORY_ORDER: LookbookCategory[] = [
   "polygel",
   "builder-gel",
   "dipping",
+  "rubber",
   "semipermanente",
   "press-on",
 ];

@@ -46,7 +46,7 @@
     "eyebrow": "Lookbook · 2026",
     "title1": "Nuestro arte,",
     "title2_em": "para ti",
-    "body": "Una selección de piezas recientes. Cada look incluye la técnica usada y el nombre de la artista. Toca cualquier imagen para verla en detalle.",
+    "body": "Una selección de piezas recientes. Cada look incluye la técnica usada. Toca cualquier imagen para verla en detalle.",
     "allLabel": "Todos",
     "seeAll": "Ver el archivo completo",
     "seeLess": "Ver menos",
@@ -185,6 +185,12 @@
       "Estación de manicura en Golden Beauty Studio, Sabaneta",
       "Detalle del espacio de Golden Beauty Studio en Sabaneta"
     ],
+    "lightbox": {
+      "close": "Cerrar",
+      "next": "Siguiente",
+      "previous": "Anterior",
+      "counter": "{current} / {total}"
+    },
     "stats": [
       { "n": "02h", "l": "Duración promedio", "s": "Por cita, sin doblar agenda" },
       { "n": "02", "l": "Puestos atendidos", "s": "Estudio íntimo, no salón" },

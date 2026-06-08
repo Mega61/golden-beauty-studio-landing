@@ -15,6 +15,7 @@
     "build-manifest": "node scripts/build-lookbook-manifest.mjs",
     "seed-lookbook": "node scripts/seed-lookbook-samples.mjs",
     "build-favicon": "node scripts/build-favicon.mjs",
+    "build-promo-collage": "node scripts/build-promo-collage.mjs",
     "export-copy": "node scripts/export-copy-template.mjs"
   },
   "dependencies": {

@@ -158,6 +158,37 @@ export const PROMOS_DATA: PromosBySlug = {
     ],
   },
 
+  "primera-visita": {
+    slug: "primera-visita",
+    label: "First visit",
+    active: true,
+    // Evergreen: no starts_at/ends_at — meant to run year-round alongside
+    // whichever seasonal promo is active.
+    strip: {
+      tag: "First visit",
+      message:
+        "10% off your first appointment at the studio — new clients only.",
+      cta: "Book now",
+      href: BOOKING,
+      accent: "ink",
+    },
+    items: [
+      {
+        id: "primera-visita-10",
+        eyebrow: "Welcome",
+        title: "10% off your first visit",
+        body:
+          "If it's your first appointment at Golden, take 10% off the service you choose. No deadline — the benefit is valid once, when you book your first appointment.",
+        cta_label: "Book my first appointment",
+        cta_href: BOOKING,
+        ribbon: "New clients only",
+        image_url: "/primera-visita.jpg",
+        accent: "ink",
+        featured: true,
+      },
+    ],
+  },
+
   vacio: {
     slug: "vacio",
     label: "No active promotion",

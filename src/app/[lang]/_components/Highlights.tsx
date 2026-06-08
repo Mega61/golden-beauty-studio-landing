@@ -1,8 +1,15 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { EyebrowLabel } from "./atoms";
 import PromoTermsCTA from "./PromoTermsCTA";
 import type { PromoItem, PromoScenario } from "@/data/promos.types";
+
+// Auto-advance cadence for the section carousel (ms). Offset from the strip so
+// the two carousels don't flip in lockstep.
+const ROTATE_MS = 7000;
 
 type HighlightsDict = {
   eyebrow: string;
@@ -17,7 +24,7 @@ type HighlightsDict = {
 };
 
 type Props = {
-  scenario: PromoScenario | null;
+  scenarios: PromoScenario[];
   dict: HighlightsDict;
 };
 
@@ -300,15 +307,87 @@ function CompactCard({ item, dict }: { item: PromoItem; dict: HighlightsDict }) 
   );
 }
 
-export default function Highlights({ scenario, dict }: Props) {
-  if (!scenario || scenario.items.length === 0) return null;
-
-  // Featured first; if no item is flagged, the first one renders as featured
-  // so the section never collapses into a row of small cards.
+// One scenario's card block: featured first (if none flagged, the first item
+// is promoted so the block never collapses into a row of small cards), then
+// the rest as compacts. This is the exact grid the section used to render for
+// a single scenario — now it's one carousel slide.
+function ScenarioGrid({
+  scenario,
+  dict,
+}: {
+  scenario: PromoScenario;
+  dict: HighlightsDict;
+}) {
   const featured =
     scenario.items.find((it) => it.featured) ?? scenario.items[0];
   const rest = scenario.items.filter((it) => it.id !== featured.id);
   const all = [featured, ...rest];
+
+  return (
+    <div
+      className="grid grid-cols-1 gap-5 px-5 md:gap-6 md:grid-cols-[var(--gbs-grid-cols)] md:px-0"
+      style={
+        {
+          ["--gbs-grid-cols" as string]: gridTemplateFor(all.length),
+        } as React.CSSProperties
+      }
+    >
+      {all.map((item, idx) =>
+        idx === 0 ? (
+          <FeaturedCard key={item.id} item={item} dict={dict} />
+        ) : (
+          <CompactCard key={item.id} item={item} dict={dict} />
+        ),
+      )}
+    </div>
+  );
+}
+
+export default function Highlights({ scenarios, dict }: Props) {
+  // Only scenarios that actually have cards become slides.
+  const slides = scenarios.filter((s) => s.items.length > 0);
+  const count = slides.length;
+  const multi = count > 1;
+
+  const [active, setActive] = useState(0);
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Measured height of the active slide. The carousel wrapper is locked to it
+  // and transitions, so the footer glides instead of jumping between slides of
+  // different heights (a 1-card promo is much taller than a 2-card row).
+  const [height, setHeight] = useState<number | undefined>(undefined);
+  // Until the first measurement the active slide stays in normal flow, so the
+  // section sizes correctly during SSR / before hydration (no layout shift).
+  const [stacked, setStacked] = useState(false);
+
+  const current = count > 0 ? Math.min(active, count - 1) : 0;
+
+  // Auto-advance. Depending on `active` restarts the timer on every change, so
+  // a manual dot click also resets the countdown.
+  useEffect(() => {
+    if (count <= 1) return;
+    const id = setInterval(
+      () => setActive((i) => (i + 1) % count),
+      ROTATE_MS,
+    );
+    return () => clearInterval(id);
+  }, [count, active]);
+
+  // Lock the wrapper to the active slide's height, then switch every slide to
+  // absolute stacking so they can cross-fade over the same footprint.
+  useEffect(() => {
+    if (!multi) return;
+    const el = slideRefs.current[current];
+    if (!el) return;
+    setHeight(el.offsetHeight);
+    setStacked(true);
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setHeight(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [current, count, multi]);
+
+  if (count === 0) return null;
+  const scenario = slides[current];
 
   return (
     <section
@@ -316,7 +395,7 @@ export default function Highlights({ scenario, dict }: Props) {
       className="relative bg-paper px-0 pb-14 pt-16 md:px-20 md:pb-[100px] md:pt-[120px]"
     >
       <div className="relative mx-auto max-w-[1240px]">
-        {/* Header */}
+        {/* Header — the scenario label tracks the active carousel slide. */}
         <div className="mb-10 grid grid-cols-1 gap-6 px-5 md:mb-16 md:grid-cols-[1.4fr_1fr] md:items-end md:gap-12 md:px-0">
           <div>
             <EyebrowLabel className="text-gold">
@@ -336,25 +415,72 @@ export default function Highlights({ scenario, dict }: Props) {
           </p>
         </div>
 
-        {/* Grid — single column on mobile, computed columns on md+ via CSS var.
-            Using `md:grid-cols-[var(--gbs-grid-cols)]` (rather than inline
-            style) is what lets the `grid-cols-1` mobile rule still win. */}
-        <div
-          className="grid grid-cols-1 gap-5 px-5 md:gap-6 md:grid-cols-[var(--gbs-grid-cols)] md:px-0"
-          style={
-            {
-              ["--gbs-grid-cols" as string]: gridTemplateFor(all.length),
-            } as React.CSSProperties
-          }
-        >
-          {all.map((item, idx) =>
-            idx === 0 ? (
-              <FeaturedCard key={item.id} item={item} dict={dict} />
-            ) : (
-              <CompactCard key={item.id} item={item} dict={dict} />
-            ),
-          )}
-        </div>
+        {/* Carousel — slides cross-fade over a height-animated footprint. A lone
+            promo skips all of this and renders as a plain grid. */}
+        {multi ? (
+          <div
+            className="relative overflow-hidden"
+            style={{
+              height: height,
+              transition: "height 500ms cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          >
+            {slides.map((s, i) => {
+              const isCurrent = i === current;
+              return (
+                <div
+                  key={s.slug}
+                  ref={(el) => {
+                    slideRefs.current[i] = el;
+                  }}
+                  aria-hidden={!isCurrent}
+                  className="transition-opacity duration-500 ease-in-out"
+                  style={{
+                    position: stacked || !isCurrent ? "absolute" : "relative",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    opacity: isCurrent ? 1 : 0,
+                    pointerEvents: isCurrent ? "auto" : "none",
+                  }}
+                >
+                  <ScenarioGrid scenario={s} dict={dict} />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <ScenarioGrid scenario={scenario} dict={dict} />
+        )}
+
+        {/* Dots — only when more than one promo is live. Each is labeled with
+            its scenario so the control is meaningful to screen readers. */}
+        {count > 1 && (
+          <div
+            role="tablist"
+            aria-label={dict.eyebrow}
+            className="mt-8 flex items-center justify-center gap-3 px-5 md:mt-10 md:px-0"
+          >
+            {slides.map((s, i) => (
+              <button
+                key={s.slug}
+                type="button"
+                role="tab"
+                aria-selected={i === current}
+                aria-label={s.label}
+                onClick={() => setActive(i)}
+                className="flex cursor-pointer items-center gap-2 font-sans text-[10px] font-semibold uppercase tracking-[0.28em] transition-colors"
+                style={{ color: i === current ? "var(--color-gold)" : "var(--color-ink-soft)" }}
+              >
+                <span
+                  className="inline-block h-[6px] w-[6px] rounded-full transition-opacity"
+                  style={{ background: "currentColor", opacity: i === current ? 1 : 0.45 }}
+                />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Footer */}
         <div

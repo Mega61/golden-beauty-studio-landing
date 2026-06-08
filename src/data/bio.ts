@@ -129,6 +129,22 @@ export function scenarioToBioPromo(
   };
 }
 
+/**
+ * Maps every active scenario (same list the landing carousel reads) onto a
+ * pinned-promo band. When 2+ promos are running the bio renders them as a
+ * rotating carousel, mirroring the landing strip + Highlights. Order follows
+ * `getActiveScenarios` (i.e. `NEXT_PUBLIC_ACTIVE_PROMO`). Scenarios that yield
+ * no band (no featured title nor strip message) are dropped.
+ */
+export function scenariosToBioPromos(
+  scenarios: PromoScenario[],
+  lang: Locale,
+): BioPromo[] {
+  return scenarios
+    .map((s) => scenarioToBioPromo(s, lang))
+    .filter((p): p is BioPromo => p !== null);
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * STRAPI SWAP
  * When the CMS is online, replace the body of `getBio` with a fetch of the

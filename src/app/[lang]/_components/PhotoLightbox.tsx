@@ -3,22 +3,27 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Locale } from "../dictionaries";
-import type { LookbookItem } from "@/data/lookbook-manifest";
-import { CATEGORY_LABELS, lookbookAlt } from "@/data/lookbook-categories";
 
-export type LookbookLightboxDict = {
+export type PhotoLightboxDict = {
   close: string;
   next: string;
   previous: string;
   counter: string;
 };
 
-export type LookbookLightboxProps = {
-  lang: Locale;
-  items: readonly LookbookItem[];
+// Section-agnostic photo shape. Callers precompute alt/caption/meta so the
+// lightbox stays decoupled from any data model (lookbook manifest, studio, …).
+export type LightboxPhoto = {
+  src: string;
+  alt: string;
+  caption?: string; // visible italic caption (optional)
+  meta?: string; // small uppercase label, e.g. technique (optional)
+};
+
+export type PhotoLightboxProps = {
+  photos: readonly LightboxPhoto[];
   startIndex: number;
-  dict: LookbookLightboxDict;
+  dict: PhotoLightboxDict;
   onClose: () => void;
 };
 
@@ -33,15 +38,14 @@ type SwipeAxis = "none" | "horizontal" | "vertical";
 
 const SIZES_HINT = "(min-width: 1200px) 1100px, 92vw";
 
-export default function LookbookLightbox({
-  lang,
-  items,
+export default function PhotoLightbox({
+  photos,
   startIndex,
   dict,
   onClose,
-}: LookbookLightboxProps) {
+}: PhotoLightboxProps) {
   const [index, setIndex] = useState(() =>
-    Math.min(Math.max(0, startIndex), Math.max(0, items.length - 1)),
+    Math.min(Math.max(0, startIndex), Math.max(0, photos.length - 1)),
   );
   const [dragX, setDragX] = useState(0);
   const [animating, setAnimating] = useState(false);
@@ -68,7 +72,7 @@ export default function LookbookLightbox({
   }, []);
 
   const canPrev = index > 0;
-  const canNext = index < items.length - 1;
+  const canNext = index < photos.length - 1;
 
   // Animated slide — used only when a real swipe gesture commits.
   function commitSlide(direction: 1 | -1) {
@@ -86,7 +90,7 @@ export default function LookbookLightbox({
     }
     snapTimeoutRef.current = window.setTimeout(() => {
       setIndex((i) =>
-        Math.max(0, Math.min(items.length - 1, i + direction)),
+        Math.max(0, Math.min(photos.length - 1, i + direction)),
       );
       setAnimating(false);
       setDragX(0);
@@ -108,7 +112,7 @@ export default function LookbookLightbox({
     setAnimating(false);
     setDragX(0);
     setIndex((i) =>
-      Math.max(0, Math.min(items.length - 1, i + direction)),
+      Math.max(0, Math.min(photos.length - 1, i + direction)),
     );
   }
 
@@ -150,18 +154,16 @@ export default function LookbookLightbox({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, onClose, canPrev, canNext]);
+  }, [photos.length, onClose, canPrev, canNext]);
 
-  if (items.length === 0) return null;
+  if (photos.length === 0) return null;
 
-  const current = items[index];
-  const prevItem = canPrev ? items[index - 1] : null;
-  const nextItem = canNext ? items[index + 1] : null;
-  const categoryLabel =
-    CATEGORY_LABELS[current.category]?.[lang] ?? current.category;
+  const current = photos[index];
+  const prevItem = canPrev ? photos[index - 1] : null;
+  const nextItem = canNext ? photos[index + 1] : null;
   const counterText = dict.counter
     .replace("{current}", String(index + 1))
-    .replace("{total}", String(items.length));
+    .replace("{total}", String(photos.length));
 
   function onBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target === e.currentTarget) onClose();
@@ -230,7 +232,7 @@ export default function LookbookLightbox({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="lookbook-lightbox-caption"
+      aria-labelledby="photo-lightbox-caption"
       className="lookbook-lightbox fixed inset-0 z-[100] flex flex-col bg-ink/95 backdrop-blur-md"
       style={{ height: "100dvh", touchAction: "pan-y" }}
       onClick={onBackdropClick}
@@ -324,9 +326,9 @@ export default function LookbookLightbox({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <CarouselSlot item={prevItem} lang={lang} />
-          <CarouselSlot item={current} lang={lang} priority />
-          <CarouselSlot item={nextItem} lang={lang} />
+          <CarouselSlot photo={prevItem} />
+          <CarouselSlot photo={current} priority />
+          <CarouselSlot photo={nextItem} />
         </div>
 
         {/* Desktop next arrow (md+) */}
@@ -365,16 +367,20 @@ export default function LookbookLightbox({
         onClick={(e) => e.stopPropagation()}
       >
         <figcaption
-          id="lookbook-lightbox-caption"
+          id="photo-lightbox-caption"
           className="flex flex-col items-center gap-0.5 text-center sm:flex-row sm:justify-center sm:gap-3"
           style={{ maxWidth: "min(92vw, 720px)", margin: "0 auto" }}
         >
-          <span className="font-display text-[16px] italic text-ivory md:text-[20px]">
-            {current.caption}
-          </span>
-          <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-gold-soft opacity-80 md:text-[11px]">
-            {categoryLabel}
-          </span>
+          {current.caption ? (
+            <span className="font-display text-[16px] italic text-ivory md:text-[20px]">
+              {current.caption}
+            </span>
+          ) : null}
+          {current.meta ? (
+            <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-gold-soft opacity-80 md:text-[11px]">
+              {current.meta}
+            </span>
+          ) : null}
         </figcaption>
 
         {/* Mobile toolbar: prev / spacer / next */}
@@ -451,12 +457,10 @@ export default function LookbookLightbox({
 }
 
 function CarouselSlot({
-  item,
-  lang,
+  photo,
   priority = false,
 }: {
-  item: LookbookItem | null;
-  lang: Locale;
+  photo: LightboxPhoto | null;
   priority?: boolean;
 }) {
   return (
@@ -464,7 +468,7 @@ function CarouselSlot({
       className="flex h-full items-center justify-center"
       style={{ flex: "0 0 100%" }}
     >
-      {item ? (
+      {photo ? (
         <div
           className="relative"
           style={{
@@ -473,8 +477,8 @@ function CarouselSlot({
           }}
         >
           <Image
-            src={item.src}
-            alt={lookbookAlt(item, lang)}
+            src={photo.src}
+            alt={photo.alt}
             fill
             sizes={SIZES_HINT}
             priority={priority}
