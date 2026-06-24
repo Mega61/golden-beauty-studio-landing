@@ -26,6 +26,7 @@
       "servicios": "Servicios",
       "tecnicas": "Técnicas",
       "estudio": "Estudio",
+      "reviews": "Reseñas",
       "contacto": "Contacto"
     },
     "cta": "Agendar cita",
@@ -212,8 +213,18 @@
       ]
     }
   },
+  "reviews": {
+    "eyebrow": "06 · Reseñas",
+    "title1": "Lo que dicen",
+    "title2_em": "nuestras clientas.",
+    "body": "Reseñas verificadas de Google de quienes ya pasaron por nuestra silla.",
+    "ratingLabel": "{rating} de 5",
+    "verifiedLabel": "Google",
+    "cta": "Ver todas en Google",
+    "ctaWrite": "Déjanos tu reseña"
+  },
   "contacto": {
-    "eyebrow": "06 · Visítanos",
+    "eyebrow": "07 · Visítanos",
     "title1": "Nos encuentras en",
     "title2_em": "Sabaneta.",
     "address": {

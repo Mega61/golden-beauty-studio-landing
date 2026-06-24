@@ -99,6 +99,37 @@
   animation: gbs-pulse 2s ease-in-out infinite;
 }
 
+/* Reviews marquee — a seamless, auto-scrolling testimonial rail.
+   The track holds the reviews TWICE (the second copy is aria-hidden); shifting
+   it by exactly -50% loops without a visible seam. Each card carries its own
+   right margin (not a flex gap) so the trailing gap is included in that 50%,
+   keeping the loop pixel-perfect. Duration scales with card count via the
+   --marquee-duration var set inline, so speed stays constant as reviews change.
+   Pure CSS: no JS ships, the review text is server-rendered and crawlable. */
+@keyframes review-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.review-marquee-track {
+  animation: review-marquee var(--marquee-duration, 60s) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-marquee-track {
+    animation: none;
+    transform: none;
+  }
+  /* No motion → let the visitor scroll the rail by hand instead. */
+  .review-marquee-viewport {
+    overflow-x: auto;
+  }
+}
+
 .text-gold-grad {
   background: linear-gradient(
     135deg,

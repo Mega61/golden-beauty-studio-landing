@@ -62,6 +62,7 @@ export const siteConfig = {
     diccionario: bool(process.env.NEXT_PUBLIC_SECTION_DICCIONARIO, true),
     tecnicas: bool(process.env.NEXT_PUBLIC_SECTION_TECNICAS, true),
     estudio: bool(process.env.NEXT_PUBLIC_SECTION_ESTUDIO, true),
+    reviews: bool(process.env.NEXT_PUBLIC_SECTION_REVIEWS, true),
     contacto: bool(process.env.NEXT_PUBLIC_SECTION_CONTACTO, true),
   },
 } as const;

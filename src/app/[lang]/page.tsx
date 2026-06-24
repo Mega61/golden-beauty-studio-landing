@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getDictionary, hasLocale } from "./dictionaries";
 import { siteConfig } from "@/config/site";
 import { getActiveScenarios } from "@/data/promos";
+import { getReviews } from "@/data/reviews";
 import Nav from "./_components/Nav";
 import Hero from "./_components/Hero";
 import PromoStrip from "./_components/PromoStrip";
@@ -11,6 +12,7 @@ import Servicios from "./_components/Servicios";
 import Diccionario from "./_components/Diccionario";
 import Tecnicas from "./_components/Tecnicas";
 import Estudio from "./_components/Estudio";
+import Reviews from "./_components/Reviews";
 import Contacto from "./_components/Contacto";
 import Footer from "./_components/Footer";
 import FloatingActions from "./_components/FloatingActions";
@@ -29,6 +31,7 @@ export default async function Page({
   const dict = await getDictionary(typedLang);
   const sections = siteConfig.sections;
   const scenarios = await getActiveScenarios(typedLang);
+  const reviews = await getReviews(typedLang);
 
   return (
     <>
@@ -45,6 +48,7 @@ export default async function Page({
       {sections.tecnicas && <Tecnicas dict={dict.tecnicas} />}
       {sections.tecnicas && sections.estudio && <BrandDivider />}
       {sections.estudio && <Estudio dict={dict.estudio} />}
+      {sections.reviews && <Reviews dict={dict.reviews} data={reviews} />}
       {sections.contacto && <Contacto dict={dict.contacto} />}
       <Footer dict={dict.footer} />
       <FloatingActions dict={dict.floating} />

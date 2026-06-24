@@ -26,6 +26,7 @@
       "servicios": "Services",
       "tecnicas": "Artists",
       "estudio": "Studio",
+      "reviews": "Reviews",
       "contacto": "Contact"
     },
     "cta": "Book a visit",
@@ -212,8 +213,18 @@
       ]
     }
   },
+  "reviews": {
+    "eyebrow": "06 · Reviews",
+    "title1": "What our",
+    "title2_em": "clients say.",
+    "body": "Verified Google reviews from those who've already sat in our chair.",
+    "ratingLabel": "{rating} of 5",
+    "verifiedLabel": "Google",
+    "cta": "See all on Google",
+    "ctaWrite": "Leave us a review"
+  },
   "contacto": {
-    "eyebrow": "06 · Visit us",
+    "eyebrow": "07 · Visit us",
     "title1": "Find us in",
     "title2_em": "Sabaneta.",
     "address": {

@@ -5,7 +5,13 @@ import { PrimaryCTA } from "./atoms";
 import type { Locale } from "../dictionaries";
 import { siteConfig, type SectionKey } from "@/config/site";
 
-type NavItemKey = "trabajo" | "servicios" | "tecnicas" | "estudio" | "contacto";
+type NavItemKey =
+  | "trabajo"
+  | "servicios"
+  | "tecnicas"
+  | "estudio"
+  | "reviews"
+  | "contacto";
 
 type NavDict = {
   items: Record<NavItemKey, string>;
@@ -19,6 +25,7 @@ const NAV_SECTION_MAP: Record<NavItemKey, SectionKey> = {
   servicios: "servicios",
   tecnicas: "tecnicas",
   estudio: "estudio",
+  reviews: "reviews",
   contacto: "contacto",
 };
 
@@ -37,6 +44,7 @@ export default function Nav({
     { key: "servicios", href: "#servicios" },
     { key: "tecnicas", href: "#tecnicas" },
     { key: "estudio", href: "#estudio" },
+    { key: "reviews", href: "#reviews" },
     { key: "contacto", href: "#contacto" },
   ];
   const anchors = allAnchors.filter(
