@@ -1,7 +1,7 @@
 import { EyebrowLabel } from "./atoms";
 import LookbookGrid from "./LookbookGrid";
 import type { Locale } from "../dictionaries";
-import { LOOKBOOK } from "@/data/lookbook-manifest";
+import { getLookbook } from "@/data/lookbook";
 import { CATEGORY_ORDER } from "@/data/lookbook-categories";
 
 type LookbookDict = {
@@ -20,13 +20,14 @@ type LookbookDict = {
   };
 };
 
-export default function Lookbook({
+export default async function Lookbook({
   lang,
   dict,
 }: {
   lang: Locale;
   dict: LookbookDict;
 }) {
+  const items = await getLookbook();
   return (
     <section
       id="trabajo"
@@ -54,7 +55,7 @@ export default function Lookbook({
 
         <LookbookGrid
           lang={lang}
-          items={LOOKBOOK}
+          items={items}
           categories={CATEGORY_ORDER}
           allLabel={dict.allLabel}
           seeAllLabel={dict.seeAll}

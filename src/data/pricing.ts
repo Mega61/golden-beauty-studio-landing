@@ -1,7 +1,13 @@
-// Single source of truth for service prices and durations.
-// Edit a number here, push, and Vercel redeploys with both languages updated.
-// Translated names/descriptions live in src/app/[lang]/dictionaries/{es,en}.json,
-// keyed by the same ids declared below.
+// Bundled fallback for service prices and durations + SEO helpers.
+//
+// When STRAPI_URL is set, the live price list (names, descriptions, prices,
+// durations — fully owner-editable) is read from the CMS via `getPricing()`
+// below; this bundled array + the dictionary names are the fallback used when
+// the CMS is unset/unreachable/empty, so the section never goes blank. The
+// SEO/JSON-LD helpers (`getStartingPriceCOP`, lib/schema.ts) intentionally keep
+// using this bundled data so metadata stays synchronous.
+
+import { type PricingLocale } from "./pricing-format";
 
 export type PriceItem = {
   id: string;
@@ -87,4 +93,142 @@ export function getStartingPriceCOP(): number {
       .filter((cat) => cat.id !== "extras")
       .flatMap((cat) => cat.items.map((it) => it.priceCOP)),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CMS-driven price list
+// ─────────────────────────────────────────────────────────────────────────────
+
+// A fully-resolved (single-locale) price list, ready to render — names and
+// descriptions already picked for the requested language. This is what the
+// Servicios component consumes, whether it came from Strapi or the fallback.
+export type ResolvedPriceItem = {
+  id: string;
+  name: string;
+  desc: string;
+  priceCOP: number;
+  durationMin: number | null;
+  fromPrice: boolean;
+};
+export type ResolvedPriceCategory = {
+  id: string;
+  label: string;
+  sub: string;
+  items: ResolvedPriceItem[];
+};
+
+// The shape of `dict.servicios.categories` — used to supply names/descriptions
+// for the bundled fallback (and category chrome) when the CMS is unavailable.
+export type PricingCopy = Record<
+  string,
+  {
+    label: string;
+    sub: string;
+    items: Record<string, { name: string; desc: string }>;
+  }
+>;
+
+type StrapiPriceItem = {
+  id: number;
+  documentId?: string;
+  slug?: string;
+  name_es?: string;
+  name_en?: string;
+  desc_es?: string;
+  desc_en?: string;
+  priceCOP?: number;
+  durationMin?: number | null;
+  fromPrice?: boolean;
+  order?: number;
+};
+type StrapiPriceCategory = {
+  id: number;
+  documentId?: string;
+  slug?: string;
+  label_es?: string;
+  label_en?: string;
+  sub_es?: string;
+  sub_en?: string;
+  order?: number;
+  items?: StrapiPriceItem[];
+};
+
+// Merge the bundled numbers with the dictionary names into the resolved shape.
+function buildFallback(
+  lang: PricingLocale,
+  copy: PricingCopy,
+): ResolvedPriceCategory[] {
+  return pricing.map((cat) => {
+    const c = copy[cat.id];
+    return {
+      id: cat.id,
+      label: c?.label ?? cat.id,
+      sub: c?.sub ?? "",
+      items: cat.items.map((it) => ({
+        id: it.id,
+        name: c?.items?.[it.id]?.name ?? it.id,
+        desc: c?.items?.[it.id]?.desc ?? "",
+        priceCOP: it.priceCOP,
+        durationMin: it.durationMin,
+        fromPrice: it.fromPrice ?? false,
+      })),
+    };
+  });
+}
+
+/**
+ * Resolves the price list for a language. Reads the Strapi `price-category`
+ * collection (with its `price-item`s) when `STRAPI_URL` is set; on any error,
+ * empty result, or when the CMS is not configured, falls back to the bundled
+ * numbers + dictionary names so the section never goes blank.
+ *
+ * Bilingual names/descriptions live on the entries as `*_es` / `*_en` sibling
+ * fields (matching the lookbook-category convention) — no Strapi i18n locales,
+ * so the owner edits one entry per service with both languages side by side.
+ * Strapi v5 returns a flat response shape.
+ */
+export async function getPricing(
+  lang: PricingLocale,
+  fallbackCopy: PricingCopy,
+): Promise<readonly ResolvedPriceCategory[]> {
+  const fallback = buildFallback(lang, fallbackCopy);
+  const base = process.env.STRAPI_URL;
+  if (!base) return fallback;
+  try {
+    const url =
+      `${base}/api/price-categories` +
+      `?populate[items][sort][0]=order:asc` +
+      `&sort[0]=order:asc` +
+      `&pagination[pageSize]=100`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) return fallback;
+    const json = (await res.json()) as { data?: StrapiPriceCategory[] };
+    const es = lang === "es";
+    const categories: ResolvedPriceCategory[] = [];
+    for (const cat of json.data ?? []) {
+      const items: ResolvedPriceItem[] = [];
+      for (const it of cat.items ?? []) {
+        const name = (es ? it.name_es : it.name_en) ?? "";
+        if (!name) continue;
+        items.push({
+          id: it.slug ?? it.documentId ?? String(it.id),
+          name,
+          desc: (es ? it.desc_es : it.desc_en) ?? "",
+          priceCOP: it.priceCOP ?? 0,
+          durationMin: it.durationMin ?? null,
+          fromPrice: it.fromPrice ?? false,
+        });
+      }
+      if (items.length === 0) continue;
+      categories.push({
+        id: cat.slug ?? cat.documentId ?? String(cat.id),
+        label: (es ? cat.label_es : cat.label_en) ?? cat.slug ?? "",
+        sub: (es ? cat.sub_es : cat.sub_en) ?? "",
+        items,
+      });
+    }
+    return categories.length > 0 ? categories : fallback;
+  } catch {
+    return fallback;
+  }
 }

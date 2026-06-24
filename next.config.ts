@@ -7,8 +7,34 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
 ];
 
+// Hosts allowed for next/image remote sources. Lookbook photos are served from
+// Strapi → GCS (and/or a Cloudflare-fronted media subdomain). Add the delivery
+// host via NEXT_PUBLIC_MEDIA_HOST (e.g. media.goldenbeautystudio.com.co); the
+// raw GCS host and localhost dev are always permitted.
+const mediaHosts = [
+  process.env.NEXT_PUBLIC_MEDIA_HOST,
+  "storage.googleapis.com",
+].filter((h): h is string => Boolean(h));
+
+const remotePatterns = [
+  ...mediaHosts.map((hostname) => ({
+    protocol: "https" as const,
+    hostname,
+    pathname: "/**",
+  })),
+  {
+    protocol: "http" as const,
+    hostname: "localhost",
+    port: "1337",
+    pathname: "/**",
+  },
+];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  images: {
+    remotePatterns,
+  },
   turbopack: {
     root: path.resolve(__dirname),
   },
