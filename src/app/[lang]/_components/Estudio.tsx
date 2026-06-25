@@ -1,5 +1,6 @@
 import EstudioGallery from "./EstudioGallery";
 import type { PhotoLightboxDict } from "./PhotoLightbox";
+import { getStudioPhotos } from "@/data/estudio";
 
 type Stat = { n: string; l: string; s: string };
 type EstudioDict = {
@@ -21,7 +22,12 @@ type EstudioDict = {
   };
 };
 
-export default function Estudio({ dict }: { dict: EstudioDict }) {
+export default async function Estudio({ dict }: { dict: EstudioDict }) {
+  const studioPhotos = await getStudioPhotos();
+  const galleryPhotos = studioPhotos.map((p, i) => ({
+    src: p.src,
+    alt: p.alt || dict.spaceAlts[i] || dict.spaceAlts[0] || "",
+  }));
   return (
     <section
       id="estudio"
@@ -80,14 +86,7 @@ export default function Estudio({ dict }: { dict: EstudioDict }) {
           </div>
         </div>
 
-        <EstudioGallery
-          photos={[
-            { src: "/space-01.jpg", alt: dict.spaceAlts[0] ?? "" },
-            { src: "/space-02.jpg", alt: dict.spaceAlts[1] ?? "" },
-            { src: "/space-03.jpg", alt: dict.spaceAlts[2] ?? "" },
-          ]}
-          dict={dict.lightbox}
-        />
+        <EstudioGallery photos={galleryPhotos} dict={dict.lightbox} />
 
         <div
           className="grid grid-cols-2 md:grid-cols-4"

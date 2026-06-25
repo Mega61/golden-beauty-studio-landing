@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { EyebrowLabel, PrimaryCTA, SecondaryCTA } from "./atoms";
 import { siteConfig } from "@/config/site";
+import { getHeroImage } from "@/data/hero";
 
 type HeroDict = {
   eyebrow: string;
@@ -14,12 +15,13 @@ type HeroDict = {
   metaStatus: string;
 };
 
-export default function Hero({ dict }: { dict: HeroDict }) {
+export default async function Hero({ dict }: { dict: HeroDict }) {
+  const heroSrc = await getHeroImage();
   return (
     <section className="relative bg-carbon">
       <div className="relative h-[620px] overflow-hidden md:h-[760px]">
         <Image
-          src="/hero.jpg"
+          src={heroSrc}
           alt="Golden Beauty Studio — uñas esculpidas en Sabaneta"
           fill
           priority
