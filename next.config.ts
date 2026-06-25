@@ -34,6 +34,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     remotePatterns,
+    // Dev only: the local Strapi serves media from http://localhost:1337, which
+    // resolves to a private IP (127.0.0.1/::1). Next's image optimizer blocks
+    // private-IP upstreams by default as SSRF protection. In production media is
+    // served from the public GCS/Cloudflare host, so this stays OFF there.
+    dangerouslyAllowLocalIP: process.env.NODE_ENV === "development",
   },
   turbopack: {
     root: path.resolve(__dirname),
