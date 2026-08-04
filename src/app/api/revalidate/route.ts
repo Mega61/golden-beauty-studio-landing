@@ -19,10 +19,12 @@ function isAuthorized(req: NextRequest): boolean {
 }
 
 function revalidateAll() {
-  // Revalidate every locale of the landing and the /bio route. Passing the
-  // dynamic route literal with type "page" refreshes all [lang] variants.
+  // Revalidate every locale of the landing, /bio and the careers page (whose
+  // cargo chips are CMS-driven). Passing the dynamic route literal with type
+  // "page" refreshes all [lang] variants.
   revalidatePath("/[lang]", "page");
   revalidatePath("/[lang]/bio", "page");
+  revalidatePath("/[lang]/trabaja-con-nosotros", "page");
 }
 
 export async function POST(req: NextRequest) {

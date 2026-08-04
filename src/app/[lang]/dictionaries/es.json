@@ -27,7 +27,8 @@
       "tecnicas": "Técnicas",
       "estudio": "Estudio",
       "reviews": "Reseñas",
-      "contacto": "Contacto"
+      "contacto": "Contacto",
+      "trabaja": "Postúlate"
     },
     "cta": "Agendar cita",
     "ctaShort": "Agendar"
@@ -72,66 +73,156 @@
         "label": "Montajes",
         "sub": "Sistemas nuevos · Extensión",
         "items": {
-          "acrylic-sculpted":  { "name": "Esculpidas en acrílico",  "desc": "Estructura perfecta · Duración que destaca" },
-          "polygel-sculpted":  { "name": "Esculpidas en polygel",   "desc": "Ligereza con extensión · Acabado natural" },
-          "polygel-dual":      { "name": "Dual system polygel",     "desc": "Precisión de lujo · Acabado impecable" },
-          "builder-gel-dual":  { "name": "Dual system builder gel", "desc": "Resistencia · Delicadeza · Perfección" },
-          "press-on":          { "name": "Press on",                "desc": "Lujo instantáneo · Estilo y comodidad" }
+          "acrylic-sculpted": {
+            "name": "Esculpidas en acrílico",
+            "desc": "Estructura perfecta · Duración que destaca"
+          },
+          "polygel-sculpted": {
+            "name": "Esculpidas en polygel",
+            "desc": "Ligereza con extensión · Acabado natural"
+          },
+          "polygel-dual": {
+            "name": "Dual system polygel",
+            "desc": "Precisión de lujo · Acabado impecable"
+          },
+          "builder-gel-dual": {
+            "name": "Dual system builder gel",
+            "desc": "Resistencia · Delicadeza · Perfección"
+          },
+          "press-on": {
+            "name": "Press on",
+            "desc": "Lujo instantáneo · Estilo y comodidad"
+          }
         }
       },
       "retoques": {
         "label": "Retoques",
         "sub": "Mantenimiento de sistema",
         "items": {
-          "acrylic-refill":     { "name": "Retoque acrílico",     "desc": "3 retoques por montaje, máximo cada 21 días" },
-          "polygel-refill":     { "name": "Retoque polygel",      "desc": "3 retoques por montaje, máximo cada 21 días" },
-          "builder-gel-refill": { "name": "Retoque builder gel",  "desc": "3 retoques por montaje, máximo cada 21 días" }
+          "acrylic-refill": {
+            "name": "Retoque acrílico",
+            "desc": "3 retoques por montaje, máximo cada 21 días"
+          },
+          "polygel-refill": {
+            "name": "Retoque polygel",
+            "desc": "3 retoques por montaje, máximo cada 21 días"
+          },
+          "builder-gel-refill": {
+            "name": "Retoque builder gel",
+            "desc": "3 retoques por montaje, máximo cada 21 días"
+          }
         }
       },
       "forrados": {
         "label": "Forrados",
         "sub": "Refuerzo sin extensión",
         "items": {
-          "polygel-overlay":      { "name": "Forrado en polygel",     "desc": "Sobre uña natural" },
-          "builder-gel-overlay":  { "name": "Forrado en builder gel", "desc": "Sobre uña natural" },
-          "acrylic-overlay":      { "name": "Forrado en acrílico",    "desc": "Sobre uña natural" },
-          "dipping":              { "name": "Dipping",                "desc": "Sistema en polvo, sin monómero" },
-          "rubber-base-leveling": { "name": "Nivelación base rubber", "desc": "Base estructurante" }
+          "polygel-overlay": {
+            "name": "Forrado en polygel",
+            "desc": "Sobre uña natural"
+          },
+          "builder-gel-overlay": {
+            "name": "Forrado en builder gel",
+            "desc": "Sobre uña natural"
+          },
+          "acrylic-overlay": {
+            "name": "Forrado en acrílico",
+            "desc": "Sobre uña natural"
+          },
+          "dipping": {
+            "name": "Dipping",
+            "desc": "Sistema en polvo, sin monómero"
+          },
+          "rubber-base-leveling": {
+            "name": "Nivelación base rubber",
+            "desc": "Base estructurante"
+          }
         }
       },
       "sencillos": {
         "label": "Sencillos",
         "sub": "Manicura · pedicura",
         "items": {
-          "semi-permanent-feet":     { "name": "Semipermanente pies",      "desc": "Limpieza + esmalte gel" },
-          "semi-permanent-no-color": { "name": "Semipermanente sin color", "desc": "Limpieza + gel sin color" },
-          "semi-permanent-hands":    { "name": "Semipermanente manos",     "desc": "Limpieza + esmalte gel" },
-          "traditional-feet":        { "name": "Tradicional pies",         "desc": "Limpieza + esmalte tradicional" },
-          "traditional-hands":       { "name": "Tradicional manos",        "desc": "Limpieza + esmalte tradicional" },
-          "feet-cleanup-only":       { "name": "Solo limpieza pies",       "desc": "Sin esmalte" },
-          "hands-cleanup-only":      { "name": "Solo limpieza manos",      "desc": "Sin esmalte" }
+          "semi-permanent-feet": {
+            "name": "Semipermanente pies",
+            "desc": "Limpieza + esmalte gel"
+          },
+          "semi-permanent-no-color": {
+            "name": "Semipermanente sin color",
+            "desc": "Limpieza + gel sin color"
+          },
+          "semi-permanent-hands": {
+            "name": "Semipermanente manos",
+            "desc": "Limpieza + esmalte gel"
+          },
+          "traditional-feet": {
+            "name": "Tradicional pies",
+            "desc": "Limpieza + esmalte tradicional"
+          },
+          "traditional-hands": {
+            "name": "Tradicional manos",
+            "desc": "Limpieza + esmalte tradicional"
+          },
+          "feet-cleanup-only": {
+            "name": "Solo limpieza pies",
+            "desc": "Sin esmalte"
+          },
+          "hands-cleanup-only": {
+            "name": "Solo limpieza manos",
+            "desc": "Sin esmalte"
+          }
         }
       },
       "combos": {
         "label": "Combos",
         "sub": "Manos + pies · Dúo",
         "items": {
-          "polygel-overlay-hands-semi-feet":       { "name": "Forrado polygel manos + semi pies",      "desc": "Forrado en uña natural + esmalte gel en pies" },
-          "builder-gel-overlay-hands-semi-feet":   { "name": "Forrado builder gel manos + semi pies",  "desc": "Forrado en uña natural + esmalte gel en pies" },
-          "acrylic-overlay-hands-semi-feet":       { "name": "Forrado acrílico manos + semi pies",     "desc": "Forrado en uña natural + esmalte gel en pies" },
-          "semi-permanent-hands-feet":             { "name": "Semipermanente manos + pies",            "desc": "Esmalte gel en manos y pies" },
-          "semi-permanent-hands-traditional-feet": { "name": "Semipermanente manos + tradicional pies","desc": "Esmalte gel manos + esmalte tradicional pies" }
+          "polygel-overlay-hands-semi-feet": {
+            "name": "Forrado polygel manos + semi pies",
+            "desc": "Forrado en uña natural + esmalte gel en pies"
+          },
+          "builder-gel-overlay-hands-semi-feet": {
+            "name": "Forrado builder gel manos + semi pies",
+            "desc": "Forrado en uña natural + esmalte gel en pies"
+          },
+          "acrylic-overlay-hands-semi-feet": {
+            "name": "Forrado acrílico manos + semi pies",
+            "desc": "Forrado en uña natural + esmalte gel en pies"
+          },
+          "semi-permanent-hands-feet": {
+            "name": "Semipermanente manos + pies",
+            "desc": "Esmalte gel en manos y pies"
+          },
+          "semi-permanent-hands-traditional-feet": {
+            "name": "Semipermanente manos + tradicional pies",
+            "desc": "Esmalte gel manos + esmalte tradicional pies"
+          }
         }
       },
       "extras": {
         "label": "Extras",
         "sub": "Servicios adicionales",
         "items": {
-          "system-removal":           { "name": "Retiro de sistema previo",     "desc": "Gratis en tu primera visita · Para uñas de otro lugar" },
-          "single-dual-system-nail":  { "name": "Uña dual system individual",   "desc": "Reemplazo individual · Sistema dual" },
-          "single-press-on-nail":     { "name": "Press-on individual",          "desc": "Reemplazo individual · Press-on" },
-          "design-per-nail":          { "name": "Diseño / decoración por uña",  "desc": "Nail art aplicado sobre tu servicio" },
-          "in-depth-foot-cleaning":   { "name": "Limpieza profunda de pies",    "desc": "Hongos, uñas encarnadas y casos especiales" }
+          "system-removal": {
+            "name": "Retiro de sistema previo",
+            "desc": "Gratis en tu primera visita · Para uñas de otro lugar"
+          },
+          "single-dual-system-nail": {
+            "name": "Uña dual system individual",
+            "desc": "Reemplazo individual · Sistema dual"
+          },
+          "single-press-on-nail": {
+            "name": "Press-on individual",
+            "desc": "Reemplazo individual · Press-on"
+          },
+          "design-per-nail": {
+            "name": "Diseño / decoración por uña",
+            "desc": "Nail art aplicado sobre tu servicio"
+          },
+          "in-depth-foot-cleaning": {
+            "name": "Limpieza profunda de pies",
+            "desc": "Hongos, uñas encarnadas y casos especiales"
+          }
         }
       }
     },
@@ -144,14 +235,47 @@
     "title2_em": "entiende.",
     "body": "Cada técnica tiene su lógica, su duración y su tipo de uña ideal. Esta es una guía rápida para que sepas qué pedir — y por qué.",
     "fallback": "También puedes escribirnos por WhatsApp si necesitas asesoría personalizada.",
-    "labels": { "duration": "Duración", "ideal": "Ideal para" },
+    "labels": {
+      "duration": "Duración",
+      "ideal": "Ideal para"
+    },
     "items": [
-      { "name": "Acrílico", "dur": "3–4 semanas", "ideal": "Forma definida · estructura", "body": "Mezcla de polímero y monómero líquido que se moldea sobre la uña. Sistema clásico, máxima resistencia y forma esculpida con limado. Ideal para extensiones largas y diseños arquitectónicos." },
-      { "name": "Polygel", "dur": "3–4 semanas", "ideal": "Ligereza con extensión", "body": "Gel en pasta moldeable con dual-form. Pesa menos que el acrílico, se siente natural y permite extensiones limpias. Curado en lámpara LED — sin olor. Recomendado para uñas finas o quien busca discreción." },
-      { "name": "Builder gel", "dur": "3–4 semanas", "ideal": "Refuerzo de uña natural", "body": "Gel viscoso que cura en lámpara UV/LED. Capa estructural que protege la uña natural sin extenderla mucho. Acabado pulido, alta durabilidad y mínimo desgaste al retirar." },
-      { "name": "Dipping", "dur": "2–3 semanas", "ideal": "Larga duración", "body": "Técnica de manicure con polvo acrílico que brinda un acabado resistente, ligero y de larga duración. Ideal para lucir uñas fuertes, brillantes y naturales por semanas." },
-      { "name": "Semipermanente", "dur": "2–3 semanas", "ideal": "Color sobre uña natural", "body": "Esmalte en gel de larga duración que se seca en lámpara UV/LED. Acabado brillante, ligero y natural; mantén tus uñas impecables y realiza desde diseños sencillos hasta nail art creativo." },
-      { "name": "Press On", "dur": "Personalizado", "ideal": "Set listo · eventos", "body": "Uñas listas para aplicar, permiten lograr un manicure rápido con diferentes formas, largos y diseños personalizados, sin necesidad de esculpido." }
+      {
+        "name": "Acrílico",
+        "dur": "3–4 semanas",
+        "ideal": "Forma definida · estructura",
+        "body": "Mezcla de polímero y monómero líquido que se moldea sobre la uña. Sistema clásico, máxima resistencia y forma esculpida con limado. Ideal para extensiones largas y diseños arquitectónicos."
+      },
+      {
+        "name": "Polygel",
+        "dur": "3–4 semanas",
+        "ideal": "Ligereza con extensión",
+        "body": "Gel en pasta moldeable con dual-form. Pesa menos que el acrílico, se siente natural y permite extensiones limpias. Curado en lámpara LED — sin olor. Recomendado para uñas finas o quien busca discreción."
+      },
+      {
+        "name": "Builder gel",
+        "dur": "3–4 semanas",
+        "ideal": "Refuerzo de uña natural",
+        "body": "Gel viscoso que cura en lámpara UV/LED. Capa estructural que protege la uña natural sin extenderla mucho. Acabado pulido, alta durabilidad y mínimo desgaste al retirar."
+      },
+      {
+        "name": "Dipping",
+        "dur": "2–3 semanas",
+        "ideal": "Larga duración",
+        "body": "Técnica de manicure con polvo acrílico que brinda un acabado resistente, ligero y de larga duración. Ideal para lucir uñas fuertes, brillantes y naturales por semanas."
+      },
+      {
+        "name": "Semipermanente",
+        "dur": "2–3 semanas",
+        "ideal": "Color sobre uña natural",
+        "body": "Esmalte en gel de larga duración que se seca en lámpara UV/LED. Acabado brillante, ligero y natural; mantén tus uñas impecables y realiza desde diseños sencillos hasta nail art creativo."
+      },
+      {
+        "name": "Press On",
+        "dur": "Personalizado",
+        "ideal": "Set listo · eventos",
+        "body": "Uñas listas para aplicar, permiten lograr un manicure rápido con diferentes formas, largos y diseños personalizados, sin necesidad de esculpido."
+      }
     ]
   },
   "tecnicas": {
@@ -193,10 +317,26 @@
       "counter": "{current} / {total}"
     },
     "stats": [
-      { "n": "02h", "l": "Duración promedio", "s": "Por cita, sin doblar agenda" },
-      { "n": "02", "l": "Puestos atendidos", "s": "Estudio íntimo, no salón" },
-      { "n": "06", "l": "Técnicas dominadas", "s": "Construidas + sencillas" },
-      { "n": "100%", "l": "Material esterilizado", "s": "Abierto frente al cliente" }
+      {
+        "n": "02h",
+        "l": "Duración promedio",
+        "s": "Por cita, sin doblar agenda"
+      },
+      {
+        "n": "02",
+        "l": "Puestos atendidos",
+        "s": "Estudio íntimo, no salón"
+      },
+      {
+        "n": "06",
+        "l": "Técnicas dominadas",
+        "s": "Construidas + sencillas"
+      },
+      {
+        "n": "100%",
+        "l": "Material esterilizado",
+        "s": "Abierto frente al cliente"
+      }
     ],
     "hygiene": {
       "eyebrow": "Higiene y proceso",
@@ -204,12 +344,30 @@
       "title2_em": "no es negociable.",
       "intro": "Lo que para otros es opcional, para nosotras es indispensable. Lo verás cada visita.",
       "items": [
-        ["Esterilización", "Cada herramienta que usamos está estéril."],
-        ["Uso único", "Todos los elementos desechables son descartados."],
-        ["Productos sellados", "Todo el material se abre frente a la clienta."],
-        ["Mesa desinfectada", "Superficie y lámpara UV limpiadas entre citas."],
-        ["Marcas premium", "Lo mejor del mercado para ti."],
-        ["Sin sobreagenda", "Te dedicamos personalmente hasta el último minuto de tu cita."]
+        [
+          "Esterilización",
+          "Cada herramienta que usamos está estéril."
+        ],
+        [
+          "Uso único",
+          "Todos los elementos desechables son descartados."
+        ],
+        [
+          "Productos sellados",
+          "Todo el material se abre frente a la clienta."
+        ],
+        [
+          "Mesa desinfectada",
+          "Superficie y lámpara UV limpiadas entre citas."
+        ],
+        [
+          "Marcas premium",
+          "Lo mejor del mercado para ti."
+        ],
+        [
+          "Sin sobreagenda",
+          "Te dedicamos personalmente hasta el último minuto de tu cita."
+        ]
       ]
     }
   },
@@ -236,19 +394,145 @@
     "hours": {
       "label": "Horarios",
       "rows": [
-        ["Lun — Sáb", "09:00 — 19:00"],
-        ["Domingo", "10:00 — 15:00"]
+        [
+          "Lun — Sáb",
+          "09:00 — 19:00"
+        ],
+        [
+          "Domingo",
+          "10:00 — 15:00"
+        ]
       ],
       "closed": "Cerrado"
     },
     "ctaBook": "Agendar mi cita →",
     "ctaWhatsapp": "WhatsApp →",
-    "socials": ["Instagram", "TikTok"],
+    "socials": [
+      "Instagram",
+      "TikTok"
+    ],
     "map": {
       "park": "Pq. Sabaneta",
       "pin": "Golden · aquí",
       "openIn": "Abrir en Google Maps",
       "coords": "6.156° N · 75.617° W"
+    }
+  },
+  "trabaja": {
+    "eyebrow": "Vacantes abiertas · Sabaneta",
+    "title1": "Trabaja con",
+    "title2_em": "nosotras.",
+    "body": "Buscamos manos con criterio y ganas de aprender. Si te apasiona el detalle y quieres crecer en un estudio que cuida su técnica tanto como a sus clientas, cuéntanos de ti y adjunta tu hoja de vida.",
+    "perks": [
+      "Formación continua en técnicas y tendencias.",
+      "Materiales premium y esterilización a la vista.",
+      "Agenda estable y un ambiente de trabajo cuidado."
+    ],
+    "form": {
+      "name": {
+        "label": "Nombre completo",
+        "placeholder": "Tu nombre y apellido"
+      },
+      "phone": {
+        "label": "WhatsApp",
+        "placeholder": "300 123 4567"
+      },
+      "email": {
+        "label": "Correo",
+        "placeholder": "tucorreo@ejemplo.com"
+      },
+      "role": {
+        "label": "¿A qué cargo te postulas?"
+      },
+      "experience": {
+        "label": "Experiencia",
+        "options": {
+          "sin_experiencia": "Sin experiencia",
+          "menos_de_1": "Menos de 1 año",
+          "de_1_a_3": "Entre 1 y 3 años",
+          "de_3_a_5": "Entre 3 y 5 años",
+          "mas_de_5": "Más de 5 años"
+        }
+      },
+      "techniques": {
+        "label": "Técnicas que manejas",
+        "hint": "Marca todas las que apliquen. Si apenas estás aprendiendo, también nos interesa conocerte.",
+        "options": {
+          "acrilico": "Acrílico",
+          "polygel": "Polygel",
+          "builder_gel": "Builder gel",
+          "dipping": "Dipping",
+          "semipermanente": "Semipermanente",
+          "press_on": "Press-on",
+          "pedicure": "Pedicura",
+          "nail_art": "Nail art y diseño"
+        }
+      },
+      "portfolio": {
+        "label": "Instagram o portafolio",
+        "placeholder": "@tucuenta"
+      },
+      "message": {
+        "label": "Cuéntanos de ti",
+        "placeholder": "Qué te gusta hacer, dónde has trabajado, qué te gustaría aprender…"
+      },
+      "cv": {
+        "label": "Hoja de vida",
+        "hint": "PDF, Word o una foto de tu hoja de vida · máximo {max} MB.",
+        "button": "Adjuntar hoja de vida",
+        "change": "Cambiar archivo",
+        "drop": "Arrástrala aquí o haz clic"
+      },
+      "consent": "Autorizo a Golden Beauty Studio a tratar mis datos personales y mi hoja de vida con el único fin de evaluar mi postulación (Ley 1581 de 2012).",
+      "optional": "Opcional",
+      "submit": "Enviar postulación",
+      "sending": "Enviando…"
+    },
+    "success": {
+      "title": "¡Recibimos tu postulación!",
+      "body": "La leemos con calma esta semana. Si tu perfil encaja, te escribimos por WhatsApp al número que nos dejaste.",
+      "again": "Enviar otra postulación"
+    },
+    "errors": {
+      "validation": "Revisa los datos marcados y vuelve a intentar.",
+      "file_missing": "Adjunta tu hoja de vida para continuar.",
+      "file_too_large": "El archivo pesa más de {max} MB. Comprímelo o envía una foto más liviana.",
+      "file_type": "Ese formato no lo admitimos. Envía un PDF, un Word o una foto (JPG o PNG).",
+      "rate_limited": "Ya recibimos varias postulaciones desde este número. Si fue un error, escríbenos por WhatsApp.",
+      "captcha": "No pudimos verificar que eres una persona. Intenta de nuevo.",
+      "spam": "No pudimos procesar el envío. Recarga la página e intenta de nuevo.",
+      "cms_unavailable": "No pudimos enviar tu postulación en este momento.",
+      "whatsappFallback": "Envíanos tu hoja de vida por WhatsApp"
+    },
+    "bio": {
+      "rowLabel": "Trabaja con nosotras",
+      "rowSub": "Únete al equipo Golden",
+      "successShort": "¡Postulación recibida!"
+    },
+    "meta": {
+      "title": "Trabaja con nosotras — Golden Beauty Studio",
+      "description": "Vacantes en Golden Beauty Studio, Sabaneta: manicurista, auxiliar de uñas, recepción y practicantes. Postúlate en línea y adjunta tu hoja de vida.",
+      "back": "Volver al inicio"
+    },
+    "photoAlt": "La fachada y el interior del estudio en Sabaneta: pared de mármol, aro de luz y estaciones de trabajo",
+    "flow": {
+      "steps": [
+        "El cargo",
+        "Tus datos",
+        "Tu perfil"
+      ],
+      "counter": "Paso {current} de {total}",
+      "next": "Continuar",
+      "back": "Atrás",
+      "reassurance": "Toma menos de 2 minutos · te respondemos por WhatsApp"
+    },
+    "fieldErrors": {
+      "role_applied": "Elige el cargo que te interesa.",
+      "full_name": "Escribe tu nombre y apellido.",
+      "phone": "Escribe tu número de WhatsApp (10 dígitos).",
+      "email": "Revisa el correo: parece incompleto.",
+      "cv": "Adjunta tu hoja de vida para continuar.",
+      "consent": "Necesitamos tu autorización para guardar tus datos."
     }
   },
   "promos": {

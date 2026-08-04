@@ -3,11 +3,20 @@ import Logo from "./Logo";
 import { BioLink, BioView } from "./BioLink";
 import BioPromoBanner from "./BioPromoBanner";
 import SocialIcon from "./SocialIcon";
+import TrabajaBio from "./TrabajaBio";
+import type { TrabajaDict } from "./PostulacionForm";
 import type { BioData, BioPromo } from "@/data/bio.types";
+import type { JobRole } from "@/data/careers.types";
+import type { Locale } from "../dictionaries";
 
 type Props = {
   bio: BioData;
   promos: BioPromo[];
+  lang: Locale;
+  /** Careers copy, or null when careers is switched off site-wide. */
+  trabaja: TrabajaDict | null;
+  /** Open cargos, from the CMS. Empty when careers is off. */
+  roles: JobRole[];
 };
 
 /**
@@ -21,7 +30,7 @@ type Props = {
  * (`BioView`) are the only client pieces. Every clickable funnels through GA4.
  */
 
-export default function Bio({ bio, promos }: Props) {
+export default function Bio({ bio, promos, lang, trabaja, roles }: Props) {
   const primary = bio.links.find((l) => l.primary) ?? null;
   const rows = bio.links.filter((l) => !l.primary);
 
@@ -234,6 +243,10 @@ export default function Bio({ bio, promos }: Props) {
             </BioLink>
           ))}
         </div>
+
+        {/* Careers — a link-tree row that expands the form in place rather than
+            sending the visitor off to the landing (see TrabajaBio). */}
+        {trabaja && <TrabajaBio dict={trabaja} lang={lang} roles={roles} />}
 
         {/* Socials + wordmark */}
         <div

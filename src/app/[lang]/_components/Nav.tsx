@@ -11,7 +11,8 @@ type NavItemKey =
   | "tecnicas"
   | "estudio"
   | "reviews"
-  | "contacto";
+  | "contacto"
+  | "trabaja";
 
 type NavDict = {
   items: Record<NavItemKey, string>;
@@ -27,29 +28,45 @@ const NAV_SECTION_MAP: Record<NavItemKey, SectionKey> = {
   estudio: "estudio",
   reviews: "reviews",
   contacto: "contacto",
+  trabaja: "trabaja",
 };
+
+/** Careers lives on its own route, not a section of the landing. */
+const CAREERS_PATH = "trabaja-con-nosotros";
 
 export default function Nav({
   lang,
   dict,
   sections,
+  onLanding = true,
 }: {
   lang: Locale;
   dict: NavDict;
   sections: typeof siteConfig.sections;
+  /**
+   * False when the nav is rendered on a standalone page (e.g. the careers page).
+   * The section links then point back at the landing (`/es#servicios`) instead of
+   * being bare in-page hashes that would resolve to nothing.
+   */
+  onLanding?: boolean;
 }) {
   const otherLang: Locale = lang === "es" ? "en" : "es";
-  const allAnchors: Array<{ key: NavItemKey; href: string }> = [
-    { key: "trabajo", href: "#trabajo" },
-    { key: "servicios", href: "#servicios" },
-    { key: "tecnicas", href: "#tecnicas" },
-    { key: "estudio", href: "#estudio" },
-    { key: "reviews", href: "#reviews" },
-    { key: "contacto", href: "#contacto" },
+  // `route: true` items navigate to another page; the rest are in-page anchors.
+  const allAnchors: Array<{ key: NavItemKey; hash: string; route?: boolean }> = [
+    { key: "trabajo", hash: "#trabajo" },
+    { key: "servicios", hash: "#servicios" },
+    { key: "tecnicas", hash: "#tecnicas" },
+    { key: "estudio", hash: "#estudio" },
+    { key: "reviews", hash: "#reviews" },
+    { key: "contacto", hash: "#contacto" },
+    { key: "trabaja", hash: `/${lang}/${CAREERS_PATH}`, route: true },
   ];
-  const anchors = allAnchors.filter(
-    (a) => sections[NAV_SECTION_MAP[a.key]],
-  );
+  const anchors = allAnchors
+    .filter((a) => sections[NAV_SECTION_MAP[a.key]])
+    .map((a) => ({
+      ...a,
+      href: a.route ? a.hash : onLanding ? a.hash : `/${lang}${a.hash}`,
+    }));
   const { bookingUrl } = siteConfig;
 
   return (
@@ -63,15 +80,21 @@ export default function Nav({
         </Link>
 
         <nav className="hidden gap-7 lg:flex lg:gap-9">
-          {anchors.map((a) => (
-            <a
-              key={a.key}
-              href={a.href}
-              className="font-sans text-[11px] font-medium uppercase tracking-[0.28em] text-ink no-underline hover:text-gold"
-            >
-              {dict.items[a.key]}
-            </a>
-          ))}
+          {anchors.map((a) => {
+            const className =
+              "font-sans text-[11px] font-medium uppercase tracking-[0.28em] text-ink no-underline hover:text-gold";
+            // Routes use <Link> for client-side navigation; hash anchors stay
+            // plain <a> because next/link short-circuits repeat same-hash clicks.
+            return a.route ? (
+              <Link key={a.key} href={a.href} className={className}>
+                {dict.items[a.key]}
+              </Link>
+            ) : (
+              <a key={a.key} href={a.href} className={className}>
+                {dict.items[a.key]}
+              </a>
+            );
+          })}
         </nav>
 
         <div className="hidden items-center gap-4 lg:flex">
@@ -95,6 +118,7 @@ export default function Nav({
             key: a.key,
             href: a.href,
             label: dict.items[a.key],
+            route: a.route,
           }))}
           cta={dict.cta}
           ctaShort={dict.ctaShort}

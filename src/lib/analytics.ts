@@ -36,6 +36,41 @@ export function trackWhatsappClick(
   trackEvent("contact_whatsapp", { location, ...extra });
 }
 
+/* ── Trabaja con nosotros (job applications) ──────────────────────────────── */
+
+export type ApplySurface = "landing" | "bio";
+
+/**
+ * Funnel for the careers form. `apply_open` fires when the /bio disclosure is
+ * expanded (the landing section has no open step — it's always visible), and
+ * `apply_submit` on a successful send. Both carry the surface so you can compare
+ * Instagram-sourced applicants against the ones who came through the site.
+ */
+export function trackApplyOpen(surface: ApplySurface): void {
+  trackEvent("apply_open", { surface });
+}
+
+/**
+ * Step reached in the 3-step application flow (1-indexed). The drop-off between
+ * `apply_step` 1 → 2 → 3 and `apply_submit` is the funnel worth watching: it
+ * tells you which question is costing applicants.
+ */
+export function trackApplyStep(surface: ApplySurface, step: number): void {
+  trackEvent("apply_step", { surface, step });
+}
+
+export function trackApplySubmit(
+  surface: ApplySurface,
+  extra?: Record<string, unknown>,
+): void {
+  trackEvent("apply_submit", { surface, ...extra });
+}
+
+/** Failed send — `reason` is the route handler's error code, not a message. */
+export function trackApplyError(surface: ApplySurface, reason: string): void {
+  trackEvent("apply_error", { surface, reason });
+}
+
 /* ── Link-in-bio (the /bio Linktree replacement) ──────────────────────────── */
 
 // Fired once when the bio page mounts — the denominator for click-through rate.

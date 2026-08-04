@@ -46,6 +46,11 @@ const mapsEmbedUrl =
     ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(embedQ)}`
     : null;
 
+// Turnstile site key (public half). When unset the form renders no widget and
+// the route handler skips verification — the section works either way.
+const turnstileSiteKey =
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null;
+
 export const siteConfig = {
   siteUrl,
   bookingUrl,
@@ -56,6 +61,7 @@ export const siteConfig = {
   googleSiteVerification,
   mapsEmbedUrl,
   mapsPlaceId,
+  turnstileSiteKey,
   sections: {
     lookbook: bool(process.env.NEXT_PUBLIC_SECTION_LOOKBOOK, true),
     servicios: bool(process.env.NEXT_PUBLIC_SECTION_SERVICIOS, true),
@@ -64,7 +70,40 @@ export const siteConfig = {
     estudio: bool(process.env.NEXT_PUBLIC_SECTION_ESTUDIO, true),
     reviews: bool(process.env.NEXT_PUBLIC_SECTION_REVIEWS, true),
     contacto: bool(process.env.NEXT_PUBLIC_SECTION_CONTACTO, true),
+    trabaja: bool(process.env.NEXT_PUBLIC_SECTION_TRABAJA, true),
   },
+} as const;
+
+/**
+ * "Trabaja con nosotros" upload rules — one source of truth for the client-side
+ * check, the `accept` attribute and the route handler's server-side check.
+ *
+ * 4 MB, not more: Vercel rejects a serverless request body over 4.5 MB before
+ * our code runs, so anything larger would surface as an unexplained failure.
+ * Strapi enforces the same ceiling (CAREERS_MAX_UPLOAD_BYTES) and is the
+ * authority on file type — it sniffs magic bytes rather than trusting the name.
+ *
+ * Images are accepted on purpose: plenty of applicants photograph their resume
+ * with their phone instead of attaching a PDF, and rejecting that loses good
+ * candidates for no security gain.
+ */
+export const careersConfig = {
+  maxBytes: 4 * 1024 * 1024,
+  maxLabelMB: 4,
+  acceptedExtensions: [
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".odt",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".heic",
+  ],
+  /** `accept` attribute for the file input. */
+  accept:
+    ".pdf,.doc,.docx,.odt,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*",
 } as const;
 
 export type SectionKey = keyof typeof siteConfig.sections;

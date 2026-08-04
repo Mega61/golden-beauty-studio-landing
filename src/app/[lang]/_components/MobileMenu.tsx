@@ -15,7 +15,7 @@ const useIsClient = () =>
     () => false,
   );
 
-type Item = { key: string; href: string; label: string };
+type Item = { key: string; href: string; label: string; route?: boolean };
 
 type Props = {
   lang: Locale;
@@ -100,18 +100,34 @@ export default function MobileMenu({
 
           <nav className="flex flex-col px-6 py-4">
             {/* Plain <a> for hash anchors — next/link short-circuits repeat
-                clicks when the URL is already at the same pathname+hash. */}
-            {items.map((i) => (
-              <a
-                key={i.key}
-                href={i.href}
-                onClick={close}
-                className="py-3 font-display text-[26px] italic text-ink no-underline"
-                style={{ borderBottom: "1px solid var(--hair)" }}
-              >
-                {i.label}
-              </a>
-            ))}
+                clicks when the URL is already at the same pathname+hash. Items
+                that point at another page (careers) use <Link>. */}
+            {items.map((i) => {
+              const className =
+                "py-3 font-display text-[26px] italic text-ink no-underline";
+              const style = { borderBottom: "1px solid var(--hair)" };
+              return i.route ? (
+                <Link
+                  key={i.key}
+                  href={i.href}
+                  onClick={close}
+                  className={className}
+                  style={style}
+                >
+                  {i.label}
+                </Link>
+              ) : (
+                <a
+                  key={i.key}
+                  href={i.href}
+                  onClick={close}
+                  className={className}
+                  style={style}
+                >
+                  {i.label}
+                </a>
+              );
+            })}
           </nav>
 
           <div className="mt-auto flex flex-col gap-3 px-6 pb-10">

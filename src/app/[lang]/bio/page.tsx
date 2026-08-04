@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale, type Locale } from "../dictionaries";
+import { siteConfig } from "@/config/site";
 import { getActiveScenarios } from "@/data/promos";
+import { getJobRoles } from "@/data/careers";
 import { getBio, scenariosToBioPromos } from "@/data/bio";
 import Bio from "../_components/Bio";
 
@@ -38,6 +40,17 @@ export default async function BioPage({
   const bio = await getBio(typedLang);
   const scenarios = await getActiveScenarios(typedLang);
   const promos = scenariosToBioPromos(scenarios, typedLang);
+  const dict = await getDictionary(typedLang);
+  const careersOn = siteConfig.sections.trabaja;
+  const roles = careersOn ? await getJobRoles(typedLang) : [];
 
-  return <Bio bio={bio} promos={promos} />;
+  return (
+    <Bio
+      bio={bio}
+      promos={promos}
+      lang={typedLang}
+      trabaja={careersOn ? dict.trabaja : null}
+      roles={roles}
+    />
+  );
 }
