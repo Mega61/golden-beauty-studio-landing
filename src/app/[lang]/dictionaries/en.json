@@ -422,6 +422,15 @@
       "coords": "6.156° N · 75.617° W"
     }
   },
+  "vacantes": {
+    "eyebrow": "We're hiring",
+    "title": "We're looking for careful hands.",
+    "body": "We're growing the Golden team — experienced or just starting out. Tell us about yourself and attach your CV.",
+    "rolesLabel": "Open roles",
+    "cta": "Apply now",
+    "bioTitle": "We're looking for careful hands.",
+    "bioCta": "Apply here"
+  },
   "trabaja": {
     "eyebrow": "Open roles · Sabaneta",
     "title1": "Work with",

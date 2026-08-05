@@ -3,10 +3,12 @@ import { getDictionary, hasLocale } from "./dictionaries";
 import { siteConfig } from "@/config/site";
 import { getActiveScenarios } from "@/data/promos";
 import { getReviews } from "@/data/reviews";
+import { getJobRoles } from "@/data/careers";
 import Nav from "./_components/Nav";
 import Hero from "./_components/Hero";
 import PromoStrip from "./_components/PromoStrip";
 import Highlights from "./_components/Highlights";
+import VacantesBand from "./_components/VacantesBand";
 import Lookbook from "./_components/Lookbook";
 import Servicios from "./_components/Servicios";
 import Diccionario from "./_components/Diccionario";
@@ -32,6 +34,9 @@ export default async function Page({
   const sections = siteConfig.sections;
   const scenarios = await getActiveScenarios(typedLang);
   const reviews = await getReviews(typedLang);
+  // Open cargos only matter when we're actually announcing them — skip the CMS
+  // round-trip entirely when the hiring band is switched off.
+  const hiringRoles = siteConfig.hiringBanner ? await getJobRoles(typedLang) : [];
 
   return (
     <>
@@ -39,7 +44,19 @@ export default async function Page({
       <PromoStrip scenarios={scenarios} dict={dict.promos} />
       <Nav lang={lang} dict={dict.nav} sections={sections} />
       <Hero dict={dict.hero} />
-      <Highlights scenarios={scenarios} dict={dict.promos} />
+      <Highlights
+        scenarios={scenarios}
+        dict={dict.promos}
+        hiring={
+          siteConfig.hiringBanner ? (
+            <VacantesBand
+              dict={dict.vacantes}
+              lang={typedLang}
+              roles={hiringRoles}
+            />
+          ) : null
+        }
+      />
       {sections.lookbook && <Lookbook lang={typedLang} dict={dict.lookbook} />}
       {sections.servicios && <Servicios dict={dict.servicios} lang={typedLang} />}
       {sections.servicios && sections.diccionario && <BrandDivider />}

@@ -33,6 +33,16 @@ export type BioPromo = {
   cta: string; // gold caps call-to-action on the banner
 };
 
+// The hiring slide in the promo banner. Not a `BioPromo`: it carries no image
+// (it deliberately breaks the photographic register so it doesn't read as an
+// offer to clients) and its href is an in-page hash, not a destination — it
+// opens the application form that already lives further down the page.
+export type BioHiring = {
+  tag: string;
+  title: string;
+  cta: string;
+};
+
 export type BioData = {
   handle: string;
   tagline: string;

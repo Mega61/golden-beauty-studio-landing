@@ -5,7 +5,7 @@ import BioPromoBanner from "./BioPromoBanner";
 import SocialIcon from "./SocialIcon";
 import TrabajaBio from "./TrabajaBio";
 import type { TrabajaDict } from "./PostulacionForm";
-import type { BioData, BioPromo } from "@/data/bio.types";
+import type { BioData, BioHiring, BioPromo } from "@/data/bio.types";
 import type { JobRole } from "@/data/careers.types";
 import type { Locale } from "../dictionaries";
 
@@ -17,6 +17,12 @@ type Props = {
   trabaja: TrabajaDict | null;
   /** Open cargos, from the CMS. Empty when careers is off. */
   roles: JobRole[];
+  /**
+   * The hiring slide for the promo banner, or null when the announcement is
+   * switched off. Independent of `trabaja`: the form can stay up while the
+   * studio stops advertising that it's hiring.
+   */
+  hiring: BioHiring | null;
 };
 
 /**
@@ -30,13 +36,22 @@ type Props = {
  * (`BioView`) are the only client pieces. Every clickable funnels through GA4.
  */
 
-export default function Bio({ bio, promos, lang, trabaja, roles }: Props) {
+export default function Bio({
+  bio,
+  promos,
+  lang,
+  trabaja,
+  roles,
+  hiring,
+}: Props) {
   const primary = bio.links.find((l) => l.primary) ?? null;
   const rows = bio.links.filter((l) => !l.primary);
 
-  const hasPromo = promos.length > 0;
-  const ctaMt = hasPromo ? 14 : 26;
-  const rowsMt = primary ? 12 : hasPromo ? 14 : 26;
+  // Spacing keys off whether the band renders at all, which the hiring slide can
+  // now cause on its own — with no promo running it is the only slide.
+  const hasBand = promos.length > 0 || hiring !== null;
+  const ctaMt = hasBand ? 14 : 26;
+  const rowsMt = primary ? 12 : hasBand ? 14 : 26;
 
   return (
     <main
@@ -116,9 +131,11 @@ export default function Bio({ bio, promos, lang, trabaja, roles }: Props) {
         </p>
 
         {/* Pinned promo band — a photographic hero (omitted when no scenario is
-            active). With 2+ active promos it becomes a rotating carousel,
-            mirroring the landing strip + Highlights. */}
-        <BioPromoBanner promos={promos} />
+            active). With 2+ slides it becomes a swipeable rotating carousel,
+            mirroring the landing strip + Highlights. The hiring slide rides
+            last in that carousel and opens the form below rather than
+            navigating away. */}
+        <BioPromoBanner promos={promos} hiring={hiring} />
 
         {/* Primary CTA — the only gold gradient fill on the page */}
         {primary && (

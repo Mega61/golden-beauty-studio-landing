@@ -80,7 +80,10 @@ export function trackBioView(): void {
   trackEvent("bio_view");
 }
 
-export type BioClickKind = "cta" | "row" | "promo" | "social";
+// "careers" is kept distinct from "promo" on purpose: the hiring slide shares
+// the promo banner's footprint but must never fire `select_promotion`, which
+// would fold job-ad impressions into the promotion reports.
+export type BioClickKind = "cta" | "row" | "promo" | "social" | "careers";
 
 // Single funnel event for every clickable on the bio page, so you can compare
 // click-through per destination. Booking/WhatsApp clicks ALSO fire their

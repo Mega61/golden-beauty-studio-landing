@@ -51,6 +51,18 @@ const mapsEmbedUrl =
 const turnstileSiteKey =
   process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null;
 
+const sectionTrabaja = bool(process.env.NEXT_PUBLIC_SECTION_TRABAJA, true);
+
+// The hiring announcement — the band inside the landing's `#promos` section and
+// the slide in the /bio banner. It rides on its own switch because the two
+// things it advertises have different lifetimes: the day a cargo fills you want
+// to stop shouting about it, but the application form (and the careers page it
+// lives on) should stay up so late applicants still land somewhere real.
+// Careers off ⇒ announcement off, always — never advertise a form that isn't
+// rendered.
+const hiringBanner =
+  sectionTrabaja && bool(process.env.NEXT_PUBLIC_HIRING_BANNER, true);
+
 export const siteConfig = {
   siteUrl,
   bookingUrl,
@@ -62,6 +74,7 @@ export const siteConfig = {
   mapsEmbedUrl,
   mapsPlaceId,
   turnstileSiteKey,
+  hiringBanner,
   sections: {
     lookbook: bool(process.env.NEXT_PUBLIC_SECTION_LOOKBOOK, true),
     servicios: bool(process.env.NEXT_PUBLIC_SECTION_SERVICIOS, true),
@@ -70,7 +83,7 @@ export const siteConfig = {
     estudio: bool(process.env.NEXT_PUBLIC_SECTION_ESTUDIO, true),
     reviews: bool(process.env.NEXT_PUBLIC_SECTION_REVIEWS, true),
     contacto: bool(process.env.NEXT_PUBLIC_SECTION_CONTACTO, true),
-    trabaja: bool(process.env.NEXT_PUBLIC_SECTION_TRABAJA, true),
+    trabaja: sectionTrabaja,
   },
 } as const;
 

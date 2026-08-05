@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PostulacionForm, { type TrabajaDict } from "./PostulacionForm";
 import { trackApplyOpen } from "@/lib/analytics";
+import {
+  CAREERS_PANEL_EVENT,
+  CAREERS_PANEL_ID,
+} from "@/lib/careers-panel";
 import type { Locale } from "../dictionaries";
 import type { JobRole } from "@/data/careers.types";
 
@@ -29,27 +33,69 @@ export default function TrabajaBio({
 }) {
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Mirrors `open` so the openers below can check it without being re-created
+  // on every toggle, and so `apply_open` fires exactly once per expansion no
+  // matter which of the three entry points did it.
+  const openRef = useRef(false);
 
   // Bring the newly revealed form into view — on a 390 px screen the panel opens
   // mostly below the fold, and a form you have to hunt for is a form you skip.
+  //
+  // Anchors on the whole disclosure (`block: "start"`), not on the panel: with
+  // the panel expanded the pair is taller than a phone viewport, and aligning
+  // anything else drops the visitor into the middle of a form with the label
+  // that explains it scrolled off the top. That matters most for the two
+  // entries the banner added — a tap from the promo band and a cold load on
+  // `…/bio#trabaja` — where the visitor arrives with no context at all.
   useEffect(() => {
     if (!open) return;
     const id = window.setTimeout(() => {
-      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
     return () => window.clearTimeout(id);
   }, [open]);
 
+  const openPanel = useCallback(() => {
+    if (openRef.current) return;
+    openRef.current = true;
+    setOpen(true);
+    trackApplyOpen("bio");
+  }, []);
+
+  // Opened from elsewhere on the page: the hiring slide in the promo banner, or
+  // a visitor landing directly on `…/bio#trabaja` (the link that gets shared in
+  // a story). See `lib/careers-panel.ts` for why it takes both a hash and an
+  // event.
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === `#${CAREERS_PANEL_ID}`) openPanel();
+    };
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    window.addEventListener(CAREERS_PANEL_EVENT, openPanel);
+    return () => {
+      window.removeEventListener("hashchange", openFromHash);
+      window.removeEventListener(CAREERS_PANEL_EVENT, openPanel);
+    };
+  }, [openPanel]);
+
   const toggle = () => {
-    setOpen((prev) => {
-      if (!prev) trackApplyOpen("bio");
-      return !prev;
-    });
+    if (openRef.current) {
+      openRef.current = false;
+      setOpen(false);
+      return;
+    }
+    openPanel();
   };
 
   return (
-    <div className="w-full" style={{ marginTop: 12 }}>
+    <div
+      id={CAREERS_PANEL_ID}
+      ref={rootRef}
+      className="w-full"
+      style={{ marginTop: 12 }}
+    >
       <button
         type="button"
         onClick={toggle}
@@ -101,7 +147,6 @@ export default function TrabajaBio({
 
       {open && (
         <div
-          ref={panelRef}
           id="bio-trabaja-panel"
           style={{
             background: "var(--color-paper)",

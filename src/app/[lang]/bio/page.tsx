@@ -44,6 +44,18 @@ export default async function BioPage({
   const careersOn = siteConfig.sections.trabaja;
   const roles = careersOn ? await getJobRoles(typedLang) : [];
 
+  // The banner slide is announcement-only — it points at the form below, so it
+  // is never rendered without it (`siteConfig.hiringBanner` already implies
+  // careers is on).
+  const announce = dict.vacantes;
+  const hiring = siteConfig.hiringBanner
+    ? {
+        tag: announce.eyebrow,
+        title: announce.bioTitle,
+        cta: announce.bioCta,
+      }
+    : null;
+
   return (
     <Bio
       bio={bio}
@@ -51,6 +63,7 @@ export default async function BioPage({
       lang={typedLang}
       trabaja={careersOn ? dict.trabaja : null}
       roles={roles}
+      hiring={hiring}
     />
   );
 }

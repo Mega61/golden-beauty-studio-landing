@@ -26,6 +26,14 @@ type HighlightsDict = {
 type Props = {
   scenarios: PromoScenario[];
   dict: HighlightsDict;
+  /**
+   * The "estamos contratando" band (`VacantesBand`), or null when the hiring
+   * announcement is switched off. Passed in as a rendered node rather than
+   * imported here so it stays a server component — importing it from this
+   * `"use client"` module would drag its markup and the cargo list into the
+   * client bundle for no reason.
+   */
+  hiring?: React.ReactNode;
 };
 
 // Accent → background + text + cta colour. Cards never use border-radius and
@@ -343,7 +351,7 @@ function ScenarioGrid({
   );
 }
 
-export default function Highlights({ scenarios, dict }: Props) {
+export default function Highlights({ scenarios, dict, hiring }: Props) {
   // Only scenarios that actually have cards become slides.
   const slides = scenarios.filter((s) => s.items.length > 0);
   const count = slides.length;
@@ -386,34 +394,46 @@ export default function Highlights({ scenarios, dict }: Props) {
     return () => ro.disconnect();
   }, [current, count, multi]);
 
-  if (count === 0) return null;
-  const scenario = slides[current];
+  // With no promo running the section still renders — the hiring band is not a
+  // promo and must not disappear just because the seasonal offer ended. It only
+  // collapses to nothing when there's neither a promo nor a vacancy to announce.
+  const hasPromos = count > 0;
+  if (!hasPromos && !hiring) return null;
+  const scenario = hasPromos ? slides[current] : null;
 
   return (
     <section
       id="promos"
-      className="relative bg-paper px-0 pb-14 pt-16 md:px-20 md:pb-[100px] md:pt-[120px]"
+      className={
+        hasPromos
+          ? "relative bg-paper px-0 pb-14 pt-16 md:px-20 md:pb-[100px] md:pt-[120px]"
+          : // Band on its own: the section's full seasonal rhythm around a
+            // single row would read as an accident, not as breathing room.
+            "relative bg-paper px-0 py-12 md:px-20 md:py-16"
+      }
     >
       <div className="relative mx-auto max-w-[1240px]">
         {/* Header — the scenario label tracks the active carousel slide. */}
-        <div className="mb-10 grid grid-cols-1 gap-6 px-5 md:mb-16 md:grid-cols-[1.4fr_1fr] md:items-end md:gap-12 md:px-0">
-          <div>
-            <EyebrowLabel className="text-gold">
-              — {dict.eyebrow} · {scenario.label}
-            </EyebrowLabel>
-            <h2
-              className="mb-0 mt-3.5 font-display text-[36px] font-normal leading-[1.02] text-ink md:text-[64px]"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              {dict.title1}
-              <br />
-              <em className="text-gold-grad italic">{dict.title2_em}</em>
-            </h2>
+        {scenario && (
+          <div className="mb-10 grid grid-cols-1 gap-6 px-5 md:mb-16 md:grid-cols-[1.4fr_1fr] md:items-end md:gap-12 md:px-0">
+            <div>
+              <EyebrowLabel className="text-gold">
+                — {dict.eyebrow} · {scenario.label}
+              </EyebrowLabel>
+              <h2
+                className="mb-0 mt-3.5 font-display text-[36px] font-normal leading-[1.02] text-ink md:text-[64px]"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                {dict.title1}
+                <br />
+                <em className="text-gold-grad italic">{dict.title2_em}</em>
+              </h2>
+            </div>
+            <p className="m-0 max-w-[460px] font-display text-[18px] italic leading-[1.45] text-ink-soft md:text-[22px]">
+              {dict.support}
+            </p>
           </div>
-          <p className="m-0 max-w-[460px] font-display text-[18px] italic leading-[1.45] text-ink-soft md:text-[22px]">
-            {dict.support}
-          </p>
-        </div>
+        )}
 
         {/* Carousel — slides cross-fade over a height-animated footprint. A lone
             promo skips all of this and renders as a plain grid. */}
@@ -450,7 +470,7 @@ export default function Highlights({ scenarios, dict }: Props) {
             })}
           </div>
         ) : (
-          <ScenarioGrid scenario={scenario} dict={dict} />
+          scenario && <ScenarioGrid scenario={scenario} dict={dict} />
         )}
 
         {/* Dots — only when more than one promo is live. Each is labeled with
@@ -482,21 +502,33 @@ export default function Highlights({ scenarios, dict }: Props) {
           </div>
         )}
 
-        {/* Footer */}
-        <div
-          className="mt-12 flex flex-col gap-3 px-5 pt-7 md:mt-16 md:flex-row md:items-center md:justify-between md:gap-6 md:px-0 md:pt-8"
-          style={{ borderTop: "1px solid var(--hair)" }}
-        >
-          <p className="m-0 font-display text-[15px] italic text-ink-soft md:text-[17px]">
-            {dict.footerQuote}
-          </p>
-          <a
-            href="#contacto"
-            className="font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-gold underline underline-offset-[5px]"
+        {/* Hiring announcement — outside the height-locked carousel wrapper on
+            purpose: anything inside it feeds the ResizeObserver that drives the
+            cross-fade height, and a fixed band would fight the measurement. */}
+        {hiring && (
+          <div className={hasPromos ? "mt-12 md:mt-16" : undefined}>
+            {hiring}
+          </div>
+        )}
+
+        {/* Footer — seasonal sign-off, so it belongs to the promos, not to the
+            hiring band that may be the only thing left in the section. */}
+        {hasPromos && (
+          <div
+            className="mt-12 flex flex-col gap-3 px-5 pt-7 md:mt-16 md:flex-row md:items-center md:justify-between md:gap-6 md:px-0 md:pt-8"
+            style={{ borderTop: "1px solid var(--hair)" }}
           >
-            {dict.footerLink}
-          </a>
-        </div>
+            <p className="m-0 font-display text-[15px] italic text-ink-soft md:text-[17px]">
+              {dict.footerQuote}
+            </p>
+            <a
+              href="#contacto"
+              className="font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-gold underline underline-offset-[5px]"
+            >
+              {dict.footerLink}
+            </a>
+          </div>
+        )}
       </div>
     </section>
   );

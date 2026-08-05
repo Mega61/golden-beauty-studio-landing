@@ -21,4 +21,14 @@ Las promos viven en `src/data/promos.{es,en}.ts` (mismas keys de escenario en am
 - **Editar el contenido por-escenario:** modificar `promos.es.ts` y `promos.en.ts`. Manten las mismas `slug` keys en ambos.
 - **Chrome estático** (eyebrow de la sección, footer): vive en `promos` dentro de `dictionaries/{es,en}.json`.
 - **Imagen del featured:** si `image_url` está vacío, el card cae a un placeholder de mármol — sin romper layout. Reemplazar agregando el archivo a `/public/` y seteando `image_url: "/ruta.jpg"` en el item correspondiente.
+## Anuncio "estamos contratando"
+
+Separado de las promos: no rota, no es un escenario, y no depende de `NEXT_PUBLIC_ACTIVE_PROMO`. Aparece en dos lugares — la banda de carbón dentro de `#promos` en la landing (`VacantesBand.tsx`) y una slide en el carrusel del banner de `/bio` (`BioPromoBanner.tsx`).
+
+- **Apagarlo:** `NEXT_PUBLIC_HIRING_BANNER=false`. Desaparece el anuncio en ambas superficies; la página `/trabaja-con-nosotros`, el formulario y la fila "Trabaja con nosotras" del `/bio` siguen arriba, para que quien llegue tarde aterrice en algo real. Para bajar también el formulario: `NEXT_PUBLIC_SECTION_TRABAJA=false` (que además apaga el anuncio — nunca se anuncia un formulario que no existe).
+- **Editar el copy:** clave `vacantes` en `dictionaries/{es,en}.json`. Vive fuera de `trabaja` a propósito: ese bloque se entrega entero al componente cliente del formulario, y meter aquí el copy lo enviaría al navegador de cada visitante para no renderizar nada.
+- **Los cargos que lista la banda** salen de Strapi (`getJobRoles`), así que abrir o cerrar una vacante no necesita deploy. El cargo `otro` se filtra — es una opción real del formulario, no una vacante que se anuncie.
+- **La slide del `/bio` abre el formulario en la misma página**, no navega a `/trabaja-con-nosotros`. Usa hash + evento (ver `src/lib/careers-panel.ts`): `…/bio#trabaja` es un link compartible que abre el panel en frío, y el evento cubre el clic in-page, donde el hash no cambia y `hashchange` nunca dispara.
+- **Sin promo activa** la sección `#promos` sigue renderizando, solo con la banda y padding reducido. Sin promo *y* sin anuncio, la sección desaparece entera.
+
 - **Collage de `primera-visita`:** el hero 16:9 de la promo evergreen (`/public/primera-visita.jpg`) se genera con `npm run build-promo-collage` (`scripts/build-promo-collage.mjs`) — compone 5 paneles del lookbook limpio (`public/lookbook/**`) separados por hairlines dorados. Para cambiar los diseños mostrados, editar el array `SOURCES` del script y re-correrlo.

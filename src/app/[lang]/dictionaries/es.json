@@ -418,6 +418,15 @@
       "coords": "6.156° N · 75.617° W"
     }
   },
+  "vacantes": {
+    "eyebrow": "Estamos contratando",
+    "title": "Buscamos manos con criterio.",
+    "body": "Sumamos talento al equipo Golden — con experiencia o empezando. Cuéntanos de ti y adjunta tu hoja de vida.",
+    "rolesLabel": "Cargos abiertos",
+    "cta": "Postúlate",
+    "bioTitle": "Buscamos manos con criterio.",
+    "bioCta": "Postúlate aquí"
+  },
   "trabaja": {
     "eyebrow": "Vacantes abiertas · Sabaneta",
     "title1": "Trabaja con",

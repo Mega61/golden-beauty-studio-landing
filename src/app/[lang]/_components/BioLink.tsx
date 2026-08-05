@@ -27,6 +27,7 @@ export function BioLink({
   className,
   style,
   ariaLabel,
+  onClick,
   children,
 }: {
   href: string;
@@ -37,6 +38,8 @@ export function BioLink({
   className?: string;
   style?: React.CSSProperties;
   ariaLabel?: string;
+  /** Extra click behavior, run after the tracking beacon. */
+  onClick?: () => void;
   children: React.ReactNode;
 }) {
   const ext = external
@@ -47,7 +50,10 @@ export function BioLink({
       href={href}
       {...ext}
       aria-label={ariaLabel}
-      onClick={() => trackBioClick({ key: linkKey, label, kind, href })}
+      onClick={() => {
+        trackBioClick({ key: linkKey, label, kind, href });
+        onClick?.();
+      }}
       className={className}
       style={style}
     >
