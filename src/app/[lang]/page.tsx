@@ -11,6 +11,7 @@ import Highlights from "./_components/Highlights";
 import VacantesBand from "./_components/VacantesBand";
 import Lookbook from "./_components/Lookbook";
 import Servicios from "./_components/Servicios";
+import Faq from "./_components/Faq";
 import Diccionario from "./_components/Diccionario";
 import Tecnicas from "./_components/Tecnicas";
 import Estudio from "./_components/Estudio";
@@ -59,6 +60,13 @@ export default async function Page({
       />
       {sections.lookbook && <Lookbook lang={typedLang} dict={dict.lookbook} />}
       {sections.servicios && <Servicios dict={dict.servicios} lang={typedLang} />}
+      {sections.faq && (
+        <Faq
+          dict={dict.faq}
+          lang={typedLang}
+          currencySuffix={dict.servicios.labels.currencySuffix ?? ""}
+        />
+      )}
       {sections.servicios && sections.diccionario && <BrandDivider />}
       {sections.diccionario && <Diccionario dict={dict.diccionario} />}
       {sections.diccionario && sections.tecnicas && <BrandDivider tone="dark" />}

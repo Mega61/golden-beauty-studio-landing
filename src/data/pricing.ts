@@ -95,6 +95,19 @@ export function getStartingPriceCOP(): number {
   );
 }
 
+// Price of one service by id, or null when the id isn't in the bundled list.
+// Lets prose (FAQ answers) quote a real price via a `{price:<id>}` token instead
+// of hardcoding a number that would silently drift from this file. Reads the
+// bundled data, not the CMS, so it stays synchronous for metadata/JSON-LD —
+// same tradeoff `getStartingPriceCOP` already makes.
+export function getPriceCOP(id: string): number | null {
+  for (const cat of pricing) {
+    const hit = cat.items.find((it) => it.id === id);
+    if (hit) return hit.priceCOP;
+  }
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CMS-driven price list
 // ─────────────────────────────────────────────────────────────────────────────

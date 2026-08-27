@@ -39,6 +39,7 @@ export default function Nav({
   dict,
   sections,
   onLanding = true,
+  switchPath = "",
 }: {
   lang: Locale;
   dict: NavDict;
@@ -49,8 +50,16 @@ export default function Nav({
    * being bare in-page hashes that would resolve to nothing.
    */
   onLanding?: boolean;
+  /**
+   * Path after the locale segment for the page this nav sits on, e.g.
+   * "/trabaja-con-nosotros". Lets the language switcher land on the *same* page
+   * in the other locale instead of dumping the visitor on the home page — which
+   * also gives `/en/trabaja-con-nosotros` its only internal inbound link.
+   */
+  switchPath?: string;
 }) {
   const otherLang: Locale = lang === "es" ? "en" : "es";
+  const switchHref = `/${otherLang}${switchPath}`;
   // `route: true` items navigate to another page; the rest are in-page anchors.
   const allAnchors: Array<{ key: NavItemKey; hash: string; route?: boolean }> = [
     { key: "trabajo", hash: "#trabajo" },
@@ -99,7 +108,7 @@ export default function Nav({
 
         <div className="hidden items-center gap-4 lg:flex">
           <Link
-            href={`/${otherLang}`}
+            href={switchHref}
             className="font-sans text-[10px] font-semibold uppercase tracking-[0.28em] text-ink-mute no-underline hover:text-gold"
             aria-label={`Switch to ${otherLang.toUpperCase()}`}
           >
@@ -114,6 +123,7 @@ export default function Nav({
         <MobileMenu
           lang={lang}
           otherLang={otherLang}
+          switchHref={switchHref}
           items={anchors.map((a) => ({
             key: a.key,
             href: a.href,

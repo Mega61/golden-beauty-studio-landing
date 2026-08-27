@@ -29,8 +29,15 @@ const googleSiteVerification =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || null;
 
 // Schema.org expects an E.164 telephone (e.g. "+573001234567"). The WhatsApp
-// env holds bare digits; emit null when unset so we never assert a fake number.
-const telephone = wppNumber ? `+${wppNumber.replace(/\D/g, "")}` : null;
+// env holds a bare 10-digit Colombian mobile with no country code, so prepend
+// +57 — without it the value is not valid E.164 and consumers drop it silently
+// rather than erroring. Tolerates the env var already carrying the 57 prefix.
+// Emits null when unset so we never assert a fake number.
+const CO_CALLING_CODE = "57";
+const wppDigits = wppNumber?.replace(/\D/g, "") ?? "";
+const telephone = wppDigits
+  ? `+${wppDigits.length > 10 && wppDigits.startsWith(CO_CALLING_CODE) ? wppDigits : `${CO_CALLING_CODE}${wppDigits}`}`
+  : null;
 
 // Public social profiles for `sameAs`. Filtered to whatever is actually set.
 const sameAs = [instagramUrl, tiktokUrl].filter(
@@ -78,6 +85,7 @@ export const siteConfig = {
   sections: {
     lookbook: bool(process.env.NEXT_PUBLIC_SECTION_LOOKBOOK, true),
     servicios: bool(process.env.NEXT_PUBLIC_SECTION_SERVICIOS, true),
+    faq: bool(process.env.NEXT_PUBLIC_SECTION_FAQ, true),
     diccionario: bool(process.env.NEXT_PUBLIC_SECTION_DICCIONARIO, true),
     tecnicas: bool(process.env.NEXT_PUBLIC_SECTION_TECNICAS, true),
     estudio: bool(process.env.NEXT_PUBLIC_SECTION_ESTUDIO, true),
@@ -133,8 +141,11 @@ export const business = {
   addressLocality: "Sabaneta",
   addressRegion: "Antioquia",
   addressCountry: "CO",
-  latitude: 6.156,
-  longitude: -75.617,
+  // Verified against the studio's Google Business Profile pin
+  // (maps.app.goo.gl/qnzYPnEjHkibtKev5). Must stay in agreement with
+  // NEXT_PUBLIC_GOOGLE_MAPS_QUERY — a geo/map mismatch weakens local ranking.
+  latitude: 6.1504912,
+  longitude: -75.6143366,
   priceRange: "$$",
   telephone,
   sameAs,

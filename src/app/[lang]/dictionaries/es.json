@@ -35,9 +35,9 @@
   },
   "hero": {
     "eyebrow": "Nails Studio · Sabaneta",
-    "title1": "Con el toque de oro,",
-    "title2_em": "Lujo en cada detalle.",
-    "body": "Nos especializamos en uñas con acabados impecables y una experiencia premium que combina belleza, elegancia y cuidado en cada cita. -Más que uñas, creamos detalles que elevan tu esencia-",
+    "title1": "Uñas esculpidas en Sabaneta,",
+    "title2_em": "con el toque de oro.",
+    "body": "Lujo en cada detalle. Nos especializamos en uñas con acabados impecables y una experiencia premium que combina belleza, elegancia y cuidado en cada cita. -Más que uñas, creamos detalles que elevan tu esencia-",
     "ctaPrimary": "Agendar cita",
     "ctaSecondary": "Ver Precios",
     "metaHours": "LUN - DOM",
@@ -228,6 +228,38 @@
     },
     "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería)",
     "cta": "Reservar mi cita"
+  },
+  "faq": {
+    "eyebrow": "Preguntas frecuentes",
+    "title1": "Lo que nos preguntan,",
+    "title2_em": "respondido.",
+    "body": "Las dudas que más escuchamos en el estudio, contestadas sin rodeos. Si te queda alguna, escríbenos por WhatsApp.",
+    "items": [
+      {
+        "q": "¿Cuánto cuestan las uñas acrílicas en Sabaneta?",
+        "a": "Un montaje de uñas esculpidas en acrílico cuesta {price:acrylic-sculpted} e incluye la estructura completa. El retoque de mantenimiento cuesta {price:acrylic-refill}. Los precios corresponden a diseños simples; la carta completa, con tiempos y todas las técnicas, está en la sección de servicios."
+      },
+      {
+        "q": "¿Cuál es la diferencia entre polygel y acrílico?",
+        "a": "El acrílico mezcla polímero y monómero: da máxima resistencia y una forma esculpida a lima, ideal para extensiones largas. El polygel es un gel en pasta que se cura en lámpara LED, pesa menos, se siente más natural y no tiene olor. Un montaje en polygel cuesta {price:polygel-sculpted}."
+      },
+      {
+        "q": "¿Cada cuánto necesito un retoque?",
+        "a": "Recomendamos un retoque máximo cada 21 días para mantener la estructura pareja y la uña natural sana. Cada montaje incluye hasta tres retoques dentro de ese ritmo. Si pasa más tiempo, la uña crece lo suficiente para que sea mejor hacer un montaje nuevo."
+      },
+      {
+        "q": "¿Necesito agendar cita previa?",
+        "a": "Sí. Atendemos solo con cita para dedicarle el tiempo completo a cada servicio: un montaje toma alrededor de dos horas y media. Puedes agendar por WhatsApp. Abrimos de lunes a sábado de 9:00 a 19:00 y los domingos de 10:00 a 15:00."
+      },
+      {
+        "q": "¿Dónde queda el estudio?",
+        "a": "Estamos en la Calle 69 Sur #43a - 41, primer piso, en Sabaneta, Antioquia, a media cuadra de la Registraduría y muy cerca del Parque de Sabaneta. Puedes abrir la ubicación exacta en Google Maps desde la sección de contacto."
+      },
+      {
+        "q": "¿Cómo manejan la higiene y la esterilización?",
+        "a": "Todo el material desechable se abre frente a ti al empezar el servicio, y las herramientas reutilizables se esterilizan entre una cita y otra. Es un protocolo fijo, no un extra que se pide: preferimos que lo veas a que tengas que creernos."
+      }
+    ]
   },
   "diccionario": {
     "eyebrow": "Entendiendo las técnicas",

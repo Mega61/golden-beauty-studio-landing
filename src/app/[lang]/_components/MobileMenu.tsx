@@ -20,6 +20,8 @@ type Item = { key: string; href: string; label: string; route?: boolean };
 type Props = {
   lang: Locale;
   otherLang: Locale;
+  /** Same-page URL in the other locale, built by Nav. */
+  switchHref: string;
   items: Item[];
   cta: string;
   ctaShort: string;
@@ -29,6 +31,7 @@ type Props = {
 export default function MobileMenu({
   lang,
   otherLang,
+  switchHref,
   items,
   cta,
   ctaShort,
@@ -132,7 +135,7 @@ export default function MobileMenu({
 
           <div className="mt-auto flex flex-col gap-3 px-6 pb-10">
             <Link
-              href={`/${otherLang}`}
+              href={switchHref}
               onClick={close}
               className="font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-mute no-underline"
             >

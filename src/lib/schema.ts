@@ -1,6 +1,6 @@
 import { business, siteConfig } from "@/config/site";
 import { pricing } from "@/data/pricing";
-import { resolveDescription } from "@/lib/seo";
+import { resolveDescription, resolvePriceTokens } from "@/lib/seo";
 import type { Dictionary, Locale } from "@/app/[lang]/dictionaries";
 
 const abs = (path: string) => new URL(path, siteConfig.siteUrl).toString();
@@ -94,8 +94,34 @@ export function buildJsonLd(lang: Locale, dict: Dictionary) {
     publisher: { "@id": businessId },
   };
 
+  // FAQ block, mirrored as structured data. Google stopped showing FAQ rich
+  // results for most sites in 2023, so this is not a SERP play — it's for the
+  // answer engines, which still read Question/Answer pairs. Built from the same
+  // dictionary the section renders, with the same `{price:…}` tokens resolved,
+  // so the markup can never claim something the visible page doesn't say.
+  const faqItems = siteConfig.sections.faq ? (dict.faq?.items ?? []) : [];
+  const currencySuffix = dict.servicios.labels.currencySuffix ?? "";
+  const faqPage =
+    faqItems.length > 0
+      ? {
+          "@type": "FAQPage",
+          "@id": `${siteConfig.siteUrl}/${lang}#faq`,
+          inLanguage: lang === "es" ? "es-CO" : "en-US",
+          isPartOf: { "@id": `${siteConfig.siteUrl}/#website` },
+          about: { "@id": businessId },
+          mainEntity: faqItems.map((item) => ({
+            "@type": "Question",
+            name: item.q,
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: resolvePriceTokens(item.a, lang, currencySuffix),
+            },
+          })),
+        }
+      : null;
+
   return {
     "@context": "https://schema.org",
-    "@graph": [localBusiness, website],
+    "@graph": [localBusiness, website, ...(faqPage ? [faqPage] : [])],
   };
 }

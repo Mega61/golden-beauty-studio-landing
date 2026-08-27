@@ -63,7 +63,10 @@ export async function generateMetadata({
     metadataBase: new URL(siteConfig.siteUrl),
     title,
     description,
-    keywords: dict.meta.keywords,
+    // No `keywords` meta tag: Google has ignored it since 2009 and Bing treats
+    // it as a spam signal. `dict.meta.keywords` is still used — as schema.org
+    // `keywords` on the BeautySalon node in lib/schema.ts, where it's a real
+    // property rather than a dead tag.
     applicationName: "Golden Beauty Studio",
     authors: [{ name: "Golden Beauty Studio" }],
     creator: "Golden Beauty Studio",

@@ -35,9 +35,9 @@
   },
   "hero": {
     "eyebrow": "Nails Studio · Sabaneta",
-    "title1": "With the golden touch,",
-    "title2_em": "luxury in every detail.",
-    "body": "We specialize in nails with flawless finishes and a premium experience that blends beauty, elegance and care into every appointment. -More than nails, we craft details that elevate your essence-",
+    "title1": "Sculpted nails in Sabaneta,",
+    "title2_em": "with the golden touch.",
+    "body": "Luxury in every detail. We specialize in nails with flawless finishes and a premium experience that blends beauty, elegance and care into every appointment. -More than nails, we craft details that elevate your essence-",
     "ctaPrimary": "Book a visit",
     "ctaSecondary": "Pricing",
     "metaHours": "MON – SUN",
@@ -228,6 +228,38 @@
     },
     "footnote": "One-week warranty on product lift (excluding charms or rhinestones).",
     "cta": "Book my appointment"
+  },
+  "faq": {
+    "eyebrow": "Frequently asked",
+    "title1": "What people ask us,",
+    "title2_em": "answered.",
+    "body": "The questions we hear most in the studio, answered plainly. If yours isn't here, message us on WhatsApp.",
+    "items": [
+      {
+        "q": "How much do acrylic nails cost in Sabaneta?",
+        "a": "A full set of sculpted acrylic nails costs {price:acrylic-sculpted} and includes the complete structure. A maintenance refill costs {price:acrylic-refill}. These prices cover simple designs; the full menu, with timings and every technique, is in the services section."
+      },
+      {
+        "q": "What is the difference between polygel and acrylic?",
+        "a": "Acrylic blends polymer and monomer: maximum strength and a shape sculpted with a file, ideal for long extensions. Polygel is a putty gel cured under an LED lamp — lighter, more natural to wear, and odourless. A polygel full set costs {price:polygel-sculpted}."
+      },
+      {
+        "q": "How often do I need a refill?",
+        "a": "We recommend a refill every 21 days at most, which keeps the structure even and the natural nail healthy. Every full set includes up to three refills at that pace. Leave it longer and the nail grows out enough that a fresh set is the better option."
+      },
+      {
+        "q": "Do I need an appointment?",
+        "a": "Yes. We work by appointment only so each service gets its full time — a full set takes around two and a half hours. You can book over WhatsApp. We are open Monday to Saturday from 9:00 to 19:00, and Sundays from 10:00 to 15:00."
+      },
+      {
+        "q": "Where is the studio located?",
+        "a": "We are at Calle 69 Sur #43a - 41, first floor, in Sabaneta, Antioquia — half a block from the Registraduría and a short walk from Parque de Sabaneta. You can open the exact location in Google Maps from the contact section."
+      },
+      {
+        "q": "How do you handle hygiene and sterilisation?",
+        "a": "Every disposable item is opened in front of you when your service begins, and reusable tools are sterilised between appointments. It is a fixed protocol, not something you have to ask for — we would rather you watch it happen than take our word for it."
+      }
+    ]
   },
   "diccionario": {
     "eyebrow": "Understanding the techniques",

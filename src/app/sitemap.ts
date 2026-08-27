@@ -12,16 +12,23 @@ function entry(
   changeFrequency: "monthly" | "yearly",
   priorityEs: number,
 ): MetadataRoute.Sitemap {
-  const lastModified = new Date();
   const languages: Record<string, string> = Object.fromEntries(
     locales.map((l) => [l, `${siteConfig.siteUrl}/${l}${path}`]),
   );
   languages["x-default"] = `${siteConfig.siteUrl}/es${path}`;
   return locales.map((lang) => ({
     url: `${siteConfig.siteUrl}/${lang}${path}`,
-    lastModified,
+    // `lastModified` is deliberately omitted. We have no per-page change
+    // tracking, so the only value we could emit is the build timestamp — which
+    // moves on every deploy whether or not the page changed. Google discounts
+    // lastmod it finds unreliable, so an absent value (it falls back to its own
+    // crawl-based freshness signal) beats one that always lies.
     changeFrequency,
-    priority: lang === "es" ? priorityEs : priorityEs - 0.2,
+    // Round: 0.6 - 0.2 is 0.39999999999999997 in IEEE-754 floats.
+    priority:
+      lang === "es"
+        ? priorityEs
+        : Math.round((priorityEs - 0.2) * 100) / 100,
     alternates: { languages },
   }));
 }

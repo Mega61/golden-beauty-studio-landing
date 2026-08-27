@@ -25,6 +25,13 @@ export async function generateMetadata({
       languages: { es: "/es/bio", en: "/en/bio", "x-default": "/es/bio" },
     },
     openGraph: { title, description, url: `/${lang}/bio` },
+    // A link tree for Instagram traffic, not a page meant to rank — which is
+    // also why sitemap.ts leaves it out. Without this it inherited
+    // `index: true` from the layout, so it was indexable, carrying real link
+    // equity from the Instagram profile, and had zero internal inlinks: exactly
+    // the setup that gets a second URL competing with the home page on brand
+    // searches. `follow` stays on so the links out of it still pass value.
+    robots: { index: false, follow: true },
   };
 }
 

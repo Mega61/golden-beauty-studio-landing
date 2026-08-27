@@ -63,9 +63,9 @@ export default function Footer({ dict }: { dict: FooterDict }) {
             </p>
           </div>
           <div>
-            <h4 className="m-0 mb-4 font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">
+            <h3 className="m-0 mb-4 font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">
               {dict.visit.title}
-            </h4>
+            </h3>
             <p className="m-0 font-sans text-[14px] leading-[1.7] text-ink">
               {dict.visit.address1}
               <br />
@@ -75,9 +75,9 @@ export default function Footer({ dict }: { dict: FooterDict }) {
             </p>
           </div>
           <div>
-            <h4 className="m-0 mb-4 font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">
+            <h3 className="m-0 mb-4 font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">
               {dict.find.title}
-            </h4>
+            </h3>
             <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
               {dict.find.links.map((l) => {
                 const href = resolveFindLink(l, findUrls);

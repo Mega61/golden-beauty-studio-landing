@@ -205,7 +205,11 @@ function FeaturedCard({ item, dict }: { item: PromoItem; dict: HighlightsDict })
             fill
             sizes="(min-width: 768px) 60vw, 100vw"
             className="object-cover"
-            priority
+            // No `priority` here on purpose: the hero image (Hero.tsx) is the
+            // LCP candidate, and a second preloaded image competes with it for
+            // bandwidth on the critical path — costly on mobile, which is ~74%
+            // of traffic. This card sits below the fold on phones anyway.
+            loading="lazy"
           />
         ) : (
           // Placeholder: marble texture + carbon wash. Sized identically to

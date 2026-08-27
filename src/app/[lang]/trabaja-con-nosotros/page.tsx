@@ -63,6 +63,7 @@ export default async function TrabajaPage({
         dict={dict.nav}
         sections={siteConfig.sections}
         onLanding={false}
+        switchPath="/trabaja-con-nosotros"
       />
       <Trabaja dict={dict.trabaja} lang={typedLang} roles={roles} />
       <Footer dict={dict.footer} />

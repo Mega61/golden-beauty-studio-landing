@@ -12,6 +12,15 @@ Prices and durations live in **`src/data/pricing.ts`** — one number per servic
 - **New / renamed / removed service:** add or remove the entry in `src/data/pricing.ts`, then add/rename/remove the matching `{ name, desc }` under `servicios.categories.<catId>.items.<itemId>` in **both** `es.json` and `en.json`. The ids must match exactly.
 - **Build guard:** `scripts/check-pricing.mjs` runs in `predev` and `prebuild` and fails fast if a pricing id has no translation, or a translation has no pricing entry. Run manually with `npm run check-pricing`.
 
+## Preguntas frecuentes (FAQ)
+
+La sección vive en `src/app/[lang]/_components/Faq.tsx` y su copy en la clave `faq` de `dictionaries/{es,en}.json`. Se renderiza entre Servicios y Diccionario, y se apaga con `NEXT_PUBLIC_SECTION_FAQ=false`.
+
+- **Por qué existe:** es la única sección escrita en lenguaje literal de búsqueda ("¿cuánto cuestan las uñas acrílicas?") en vez de la voz evocativa del resto de la página. Ese es su trabajo — que un motor de respuestas encuentre una pregunta que coincide con la del usuario. No la reescribas en voz de marca.
+- **Formato de las respuestas:** autocontenidas, 40–60 palabras, sin "como mencionamos arriba" ni pronombres que apunten a otra sección. Un pasaje extraído solo debe seguir teniendo sentido.
+- **Precios en el texto:** nunca escribas un número a mano. Usa el token `{price:<id>}` con un id de `src/data/pricing.ts` (ej. `{price:acrylic-sculpted}`) — `resolvePriceTokens()` en `src/lib/seo.ts` lo reemplaza por el precio formateado según el idioma. Un id inexistente se deja literal en pantalla, para que el error se vea en revisión en vez de publicar un precio falso.
+- **JSON-LD:** `lib/schema.ts` emite un nodo `FAQPage` construido desde el mismo diccionario y con los mismos tokens resueltos, así el markup nunca afirma algo que la página visible no diga. Google ya casi no muestra rich results de FAQ; esto es para los motores de respuesta (ChatGPT, Perplexity, AI Overviews).
+
 ## Promociones de temporada
 
 Las promos viven en `src/data/promos.{es,en}.ts` (mismas keys de escenario en ambos archivos). El selector `getActiveScenarios(lang)` en `src/data/promos.ts` lee la env var `NEXT_PUBLIC_ACTIVE_PROMO` para decidir qué escenarios están activos. La shape por-escenario (un solo `strip`) ya espeja la del futuro Collection Type `promo-scenario` en Strapi; cuando se conecte el CMS solo se reemplaza el cuerpo de `getActiveScenarios` (hay un bloque comentado con la implementación lista al final del archivo). `getActiveScenario(lang)` sigue existiendo como wrapper que devuelve el primero — lo usa el `/bio`.
