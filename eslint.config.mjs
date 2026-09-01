@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The admin panel is a sibling Next app with its own eslint/tsconfig and
+    // its own CI job — it is not part of the landing's lint or build.
+    "admin/**",
+    // Agent worktrees hold a full copy of the repo, build output included.
+    // Without this, a worktree left on disk makes `npm run lint` report
+    // thousands of problems in generated chunks that nobody wrote.
+    ".claude/**",
   ]),
 ]);
 

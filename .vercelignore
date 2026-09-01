@@ -1,0 +1,30 @@
+# Qué NO se sube al build de la landing.
+#
+# Es distinto del `ignoreCommand` de `vercel.json`, y las dos cosas hacen falta:
+#
+#   · `ignoreCommand` decide **si hay build**. Un push que solo toca `admin/`,
+#     `deploy/`, `docs/` o `.github/` no despliega la landing. Semántica de
+#     Vercel, que se lee al revés de lo que parece: **exit 1 → construye,
+#     exit 0 → ignora**. `git diff --quiet` sale 0 cuando no hay diferencias,
+#     así que el comando dice "no hay nada que la landing necesite construir".
+#     `deploy/` en esa lista es obligatorio: cada despliegue del panel escribe
+#     el digest ahí, y sin la exclusión cada despliegue del panel redesplegaría
+#     la landing.
+#
+#   · Este archivo decide **qué se sube cuando sí hay build**. El panel es una
+#     app Next completa con su propio árbol de dependencias; subirla al builder
+#     de la landing serían megabytes y segundos por deploy para que nada la
+#     use.
+
+# La app hermana del panel: se construye en GitHub Actions y corre en la VM.
+admin/
+
+# El stack de Docker y el runbook de despliegue: los lee Portainer y los lee
+# una persona, no el builder.
+deploy/
+docs/
+.github/
+
+# Nunca hicieron falta acá.
+.claude/
+.playwright-mcp/
