@@ -10,6 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "optimize-logos": "node scripts/optimize-logos.mjs",
     "watermark-lookbook": "node scripts/watermark-lookbook.mjs",
     "build-manifest": "node scripts/build-lookbook-manifest.mjs",
@@ -32,9 +35,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

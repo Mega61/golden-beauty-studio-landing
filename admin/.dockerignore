@@ -1,0 +1,37 @@
+# Contexto de build de la imagen del panel. La raíz del contexto es `admin/`:
+# la app no importa nada de `src/` de la landing, y darle un contexto más ancho
+# solo serviría para que un cambio en la landing invalide la caché de esta
+# imagen.
+#
+# Lo que se excluye acá no es solo peso: `.env*` fuera del contexto es la
+# garantía de que un secreto local no termine horneado en un layer, donde
+# `docker history` lo muestra aunque el Dockerfile nunca lo mencione.
+
+# Dependencias y artefactos: el build hace su propio `npm ci` y su propio
+# `next build`. Copiar los de la máquina de quien construye traería binarios
+# compilados para Windows a un contenedor Alpine.
+node_modules
+.next
+dist
+coverage
+*.tsbuildinfo
+
+# Secretos y configuración local. Las variables del contenedor las inyecta el
+# stack en Portainer, nunca la imagen.
+.env
+.env.*
+!.env.example
+
+# Ruido del entorno de desarrollo
+.git
+.gitignore
+.DS_Store
+*.log
+npm-debug.log*
+
+# No hacen falta para construir ni para servir, y cada archivo del contexto es
+# una razón más para invalidar la caché.
+Dockerfile
+.dockerignore
+README.md
+*.md

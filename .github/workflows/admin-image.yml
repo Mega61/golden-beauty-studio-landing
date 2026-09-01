@@ -1,0 +1,170 @@
+# Construye la imagen del panel, la publica en GHCR y escribe su digest en
+# `deploy/compose/.env`. Portainer hace polling del repo y redespliega solo.
+#
+# CI **no tiene ninguna credencial hacia la VM**: ni llave SSH, ni token de
+# Portainer, ni puerto abierto. Su único secreto es el `GITHUB_TOKEN` que
+# Actions ya provee. Eso es consecuencia de que el stack corra en modo Git, y es
+# la razón por la que el diseño no usa webhooks (que además son Business
+# Edition en Portainer).
+#
+# ── Las dos guardas anti-bucle ───────────────────────────────────────────────
+#
+# El último paso de este workflow commitea al repo, así que sin guardas se
+# dispararía a sí mismo para siempre:
+#
+#   1. `paths: admin/**` — el commit de despliegue toca `deploy/compose/.env`,
+#      que no está en la lista. (El plan hablaba de `paths-ignore`, pero
+#      GitHub Actions **prohíbe declarar `paths` y `paths-ignore` juntos** en el
+#      mismo evento: el workflow queda inválido. Con `paths` restringido a
+#      `admin/**` el efecto es el mismo y más estricto.)
+#   2. `[skip ci]` en el mensaje del commit — Actions lo respeta para eventos
+#      `push`, y cubre el caso de que alguien amplíe la lista de arriba.
+#
+# Las dos, y no una: cada una tapa un agujero distinto.
+
+name: admin image
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "admin/**"
+      - ".github/workflows/admin-image.yml"
+  # Para reconstruir sin cambios de código (por ejemplo, tras un cambio de base
+  # en `node:22-alpine`).
+  workflow_dispatch:
+
+permissions:
+  # Empujar la imagen a GHCR.
+  packages: write
+  # Commitear el digest a `deploy/compose/.env`.
+  contents: write
+
+# Dos merges seguidos no pueden pisarse el commit de despliegue: se encolan.
+# `cancel-in-progress: false` a propósito — cancelar el de más atrás dejaría
+# publicada una imagen sin su digest en el repo.
+concurrency:
+  group: admin-image
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/mega61/gbs-admin
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      # ── La compuerta ──────────────────────────────────────────────────────
+      # Si algo de acá falla, no hay imagen. Es todo el punto de que el build
+      # esté después: una imagen que se publica igual convierte el pipeline en
+      # decoración.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Los tests de capa 2 levantan su propio MySQL efímero con `docker run`
+      # (los runners de GitHub traen Docker). Es el mismo camino que corre en la
+      # máquina de quien desarrolla, así que un fallo acá se reproduce local sin
+      # traducción. La alternativa —un `services: mysql` y `GBS_TEST_MYSQL_URL`—
+      # sería unos segundos más rápida y un camino distinto al de desarrollo.
+      #
+      # `TZ` fijada: EA guarda datetimes locales sin zona y los tests de mapeo
+      # dependen de la zona del proceso. Un runner en UTC los pasaría por
+      # casualidad o los rompería por casualidad; ninguna de las dos sirve.
+      - name: Tests
+        run: npm test
+        env:
+          TZ: America/Bogota
+
+      # ── La imagen ─────────────────────────────────────────────────────────
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: SHA corto
+        id: vars
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Construir y publicar
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          # El contexto es `admin/`, no la raíz: la app no importa nada de
+          # `src/` de la landing.
+          context: admin
+          file: admin/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:sha-${{ steps.vars.outputs.short }}
+          # Sin esto, cada build vuelve a hacer `npm ci` desde cero.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      # ── El despliegue ─────────────────────────────────────────────────────
+      # Escribir el digest ES el despliegue: Portainer lee este archivo del repo
+      # en su próximo ciclo de polling y recrea el stack.
+      #
+      # Por digest y no por el tag que se acaba de publicar: `git revert` de este
+      # commit devuelve exactamente el binario anterior. Con un tag móvil no hay
+      # rollback, hay esperanza.
+      - name: Escribir el digest en deploy/compose/.env
+        working-directory: ${{ github.workspace }}
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          SHORT: ${{ steps.vars.outputs.short }}
+        run: |
+          set -euo pipefail
+          test -n "$DIGEST"
+          # Se reescribe SOLO la línea del digest: el resto del archivo explica
+          # por qué existe, y un `echo >` lo borraría.
+          sed -i -E "s#^ADMIN_IMAGE=.*#ADMIN_IMAGE=${IMAGE}@${DIGEST}#" deploy/compose/.env
+          grep -q "^ADMIN_IMAGE=${IMAGE}@sha256:" deploy/compose/.env
+
+          if git diff --quiet -- deploy/compose/.env; then
+            echo "El digest no cambió (build reproducible o reintento). No hay nada que desplegar."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/compose/.env
+          git commit -m "[skip ci] deploy: admin ${SHORT}"
+          # `--rebase` por si otro workflow encoló su propio commit de
+          # despliegue mientras este construía.
+          git pull --rebase --autostash origin master
+          git push origin HEAD:master
+
+      - name: Resumen
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          {
+            echo "### Panel de administración"
+            echo ""
+            echo "- Imagen: \`${IMAGE}:sha-${{ steps.vars.outputs.short }}\`"
+            echo "- Digest: \`${{ steps.build.outputs.digest }}\`"
+            echo ""
+            echo "Portainer lo toma en su próximo ciclo de polling."
+          } >> "$GITHUB_STEP_SUMMARY"

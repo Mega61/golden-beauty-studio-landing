@@ -33,7 +33,20 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env
 .env*.local
+
+# ...con una excepción: el .env del stack del panel SÍ va versionado. Contiene
+# una sola línea —el digest de la imagen que CI acaba de publicar— y ningún
+# secreto. Es el archivo que Portainer lee del repo para saber qué desplegar:
+# ignorarlo dejaría al CI/CD sin canal. Los secretos del panel viven en las
+# variables de entorno del stack, en Portainer.
+!deploy/compose/.env
 .claude
+# ...menos las definiciones de agentes: son herramientas del proyecto, las
+# referencia docs/WORK-PACKAGES.md, y sin ellas ese documento apunta a archivos
+# que solo existen en una máquina. El resto de .claude/ (settings locales,
+# capturas, exports de Search Console) se queda afuera.
+!.claude/agents/
+!.claude/agents/**
 .playwright-mcp
 
 # vercel

@@ -1,0 +1,93 @@
+# Stack de DESARROLLO local — Easy!Appointments + MySQL + Mailpit.
+#
+# Espeja el stack real de Portainer a propósito: los nombres de servicio son los
+# mismos (`golden-agenda`, `mysql-transversal`) y el usuario de base de datos
+# también, para que la única diferencia entre dev y producción sean los valores
+# de las variables, nunca la forma. En producción, además, `mysql-transversal`
+# es un servidor COMPARTIDO que vive fuera del stack, en la red externa `data`.
+#
+# No es el stack de producción: ése lo entrega el paquete A4 en gbs-stack.yml,
+# con los servicios `admin`, `admin-migrate` y `db-backup`, sin puertos
+# publicados y colgado de las redes externas `data` y `web`.
+#
+# Acá el panel NO corre en Docker: corre con `npm run dev` en el host (3001),
+# para tener HMR.
+#
+#   docker compose -f deploy/compose/dev-stack.yml up -d
+#
+# Puertos elegidos para no chocar con lo que suele estar ocupado en Windows:
+#   8080 → EA          (80 lo toma cualquier cosa)
+#   3307 → MySQL       (3306 lo toma un MySQL local si existe)
+#   8025 → Mailpit     (bandeja de correo falsa; EA manda sus notificaciones acá)
+
+name: gbs-dev
+
+services:
+  golden-agenda:
+    # Pinear a la MISMA versión que corre la VM. `latest` significa desarrollar
+    # contra algo distinto a producción y no enterarse — y en producción,
+    # además, que un redespliegue traiga una versión nueva sin avisar.
+    image: alextselegidis/easyappointments:${EA_VERSION:-latest}
+    container_name: gbs-dev-agenda
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      BASE_URL: http://localhost:8080
+      DEBUG_MODE: "TRUE"
+      DB_HOST: mysql-transversal
+      DB_NAME: easyappointments
+      DB_USERNAME: easyappointments
+      DB_PASSWORD: easyappointments_dev
+      # Todo el correo cae en Mailpit; nada sale a internet.
+      MAIL_PROTOCOL: smtp
+      MAIL_SMTP_HOST: mailpit
+      MAIL_SMTP_PORT: "1025"
+      MAIL_SMTP_AUTH: "0"
+      MAIL_SMTP_CRYPTO: ""
+      MAIL_FROM_ADDRESS: dev@goldenbeautystudio.local
+      MAIL_FROM_NAME: Golden Beauty Studio (dev)
+    volumes:
+      - ea_storage:/var/www/html/storage
+    depends_on:
+      mysql-transversal:
+        condition: service_healthy
+
+  mysql-transversal:
+    image: mysql:8.0
+    container_name: gbs-dev-mysql
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: easyappointments
+      MYSQL_USER: easyappointments
+      MYSQL_PASSWORD: easyappointments_dev
+      # America/Bogota no tiene horario de verano, pero el contenedor por
+      # defecto corre en UTC y EA guarda datetimes locales sin zona: sin esto,
+      # cinco horas de desfase que aparecen como "los totales no cuadran".
+      TZ: America/Bogota
+    command: >
+      --default-time-zone=-05:00
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./dev-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-psecret"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: gbs-dev-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+
+volumes:
+  mysql-data:
+  ea_storage:

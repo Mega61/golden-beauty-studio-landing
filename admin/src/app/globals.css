@@ -1,0 +1,1577 @@
+@import "tailwindcss";
+
+/* =============================================================================
+   Sistema de diseño del panel — WP-A3
+   =============================================================================
+
+   Se hereda de `src/app/globals.css` de la landing con una corrección de
+   registro: allá la tipografía display *es* el producto; acá la interfaz sirve
+   a la tarea y desaparece. Los tokens de marca (marfil, carbón, dorado) son los
+   mismos hex; lo que cambia es qué trabajo hace cada uno.
+
+   Tres cosas que este archivo hace a propósito y conviene no deshacer:
+
+   1. **`--text-*: initial` y `--color-*: initial` borran las escalas por
+      defecto de Tailwind antes de declarar las nuestras.** La escala
+      tipográfica es fija (12 · 13 · 14 · 16 · 20 · 24) y la paleta es cerrada;
+      dejar las de Tailwind vivas convierte "escala fija" en una convención que
+      nadie respeta a los tres meses. Así `text-2xl` o `bg-blue-500` no compilan
+      a nada y el error se ve al escribirlo.
+
+   2. **Los componentes son clases CSS de verdad** (`@layer components`), no
+      cadenas de utilidades repetidas en cada `.tsx`. El contraste de esta
+      interfaz está medido; si los siete estados de un botón viven desperdigados
+      en veinte archivos, la próxima persona los rompe sin enterarse.
+
+   3. **El dorado nunca codifica un dato.** Es acción primaria, selección actual
+      y anillo de foco, y nada más. El estado de la cita tiene su propia familia
+      semántica (ver § paleta de estados).
+   ========================================================================== */
+
+@theme {
+  /* --- Superficies -------------------------------------------------------
+     Los paneles se separan del contenido por superficie, no por sombra. La
+     sombra queda reservada para lo que de verdad flota sobre la página
+     (diálogo, hoja, toast, menú). */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+
+  --color-paper: #fbf8f3; /* fondo de contenido */
+  --color-ivory: #f8f4ee; /* fondo de la app */
+  --color-cream: #f3ecdf; /* segunda capa: barra lateral, toolbars, thead */
+  --color-ivory-deep: #efe7da; /* tercera capa: celdas fuera de horario, wells */
+
+  /* --- Tinta -------------------------------------------------------------
+     `ink-mute` mide 3.91:1 sobre marfil: NO alcanza para texto de cuerpo ni
+     para placeholders. Vive para iconos decorativos, filetes y el estado
+     `disabled`, donde 4.5:1 no aplica. */
+  --color-ink: #2a221c; /* 14.75:1 sobre paper — cuerpo */
+  --color-carbon: #1c1714; /* 16.77:1 — titulares y cifras */
+  --color-ink-soft: #5b4a3a; /* 7.98:1 — secundario, placeholders, labels */
+  --color-ink-mute: #8a7a68; /* 3.91:1 — NO para texto de cuerpo */
+
+  /* --- Dorado: acción, selección, foco ------------------------------------
+     El `--color-gold` de marca (#ac8231) mide 3.31:1 sobre marfil y 2.98:1
+     sobre crema: no llega al piso de 3:1 en las dos superficies que el plan
+     exige, y con texto blanco encima se queda en 3.50:1. Por eso el relleno del
+     botón primario y el anillo de foco usan `gold-dark` (#8b6a1f), que mide
+     4.74:1 / 4.28:1 y 5.02:1 con blanco. El `gold` de marca sobrevive como
+     filete y como acento fino, donde 3:1 no aplica. */
+  --color-gold: #ac8231;
+  --color-gold-dark: #8b6a1f; /* relleno primario y anillo de foco */
+  --color-gold-press: #6d5214; /* :active */
+  --color-gold-deep: #5b2b08;
+  --color-gold-bright: #e7aa51;
+  --color-gold-pale: #fff1d6; /* fondo de la fila seleccionada */
+
+  /* --- Paleta de estados de la cita --------------------------------------
+     Cinco estados, cuatro tokens cada uno: tinte (superficie), filete (1 px),
+     tinta (etiqueta) y punto (la marca — el mismo tono que después alimenta
+     los gráficos de reportes).
+
+     Fijada con la skill `dataviz`: los cinco puntos pasan el gate duro en
+     todos-contra-todos sobre marfil — peor par ΔE 16.5 en visión normal (piso
+     15) y ΔE 9.3 bajo deuteranopía/protanopía simuladas con
+     Machado-Oliveira-Fernandes 1.0 (objetivo 8). Cada etiqueta mide ≥6.0:1
+     sobre su propio tinte, muy por encima del 4.5:1 pedido.
+
+     La asignación de tono no es arbitraria:
+       reservada  — piedra, sin tono: está en la agenda y todavía no pasó nada
+       confirmada — azul: acordado, informativo, en marcha
+       completada — verde: se hizo y entró plata
+       cancelada  — violeta: se cayó con aviso; es un desenlace, no una alarma
+       no-asistio — rojo: la única pérdida real, y la única que merece rojo
+
+     Que "cancelada" no sea roja es deliberado. Cancelar con aviso es negocio
+     normal; si los dos desenlaces fueran rojos, un martes cualquiera la agenda
+     se vería como un incendio y el estado que sí cuesta plata quedaría
+     enterrado. */
+  --color-st-reservada-tint: #f3eeea;
+  --color-st-reservada-line: #c8c1ba;
+  --color-st-reservada-ink: #61584f; /* 6.04:1 sobre su tinte */
+  --color-st-reservada-dot: #544b43;
+
+  --color-st-confirmada-tint: #e3f1ff;
+  --color-st-confirmada-line: #93c8fa;
+  --color-st-confirmada-ink: #005d9a; /* 6.03:1 */
+  --color-st-confirmada-dot: #1f7fc8;
+
+  --color-st-completada-tint: #d4f9e7;
+  --color-st-completada-line: #98d2b6;
+  --color-st-completada-ink: #006747; /* 6.10:1 */
+  --color-st-completada-dot: #2f8a66;
+
+  --color-st-cancelada-tint: #f2ebfe;
+  --color-st-cancelada-line: #cdb5f4;
+  --color-st-cancelada-ink: #6a4798; /* 6.10:1 */
+  --color-st-cancelada-dot: #6a3f9e;
+
+  --color-st-no-asistio-tint: #ffeae4;
+  --color-st-no-asistio-line: #f6ae9a;
+  --color-st-no-asistio-ink: #973b21; /* 6.12:1 */
+  --color-st-no-asistio-dot: #c8461f;
+
+  /* Sexto token, no un sexto estado: el `status` de EA es texto libre y nada
+     impide que aparezca uno que el panel no conoce (ver `lib/ea/types.ts`).
+     Se dibuja con filete punteado para que se lea como "esto no debería estar
+     acá" en vez de inventarle un color. */
+  --color-st-desconocido-tint: #f6f3ef;
+  --color-st-desconocido-line: #b9ada0;
+  --color-st-desconocido-ink: #574c41;
+  --color-st-desconocido-dot: #8a7a68;
+
+  /* --- Retroalimentación del sistema (≠ estado de la cita) ----------------
+     Nunca se mezclan con la familia de arriba: un aviso de guardado no puede
+     parecer una cita confirmada. */
+  --color-ok-tint: #e6f6ec;
+  --color-ok-line: #a8d5b8;
+  --color-ok-ink: #12633a;
+  --color-warn-tint: #fdf0dc;
+  --color-warn-line: #e7c489;
+  --color-warn-ink: #7a5310;
+  --color-error-tint: #fdeceb;
+  --color-error-line: #f0b2ad;
+  --color-error-ink: #a02620;
+  --color-info-tint: #eaf2fb;
+  --color-info-line: #b5cfeb;
+  --color-info-ink: #1c5588;
+
+  /* --- Tipografía ---------------------------------------------------------
+     Escala fija en rem, razón ≈1.15. Nada de `clamp()`: en producto un titular
+     fluido que encoge dentro de un panel se ve peor, no mejor. */
+  --text-*: initial;
+  --text-2xs: 0.75rem; /* 12 — meta, encabezados de tabla, badges */
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.8125rem; /* 13 — densidad compacta, celdas */
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem; /* 14 — CUERPO */
+  --text-sm--line-height: 1.25rem;
+  --text-md: 1rem; /* 16 — entrada táctil, cifra de tabla */
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.25rem; /* 20 — título de pantalla */
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.5rem; /* 24 — cifra de KPI */
+  --text-xl--line-height: 1.875rem;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Cormorant vive exactamente en dos lugares: el wordmark de la barra lateral
+     y la pantalla de login. En etiquetas, botones, encabezados de tabla o
+     cifras, jamás — una serif display en una celda de datos es el tell de
+     "landing disfrazada de herramienta". */
+  --font-display: var(--font-cormorant), "Playfair Display", serif;
+
+  /* --- Radios, filetes, sombras -------------------------------------------
+     La marca es de esquinas sobrias. 3 px en controles, 4 px en contenedores;
+     nada de lozenges de 999 px, que en una tabla densa leen como juguete. */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+
+  /* Con desplazamiento y desenfoque: un halo de color a offset cero es
+     decoración, no profundidad. Solo para lo que flota. */
+  --shadow-pop: 0 2px 6px rgba(28, 23, 20, 0.08), 0 8px 24px rgba(28, 23, 20, 0.1);
+  --shadow-sheet: 0 -2px 8px rgba(28, 23, 20, 0.06), 0 -12px 40px rgba(28, 23, 20, 0.14);
+  --shadow-side: -2px 0 8px rgba(28, 23, 20, 0.06), -12px 0 40px rgba(28, 23, 20, 0.12);
+}
+
+:root {
+  --hair: rgba(28, 23, 20, 0.12);
+  --hair-strong: rgba(28, 23, 20, 0.2);
+
+  /* Movimiento: 150–250 ms, ease-out, y solo para comunicar estado. */
+  --dur-1: 150ms; /* micro-estado: hover, foco, check */
+  --dur-2: 200ms; /* aparición de capa: toast, menú */
+  --dur-3: 250ms; /* hoja y diálogo */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Alto mínimo del área táctil. Densidad táctil por defecto; el escritorio
+     puede pedir compacto con `data-density="compact"` en el <html>. */
+  --hit: 44px;
+  --control-h: 44px;
+  --row-h: 52px;
+
+  /* Cromo del shell. Se leen desde los componentes para que la grilla de la
+     agenda (paquete C1) pueda restar el chrome con `calc()` en vez de adivinar
+     números. */
+  --sidebar-w: 15rem;
+  --rail-w: 4.25rem;
+  --topbar-h: 3.5rem;
+  --bottombar-h: 3.75rem;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+:root[data-density="compact"] {
+  --control-h: 34px;
+  --row-h: 38px;
+}
+
+/* =============================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    /* El panel es de tema claro y punto: no hay uso nocturno de escritorio y
+       el marfil de la marca ya es el fondo del estudio. Declararlo evita que
+       el navegador pinte de oscuro los controles nativos. */
+    color-scheme: light;
+    /* Ningún scroll horizontal en la página. Lo único que scrollea de lado es
+       la grilla de la agenda, y lo hace dentro de su propio contenedor. */
+    overflow-x: hidden;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+    color: var(--color-ink);
+    background: var(--color-ivory);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* `tabular-nums` en todo número: precios, horas, totales, ids. Se pone en
+     `body` y se hereda; las clases `.num` y `.u-tnum` existen para los casos
+     donde algo la haya pisado. Sin esto, una columna de pesos baila en cada
+     repintado y la dueña no puede comparar dos filas de un vistazo. */
+  body,
+  input,
+  select,
+  textarea,
+  button,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  figure {
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  /* Foco visible en todo control, sin excepciones y sin `outline: none`
+     escondido en ninguna parte. El anillo es `gold-dark`: 4.74:1 sobre marfil
+     y 4.28:1 sobre crema, contra el piso de 3:1 que pide el plan. El offset lo
+     despega del borde del control para que se vea también sobre superficies
+     tintadas. */
+  :focus-visible {
+    outline: 2px solid var(--color-gold-dark);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Las superficies que no dibujamos también llevan el diseño. */
+  ::selection {
+    background: var(--color-gold-pale);
+    color: var(--color-carbon);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--color-gold-dark);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(91, 43, 8, 0.22) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(91, 43, 8, 0.22);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(91, 43, 8, 0.38);
+    background-clip: content-box;
+  }
+
+  /* Obligatorio, no opcional. Todo el movimiento de este sistema comunica
+     estado; ninguno lleva información que se pierda al apagarlo. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* =============================================================================
+   Componentes
+   ========================================================================== */
+
+@layer components {
+  /* --- Wordmark (uno de los dos únicos lugares con Cormorant) -------------- */
+  .ui-wordmark {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--color-carbon);
+    line-height: 1.1;
+  }
+
+  /* --- Botón --------------------------------------------------------------
+     Los siete estados: default, hover, focus, active, disabled, loading,
+     error. `loading` no encoge el botón — mantiene el ancho y cambia el
+     contenido por el spinner, para que la fila no salte al enviar. */
+  .ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: var(--control-h);
+    min-width: var(--hit);
+    padding-inline: 0.875rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    position: relative;
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      border-color var(--dur-1) var(--ease-out),
+      color var(--dur-1) var(--ease-out);
+  }
+  .ui-btn:disabled,
+  .ui-btn[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 1; /* se apaga con color propio, no con opacidad: el texto en
+                   opacity 0.5 deja de medir 4.5:1 y nadie se entera */
+  }
+  .ui-btn[data-loading="true"] {
+    cursor: progress;
+  }
+
+  /* Primario: relleno dorado. `gold-dark` y no el `gold` de marca porque el
+     texto blanco encima tiene que medir ≥4.5:1 (5.02:1 vs 3.50:1). */
+  .ui-btn--primary {
+    background: var(--color-gold-dark);
+    color: var(--color-white);
+    border-color: var(--color-gold-dark);
+  }
+  .ui-btn--primary:hover:not(:disabled):not([data-loading="true"]) {
+    background: #7b5c18;
+    border-color: #7b5c18;
+  }
+  .ui-btn--primary:active:not(:disabled) {
+    background: var(--color-gold-press);
+    border-color: var(--color-gold-press);
+  }
+  .ui-btn--primary:disabled:not([data-loading="true"]),
+  .ui-btn--primary[aria-disabled="true"]:not([data-loading="true"]) {
+    background: var(--color-ivory-deep);
+    border-color: var(--hair);
+    color: var(--color-ink-mute);
+  }
+
+  /* Secundario: filete sobre la superficie. */
+  .ui-btn--secondary {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    border-color: var(--hair-strong);
+  }
+  .ui-btn--secondary:hover:not(:disabled):not([data-loading="true"]) {
+    background: var(--color-cream);
+    border-color: var(--color-ink-mute);
+  }
+  .ui-btn--secondary:active:not(:disabled) {
+    background: var(--color-ivory-deep);
+  }
+  .ui-btn--secondary:disabled:not([data-loading="true"]),
+  .ui-btn--secondary[aria-disabled="true"]:not([data-loading="true"]) {
+    background: var(--color-ivory);
+    color: var(--color-ink-mute);
+    border-color: var(--hair);
+  }
+
+  /* Fantasma: para acciones terciarias dentro de una fila. */
+  .ui-btn--ghost {
+    background: transparent;
+    color: var(--color-ink-soft);
+    border-color: transparent;
+  }
+  .ui-btn--ghost:hover:not(:disabled):not([data-loading="true"]) {
+    background: var(--color-cream);
+    color: var(--color-ink);
+  }
+  .ui-btn--ghost:active:not(:disabled) {
+    background: var(--color-ivory-deep);
+  }
+  .ui-btn--ghost:disabled:not([data-loading="true"]),
+  .ui-btn--ghost[aria-disabled="true"]:not([data-loading="true"]) {
+    color: var(--color-ink-mute);
+  }
+
+  /* Destructivo. Toda acción destructiva ofrece Deshacer en el toast en vez de
+     un "¿Está seguro?"; este botón existe para las pocas que sí confirman
+     (cancelar una cita notifica a la clienta). */
+  .ui-btn--danger {
+    background: var(--color-error-ink);
+    color: var(--color-white);
+    border-color: var(--color-error-ink);
+  }
+  .ui-btn--danger:hover:not(:disabled):not([data-loading="true"]) {
+    background: #85201b;
+    border-color: #85201b;
+  }
+  .ui-btn--danger:active:not(:disabled) {
+    background: #6d1a16;
+  }
+  .ui-btn--danger:disabled:not([data-loading="true"]),
+  .ui-btn--danger[aria-disabled="true"]:not([data-loading="true"]) {
+    background: var(--color-ivory-deep);
+    color: var(--color-ink-mute);
+    border-color: var(--hair);
+  }
+
+  .ui-btn--sm {
+    min-height: 34px;
+    font-size: var(--text-xs);
+    padding-inline: 0.625rem;
+  }
+  .ui-btn--icon {
+    padding-inline: 0;
+    width: var(--control-h);
+    min-width: var(--control-h);
+  }
+  .ui-btn--block {
+    width: 100%;
+  }
+
+  /* --- Spinner ------------------------------------------------------------ */
+  .ui-spinner {
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: ui-spin 700ms linear infinite;
+  }
+  @keyframes ui-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* El spinner sí necesita moverse para significar "esperá". Se frena a un
+       giro por segundo y medio en vez de desaparecer, que dejaría un aro
+       quieto imposible de interpretar. */
+    .ui-spinner {
+      animation-duration: 1500ms !important;
+      animation-iteration-count: infinite !important;
+    }
+  }
+
+  /* --- Pastilla de estado -------------------------------------------------
+     Superficie tintada + filete de 1 px + punto + texto. Nunca color solo:
+     una persona daltónica y una hoja impresa en blanco y negro tienen que
+     poder leerla. Y nunca franja lateral de 4 px — patrón prohibido. */
+  .ui-pill {
+    display: inline-flex;
+    width: fit-content;
+    justify-self: start;
+    align-self: center;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.1875rem 0.5rem 0.1875rem 0.4375rem;
+    border: 1px solid var(--pill-line);
+    border-radius: var(--radius-sm);
+    background: var(--pill-tint);
+    color: var(--pill-ink);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    line-height: 1rem;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .ui-pill__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--pill-dot);
+    flex: none;
+  }
+  .ui-pill--desconocido {
+    border-style: dashed;
+  }
+  /* Impresa, la hoja de ruta del día tiene que seguir diciendo el estado. El
+     tinte se va, el filete y el punto se vuelven negros, y la palabra queda. */
+  @media print {
+    .ui-pill {
+      background: transparent !important;
+      color: #000 !important;
+      border-color: #000 !important;
+    }
+    .ui-pill__dot {
+      background: #000 !important;
+    }
+  }
+
+  .ui-pill--reservada {
+    --pill-tint: var(--color-st-reservada-tint);
+    --pill-line: var(--color-st-reservada-line);
+    --pill-ink: var(--color-st-reservada-ink);
+    --pill-dot: var(--color-st-reservada-dot);
+  }
+  .ui-pill--confirmada {
+    --pill-tint: var(--color-st-confirmada-tint);
+    --pill-line: var(--color-st-confirmada-line);
+    --pill-ink: var(--color-st-confirmada-ink);
+    --pill-dot: var(--color-st-confirmada-dot);
+  }
+  .ui-pill--completada {
+    --pill-tint: var(--color-st-completada-tint);
+    --pill-line: var(--color-st-completada-line);
+    --pill-ink: var(--color-st-completada-ink);
+    --pill-dot: var(--color-st-completada-dot);
+  }
+  .ui-pill--cancelada {
+    --pill-tint: var(--color-st-cancelada-tint);
+    --pill-line: var(--color-st-cancelada-line);
+    --pill-ink: var(--color-st-cancelada-ink);
+    --pill-dot: var(--color-st-cancelada-dot);
+  }
+  .ui-pill--no-asistio {
+    --pill-tint: var(--color-st-no-asistio-tint);
+    --pill-line: var(--color-st-no-asistio-line);
+    --pill-ink: var(--color-st-no-asistio-ink);
+    --pill-dot: var(--color-st-no-asistio-dot);
+  }
+  .ui-pill--desconocido {
+    --pill-tint: var(--color-st-desconocido-tint);
+    --pill-line: var(--color-st-desconocido-line);
+    --pill-ink: var(--color-st-desconocido-ink);
+    --pill-dot: var(--color-st-desconocido-dot);
+  }
+
+  /* --- Campos de formulario ----------------------------------------------- */
+  .ui-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3125rem;
+    min-width: 0;
+  }
+  .ui-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-ink-soft);
+    letter-spacing: 0.01em;
+  }
+  .ui-label__req {
+    color: var(--color-error-ink);
+    margin-left: 0.125rem;
+  }
+  .ui-hint {
+    font-size: var(--text-2xs);
+    color: var(--color-ink-soft);
+  }
+  .ui-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.25rem;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    color: var(--color-error-ink); /* 7.4:1 sobre marfil */
+  }
+
+  .ui-input,
+  .ui-select,
+  .ui-textarea {
+    width: 100%;
+    min-height: var(--control-h);
+    padding: 0.5rem 0.6875rem;
+    border: 1px solid var(--hair-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-white);
+    color: var(--color-ink);
+    font: inherit;
+    font-size: var(--text-md); /* 16 px: por debajo de eso iOS hace zoom al
+                                  enfocar, y la recepción trabaja en el celular */
+    line-height: 1.375;
+    transition:
+      border-color var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  .ui-textarea {
+    min-height: 5.5rem;
+    resize: vertical;
+  }
+  .ui-input::placeholder,
+  .ui-textarea::placeholder {
+    /* 7.98:1. El `ink-mute` habitual para placeholders mide 3.53:1 sobre crema
+       y no llega al piso. */
+    color: var(--color-ink-soft);
+    opacity: 1;
+  }
+  .ui-input:hover:not(:disabled),
+  .ui-select:hover:not(:disabled),
+  .ui-textarea:hover:not(:disabled) {
+    border-color: var(--color-ink-mute);
+  }
+  .ui-input:disabled,
+  .ui-select:disabled,
+  .ui-textarea:disabled {
+    background: var(--color-ivory-deep);
+    color: var(--color-ink-soft);
+    border-color: var(--hair);
+    cursor: not-allowed;
+  }
+  .ui-input[aria-invalid="true"],
+  .ui-select[aria-invalid="true"],
+  .ui-textarea[aria-invalid="true"] {
+    border-color: var(--color-error-ink);
+    background: var(--color-error-tint);
+  }
+  .ui-input[data-loading="true"] {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(172, 130, 49, 0.12) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: ui-shimmer 1.2s linear infinite;
+  }
+
+  .ui-select {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%235b4a3a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5l4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+  }
+
+  /* Entrada de dinero: el signo vive fuera del input, el número adentro y
+     alineado a la derecha, como en una cuenta. */
+  .ui-money {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--hair-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-white);
+    transition: border-color var(--dur-1) var(--ease-out);
+  }
+  .ui-money:hover:not([data-disabled="true"]) {
+    border-color: var(--color-ink-mute);
+  }
+  .ui-money[data-invalid="true"] {
+    border-color: var(--color-error-ink);
+    background: var(--color-error-tint);
+  }
+  .ui-money[data-disabled="true"] {
+    background: var(--color-ivory-deep);
+  }
+  .ui-money__sign {
+    display: flex;
+    align-items: center;
+    padding-inline: 0.6875rem;
+    border-right: 1px solid var(--hair);
+    background: var(--color-cream);
+    color: var(--color-ink-soft);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  }
+  .ui-money__input {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--control-h);
+    padding: 0.5rem 0.6875rem;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink);
+    font: inherit;
+    font-size: var(--text-md);
+    font-weight: 600;
+    text-align: right;
+    letter-spacing: 0.01em;
+  }
+  /* El único `outline: none` del sistema, y no quita el foco: lo **mueve** al
+     grupo. El input es solo la mitad derecha del control —el signo `$` es la
+     otra— y un anillo alrededor de media pieza se lee como un error de
+     maquetación. El `:has()` dibuja el anillo alrededor del control entero. */
+  .ui-money__input:focus {
+    outline: none;
+  }
+  .ui-money:has(.ui-money__input:focus-visible) {
+    outline: 2px solid var(--color-gold-dark);
+    outline-offset: 2px;
+  }
+  .ui-money__input:disabled {
+    color: var(--color-ink-soft);
+    cursor: not-allowed;
+  }
+
+  .ui-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    min-height: var(--hit);
+    padding-block: 0.5rem;
+    cursor: pointer;
+  }
+  .ui-check input {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0.0625rem 0 0;
+    accent-color: var(--color-gold-dark);
+    flex: none;
+  }
+  .ui-check[data-disabled="true"] {
+    cursor: not-allowed;
+    color: var(--color-ink-soft);
+  }
+
+  /* Resumen de errores al enviar un formulario largo. Recibe el foco al
+     aparecer, así el lector de pantalla lo lee sin que nadie lo busque. */
+  .ui-errorsummary {
+    border: 1px solid var(--color-error-line);
+    border-radius: var(--radius-md);
+    background: var(--color-error-tint);
+    color: var(--color-error-ink);
+    padding: 0.75rem 0.875rem;
+  }
+  .ui-errorsummary ul {
+    margin: 0.5rem 0 0;
+    padding-left: 1.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .ui-errorsummary a {
+    color: inherit;
+    font-weight: 600;
+  }
+
+  /* --- Tarjeta / superficie de contenido ---------------------------------- */
+  .ui-card {
+    background: var(--color-paper);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-md);
+  }
+  .ui-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--hair);
+  }
+  .ui-card__title {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--color-carbon);
+  }
+
+  /* --- Tabla --------------------------------------------------------------
+     La tabla existe desde 768 px. Por debajo el mismo componente renderiza una
+     lista de dos líneas: nunca scroll lateral en una tabla de datos. */
+  .ui-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--text-sm);
+  }
+  .ui-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-cream);
+    color: var(--color-ink-soft);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--hair-strong);
+    white-space: nowrap;
+  }
+  .ui-table tbody td {
+    padding: 0.625rem 0.75rem;
+    height: var(--row-h);
+    border-bottom: 1px solid var(--hair);
+    vertical-align: middle;
+  }
+  .ui-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .ui-table tbody tr[data-interactive="true"] {
+    cursor: pointer;
+  }
+  .ui-table tbody tr[data-interactive="true"]:hover {
+    background: var(--color-cream);
+  }
+  /* Selección actual: dorado, que es exactamente su trabajo. */
+  .ui-table tbody tr[aria-selected="true"] {
+    background: var(--color-gold-pale);
+  }
+  .ui-table [data-align="end"] {
+    text-align: right;
+  }
+  .ui-table [data-numeric="true"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Lista de dos líneas: la forma de la tabla por debajo de 768 px. */
+  .ui-list {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ui-list > li {
+    display: block;
+  }
+  .ui-list__row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: var(--hit);
+    padding: 0.6875rem 0.875rem;
+    border: 0;
+    border-bottom: 1px solid var(--hair);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ui-list__row:last-child {
+    border-bottom: 0;
+  }
+  .ui-list__row[data-interactive="false"] {
+    cursor: default;
+  }
+  .ui-list__row:hover[data-interactive="true"] {
+    background: var(--color-cream);
+  }
+  .ui-list__row[aria-selected="true"] {
+    background: var(--color-gold-pale);
+  }
+  .ui-list__body {
+    flex: 1;
+    min-width: 0;
+  }
+  .ui-list__primary {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-carbon);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-list__secondary {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: var(--text-2xs);
+    color: var(--color-ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-list__trail {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1875rem;
+    flex: none;
+  }
+
+  /* --- Panel: hoja en móvil, diálogo lateral en escritorio ----------------
+     Un solo componente y un solo elemento: `<dialog>` nativo. Trae capa
+     superior, trampa de foco, Escape y `inert` sobre el resto de la página sin
+     una línea de JS nuestro. Lo único que cambia entre móvil y escritorio es
+     de dónde entra. */
+  .ui-panel {
+    padding: 0;
+    border: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    max-width: none;
+    max-height: none;
+  }
+  .ui-panel::backdrop {
+    background: rgba(28, 23, 20, 0.42);
+  }
+  .ui-panel[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Móvil: hoja desde abajo, a pantalla completa menos un respiro arriba. */
+  .ui-panel {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    height: min(92dvh, 100dvh - 1.5rem);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-sheet);
+    padding-bottom: var(--safe-b);
+  }
+  .ui-panel[open] {
+    animation: ui-sheet-in var(--dur-3) var(--ease-emphasis);
+  }
+  .ui-panel[open]::backdrop {
+    animation: ui-fade-in var(--dur-3) var(--ease-out);
+  }
+
+  @media (min-width: 48rem) {
+    /* Escritorio: panel lateral derecho de alto completo. */
+    .ui-panel {
+      inset: 0 0 0 auto;
+      width: min(32rem, 100vw - 3rem);
+      height: 100dvh;
+      border-radius: 0;
+      box-shadow: var(--shadow-side);
+      padding-bottom: 0;
+    }
+    .ui-panel[open] {
+      animation: ui-side-in var(--dur-3) var(--ease-emphasis);
+    }
+  }
+
+  @keyframes ui-sheet-in {
+    from {
+      transform: translateY(3%);
+      opacity: 0;
+    }
+  }
+  @keyframes ui-side-in {
+    from {
+      transform: translateX(2.5rem);
+      opacity: 0;
+    }
+  }
+  @keyframes ui-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .ui-panel__head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem 0.75rem 1rem;
+    border-bottom: 1px solid var(--hair);
+    background: var(--color-cream);
+    flex: none;
+  }
+  .ui-panel__title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--color-carbon);
+  }
+  .ui-panel__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1rem;
+  }
+  .ui-panel__foot {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--hair);
+    background: var(--color-cream);
+    flex: none;
+  }
+  .ui-panel__foot > * {
+    flex: 1;
+  }
+  @media (min-width: 48rem) {
+    .ui-panel__foot {
+      justify-content: flex-end;
+    }
+    .ui-panel__foot > * {
+      flex: none;
+    }
+  }
+
+  /* La variante persistente de ≥1440: el mismo cromo, sin capa superior, para
+     ver la cita sin tapar la grilla. */
+  .ui-panel--inline {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    border-left: 1px solid var(--hair);
+    box-shadow: none;
+    animation: none;
+  }
+
+  /* --- Toast --------------------------------------------------------------
+     Toda acción destructiva ofrece Deshacer acá en vez de un "¿Está seguro?".
+     El contenedor es `aria-live="polite"` y vive por encima de la barra
+     inferior en móvil. */
+  .ui-toaster {
+    position: fixed;
+    z-index: 60;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(var(--bottombar-h) + var(--safe-b) + 0.75rem);
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+    pointer-events: none;
+  }
+  @media (min-width: 48rem) {
+    .ui-toaster {
+      left: auto;
+      right: 1.25rem;
+      bottom: 1.25rem;
+      width: 24rem;
+    }
+  }
+  .ui-toast {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6875rem 0.75rem 0.6875rem 0.875rem;
+    border: 1px solid var(--toast-line, var(--hair-strong));
+    border-left-width: 1px; /* nunca franja lateral gruesa */
+    border-radius: var(--radius-md);
+    background: var(--toast-tint, var(--color-paper));
+    color: var(--toast-ink, var(--color-ink));
+    box-shadow: var(--shadow-pop);
+    pointer-events: auto;
+    animation: ui-toast-in var(--dur-2) var(--ease-emphasis);
+  }
+  .ui-toast--ok {
+    --toast-tint: var(--color-ok-tint);
+    --toast-line: var(--color-ok-line);
+    --toast-ink: var(--color-ok-ink);
+  }
+  .ui-toast--error {
+    --toast-tint: var(--color-error-tint);
+    --toast-line: var(--color-error-line);
+    --toast-ink: var(--color-error-ink);
+  }
+  .ui-toast--warn {
+    --toast-tint: var(--color-warn-tint);
+    --toast-line: var(--color-warn-line);
+    --toast-ink: var(--color-warn-ink);
+  }
+  .ui-toast__text {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+  .ui-toast__undo {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    min-height: 2rem;
+    padding-inline: 0.625rem;
+    border: 1px solid currentColor;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .ui-toast__undo:hover {
+    background: rgba(28, 23, 20, 0.07);
+  }
+  .ui-toast__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .ui-toast__close:hover {
+    background: rgba(28, 23, 20, 0.07);
+  }
+  @keyframes ui-toast-in {
+    from {
+      transform: translateY(0.5rem);
+      opacity: 0;
+    }
+  }
+
+  /* --- Esqueletos ---------------------------------------------------------
+     Con la forma del contenido. Nada de spinner en el centro de la pantalla. */
+  .ui-skel {
+    display: block;
+    border-radius: var(--radius-xs);
+    background: linear-gradient(
+      90deg,
+      var(--color-ivory-deep) 0%,
+      #f6f0e6 50%,
+      var(--color-ivory-deep) 100%
+    );
+    background-size: 200% 100%;
+    animation: ui-shimmer 1.4s linear infinite;
+  }
+  @keyframes ui-shimmer {
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-skel {
+      animation: none;
+      background: var(--color-ivory-deep);
+    }
+  }
+
+  /* --- Vacío que enseña la interfaz --------------------------------------- */
+  .ui-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 2.5rem 1.25rem;
+    text-align: center;
+  }
+  .ui-empty__mark {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--hair-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-cream);
+    color: var(--color-ink-soft);
+  }
+  .ui-empty__title {
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--color-carbon);
+    text-wrap: balance;
+  }
+  .ui-empty__body {
+    max-width: 34rem;
+    font-size: var(--text-sm);
+    color: var(--color-ink-soft);
+    text-wrap: pretty;
+  }
+
+  /* --- Banda de solo lectura ----------------------------------------------
+     EA caído: MySQL sigue arriba, así que la agenda y los reportes se ven y
+     nada se puede guardar. Mucho mejor que un formulario que falla al enviar.
+     Es `role="status"`, no `alert`: informa una condición persistente, no
+     interrumpe. */
+  .ui-readonly {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--color-warn-line);
+    background: var(--color-warn-tint);
+    color: var(--color-warn-ink); /* 6.0:1 sobre su tinte */
+    font-size: var(--text-xs);
+  }
+  .ui-readonly strong {
+    font-weight: 700;
+  }
+  .ui-readonly__icon {
+    flex: none;
+    margin-top: 0.0625rem;
+  }
+
+  /* --- Shell --------------------------------------------------------------
+     Tres modos de navegación, un solo árbol de DOM. La barra lateral y el riel
+     son el MISMO `<nav>`: por debajo de 1024 px se esconden las etiquetas con
+     CSS. Duplicar el nav duplicaría también los destinos que recorre el
+     tabulador, y un lector de pantalla anunciaría "Agenda" dos veces. */
+  .ui-shell {
+    display: grid;
+    min-height: 100dvh;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 48rem) {
+    .ui-shell {
+      grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    }
+  }
+  @media (min-width: 64rem) {
+    .ui-shell {
+      grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    }
+  }
+
+  .ui-side {
+    display: none;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: var(--color-cream);
+    border-right: 1px solid var(--hair);
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+  }
+  @media (min-width: 48rem) {
+    .ui-side {
+      display: flex;
+      align-items: center;
+    }
+  }
+  @media (min-width: 64rem) {
+    .ui-side {
+      align-items: stretch;
+      padding-inline: 0.625rem;
+    }
+  }
+
+  .ui-side__brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--topbar-h);
+    margin-bottom: 0.5rem;
+  }
+  @media (min-width: 64rem) {
+    .ui-side__brand {
+      justify-content: flex-start;
+      padding-inline: 0.5rem;
+    }
+  }
+
+  .ui-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: 100%;
+  }
+  .ui-nav__item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: var(--hit);
+    padding: 0 0.625rem;
+    border-radius: var(--radius-sm);
+    color: var(--color-ink-soft);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-decoration: none;
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      color var(--dur-1) var(--ease-out);
+  }
+  .ui-nav__item:hover {
+    background: var(--color-ivory-deep);
+    color: var(--color-ink);
+  }
+  /* Selección actual: dorado, y además un filete a la izquierda de 2 px —
+     nunca los 4 px del patrón prohibido, y acompañado de `aria-current` para
+     que no sea solo color. */
+  .ui-nav__item[aria-current="page"] {
+    background: var(--color-gold-pale);
+    color: var(--color-gold-deep);
+    box-shadow: inset 2px 0 0 var(--color-gold-dark);
+  }
+  .ui-nav__icon {
+    flex: none;
+  }
+  .ui-nav__label {
+    display: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  @media (min-width: 48rem) {
+    /* Riel: solo iconos. El nombre viaja en `aria-label` y en el tooltip
+       nativo, así el destino nunca depende de reconocer un dibujo. */
+    .ui-nav__item {
+      justify-content: center;
+      padding-inline: 0;
+      width: 100%;
+    }
+  }
+  @media (min-width: 64rem) {
+    .ui-nav__item {
+      justify-content: flex-start;
+      padding-inline: 0.625rem;
+    }
+    .ui-nav__label {
+      display: block;
+    }
+  }
+
+  .ui-nav__sep {
+    height: 1px;
+    margin: 0.5rem 0.375rem;
+    background: var(--hair);
+    border: 0;
+  }
+
+  .ui-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    /* La barra inferior es fija: el contenido reserva su alto para que la
+       última fila de una lista no quede debajo. */
+    padding-bottom: calc(var(--bottombar-h) + var(--safe-b));
+  }
+  @media (min-width: 48rem) {
+    .ui-main {
+      padding-bottom: 0;
+    }
+  }
+
+  .ui-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: var(--topbar-h);
+    padding: 0 0.75rem;
+    background: var(--color-cream);
+    border-bottom: 1px solid var(--hair);
+  }
+  @media (min-width: 48rem) {
+    .ui-topbar {
+      padding-inline: 1.25rem;
+    }
+  }
+  .ui-topbar__title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--color-carbon);
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-topbar__brand {
+    display: flex;
+    align-items: center;
+  }
+  @media (min-width: 48rem) {
+    .ui-topbar__brand {
+      display: none;
+    }
+  }
+
+  .ui-content {
+    flex: 1;
+    min-width: 0;
+    padding: 0.875rem 0.75rem 1.5rem;
+  }
+  @media (min-width: 48rem) {
+    .ui-content {
+      padding: 1.25rem 1.25rem 2rem;
+    }
+  }
+
+  /* Barra inferior de cinco destinos. `env(safe-area-inset-bottom)` para que
+     el indicador de gestos de iOS no se coma la fila. */
+  .ui-bottombar {
+    position: fixed;
+    z-index: 30;
+    inset: auto 0 0 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background: var(--color-cream);
+    border-top: 1px solid var(--hair);
+    padding-bottom: var(--safe-b);
+  }
+  @media (min-width: 48rem) {
+    .ui-bottombar {
+      display: none;
+    }
+  }
+  .ui-bottombar__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1875rem;
+    min-height: var(--bottombar-h);
+    border: 0;
+    background: transparent;
+    color: var(--color-ink-soft);
+    font: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .ui-bottombar__item[aria-current="page"],
+  .ui-bottombar__item[data-current="true"],
+  .ui-bottombar__item[aria-expanded="true"] {
+    color: var(--color-gold-deep);
+    box-shadow: inset 0 2px 0 var(--color-gold-dark);
+    background: var(--color-gold-pale);
+  }
+
+  /* --- Interruptores de forma ---------------------------------------------
+     La tabla y la lista de dos líneas se renderizan las dos y CSS decide cuál
+     se ve. `aria-hidden` va sobre la que está oculta para que el lector de
+     pantalla no recorra las filas dos veces; `display: none` ya la saca del
+     recorrido, y el atributo cubre el caso de la impresión. */
+  .ui-only-sm {
+    display: block;
+  }
+  .ui-only-md {
+    display: none;
+  }
+  .ui-only-md-inline {
+    display: inline-flex;
+  }
+  .ui-only-lg-inline {
+    display: none;
+  }
+  @media (min-width: 48rem) {
+    .ui-only-sm {
+      display: none;
+    }
+    .ui-only-md {
+      display: block;
+    }
+  }
+  @media (min-width: 64rem) {
+    .ui-only-md-inline {
+      display: none;
+    }
+    .ui-only-lg-inline {
+      display: inline-flex;
+    }
+  }
+  /* Columna que solo existe con la tabla completa (≥1024). */
+  .ui-only-lg-cell {
+    display: none;
+  }
+  @media (min-width: 64rem) {
+    .ui-only-lg-cell {
+      display: table-cell;
+    }
+  }
+
+  /* El disparador de la fila: un botón de verdad que no se ve como botón. La
+     fila entera responde al clic, pero es este el que existe para el teclado. */
+  .ui-cellbtn {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+  }
+
+  /* La fila de la lista cuando está seleccionada. `aria-current` no sirve acá
+     porque el <li> ya lo usa la navegación; el data-attr lo separa. */
+  .ui-list__row[data-selected="true"] {
+    background: var(--color-gold-pale);
+  }
+
+  .ui-skeltable {
+    display: grid;
+    gap: 1px;
+    background: var(--hair);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .ui-skeltable__row {
+    display: grid;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--color-paper);
+    min-height: var(--row-h);
+  }
+
+  /* --- Utilidades del sistema --------------------------------------------- */
+  .ui-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .ui-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  /* Solo se ve al recibir foco: el salto al contenido. */
+  .ui-skip {
+    position: absolute;
+    left: 0.5rem;
+    top: -3rem;
+    z-index: 100;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-carbon);
+    color: var(--color-ivory);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    transition: top var(--dur-1) var(--ease-out);
+  }
+  .ui-skip:focus {
+    top: 0.5rem;
+  }
+}

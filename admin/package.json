@@ -1,0 +1,39 @@
+{
+  "name": "gbs-admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "build:migrator": "esbuild src/db/migrate-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/migrate.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
+    "build:reconcile": "esbuild src/jobs/reconcile-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/reconcile.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning"
+  },
+  "dependencies": {
+    "better-auth": "^1.7.2",
+    "kysely": "^0.29.5",
+    "mysql2": "^3.24.2",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.11",
+    "esbuild": "^0.28.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,385 @@
+# Stack de PRODUCCIÓN del panel — `gbs-admin` en Portainer, desplegado desde Git.
+#
+# Este archivo es la única forma de cambiar la infraestructura del panel: el
+# stack corre en modo Git con actualización automática por polling, así que
+# **cualquier cambio hecho a mano en la VM se pierde sin aviso** en el siguiente
+# ciclo. Todo entra por un commit acá.
+#
+# ── Qué NO está en este stack, y por qué ─────────────────────────────────────
+#
+#   · **Easy!Appointments.** Vive en el stack `golden-agenda`, que está en modo
+#     "web editor" y en producción atendiendo clientas. No se toca: migrarlo a
+#     Git para poder desplegar el panel significaría recrearlo, y un cambio de
+#     nombre dejaría el volumen `ea_storage` huérfano — EA arrancaría con su
+#     almacenamiento vacío. Las redes externas ya dan el DNS interno sin
+#     compartir stack.
+#   · **MySQL.** `mysql-transversal` es un servidor COMPARTIDO con otras
+#     aplicaciones, en la red `data`. De ahí que los grants sean por esquema y
+#     que el respaldo haga dump de nuestras dos bases y no del servidor entero:
+#     no es nuestro.
+#   · **Caddy.** Corre en su propio stack, en la red `web`, y publica el
+#     subdominio. Su bloque está en `docs/DEPLOY.md`.
+#
+# ── Variables ────────────────────────────────────────────────────────────────
+#
+# `ADMIN_IMAGE` sale de `deploy/compose/.env`, que CI reescribe con el digest en
+# cada despliegue. **El resto son variables de entorno del stack en Portainer**
+# (Stacks → gbs-admin → Environment variables) y ninguna entra al repo:
+#
+#   DATABASE_URL              RW sobre gbs_admin
+#   DATABASE_URL_EA_RO        SOLO LECTURA sobre easyappointments
+#   EA_API_URL                http://golden-agenda/index.php/api/v1
+#   EA_API_TOKEN
+#   EA_WEBHOOK_SECRET_HEADER  EA_WEBHOOK_SECRET_TOKEN
+#   BETTER_AUTH_SECRET        BETTER_AUTH_URL
+#   GOOGLE_CLIENT_ID          GOOGLE_CLIENT_SECRET   GOOGLE_WORKSPACE_DOMAIN
+#   TOTP_ENC_KEY
+#   INGEST_URL                INGEST_SHARED_SECRET
+#   MYSQL_HOST                MYSQL_PORT             (respaldo)
+#   BACKUP_GBS_USER           BACKUP_GBS_PASSWORD    (respaldo, RW sobre gbs_admin)
+#   BACKUP_EA_USER            BACKUP_EA_PASSWORD     (respaldo, RO sobre easyappointments)
+#
+# La lista completa con su explicación está en `docs/DEV-LOCAL.md` § Paso 4 y en
+# `docs/ADMIN-PANEL.md` § Reglas de operación.
+
+name: gbs-admin
+
+# Las dos redes ya existen y las crea otro. `external: true` es lo que hace que
+# `admin` resuelva `mysql-transversal` y `golden-agenda` por DNS interno sin
+# compartir stack con ellos, y que Caddy lo alcance a él.
+networks:
+  data:
+    external: true
+  web:
+    external: true
+
+volumes:
+  # Los respaldos. Es el único estado que este stack posee; `admin` no monta
+  # nada, y menos que nada el `ea_storage` de la agenda.
+  gbs_backups:
+
+# Anclas compartidas: rotación de logs igual en los tres servicios. Sin esto un
+# contenedor que loguea en bucle llena el disco de la VM y se lleva puesta a la
+# agenda, que es exactamente el radio de explosión que este stack existe para
+# evitar.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── Migraciones ────────────────────────────────────────────────────────────
+  # One-shot: corre, aplica lo que falte y muere. Las migraciones NO van en el
+  # arranque del server — un contenedor en bucle de reinicio las correría en
+  # bucle, y Portainer recrea el contenedor en cada despliegue.
+  #
+  # No hay `depends_on` hacia MySQL porque `mysql-transversal` es externo al
+  # stack: no hay condición que esperar. El script reintenta con backoff
+  # (`src/db/migrate-cli.ts`) y falla de una ante un error de credenciales, que
+  # no mejora esperando.
+  admin-migrate:
+    image: ${ADMIN_IMAGE}
+    container_name: gbs-admin-migrate
+    command: ["node", "scripts/migrate.js"]
+    restart: "no"
+    environment:
+      TZ: America/Bogota
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+    networks: [data]
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ── El panel ───────────────────────────────────────────────────────────────
+  admin:
+    # Digest, nunca `:latest` ni un tag móvil. Es lo único que convierte el
+    # rollback en una operación real: un `git revert` del commit de despliegue
+    # devuelve exactamente el binario anterior.
+    image: ${ADMIN_IMAGE}
+    container_name: gbs-admin
+    restart: unless-stopped
+
+    # Ningún puerto publicado. Caddy entra por la red `web`, igual que ya
+    # alcanza a `golden-agenda`. Si Caddy corriera en el host y no en un
+    # contenedor, sería `ports: ["127.0.0.1:3001:3000"]` — nunca 0.0.0.0.
+    networks: [data, web]
+
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+
+    environment:
+      # No es cosmético: EA guarda datetimes locales sin zona, y un contenedor
+      # en UTC desplaza cinco horas cada cálculo. Se manifiesta como "los
+      # totales del cierre diario no cuadran". La imagen trae `tzdata` para que
+      # esta variable signifique algo.
+      TZ: America/Bogota
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL_EA_RO: ${DATABASE_URL_EA_RO}
+
+      EA_API_URL: ${EA_API_URL}
+      EA_API_TOKEN: ${EA_API_TOKEN}
+      EA_WEBHOOK_SECRET_HEADER: ${EA_WEBHOOK_SECRET_HEADER}
+      EA_WEBHOOK_SECRET_TOKEN: ${EA_WEBHOOK_SECRET_TOKEN}
+
+      # Fijada al dominio público a propósito: el panel vive detrás del rewrite
+      # de Vercel y el `Host` que le llega es el del origen, no el que la
+      # persona escribió. Derivarla del `Host` rompería los redirects de OAuth.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_WORKSPACE_DOMAIN: ${GOOGLE_WORKSPACE_DOMAIN}
+      TOTP_ENC_KEY: ${TOTP_ENC_KEY}
+
+      INGEST_URL: ${INGEST_URL}
+      INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
+
+    healthcheck:
+      # El mismo Node que sirve el panel es el que lo consulta: no hay `curl` ni
+      # `wget` en la imagen. La ruta lleva `/admin` porque `basePath` prefija
+      # todo, incluidos los route handlers.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/admin/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    logging: *logging
+
+    # El radio de explosión, acotado con números. Un `admin` en bucle de
+    # reinicio no puede agotar la memoria de la VM y llevarse puesta la agenda.
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  # ── Respaldos ──────────────────────────────────────────────────────────────
+  # EA no guarda dinero: `gbs_admin` es el libro de caja del estudio y **no se
+  # puede reconstruir desde ninguna otra fuente**. Es el único riesgo del
+  # proyecto que no tiene arreglo después de ocurrido.
+  #
+  # El script va en línea y no en un archivo montado a propósito: en un stack de
+  # Git, Portainer clona el repo adentro de su propio contenedor, así que un
+  # bind-mount relativo (`./backup.sh`) resolvería contra una ruta del host que
+  # no existe. Es una de las trampas clásicas de este modo de despliegue.
+  db-backup:
+    # La misma versión mayor que el servidor. Un `mysqldump` más viejo que el
+    # servidor produce dumps que fallan al restaurar de formas creativas.
+    image: mysql:8.0
+    container_name: gbs-admin-backup
+    restart: unless-stopped
+    networks: [data]
+    volumes:
+      - gbs_backups:/backups
+    environment:
+      TZ: America/Bogota
+      MYSQL_HOST: ${MYSQL_HOST:-mysql-transversal}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      BACKUP_GBS_USER: ${BACKUP_GBS_USER}
+      BACKUP_GBS_PASSWORD: ${BACKUP_GBS_PASSWORD}
+      BACKUP_EA_USER: ${BACKUP_EA_USER}
+      BACKUP_EA_PASSWORD: ${BACKUP_EA_PASSWORD}
+      # Hora local de la corrida diaria y cuántos días se guardan localmente.
+      BACKUP_AT: ${BACKUP_AT:-03:15}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+      # Destino fuera de la VM. Hoy NO hay bucket: la variable queda vacía, el
+      # servicio funciona igual y avisa en cada corrida que el respaldo es solo
+      # local. El día que exista, se llena acá y se habilita el perfil
+      # `offsite` (ver `db-backup-offsite` más abajo).
+      BACKUP_OFFSITE_URI: ${BACKUP_OFFSITE_URI:-}
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -u
+        echo "[backup] respaldo diario a las $${BACKUP_AT} (America/Bogota), retención $${BACKUP_KEEP_DAYS} días"
+        if [ -z "$${BACKUP_OFFSITE_URI}" ]; then
+          echo "[backup] AVISO: BACKUP_OFFSITE_URI vacío — el respaldo queda SOLO en la VM."
+          echo "[backup] Un respaldo que vive en la misma máquina que la base no cubre el modo de falla que importa."
+        fi
+        while true; do
+          now=$$(date +%s)
+          next=$$(date -d "today $${BACKUP_AT}" +%s)
+          [ "$$next" -le "$$now" ] && next=$$(date -d "tomorrow $${BACKUP_AT}" +%s)
+          echo "[backup] próxima corrida: $$(date -d "@$$next" '+%Y-%m-%d %H:%M:%S %Z')"
+          sleep $$((next - now))
+
+          stamp=$$(date +%Y%m%d-%H%M%S)
+          rc=0
+          # --single-transaction: no bloquea a EA mientras la clienta agenda.
+          # --no-tablespaces: el privilegio PROCESS es global y estos usuarios
+          #   lo tienen por esquema; sin la bandera, mysqldump aborta.
+          # --skip-triggers en EA: el usuario es de SOLO LECTURA, y el
+          #   privilegio TRIGGER permitiría escribir. EA no define triggers; si
+          #   algún día define uno, hay que crear un usuario de respaldo aparte.
+          # SIN --databases: el dump no lleva `CREATE DATABASE` ni `USE`, así que
+          #   se puede restaurar en un esquema con otro nombre. Es lo que hace
+          #   posible el ensayo de restauración contra una base limpia sin
+          #   pisar la de producción — y un ensayo que hay que hacer encima de
+          #   la base viva no se hace nunca.
+          MYSQL_PWD="$${BACKUP_GBS_PASSWORD}" mysqldump \
+            --host="$${MYSQL_HOST}" --port="$${MYSQL_PORT}" --user="$${BACKUP_GBS_USER}" \
+            --single-transaction --quick --no-tablespaces --default-character-set=utf8mb4 \
+            gbs_admin \
+            | gzip -9 > "/backups/gbs_admin-$${stamp}.sql.gz" || rc=1
+          MYSQL_PWD="$${BACKUP_EA_PASSWORD}" mysqldump \
+            --host="$${MYSQL_HOST}" --port="$${MYSQL_PORT}" --user="$${BACKUP_EA_USER}" \
+            --single-transaction --quick --no-tablespaces --skip-triggers \
+            --default-character-set=utf8mb4 \
+            easyappointments \
+            | gzip -9 > "/backups/easyappointments-$${stamp}.sql.gz" || rc=1
+
+          if [ "$$rc" -ne 0 ]; then
+            # Se deja el archivo a medias a propósito: un .sql.gz de 20 bytes es
+            # una evidencia visible, y borrarlo dejaría el mismo silencio que un
+            # respaldo que nunca corrió.
+            echo "[backup] ERROR: al menos un mysqldump falló ($$stamp). Revisar credenciales y grants."
+          else
+            echo "[backup] OK $$stamp:"
+            ls -la /backups/*-$${stamp}.sql.gz
+          fi
+
+          # Retención local. Solo nuestros archivos, y solo por antigüedad.
+          find /backups -maxdepth 1 -name '*.sql.gz' -mtime +$${BACKUP_KEEP_DAYS} -print -delete
+          # Marca que Diagnóstico lee para pintar en rojo un respaldo de más de
+          # 48 horas. Un backup que falló en silencio es igual a no tener backup.
+          date -Iseconds > /backups/last-run.txt
+          echo "$$rc" > /backups/last-status.txt
+
+          # Un minuto de gracia antes de recalcular la próxima corrida: si el
+          # dump terminó dentro del mismo minuto en que arrancó, "hoy a las
+          # HH:MM" todavía sería futuro y la corrida se repetiría enseguida.
+          sleep 61
+        done
+
+  # ── Copia fuera de la VM (opcional, hoy apagada) ───────────────────────────
+  # No arranca salvo que el stack corra con COMPOSE_PROFILES=offsite. Existe
+  # apagada, y no comentada, para que el día que haya bucket sea encender un
+  # perfil y no escribir un servicio nuevo bajo presión.
+  #
+  # Necesita: BACKUP_OFFSITE_URI (gs://bucket/ruta) y una cuenta de servicio con
+  # permiso SOLO de escritura sobre ese bucket, montada como archivo en el host
+  # (BACKUP_GCP_SA_FILE). Ninguna credencial se inventa acá.
+  db-backup-offsite:
+    profiles: [offsite]
+    image: google/cloud-sdk:alpine
+    container_name: gbs-admin-backup-offsite
+    restart: unless-stopped
+    volumes:
+      - gbs_backups:/backups:ro
+      - ${BACKUP_GCP_SA_FILE:-/dev/null}:/secrets/sa.json:ro
+    environment:
+      TZ: America/Bogota
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/sa.json
+      BACKUP_OFFSITE_URI: ${BACKUP_OFFSITE_URI:-}
+      # Cada cuánto sincroniza. Intervalo y no hora del día: la imagen de
+      # cloud-sdk trae BusyBox, y su `date` no entiende "today 04:15".
+      BACKUP_OFFSITE_EVERY_SECONDS: ${BACKUP_OFFSITE_EVERY_SECONDS:-86400}
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -u
+        if [ -z "$${BACKUP_OFFSITE_URI}" ]; then
+          echo "[offsite] BACKUP_OFFSITE_URI vacío y el perfil está encendido. Nada que hacer."
+          exit 1
+        fi
+        gcloud auth activate-service-account --key-file="$${GOOGLE_APPLICATION_CREDENTIALS}"
+        while true; do
+          # rsync y no cp: subir de nuevo lo que ya está sería pagar egreso por
+          # el mismo archivo todas las noches.
+          if gcloud storage rsync /backups "$${BACKUP_OFFSITE_URI}" --recursive; then
+            echo "[offsite] OK $$(date -Iseconds)"
+          else
+            echo "[offsite] ERROR $$(date -Iseconds)"
+          fi
+          sleep "$${BACKUP_OFFSITE_EVERY_SECONDS}"
+        done
+
+  # ── Reconcile nocturno ──────────────────────────────────────────────────────
+  #
+  # **No es una red de seguridad: es el mecanismo principal.** Los webhooks de EA
+  # no reintentan — `Webhooks_client::call()` traga la excepción y solo la
+  # escribe en el log de EA —, así que cada minuto que el panel esté caído o en
+  # redespliegue es un minuto de citas que se quedan sin precio congelado, sin
+  # ningún rastro de este lado. Este job es lo que garantiza que toda cita
+  # termine con su snapshot; el webhook solo lo adelanta.
+  #
+  # Mismo patrón que `admin-migrate`: la misma imagen, un bundle de esbuild
+  # (`scripts/reconcile.js`) porque el loader de TypeScript de Node no resuelve
+  # los imports de directorio del árbol de `src/`.
+  #
+  # El bucle vive acá y no en un cron del host: el host no es nuestro y un
+  # crontab fuera del stack es una pieza que Portainer no ve y que nadie
+  # recuerda al migrar la VM.
+  admin-reconcile:
+    image: ${ADMIN_IMAGE}
+    container_name: gbs-admin-reconcile
+    restart: unless-stopped
+    networks: [data, web]
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+    environment:
+      TZ: America/Bogota
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      EA_API_URL: ${EA_API_URL}
+      EA_API_TOKEN: ${EA_API_TOKEN}
+      # Hacia atrás para recuperar lo que el webhook perdió; hacia adelante
+      # porque una cita reservada hoy para dentro de dos meses tiene que
+      # congelar la tarifa vigente el día que se preste, y `from`/`till` de EA
+      # filtran por fecha de la cita, nunca por fecha de reserva.
+      RECONCILE_LOOKBACK_DAYS: ${RECONCILE_LOOKBACK_DAYS:-7}
+      RECONCILE_LOOKAHEAD_DAYS: ${RECONCILE_LOOKAHEAD_DAYS:-60}
+      RECONCILE_AT: ${RECONCILE_AT:-03:45}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -u
+        # 03:45, después del respaldo de las 03:15: si el reconcile escribiera
+        # filas nuevas justo antes del dump, el respaldo de esa noche las
+        # tendría a medias.
+        while true; do
+          now=$$(date +%H:%M)
+          if [ "$${now}" = "$${RECONCILE_AT}" ]; then
+            node scripts/reconcile.js
+            sleep 60
+          fi
+          sleep 20
+        done
