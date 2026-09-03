@@ -20,6 +20,26 @@ import { Icon } from "./Icon";
  * escritura**. La banda informa; no protege. Un botón habilitado bajo una banda
  * que dice "no se puede guardar" es peor que no tener banda.
  */
+/**
+ * Cierra la frase de la causa sin duplicarle la puntuación.
+ *
+ * La banda completa la oración con ", así que…", y por eso no puede pegar esa
+ * coma detrás de un `reason` que ya viene terminado: el resultado era
+ * "…no se puede guardar., así que por ahora no se puede…". Un `reason` que
+ * cierra con `.`, `!` o `?` se deja como una oración aparte; uno que no,
+ * recibe la subordinada.
+ *
+ * `since` va siempre antes del corte, porque es parte de la causa
+ * ("EA no responde **desde las 3:12 p. m.**"), no de la consecuencia.
+ */
+function readOnlySentence(reason: string, since?: string): string {
+  const causa = `${reason.trimEnd()}${since ? ` ${since}` : ""}`;
+
+  return /[.!?]$/.test(causa)
+    ? `${causa} Por ahora no se puede crear ni modificar nada.`
+    : `${causa}, así que por ahora no se puede crear ni modificar nada.`;
+}
+
 export function ReadOnlyBand({
   /** Desde cuándo, ya formateado. `"desde las 3:12 p. m."` */
   since,
@@ -36,9 +56,8 @@ export function ReadOnlyBand({
     <div className="ui-readonly" role="status">
       <Icon name="candado" size={16} className="ui-readonly__icon" />
       <span>
-        <strong>Solo lectura.</strong> {reason}
-        {since ? ` ${since}` : ""}, así que por ahora no se puede crear ni
-        modificar nada. La agenda y los reportes siguen al día.
+        <strong>Solo lectura.</strong> {readOnlySentence(reason, since)} La
+        agenda y los reportes siguen al día.
         {detailsHref ? (
           <>
             {" "}

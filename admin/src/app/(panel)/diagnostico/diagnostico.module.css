@@ -1,0 +1,251 @@
+/* =============================================================================
+   Diagnóstico — WP-D4
+   =============================================================================
+
+   Un módulo de CSS, no `globals.css`: esa hoja es de A3.
+
+   **La familia cromática de acá es la de retroalimentación del sistema
+   (`--color-ok-*`, `--color-warn-*`, `--color-error-*`, `--color-info-*`), no
+   la de estados de la cita.** No es un detalle: un renglón rojo acá significa
+   "el sistema está roto", y si usara el mismo rojo que "no asistió", la dueña
+   tendría dos rojos distintos con el mismo tono en el mismo panel. A3 separó
+   las dos familias exactamente para esto.
+
+   Y **nunca color solo**: cada renglón lleva punto, palabra y texto. La misma
+   regla que la pastilla de la agenda, por la misma razón — daltonismo y hoja
+   impresa en blanco y negro.
+   ========================================================================== */
+
+.head {
+  align-items: baseline;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding-bottom: 0.75rem;
+}
+
+.headline {
+  align-items: center;
+  display: flex;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  gap: 0.5rem;
+}
+
+.meta {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* Una lista, no una rejilla de tarjetas. Once renglones en tarjetas obligan a
+   barrer en dos dimensiones para encontrar el rojo; en una columna el ojo baja
+   una sola vez. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  align-items: start;
+  border: 1px solid var(--hair);
+  border-left-width: 1px;
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 0.25rem 0.75rem;
+  /* punto · cuerpo · cifra */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 0.75rem;
+}
+
+@media (max-width: 30rem) {
+  .item {
+    /* A 390 px la cifra baja a su propia fila en vez de comprimir el título. */
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .figure {
+    grid-column: 2;
+  }
+}
+
+/* Superficie tintada más filete de 1 px, **nunca una franja lateral de 4 px**:
+   es el patrón que el plan prohíbe explícitamente. */
+.item[data-level="ok"] {
+  background: var(--color-ok-tint);
+  border-color: var(--color-ok-line);
+}
+
+.item[data-level="warn"] {
+  background: var(--color-warn-tint);
+  border-color: var(--color-warn-line);
+}
+
+.item[data-level="down"] {
+  background: var(--color-error-tint);
+  border-color: var(--color-error-line);
+}
+
+.item[data-level="unknown"] {
+  background: var(--color-info-tint);
+  border-color: var(--color-info-line);
+  /* Filete punteado: la misma señal que la pastilla `desconocido` de la
+     agenda. "Esto no se pudo comprobar" no es un estado del sistema, es un
+     hueco en la comprobación. */
+  border-style: dashed;
+}
+
+.dot {
+  border-radius: 50%;
+  flex: none;
+  height: 0.625rem;
+  margin-top: 0.3125rem;
+  width: 0.625rem;
+}
+
+.item[data-level="ok"] .dot {
+  background: var(--color-ok-ink);
+}
+
+.item[data-level="warn"] .dot {
+  background: var(--color-warn-ink);
+}
+
+.item[data-level="down"] .dot {
+  background: var(--color-error-ink);
+}
+
+.item[data-level="unknown"] .dot {
+  background: var(--color-info-ink);
+}
+
+/* El punto del encabezado lleva el nivel en sí mismo, no en un ancestro: es el
+   resumen del tablero y no vive dentro de ningún renglón. Mismo atributo, mismo
+   mecanismo — no dos formas de decir lo mismo. */
+.dot[data-level="ok"] {
+  background: var(--color-ok-ink);
+}
+
+.dot[data-level="warn"] {
+  background: var(--color-warn-ink);
+}
+
+.dot[data-level="down"] {
+  background: var(--color-error-ink);
+}
+
+.dot[data-level="unknown"] {
+  background: var(--color-info-ink);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.title {
+  color: var(--color-carbon);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* La palabra del estado, que es el canal que carga el dato junto con el punto.
+   Va con la tinta de su propia familia, medida sobre su tinte por A3. */
+.word {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.item[data-level="ok"] .word {
+  color: var(--color-ok-ink);
+}
+
+.item[data-level="warn"] .word {
+  color: var(--color-warn-ink);
+}
+
+.item[data-level="down"] .word {
+  color: var(--color-error-ink);
+}
+
+.item[data-level="unknown"] .word {
+  color: var(--color-info-ink);
+}
+
+.detail {
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+  line-height: 1.125rem;
+  margin: 0;
+  max-width: 72ch;
+}
+
+/* Los nombres de columna y de ajuste de EA (`id_google_calendar`,
+   `secret_header`) van en `code` porque hay que poder buscarlos tal cual en la
+   interfaz de EA o en un `SHOW CREATE TABLE`.
+
+   **El fondo es un token opaco, no un negro al 6 %.** Con alpha, el contraste
+   del texto depende del tinte que haya debajo —y acá hay cuatro tintes
+   distintos, uno por nivel—, así que la razón real cambia de renglón en
+   renglón y no se puede afirmar una sola. Con `ivory-deep` la cuenta es una y
+   está medida: 13.03:1. */
+.detail code {
+  background: var(--color-ivory-deep);
+  border-radius: var(--radius-xs);
+  font-size: 0.95em;
+  padding: 0 0.2em;
+}
+
+.lastSeen {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+}
+
+.figure {
+  color: var(--color-carbon);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  max-width: 22ch;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+/* El pie: lo que esta pantalla no puede comprobar y por qué. Va abajo y en
+   crema porque es contexto permanente, no un hallazgo del día. */
+.foot {
+  background: var(--color-cream);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+  line-height: 1.125rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+}
+
+.foot h2 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin: 0 0 0.375rem;
+}
+
+.foot ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding-left: 1.125rem;
+}

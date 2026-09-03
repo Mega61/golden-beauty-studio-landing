@@ -40,7 +40,9 @@ export const DESTINATIONS: readonly Destination[] = [
   {
     id: "hoy",
     label: "Hoy",
-    href: "/",
+    // `/` solo redirige acá. Apuntarlo a `/` dejaba el ítem sin marcar como
+    // activo (la ruta real nunca coincidía) y sumaba un salto en cada clic.
+    href: "/hoy",
     icon: "hoy",
     roles: ALL,
     bottom: 1,
@@ -137,6 +139,9 @@ export function bottomBarFor(role: Role): Destination[] {
     .slice(0, 4);
 }
 
+/** A dónde manda `app/page.tsx` la raíz. Ver `activeDestinationId()`. */
+const ROOT_DESTINATION_HREF = "/hoy";
+
 /** Lo que queda para la hoja de "Más". */
 export function overflowFor(role: Role): Destination[] {
   const inBar = new Set(bottomBarFor(role).map((d) => d.id));
@@ -146,10 +151,13 @@ export function overflowFor(role: Role): Destination[] {
 /**
  * Qué destino está activo para una ruta.
  *
- * Prefijo, no igualdad: `/clientes/482` tiene que iluminar "Clientas". La raíz
- * es el caso especial —si no, `/` sería prefijo de todo— y el desempate es por
- * `href` más largo, así que `/caja/cierre` gana contra `/caja` si algún día
- * existieran los dos.
+ * Prefijo, no igualdad: `/clientes/482` tiene que iluminar "Clientas". El
+ * desempate es por `href` más largo, así que `/caja/cierre` gana contra
+ * `/caja` si algún día existieran los dos.
+ *
+ * `/` no es un destino —`app/page.tsx` redirige a `/hoy`— pero ilumina Hoy de
+ * todos modos, para que la barra no quede apagada durante el salto ni si
+ * alguien llega con la URL desnuda.
  *
  * `pathname` llega **sin** el `basePath`: `usePathname()` ya lo quita.
  */
@@ -162,7 +170,9 @@ export function activeDestinationId(
   for (const d of destinationsFor(role)) {
     if (d.external) continue;
     const match =
-      d.href === "/" ? clean === "/" : clean === d.href || clean.startsWith(`${d.href}/`);
+      clean === d.href ||
+      clean.startsWith(`${d.href}/`) ||
+      (clean === "/" && d.href === ROOT_DESTINATION_HREF);
     if (match && (!best || d.href.length > best.href.length)) best = d;
   }
   return best?.id ?? null;

@@ -2,10 +2,27 @@
  * `appointment_finance` → el cuerpo que se le manda a la ruta de ingest de
  * Strapi, la misma que hoy alimenta `agendapro-pull`.
  *
- * ⚠ **La forma exacta de `Payment` no está verificada contra el CRM.** El plan
- * manda leer `src/api/visit/services/ingest.ts` del repo del CRM para fijar el
- * contrato (§ Fases), y ese repo no está disponible desde acá. Lo que sí está
- * fijado por el plan y este archivo sí garantiza:
+ * **La forma de `Payment` está verificada** contra
+ * `src/api/payment/content-types/payment/schema.json` del CRM
+ * (`Mega61/golden-beauty-studio-crm`, público). El content type tiene
+ * exactamente `tx_id` (string, requerido, **UNIQUE**), `sale_id`, `paid_at`
+ * (date), `amount` (integer), `tip` (integer, default 0), `method` (enum
+ * `efectivo | transferencia | otro`), `payment_status`, `synced_to_actual` y
+ * `actual_txn_id`.
+ *
+ * **No existen** las columnas `source`, `source_tx_id`, `imported_id`,
+ * `ea_appointment_id`, `ea_provider_id` ni `ea_service_id` que este archivo
+ * mandaba antes: la migración que el plan describía como "generalizar los
+ * campos con forma de Agenda Pro" nunca se hizo. `IngestPayment` es hoy los
+ * cinco campos que la fila realmente tiene, y nada más.
+ *
+ * `imported_id` **no lo escribe el panel**: lo deriva aguas abajo
+ * `automation/actual-sync/sync.mjs`, como `` `agendapro-tx:${tx_id}` ``, con
+ * un prefijo único y sin conciencia de la fuente. Nuestro `tx_id` viaja
+ * adentro de ese prefijo (`agendapro-tx:ea-appt:501`) — feo, pero único contra
+ * los ids numéricos del histórico, y no exige tocar `actual-sync`.
+ *
+ * Lo que este archivo garantiza:
  *
  * - `method` **siempre** dentro del enum `efectivo | transferencia | otro`, que
  *   es el mismo de `Payment.method` en Strapi. No se inventan valores nuevos.
@@ -27,8 +44,7 @@
  */
 
 import {
-  buildEaAdjustmentImportedId,
-  buildEaImportedId,
+  buildPaymentAdjustmentSourceTxId,
   buildPaymentSourceTxId,
 } from "./ingest-id";
 
@@ -71,20 +87,25 @@ export type FinanceForIngest = {
   performedServiceId: number | null;
 };
 
-/** El cuerpo de un pago. Ver la advertencia del encabezado sobre los nombres. */
+/**
+ * El cuerpo de un pago: los cinco campos de `Payment` y ninguno más.
+ *
+ * `source_tx_id` es el nombre local de lo que en Strapi se llama `tx_id`. Se
+ * mantiene el nombre largo acá adentro porque "tx_id" a secas ya significa
+ * otra cosa en este dominio — el id opaco del scraper de Agenda Pro — y
+ * confundir los dos es exactamente el error que duplica ingresos.
+ *
+ * **Es la llave única de la fila.** Dos cosas distintas con el mismo
+ * `source_tx_id` no producen dos filas: la segunda le pisa el monto a la
+ * primera, porque `upsertPayment()` del CRM llavea por ahí.
+ */
 export type IngestPayment = {
-  /** Agnóstico de fuente: reemplaza al `tx_id` con forma de Agenda Pro. */
-  source: "ea";
   source_tx_id: string;
-  /** Con lo que Actual deduplica. Nunca se reusa entre una cita y su ajuste. */
-  imported_id: string;
   amount: Cop;
   tip: Cop;
   method: PaymentMethod;
+  /** `paid_at` en Strapi. Fecha de caja, `YYYY-MM-DD`. */
   paid_on: string;
-  ea_appointment_id: number;
-  ea_provider_id: number | null;
-  ea_service_id: number | null;
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -102,7 +123,11 @@ function assertPesos(value: number, what: string): void {
  * antes de que la cifra salga del panel: lo que pase de acá ya no vuelve —
  * Actual no actualiza.
  */
-function baseOf(finance: FinanceForIngest, amount: Cop): Omit<IngestPayment, "imported_id"> {
+function baseOf(
+  finance: FinanceForIngest,
+  amount: Cop,
+  sourceTxId: string,
+): IngestPayment {
   if (finance.paymentMethod === null) {
     throw new IngestPayloadError(
       `La cita ${finance.eaAppointmentId} no tiene método de pago y no se puede empujar`,
@@ -130,8 +155,7 @@ function baseOf(finance: FinanceForIngest, amount: Cop): Omit<IngestPayment, "im
   assertPesos(finance.tip, `La propina de la cita ${finance.eaAppointmentId}`);
 
   return {
-    source: "ea",
-    source_tx_id: buildPaymentSourceTxId(finance.eaAppointmentId),
+    source_tx_id: sourceTxId,
     amount,
     // La propina viaja **al lado** del monto, nunca sumada: no es ingreso del
     // estudio y meterla adentro inflaría el ingreso del mes con plata que es
@@ -139,9 +163,6 @@ function baseOf(finance: FinanceForIngest, amount: Cop): Omit<IngestPayment, "im
     tip: finance.tip,
     method: finance.paymentMethod,
     paid_on: finance.paidOn,
-    ea_appointment_id: finance.eaAppointmentId,
-    ea_provider_id: finance.eaProviderId,
-    ea_service_id: finance.performedServiceId,
   };
 }
 
@@ -153,10 +174,11 @@ export function buildIngestPayment(finance: FinanceForIngest): IngestPayment {
     );
   }
 
-  return {
-    ...baseOf(finance, finance.amountCharged),
-    imported_id: buildEaImportedId(finance.eaAppointmentId),
-  };
+  return baseOf(
+    finance,
+    finance.amountCharged,
+    buildPaymentSourceTxId(finance.eaAppointmentId),
+  );
 }
 
 /**
@@ -183,11 +205,16 @@ export function buildIngestAdjustment(
   }
 
   return {
-    ...baseOf(finance, delta),
+    ...baseOf(
+      finance,
+      delta,
+      // Llave propia, con la secuencia adentro: reusar la del pago le pisaría
+      // el monto a la fila original en vez de agregar un movimiento.
+      buildPaymentAdjustmentSourceTxId(finance.eaAppointmentId, sequence),
+    ),
     // La propina no se re-empuja con el ajuste: si cambió, cambió como parte
     // del delta que el llamador calculó.
     tip: 0,
-    imported_id: buildEaAdjustmentImportedId(finance.eaAppointmentId, sequence),
   };
 }
 
@@ -204,9 +231,12 @@ export function buildDayClosePayments(
 ): IngestPayment[] {
   const payments = finances.map((finance) => buildIngestPayment(finance));
 
-  // **Dos movimientos con el mismo `imported_id` no pueden salir en el mismo
-  // lote.** Actual Budget deduplica por esa llave y se come el segundo **en
-  // silencio**: no hay error, no hay fila, y la plata simplemente no está.
+  // **Dos movimientos con el mismo `source_tx_id` no pueden salir en el mismo
+  // lote.** Es la llave UNIQUE de `Payment` y la que usa `upsertPayment()`:
+  // el segundo no crearía una fila, **le pisaría el monto al primero**. Y
+  // aguas abajo Actual deduplica por el `imported_id` que deriva de ella, así
+  // que se come el segundo **en silencio** — no hay error, no hay fila, y la
+  // plata simplemente no está.
   //
   // Es la única función que construye un *conjunto* de esas llaves, así que es
   // la única que puede comprobarlo. Hoy la UNIQUE de `appointment_finance` lo
@@ -219,17 +249,17 @@ export function buildDayClosePayments(
   const seen = new Map<string, number>();
 
   for (const [index, payment] of payments.entries()) {
-    const previous = seen.get(payment.imported_id);
+    const previous = seen.get(payment.source_tx_id);
 
     if (previous !== undefined) {
       throw new IngestPayloadError(
-        `El lote del cierre trae dos movimientos con el mismo imported_id ` +
-          `(${payment.imported_id}): posiciones ${previous} y ${index}. ` +
-          "Actual descartaría el segundo sin avisar.",
+        `El lote del cierre trae dos movimientos con el mismo tx_id ` +
+          `(${payment.source_tx_id}): posiciones ${previous} y ${index}. ` +
+          "El segundo le pisaría el monto al primero sin avisar.",
       );
     }
 
-    seen.set(payment.imported_id, index);
+    seen.set(payment.source_tx_id, index);
   }
 
   return payments;

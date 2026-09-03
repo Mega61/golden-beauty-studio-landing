@@ -33,17 +33,15 @@ const finance = (over: Partial<FinanceForIngest> = {}): FinanceForIngest => ({
 
 describe("buildIngestPayment", () => {
   it("arma el pago de una cita cerrada", () => {
+    // Los cinco campos que `Payment` tiene en Strapi, y ni uno más: mandar
+    // `source`, `ea_appointment_id` o `imported_id` era mandar columnas que el
+    // content type no tiene.
     expect(buildIngestPayment(finance())).toEqual({
-      source: "ea",
       source_tx_id: "ea-appt:42",
-      imported_id: "ea-tx:42",
       amount: 130_000,
       tip: 10_000,
       method: "efectivo",
       paid_on: "2026-08-31",
-      ea_appointment_id: 42,
-      ea_provider_id: 2,
-      ea_service_id: 12,
     });
   });
 
@@ -54,11 +52,6 @@ describe("buildIngestPayment", () => {
 
     expect(pago.amount).toBe(100_000);
     expect(pago.tip).toBe(50_000);
-  });
-
-  it("reporta el servicio REALIZADO, no el agendado", () => {
-    // El encabezado guarda los dos; el que cruza hacia el CRM es el que se hizo.
-    expect(buildIngestPayment(finance({ performedServiceId: 99 })).ea_service_id).toBe(99);
   });
 
   it("un método fuera del enum de Strapi no sale del panel", () => {
@@ -108,32 +101,27 @@ describe("buildIngestAdjustment — corregir después del cierre", () => {
     // Actual importa el ajuste como movimiento aparte y lo suma al que ya
     // tiene. Mandar el total nuevo duplicaría el ingreso de esa cita.
     expect(buildIngestAdjustment(finance(), -15_000, 1)).toEqual({
-      source: "ea",
-      source_tx_id: "ea-appt:42",
-      imported_id: "ea-tx:42:adj1",
+      source_tx_id: "ea-appt:42:adj1",
       amount: -15_000,
       tip: 0,
       method: "efectivo",
       paid_on: "2026-08-31",
-      ea_appointment_id: 42,
-      ea_provider_id: 2,
-      ea_service_id: 12,
     });
   });
 
-  it("el ajuste nunca reusa el imported_id del pago original", () => {
-    // Reusarlo dejaría a Actual con la cifra vieja para siempre, sin error
-    // visible: no actualiza montos de lo ya importado.
+  it("el ajuste nunca reusa la llave del pago original", () => {
+    // `Payment.tx_id` es UNIQUE y `upsertPayment()` llavea por ahí: un ajuste
+    // que la reusara no crearía un movimiento, le PISARÍA el monto al pago —
+    // y el ingreso del día quedaría corto por el monto original, en silencio.
     const pago = buildIngestPayment(finance());
     const ajuste = buildIngestAdjustment(finance(), 5_000, 1);
 
-    expect(ajuste.imported_id).not.toBe(pago.imported_id);
-    expect(ajuste.source_tx_id).toBe(pago.source_tx_id);
+    expect(ajuste.source_tx_id).not.toBe(pago.source_tx_id);
   });
 
-  it("dos ajustes de la misma cita son dos transacciones distintas", () => {
-    expect(buildIngestAdjustment(finance(), 1_000, 1).imported_id).not.toBe(
-      buildIngestAdjustment(finance(), 2_000, 2).imported_id,
+  it("dos ajustes de la misma cita son dos filas distintas", () => {
+    expect(buildIngestAdjustment(finance(), 1_000, 1).source_tx_id).not.toBe(
+      buildIngestAdjustment(finance(), 2_000, 2).source_tx_id,
     );
   });
 
@@ -164,7 +152,11 @@ describe("buildDayClosePayments", () => {
       finance({ eaAppointmentId: 3 }),
     ]);
 
-    expect(pagos.map((p) => p.imported_id)).toEqual(["ea-tx:1", "ea-tx:2", "ea-tx:3"]);
+    expect(pagos.map((p) => p.source_tx_id)).toEqual([
+      "ea-appt:1",
+      "ea-appt:2",
+      "ea-appt:3",
+    ]);
   });
 
   it("una sola cuenta mala tumba el lote completo", () => {

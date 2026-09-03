@@ -22,12 +22,33 @@
  * | Namespace | Qué llavea | Quién lo escribe |
  * | --- | --- | --- |
  * | `agendapro-tx:` | las transacciones históricas scrapeadas de Agenda Pro | ya está en Actual, **congelado para siempre** |
- * | `ea-tx:` | una cita cerrada en el panel, empujada en el cierre diario | el push de C3 |
- * | `ea-tx:<id>:adj<n>` | una corrección posterior al cierre de esa misma cita | el push de C3 |
+ * | `ea-appt:<id>` | la fila `Payment` de una cita cerrada en el panel | el push del cierre diario |
+ * | `ea-appt:<id>:adj<n>` | la fila `Payment` de una corrección posterior al cierre | el push del ajuste |
+ * | `ea-tx:…` | nada, hoy | nadie — ver la nota de abajo |
  *
  * El histórico no se re-llavea nunca: cambiarle el prefijo a filas que Actual ya
  * importó las volvería a importar como duplicados. `ACTUAL_SYNC_SINCE` marca la
  * frontera entre los dos mundos, y ese corte vive en `actual-sync`, no acá.
+ *
+ * ## `ea-tx:` no llega a Actual — y está bien
+ *
+ * El plan asumía que el panel escribiría el `imported_id` de Actual con su
+ * propio namespace. **No lo escribe.** `automation/actual-sync/sync.mjs` lo
+ * deriva él, con un único prefijo hardcodeado:
+ * `` imported_id: `agendapro-tx:${tx_id}` ``, sin conciencia de la fuente.
+ *
+ * Así que lo que Actual ve de una cita nuestra es
+ * `agendapro-tx:ea-appt:501` — el prefijo del histórico envolviendo nuestra
+ * llave. Feo, y a la vez **provablemente libre de colisiones**: los `tx_id`
+ * históricos de Agenda Pro son opacos pero nunca empiezan por `ea-appt:`. El
+ * namespace real quedó un nivel más abajo, dentro del `tx_id`, y eso no exige
+ * tocar `actual-sync` — que es un tercer sistema en producción.
+ *
+ * `buildEaImportedId()` y `buildEaAdjustmentImportedId()` se quedan como la
+ * contraparte de `parseImportedId()`: describen la forma que `ea-tx:` tendría
+ * *si* algún día `actual-sync` aprendiera de fuentes, y sostienen el test
+ * exhaustivo de no-colisión entre los tres namespaces. Ninguna ruta de
+ * producción las llama hoy.
  *
  * Por qué las correcciones son ids nuevos y no una reescritura: Actual no
  * actualiza montos. Corregir un ticket después del cierre y reusar el
@@ -128,6 +149,28 @@ export function buildAgendaproImportedId(txId: string): string {
 export function buildPaymentSourceTxId(eaAppointmentId: number): string {
   assertEaId(eaAppointmentId, "El id de la cita");
   return `${EA_PAYMENT_PREFIX}${eaAppointmentId}`;
+}
+
+/**
+ * La llave de la fila `Payment` de **una corrección posterior al cierre**.
+ *
+ * Tiene que existir aparte de `buildPaymentSourceTxId()` porque en Strapi
+ * `Payment.tx_id` es **UNIQUE y el upsert de `upsertPayment()` llavea por ahí**:
+ * un ajuste que reusara el `tx_id` del pago original no crearía un movimiento
+ * nuevo, **le pisaría el monto a la fila del pago** — y dejaría el ingreso del
+ * día corto por el monto original, sin error visible en ningún lado.
+ *
+ * Encontrado por el agente de C3 mientras conectaba el cliente: los
+ * constructores de arriba cubrían el `imported_id` de Actual con secuencia,
+ * pero el `tx_id` de Strapi sin ella.
+ */
+export function buildPaymentAdjustmentSourceTxId(
+  eaAppointmentId: number,
+  sequence: number,
+): string {
+  assertEaId(eaAppointmentId, "El id de la cita");
+  assertEaId(sequence, "El número de ajuste");
+  return `${EA_PAYMENT_PREFIX}${eaAppointmentId}${ADJUSTMENT_SEPARATOR}${sequence}`;
 }
 
 /** Lo que un `imported_id` significa, una vez leído de vuelta. */

@@ -1,0 +1,650 @@
+/* =============================================================================
+   Los gráficos de Reportes — WP-D4, con la skill `dataviz`
+   =============================================================================
+
+   Un módulo de CSS y no `globals.css`: esa hoja es de A3 y no de este paquete.
+   Es el mismo camino que tomó C1 con `calendar.module.css`.
+
+   Todo lo de acá lee los tokens de A3 con `var()`. Ni un hex nuevo: la paleta
+   de los gráficos es la de los estados de la cita (ver `palette.ts`) y los
+   grises, filetes y tamaños son los mismos de la agenda y de la caja. El único
+   sitio con hex es `palette.ts`, porque el color de una serie entra como
+   `style` desde el componente — es un dato, y los datos no pueden estar en una
+   hoja de estilos.
+
+   Tres reglas de `dataviz` que están implementadas como CSS y conviene no
+   deshacer:
+
+   - **La marca no llena su banda y se topa en 24 px.** `--bar-h: 24px` con la
+     fila más alta que la barra: el sobrante es aire, no una barra más gorda.
+   - **El extremo de dato va redondeado 4 px; el de la línea base, cuadrado.**
+     Un `border-radius` de un solo lado, no una pastilla.
+   - **Lo que separa dos rellenos que se tocan es un hueco de 2 px del color de
+     la superficie**, nunca un filete alrededor. Un filete agrega tinta con peso
+     de dato que no es dato.
+   ========================================================================== */
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  /* **`min-width: 0` no es opcional en ninguno de estos contenedores.** Un
+     ítem de grilla o de flex tiene `min-width: auto`, que vale el min-content
+     de su contenido: el mapa de calor mide 453 px de min-content y con eso
+     estiraba la tarjeta a 503 px dentro de un viewport de 390. La página no
+     se veía scrollear de lado —`html { overflow-x: hidden }` de A3 lo
+     recortaba— y el resultado era peor que un scroll: contenido cortado y
+     fuera de alcance. Medido en navegador a 390 px, no deducido. */
+  min-width: 0;
+}
+
+/* El rótulo de la decisión que el reporte habilita. Va debajo del título y en
+   secundario: es la razón de que el reporte exista, no un dato. */
+.decision {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+  line-height: 1rem;
+  margin: 0;
+  max-width: 60ch;
+}
+
+.figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* Un aviso dentro de un reporte: lo que no se pudo medir y por qué. Usa la
+   familia de retroalimentación del sistema, nunca la de estados de la cita —
+   un dato que falta no puede parecer una cita confirmada. */
+.note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  background: var(--color-warn-tint);
+  border: 1px solid var(--color-warn-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-warn-ink);
+  font-size: var(--text-2xs);
+  line-height: 1rem;
+  padding: 0.5rem 0.625rem;
+}
+
+.note--info {
+  background: var(--color-info-tint);
+  border-color: var(--color-info-line);
+  color: var(--color-info-ink);
+}
+
+/* --- Leyenda -----------------------------------------------------------------
+   Presente siempre con dos o más series, y ausente con una sola: con una serie
+   el título ya dice qué se dibuja y una caja con un solo cuadrito repite el
+   título gastando espacio.
+
+   El texto nunca lleva el color del dato: la identidad la carga la marca de al
+   lado. Un tono claro como texto sobre marfil es ilegible. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.legendItem {
+  align-items: center;
+  color: var(--color-ink-soft);
+  display: flex;
+  font-size: var(--text-2xs);
+  gap: 0.375rem;
+  line-height: 1rem;
+}
+
+/* Rectángulo para barras y áreas; la leyenda espeja la forma de la marca. */
+.swatch {
+  border-radius: 1px;
+  flex: none;
+  height: 0.625rem;
+  width: 0.625rem;
+}
+
+/* --- Barras horizontales -----------------------------------------------------
+   Horizontal y no vertical a propósito: las categorías de este panel son
+   nombres largos —"Combo manos y pies", "Montaje con diseño"— y en columnas
+   verticales terminarían rotados 45°, que es el tell de un gráfico que no se
+   pensó.
+
+   **Cada fila es su propia grilla de tres columnas, no una grilla plana con
+   todas las celdas de todas las filas.** La primera versión era plana y a
+   390 px se rompía de una forma que solo se ve mirándola: la pista tomaba el
+   ancho completo con `grid-column: 1 / -1`, así que el orden del DOM —nombre,
+   pista, valor— dejaba el valor de una fila al lado del nombre de la
+   siguiente. Con una grilla por fila, `grid-row: 2` coloca la pista debajo de
+   su propio nombre y su propio valor, y no hay forma de que se cruce con la
+   fila vecina. Encontrado en navegador a 390 px, no deducido. */
+.bars {
+  --bar-h: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.barRow,
+.axisRow {
+  align-items: center;
+  display: grid;
+  gap: 0.25rem 0.5rem;
+  /* nombre · pista · valor. El nombre se topa para que la pista no desaparezca
+     cuando un servicio se llama largo. */
+  grid-template-columns: minmax(6rem, 11rem) minmax(0, 1fr) max-content;
+  min-width: 0;
+}
+
+@media (max-width: 30rem) {
+  .barRow,
+  .axisRow {
+    /* A 390 px tres columnas dejan la pista en 80 px. La fila se parte en dos:
+       nombre y valor arriba, pista abajo, a todo el ancho. */
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .barTrack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+.barName {
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+  line-height: 1.125rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* La pista lleva la grilla como un degradado de líneas: filete de 1 px,
+   sólido, un paso off-surface. Nada de líneas punteadas — puntear agrega ruido
+   y lee como "proyección" cuando solo es una grilla. */
+.barTrack {
+  min-width: 0;
+  background-image: var(--grid-lines);
+  background-repeat: no-repeat;
+  /* El área de hover/foco llega al piso de 24 px aunque la barra sea más
+     fina: un blanco de 8 px de alto no lo acierta nadie. */
+  min-height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.barFill {
+  background: var(--series);
+  /* Extremo de dato redondeado, extremo de línea base cuadrado. */
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  height: var(--bar-h);
+  min-width: 2px;
+  transition: width var(--dur-1) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barFill {
+    transition: none;
+  }
+}
+
+/* El blanco de foco y de hover cubre la fila entera de la pista. Es un botón
+   solo para que reciba foco de teclado: la misma información en hover y en
+   foco, que es el contrato de `dataviz`. */
+.barHit {
+  appearance: none;
+  background: none;
+  border: 0;
+  cursor: default;
+  inset: 0;
+  padding: 0;
+  position: absolute;
+}
+
+.barHit:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: 1px;
+}
+
+.barValue {
+  color: var(--color-carbon);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.barMeta {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+}
+
+/* El eje: las marcas alineadas con las líneas de la grilla. Va en una fila con
+   las mismas columnas que las barras y una celda vacía al principio, así las
+   marcas caen exactamente debajo de la pista a cualquier ancho. */
+.axis {
+  /* **`ink-soft` (7.98:1) y no `ink-mute` (3.91:1).** Las marcas del eje son
+     texto que carga los valores que no se etiquetaron directamente, así que el
+     piso que les aplica es el de texto de cuerpo, 4.5:1 — y A3 dice
+     explícitamente que `ink-mute` no llega. La convención de `dataviz` de un
+     eje "muted" se respeta bajando el peso visual con el tamaño (12 px) y con
+     el filete de la grilla, no bajando el contraste por debajo del piso.
+     Medido en navegador: 3.91:1 antes, 7.98:1 ahora. */
+  color: var(--color-ink-soft);
+  display: flex;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  justify-content: space-between;
+  border-top: 1px solid var(--hair-strong);
+  min-width: 0;
+  padding-top: 0.25rem;
+}
+
+.axisTrack {
+  grid-column: 2 / 3;
+}
+
+@media (max-width: 30rem) {
+  .axisTrack {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- Barra apilada (parte-de-un-todo) ---------------------------------------
+   Un solo riel horizontal. El hueco de 2 px entre tramos es `gap`, o sea
+   superficie, y no un borde alrededor de cada tramo. */
+.stack {
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 2px;
+  height: var(--bar-h, 24px);
+  overflow: hidden;
+}
+
+.stackSegment {
+  background: var(--series);
+  flex-basis: 0;
+  min-width: 3px;
+  position: relative;
+}
+
+.stackSegment:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.stackSegment:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.stackSegment:only-child {
+  border-radius: var(--radius-md);
+}
+
+.stackSegment:focus-visible {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: 1px;
+}
+
+/* Los tramos interiores **no** llevan etiqueta adentro: un tramo no tiene
+   extremo libre donde poner el número, y meterlo adentro lo recortaría en
+   cuanto el tramo sea chico. Los valores viven en la leyenda con su cifra, en
+   el tooltip y en la tabla. */
+.stackKeys {
+  display: grid;
+  gap: 0.25rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stackKey {
+  align-items: baseline;
+  display: flex;
+  gap: 0.375rem;
+}
+
+.stackKeyLabel {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+}
+
+.stackKeyValue {
+  color: var(--color-carbon);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+/* --- Mapa de calor -----------------------------------------------------------
+   La forma correcta para una grilla de magnitud: un solo tono, más oscuro es
+   más. Sin cap categórico, así que aguanta cinco motivos o siete franjas sin
+   inventar tonos.
+
+   Scrollea de lado **dentro de su propio contenedor** cuando no cabe. La
+   página nunca scrollea de lado: es el contrato responsive del panel. */
+.heatScroll {
+  overflow-x: auto;
+  /* Que se pueda alcanzar con teclado si tiene scroll. */
+  scrollbar-width: thin;
+}
+
+.heat {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: var(--text-2xs);
+  min-width: 100%;
+}
+
+.heat th {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  padding: 0.25rem 0.375rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.heat thead th {
+  vertical-align: bottom;
+}
+
+.heatRowName {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatCell {
+  border-radius: var(--radius-xs);
+  /* La cifra no se parte en dos líneas: la celda crecería de alto y el mapa
+     dejaría de leerse como una grilla. Si no cabe, scrollea el contenedor. */
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  min-height: 2rem;
+  min-width: 3.5rem;
+  padding: 0.375rem 0.5rem;
+  text-align: right;
+}
+
+/* Una celda sin dato **no es una celda en cero**: filete punteado y sin
+   relleno, la misma señal que la pastilla `desconocido` de la agenda. */
+.heatCell--empty {
+  border: 1px dashed var(--hair-strong);
+  /* Misma razón que el eje: la raya de "sin dato" es texto de 12 px, y
+     `ink-mute` mide 3.91:1. Lo que hace recesiva la celda es la ausencia de
+     relleno y el filete punteado, no un texto que no se alcanza a leer. */
+  color: var(--color-ink-soft);
+}
+
+.heatCell:focus-visible {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: 1px;
+}
+
+/* La escala del mapa: obligatoria, porque sin ella el tono no se puede leer. */
+.heatScale {
+  align-items: center;
+  color: var(--color-ink-soft);
+  display: flex;
+  font-size: var(--text-2xs);
+  gap: 0.375rem;
+}
+
+.heatScaleSteps {
+  display: flex;
+  gap: 1px;
+}
+
+.heatScaleStep {
+  height: 0.625rem;
+  width: 1.25rem;
+}
+
+/* --- Tiles de KPI -----------------------------------------------------------
+   Cuando el dato es un número, la forma es un número. Una barra sola no es un
+   gráfico de barras. */
+.tiles {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.tile {
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+}
+
+.tileLabel {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+  line-height: 1rem;
+}
+
+/* La cifra va en Inter, como todo lo demás: una serif display en una cifra de
+   datos es el tell de "landing disfrazada de herramienta".
+
+   Y con figuras **proporcionales**, no tabulares: `tabular-nums` le da a cada
+   dígito el ancho de un `0`, y a 24 px un `121` queda flojo. Lo tabular se
+   reserva para columnas que tienen que alinearse — las filas de la tabla y las
+   marcas del eje. */
+.tileValue {
+  color: var(--color-carbon);
+  font-size: var(--text-xl);
+  font-variant-numeric: proportional-nums;
+  font-weight: 600;
+  line-height: 1.875rem;
+}
+
+.tileValue--soft {
+  color: var(--color-ink-soft);
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1.5rem;
+}
+
+.tileFoot {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  min-height: 1.25rem;
+}
+
+.tileDelta {
+  align-items: center;
+  color: var(--color-ink-soft);
+  display: flex;
+  font-size: var(--text-2xs);
+  gap: 0.25rem;
+}
+
+/* La dirección **no** decide el color: lo decide si subir es bueno para ese
+   indicador. Un alza de inasistencia es mala y un alza de ingreso es buena, y
+   con el color atado al signo las dos se verían verdes. */
+.tileDelta--good {
+  color: var(--color-ok-ink);
+}
+
+.tileDelta--bad {
+  color: var(--color-error-ink);
+}
+
+.spark {
+  display: block;
+  height: 1.5rem;
+  overflow: visible;
+  width: 4.5rem;
+}
+
+/* --- Vista de tabla ---------------------------------------------------------
+   El gemelo de cada gráfico. No es un extra: es lo que hace que ningún valor
+   dependa del color ni del hover. Va en un `<details>` cerrado para no doblar
+   el alto de la pantalla, y abierto imprime bien. */
+.tableToggle {
+  align-self: flex-start;
+}
+
+.tableToggle > summary {
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  font-size: var(--text-2xs);
+  list-style: none;
+  padding: 0.25rem 0;
+}
+
+.tableToggle > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tableToggle > summary::before {
+  content: "▸ ";
+}
+
+.tableToggle[open] > summary::before {
+  content: "▾ ";
+}
+
+.tableToggle > summary:focus-visible {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: 2px;
+}
+
+.tableWrap {
+  margin-top: 0.5rem;
+  overflow-x: auto;
+}
+
+.dataTable {
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  width: 100%;
+}
+
+.dataTable th,
+.dataTable td {
+  border-bottom: 1px solid var(--hair);
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+}
+
+.dataTable th {
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dataTable td[data-numeric="true"],
+.dataTable th[data-numeric="true"] {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media print {
+  .tableToggle > summary {
+    display: none;
+  }
+
+  .tableWrap {
+    display: block !important;
+  }
+}
+
+/* --- Tooltip ---------------------------------------------------------------
+   Realza, nunca es la única forma de leer un valor: lo mismo está en la tabla.
+   El **valor** es el elemento fuerte y el nombre de la serie va secundario —
+   la jerarquía de la leyenda al revés, porque acá quien mira ya sabe la serie
+   y lo que quiere es el número. */
+.tip {
+  background: var(--color-carbon);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pop);
+  color: #ffffff;
+  font-size: var(--text-2xs);
+  line-height: 1rem;
+  padding: 0.375rem 0.5rem;
+  pointer-events: none;
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 0.5rem));
+  white-space: nowrap;
+  z-index: 60;
+}
+
+.tipValue {
+  display: block;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.tipLabel {
+  color: rgba(255, 255, 255, 0.78);
+  display: block;
+}
+
+/* --- Fila de filtros -------------------------------------------------------
+   Una sola fila, arriba de todo lo que scopea. Ni un filtro adentro de una
+   tarjeta: si un gráfico necesitara su propio rango, sería otro tablero. */
+.filters {
+  align-items: center;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.filterGroup {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.periodLabel {
+  color: var(--color-carbon);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  min-width: 12ch;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* --- Rejilla de reportes ---------------------------------------------------
+   **Un gráfico por pantalla en móvil**, que es el contrato del plan para
+   Reportes. Una columna abajo de 64 rem; dos arriba, y las tarjetas que
+   necesitan ancho se marcan `wide` y ocupan las dos. */
+.grid {
+  display: grid;
+  gap: 1rem;
+  /* `minmax(0, 1fr)` y no `1fr`: ver la nota de `.frame`. Un `1fr` pelado
+     tiene min-content como mínimo automático, y una tarjeta con un mapa de
+     calor adentro lo estira más allá del viewport. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 64rem) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+}

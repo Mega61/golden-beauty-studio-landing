@@ -64,18 +64,26 @@ describe("AUDIT · lo que sale del panel", () => {
     }
   });
 
+  /**
+   * La versión anterior de este test afirmaba lo contrario en su última línea
+   * —"el ajuste comparte la fila `Payment` de Strapi, no el movimiento"— y esa
+   * afirmación era el bug: `Payment.tx_id` es **UNIQUE** y el upsert del CRM
+   * llavea por ahí, así que un ajuste que compartiera la llave no habría
+   * agregado un movimiento, le habría **pisado el monto al pago original**.
+   *
+   * Se mantiene exhaustivo sobre 500 citas × 6 secuencias porque la propiedad
+   * que sostiene —dos cosas distintas, dos llaves distintas— es justo la que no
+   * da ningún error visible cuando se rompe.
+   */
   it("el ajuste nunca reusa la llave del pago, para ninguna cita ni secuencia", () => {
     for (let ea = 1; ea <= 500; ea += 1) {
       const f = finance({ eaAppointmentId: ea });
-      const pago = buildIngestPayment(f);
-      const llaves = new Set([pago.imported_id]);
+      const llaves = new Set([buildIngestPayment(f).source_tx_id]);
 
       for (let seq = 1; seq <= 6; seq += 1) {
         const ajuste = buildIngestAdjustment(f, -1_000 * seq, seq);
-        expect(llaves.has(ajuste.imported_id)).toBe(false);
-        llaves.add(ajuste.imported_id);
-        // El ajuste comparte la fila Payment de Strapi, no el movimiento.
-        expect(ajuste.source_tx_id).toBe(pago.source_tx_id);
+        expect(llaves.has(ajuste.source_tx_id)).toBe(false);
+        llaves.add(ajuste.source_tx_id);
       }
     }
   });

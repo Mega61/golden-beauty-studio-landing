@@ -54,8 +54,9 @@ networks:
     external: true
 
 volumes:
-  # Los respaldos. Es el único estado que este stack posee; `admin` no monta
-  # nada, y menos que nada el `ea_storage` de la agenda.
+  # Los respaldos. Es el único estado que este stack posee. `admin` lo monta
+  # `:ro` para que Diagnóstico lea la fecha del último respaldo; nada más, y
+  # menos que nada el `ea_storage` de la agenda.
   gbs_backups:
 
 # Anclas compartidas: rotación de logs igual en los tres servicios. Sin esto un
@@ -147,6 +148,20 @@ services:
 
       INGEST_URL: ${INGEST_URL}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
+
+      # Dónde buscar `last-run.txt` y `last-status.txt`, que escribe
+      # `db-backup`. Sin esta variable Diagnóstico muestra el respaldo como
+      # `unknown` en vez de rojo/verde — a propósito: un tablero que se
+      # inventa un verde deja de servir en todas sus filas, no solo en esa.
+      BACKUP_STATUS_DIR: /backups
+
+    # **Solo lectura, y solo por esto.** `admin` no posee ningún estado; monta
+    # el volumen de respaldos únicamente para que Diagnóstico pueda leer las
+    # dos marcas de agua que deja `db-backup`. `:ro` es lo que garantiza que el
+    # panel no pueda corromper ni borrar un respaldo — ni por un bug ni por
+    # alguien que llegue a ejecutar código adentro del contenedor.
+    volumes:
+      - gbs_backups:/backups:ro
 
     healthcheck:
       # El mismo Node que sirve el panel es el que lo consulta: no hay `curl` ni

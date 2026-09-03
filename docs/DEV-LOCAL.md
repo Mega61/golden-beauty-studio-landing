@@ -119,7 +119,10 @@ GOOGLE_WORKSPACE_DOMAIN="goldenbeautystudio.com.co"
 TOTP_ENC_KEY="<openssl rand -base64 32>"
 
 # ── Integraciones ────────────────────────────────────────────────
-INGEST_URL="http://localhost:1337/api/ingest/agendapro-transactions"
+# Dejar INGEST_URL VACÍA. El push queda apagado y el cierre diario registra
+# que no salió; se reintenta con el botón "Reintentar" cuando la ruta exista.
+# Ver la nota de abajo antes de ponerle un valor.
+INGEST_URL=""
 INGEST_SHARED_SECRET="<el mismo del CRM local>"
 
 # ── Entorno ──────────────────────────────────────────────────────
@@ -142,6 +145,23 @@ TICKET_STAFF_COBRA="true"
 | `GOOGLE_WORKSPACE_DOMAIN` | Se compara contra el claim `hd` del ID token. Es una de las dos compuertas | Un Gmail personal cualquiera entraría al panel |
 | `TOTP_ENC_KEY` | Cifra los secretos TOTP de las técnicas en reposo | Los secretos quedarían en claro en la base |
 | `INGEST_URL` / `INGEST_SHARED_SECRET` | Push de pagos a Strapi al cerrar el día | El cierre diario no llega a Actual Budget |
+
+> **`INGEST_URL` va vacía hasta que el CRM tenga una ruta JSON.**
+> `POST /api/ingest/agendapro-transactions` —la única ruta de transacciones que
+> existe hoy— lee `ctx.request.files` y parsea un **XLSX de Agenda Pro**.
+> Apuntarle el JSON del panel es mandarle un cuerpo que su parser de planillas
+> no entiende. La ruta JSON que sí existe, `POST /api/ingest/agendapro`, es de
+> **visitas** (`{ bookings: [...] }`), no de pagos.
+>
+> El panel manda `{ payments: [...] }` con los cinco campos de `Payment` y el
+> header `x-ingest-secret`. Lo que falta del lado del CRM es un
+> `POST /api/ingest/payments` que llame a `upsertPayment()`, que ya existe en
+> `src/api/payment/services/ingest.ts` y se describe como "the ONE upsert path".
+> Está **propuesto, no aprobado**: toca un segundo sistema en producción.
+>
+> Con `INGEST_URL` vacía el cierre del día funciona completo — congela los
+> montos, escribe `day_close` y deja `pushed_to_ingest_at` en `NULL`. El push
+> se recupera después con **Reintentar**, sin recalcular nada.
 | `TZ` | Bogotá. EA guarda hora local sin zona | Todo desfasado cinco horas, y se manifiesta como "los totales no cuadran" |
 | `TICKET_STAFF_COBRA` | Si la técnica registra también el método de pago | Solo cambia qué ve ella en "Cerrar servicio" |
 

@@ -476,7 +476,7 @@ describe("golden week — 24 al 29 de agosto de 2026", () => {
       })),
     );
 
-    expect(new Set(pagos.map((p) => p.imported_id)).size).toBe(pagos.length);
+    expect(new Set(pagos.map((p) => p.source_tx_id)).size).toBe(pagos.length);
     expect(pagos.reduce((sum, p) => sum + p.amount, 0)).toBe(870_000);
     expect(pagos.reduce((sum, p) => sum + p.tip, 0)).toBe(60_000);
   });
