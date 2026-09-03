@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Golden Beauty Studio">
+  <!--
+    Favicon del panel. Next lo sirve solo por convención de archivo (`icon.svg`
+    en `app/`), sin tocar el layout.
+
+    Existía como un 404 en cada carga de página: ruido permanente en la consola
+    que además entrena a ignorarla, que es justo lo que no se quiere en una
+    herramienta cuyo diagnóstico depende de mirar los logs.
+
+    Monograma sobre marfil, no sobre transparente: la pestaña del navegador
+    puede ser clara u oscura y un trazo dorado sobre nada desaparece en una de
+    las dos.
+  -->
+  <rect width="32" height="32" rx="7" fill="#1c1714" />
+  <text
+    x="16"
+    y="22.5"
+    text-anchor="middle"
+    font-family="Cormorant Garamond, Playfair Display, Georgia, serif"
+    font-size="21"
+    font-weight="600"
+    fill="#ac8231"
+  >G</text>
+</svg>
