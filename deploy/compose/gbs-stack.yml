@@ -83,6 +83,10 @@ services:
     container_name: gbs-admin-migrate
     command: ["node", "scripts/migrate.js"]
     restart: "no"
+    # Igual que el reconcile: la sonda horneada en la imagen consulta un
+    # servidor HTTP que este contenedor no levanta.
+    healthcheck:
+      disable: true
     environment:
       TZ: America/Bogota
       NODE_ENV: production
@@ -368,16 +372,27 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+    # **La imagen trae un HEALTHCHECK horneado** que consulta
+    # `/admin/api/health`, y este contenedor no levanta ningún servidor HTTP:
+    # sin desactivarlo, Docker lo marca `unhealthy` para siempre aunque el job
+    # esté perfecto. Un contenedor en rojo que en realidad está bien es peor que
+    # no tener sonda: enseña a ignorar los rojos.
+    healthcheck:
+      disable: true
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -u
+        # Una línea al arrancar: sin esto el contenedor no escribe nada hasta la
+        # primera corrida y no hay forma de distinguir "esperando" de "colgado".
+        echo "reconcile: en pie. Corre todos los días a las $${RECONCILE_AT} (hora de Bogotá)."
         # 03:45, después del respaldo de las 03:15: si el reconcile escribiera
         # filas nuevas justo antes del dump, el respaldo de esa noche las
         # tendría a medias.
         while true; do
           now=$$(date +%H:%M)
           if [ "$${now}" = "$${RECONCILE_AT}" ]; then
+            echo "reconcile: arrancando la corrida de las $${now}."
             node scripts/reconcile.js
             sleep 60
           fi
