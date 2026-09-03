@@ -121,6 +121,23 @@ export function checkWorkspaceClaims(
     return { ok: false, reason: "dominio" };
   }
 
+  // **El `hd` tiene que corresponderse con el correo.**
+  //
+  // Sin esta comprobación, un token con `email: lina@gmail.com` y
+  // `hd: goldenbeautystudio.com.co` pasaba la compuerta: el código leía `hd`
+  // como un valor suelto y nunca lo cruzaba con el dominio del correo. Hoy
+  // Google no emite `hd` en cuentas de Gmail, así que no era explotable por el
+  // camino normal — pero la defensa no estaba donde el resto del sistema cree
+  // que está, y la tercera compuerta tampoco lo habría atajado: las técnicas
+  // entran con correo personal y viven en la misma `allowed_user`.
+  //
+  // Encontrado por `gbs-money-auditor` (H6). El test que decía cubrirlo pasaba
+  // solo porque Google no manda el claim, no porque el código lo verificara.
+  const emailDomain = email.slice(email.lastIndexOf("@") + 1);
+  if (emailDomain !== domain) {
+    return { ok: false, reason: "dominio" };
+  }
+
   // `=== true` y no una verdad blanda: la cadena `"false"` es verdadera en
   // JavaScript, y ese es justo el valor que un proveedor mal parseado manda.
   if (claims.email_verified !== true) {

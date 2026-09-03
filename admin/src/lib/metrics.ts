@@ -364,10 +364,29 @@ export function retentionRate(
         eaLocalToInstant(visit.at).getTime() <= deadlineMs,
     );
 
+    // **Una cohorte cuya ventana todavía no se cumplió está pendiente, haya
+    // vuelto o no.**
+    //
+    // El filtro se aplicaba solo a quien *no* había vuelto: quien ya volvió
+    // entraba a `returned` de inmediato y el denominador solo contaba a los
+    // resueltos. Resultado: un periodo recién cerrado arrancaba cerca del
+    // 100 % y **empeoraba solo** a medida que vencían las ventanas de los
+    // demás. La misma cohorte congelada daba 100 % en febrero y 50 % en abril
+    // sin que cambiara un solo dato — que es justo lo que el comentario de
+    // arriba dice que `pending` viene a evitar: "un número que se mueve sin que
+    // nadie haga nada es un número en el que nadie va a confiar".
+    //
+    // Volver antes de tiempo sí es información, y no se pierde: sale en
+    // `returned`. Lo que no se hace es meterla en una tasa que todavía no se
+    // puede calcular. Encontrado por `gbs-money-auditor` (H4).
+    if (deadlineMs > nowMs) {
+      pending += 1;
+      if (cameBack) returned += 1;
+      continue;
+    }
+
     if (cameBack) {
       returned += 1;
-    } else if (deadlineMs > nowMs) {
-      pending += 1;
     }
   }
 

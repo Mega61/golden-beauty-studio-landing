@@ -261,6 +261,21 @@ export function ticketFromEnteredTotal(
   items: readonly TicketItemInput[],
   enteredAmount: Cop,
   tip: Cop = 0,
+  /**
+   * El motivo de la variación. **Obligatorio si el total ingresado queda por
+   * debajo del precio de lista**, que es el caso para el que esta función
+   * existe.
+   *
+   * Antes no estaba: la función derivaba el descuento y devolvía la cuenta sin
+   * pasar por `validateTicketClose()`, así que **el camino que el plan describe
+   * como *el* que abre el motivo era justo el que no lo exigía** — tocar el
+   * total y escribir menos guardaba sin dar explicación. Las dos funciones no
+   * estaban compuestas. Encontrado por `gbs-money-auditor` (H5).
+   */
+  variance?: {
+    varianceReasonCode?: VarianceReasonCode | null;
+    varianceReason?: string | null;
+  },
 ): TicketTotals {
   assertPesos(enteredAmount, "El total ingresado");
 
@@ -273,7 +288,16 @@ export function ticketFromEnteredTotal(
     );
   }
 
-  return computeTicketTotals(items, priced.subtotal - enteredAmount, tip);
+  // Se cierra por la misma puerta que todo lo demás. Que la variación se
+  // exprese como un total escrito a mano en vez de como un campo `discount` no
+  // la vuelve otra cosa.
+  return validateTicketClose({
+    items,
+    discount: priced.subtotal - enteredAmount,
+    tip,
+    varianceReasonCode: variance?.varianceReasonCode ?? null,
+    varianceReason: variance?.varianceReason ?? null,
+  });
 }
 
 /** Lo que la técnica manda al tocar "Guardar". */
@@ -301,10 +325,34 @@ export type TicketCloseInput = {
 export function validateTicketClose(input: TicketCloseInput): TicketTotals {
   const totals = computeTicketTotals(input.items, input.discount ?? 0, input.tip ?? 0);
 
-  if (totals.discount > 0 && !input.varianceReasonCode) {
+  // **La compuerta mira lo cobrado contra el precio de lista, no el campo
+  // `discount`.**
+  //
+  // Mirando solo `discount` había dos formas de bajar el total sin dar motivo,
+  // y las dos son las que la técnica usa de verdad:
+  //
+  // 1. Tocar el total y escribir menos. `ticketFromEnteredTotal()` deriva el
+  //    descuento y devuelve la cuenta ya armada, sin pasar nunca por acá — las
+  //    dos funciones no estaban compuestas.
+  // 2. Agregar un renglón negativo. `discount` queda en 0 y la compuerta ni se
+  //    entera, aunque el cobro haya bajado 30.000.
+  //
+  // El precio de lista es lo que suman los renglones **positivos**: el trabajo
+  // que se hizo, a la tarifa del catálogo. Un renglón negativo no es trabajo,
+  // es una rebaja escrita como renglón, y por eso queda del lado de la
+  // variación y no del lado de la lista. La diferencia contra lo cobrado es la
+  // variación real, venga por el campo `discount`, por un total escrito a mano
+  // o por un renglón que resta. Encontrado por `gbs-money-auditor` (H5).
+  const listTotal = totals.lines.reduce(
+    (sum, line) => (line.lineTotal > 0 ? sum + line.lineTotal : sum),
+    0,
+  );
+  const belowList = listTotal - totals.amountCharged;
+
+  if (belowList > 0 && !input.varianceReasonCode) {
     throw new TicketError(
-      `Se cobró ${totals.discount} menos que el precio de lista y no hay motivo. ` +
-        "Un descuento sin motivo no se guarda.",
+      `Se cobró ${belowList} menos que el precio de lista y no hay motivo. ` +
+        "Una variación sin motivo no se guarda.",
     );
   }
 

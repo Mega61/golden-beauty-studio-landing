@@ -202,5 +202,35 @@ export function buildIngestAdjustment(
 export function buildDayClosePayments(
   finances: readonly FinanceForIngest[],
 ): IngestPayment[] {
-  return finances.map((finance) => buildIngestPayment(finance));
+  const payments = finances.map((finance) => buildIngestPayment(finance));
+
+  // **Dos movimientos con el mismo `imported_id` no pueden salir en el mismo
+  // lote.** Actual Budget deduplica por esa llave y se come el segundo **en
+  // silencio**: no hay error, no hay fila, y la plata simplemente no está.
+  //
+  // Es la única función que construye un *conjunto* de esas llaves, así que es
+  // la única que puede comprobarlo. Hoy la UNIQUE de `appointment_finance` lo
+  // hace inalcanzable desde la consulta del cierre, pero esta función recibe un
+  // arreglo, no una consulta — y el día que alguien la llame con un reproceso
+  // armado a mano, esta línea es lo que separa "falla ruidosa" de "faltan
+  // 200.000 pesos en Actual y nadie sabe desde cuándo".
+  //
+  // Encontrado por `gbs-money-auditor` (H7).
+  const seen = new Map<string, number>();
+
+  for (const [index, payment] of payments.entries()) {
+    const previous = seen.get(payment.imported_id);
+
+    if (previous !== undefined) {
+      throw new IngestPayloadError(
+        `El lote del cierre trae dos movimientos con el mismo imported_id ` +
+          `(${payment.imported_id}): posiciones ${previous} y ${index}. ` +
+          "Actual descartaría el segundo sin avisar.",
+      );
+    }
+
+    seen.set(payment.imported_id, index);
+  }
+
+  return payments;
 }

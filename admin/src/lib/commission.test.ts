@@ -223,6 +223,27 @@ describe("applies_to — principal, adicionales, ambos", () => {
   });
 });
 
+describe("applyRule — el signo de la base manda", () => {
+  // Los tres casos del arreglo de H3. Un fijo no puede pagar por un trabajo que
+  // se anuló, ni abstenerse cuando el cobro original ya pagó.
+  const fijo = { id: 1, kind: "fixed" as const, fixedAmount: 5_000, percentBp: null };
+
+  it("base positiva paga el fijo entero", () => {
+    expect(applyRule(fijo, 50_000)).toEqual({ amount: 5_000, rateBp: null });
+  });
+
+  it("base exactamente cero no paga: no hubo trabajo que remunerar", () => {
+    expect(applyRule(fijo, 0)).toEqual({ amount: 0, rateBp: null });
+  });
+
+  it("base negativa devuelve el fijo, para que la corrección cancele el cobro", () => {
+    expect(applyRule(fijo, -50_000)).toEqual({ amount: -5_000, rateBp: null });
+    // Cobro y ajuste suman exactamente cero, que es lo que una corrección
+    // significa. Con el comportamiento anterior sumaban +10.000.
+    expect(applyRule(fijo, 50_000).amount + applyRule(fijo, -50_000).amount).toBe(0);
+  });
+});
+
 describe("applyRule — porcentaje y monto fijo", () => {
   it("porcentaje en puntos básicos, redondeado a pesos por renglón", () => {
     // 12,5 % es la razón de que las tasas sean bp y no un entero 0–100.

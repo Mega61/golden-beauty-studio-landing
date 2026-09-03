@@ -406,7 +406,16 @@ export function verifyTotpCode(params: {
 
   for (let delta = -TOTP_SKEW_STEPS; delta <= TOTP_SKEW_STEPS; delta += 1) {
     const candidate = current + delta;
-    // Sin `break`: se recorre siempre la ventana entera.
+
+    // Un `step` negativo solo aparece con el reloj en los primeros 30 segundos
+    // de 1970 — un contenedor recién arrancado sin NTP, una prueba con `new
+    // Date(0)`. `hotp()` lo pasa a `writeBigUInt64BE`, que lanza `RangeError`, y
+    // el login contestaría **500 en vez de "código incorrecto"**: un error de
+    // servidor donde correspondía un rechazo. Se salta el candidato imposible y
+    // la ventana sigue recorriéndose entera, sin `break`, para no filtrar por
+    // tiempo cuál fue el que coincidió. Encontrado por `gbs-money-auditor` (H8).
+    if (candidate < 0) continue;
+
     if (equalsConstantTime(hotp(secret, candidate), normalized)) {
       matched = candidate;
     }

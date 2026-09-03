@@ -97,16 +97,36 @@ export function allocateByWeights(amount: Cop, weights: readonly number[]): Cop[
     );
   }
 
-  // Cuota exacta de cada parte = amount * weight / totalWeight, en aritmética
-  // entera: `floor` da el entero, y `numerador − floor * totalWeight` da el
-  // residuo sin tocar un solo float. `Math.floor` redondea hacia −∞ también
-  // para negativos, que es justo lo que mantiene el residuo en `[0, n)`.
+  // **El reparto es simétrico respecto del signo: repartir −a es repartir a
+  // con el signo cambiado.**
+  //
+  // Antes no lo era. El residuo se asignaba "mayor residuo, desempate por
+  // índice ascendente" en los dos sentidos, así que un combo de precio impar
+  // repartido 50/50 daba `{47501, 47500}` al cobrar y `{−47500, −47501}` al
+  // corregir: el total cancelaba, pero **quedaba +1 peso pegado a manos y −1 a
+  // pies, para siempre y sin marca**. Con `allocateByWeights` compartido por el
+  // prorrateo del ticket, el reparto del combo y la comisión entre dos
+  // técnicas, el mismo peso fantasma aparecía en tres reportes distintos.
+  //
+  // Se resuelve repartiendo siempre el valor absoluto y devolviéndole el signo
+  // al final, que es también lo que elimina el `-0` que `Math.floor(-0/W)`
+  // producía y que se colaba hasta `commission_entry` — `roundPesos()` ya lo
+  // atajaba, pero la salida de esta función no pasa por ahí.
+  //
+  // Encontrado por `gbs-money-auditor` (H1 y H1b).
+  const sign = amount < 0 ? -1 : 1;
+  const magnitude = Math.abs(amount);
+
+  // Cuota exacta de cada parte = magnitude * weight / totalWeight, en
+  // aritmética entera: `floor` da el entero, y `numerador − floor * totalWeight`
+  // da el residuo sin tocar un solo float. Con el monto ya en positivo, el
+  // residuo cae en `[0, n)` por construcción.
   const shares: Cop[] = [];
   const remainders: number[] = [];
   let assigned = 0;
 
   for (const weight of weights) {
-    const numerator = amount * weight;
+    const numerator = magnitude * weight;
     assertSafeInteger(numerator, "El producto monto × peso");
 
     const share = Math.floor(numerator / totalWeight);
@@ -117,7 +137,7 @@ export function allocateByWeights(amount: Cop, weights: readonly number[]): Cop[
   }
 
   // Cuántos pesos quedaron sin repartir. Por construcción está en `[0, n)`.
-  const leftover = amount - assigned;
+  const leftover = magnitude - assigned;
 
   // Se reparten de a uno entre las partes de mayor residuo. El desempate por
   // índice ascendente es lo que hace el resultado reproducible: sin él, dos
@@ -131,7 +151,11 @@ export function allocateByWeights(amount: Cop, weights: readonly number[]): Cop[
     shares[order[i].index] += 1;
   }
 
-  return shares;
+  // El signo se devuelve al final. `sign * 0` es `0` cuando `sign` es 1 y `-0`
+  // cuando es −1, así que las partes en cero se dejan explícitamente en `+0`:
+  // un `-0` en una fila de `commission_entry` o en un reporte es un valor que
+  // se imprime distinto y compara igual, que es la peor combinación posible.
+  return shares.map((share) => (share === 0 ? 0 : sign * share));
 }
 
 /** Las dos mitades de un combo, ya en pesos enteros. */

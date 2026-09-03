@@ -263,8 +263,16 @@ describe("assertTicketInvariant", () => {
 });
 
 describe("ticketFromEnteredTotal — la técnica edita el total", () => {
-  it("un total menor se guarda como descuento", () => {
-    const totals = ticketFromEnteredTotal([servicio(115_000), adicional(DESIGN_PER_NAIL, 3)], 130_000);
+  it("un total menor se guarda como descuento, con su motivo", () => {
+    // El motivo dejó de ser opcional en este camino: bajar el total escribiendo
+    // menos es exactamente la variación que § Independencia con rastro exige
+    // justificar, y antes era el único camino que se la saltaba (H5).
+    const totals = ticketFromEnteredTotal(
+      [servicio(115_000), adicional(DESIGN_PER_NAIL, 3)],
+      130_000,
+      0,
+      { varianceReasonCode: "cortesia" },
+    );
 
     expect(totals.subtotal).toBe(145_000);
     expect(totals.discount).toBe(15_000);

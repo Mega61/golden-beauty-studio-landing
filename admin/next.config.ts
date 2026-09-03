@@ -28,6 +28,39 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   basePath: "/admin",
 
+  /**
+   * Los orígenes desde los que se aceptan Server Actions.
+   *
+   * **Sin esto, ningún botón del panel funciona en producción.** Next protege
+   * las Server Actions contra CSRF comparando el header `Origin` con el `Host`,
+   * y detrás del rewrite esos dos valores nunca coinciden: el navegador manda
+   * `Origin: https://www.goldenbeautystudio.com.co` y el contenedor recibe
+   * `Host: panel.goldenbeautystudio.com.co`. Next rechaza la acción, y lo que la
+   * persona ve es *"A server error occurred"* sin una sola pista de por qué —
+   * el endpoint de auth responde perfecto, la página carga, y solo el botón
+   * falla.
+   *
+   * Es la contrapartida exacta del `basePath`: las dos existen porque el panel
+   * se sirve en un dominio y se ejecuta en otro. La documentación de Next lo
+   * llama por su nombre — "reverse proxies or multi-layered backend
+   * architectures" (`docs/01-app/02-guides/data-security.md`).
+   *
+   * La lista es explícita a propósito, sin comodines: son los dos hosts
+   * públicos reales más los de desarrollo. Un `*` acá desactivaría la
+   * protección CSRF que esta opción viene a reconfigurar, no a apagar.
+   */
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        "www.goldenbeautystudio.com.co",
+        "goldenbeautystudio.com.co",
+        "panel.goldenbeautystudio.com.co",
+        "localhost:3000",
+        "localhost:3001",
+      ],
+    },
+  },
+
   // Deja el build en `.next/standalone`, con solo los archivos que el runtime
   // necesita. La imagen de Docker lo copia junto con `public/` y
   // `.next/static`, que standalone NO copia solo (paquete A4).

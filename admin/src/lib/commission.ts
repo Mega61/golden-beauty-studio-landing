@@ -324,6 +324,32 @@ export function applyRule(rule: CommissionRuleInput, baseAmount: Cop): { amount:
     );
   }
 
+  // **El fijo sigue el signo de la base.**
+  //
+  // El mecanismo de corrección del plan es un renglón nuevo que resta. Con un
+  // porcentaje eso sale solo —base negativa, comisión negativa—, pero un monto
+  // fijo devolvía su valor entero sin mirar el signo: un cobro de 50.000 y su
+  // ajuste de −50.000 dejaban la quincena con base 0 y comisión **+10.000**.
+  // Pagar dos veces por un trabajo que se anuló.
+  //
+  // Devolver cero tampoco alcanza —lo intenté— porque el cobro original ya pagó
+  // sus 5.000 y la corrección tiene que **deshacerlos**, no abstenerse. Con el
+  // signo espejado, cobro y ajuste suman exactamente cero, que es lo que una
+  // corrección significa.
+  //
+  // Base exactamente cero sí paga cero: no hubo trabajo que remunerar.
+  // Encontrado por `gbs-money-auditor` (H3).
+  if (baseAmount === 0) {
+    return { amount: 0, rateBp: null };
+  }
+
+  if (baseAmount < 0) {
+    return { amount: -rule.fixedAmount, rateBp: null };
+  }
+
+  // Reparto del fijo entre quienes trabajaron el renglón — ver `shareOfFixed`
+  // en el llamador. Acá se devuelve el fijo completo; partirlo es
+  // responsabilidad de quien conoce las asignaciones.
   return { amount: rule.fixedAmount, rateBp: null };
 }
 
@@ -348,6 +374,20 @@ function splitBase(baseAmount: Cop, assignments: readonly LineAssignment[]): Cop
   }
 
   return allocateByWeights(baseAmount, assignments.map((a) => a.shareBp));
+}
+
+/**
+ * Reparte un monto **fijo** entre quienes trabajaron el renglón.
+ *
+ * Mismo algoritmo y mismos pesos que `splitBase`, a propósito: si la base se
+ * parte 60/40, el fijo también, y las dos particiones cuentan la misma
+ * historia en la liquidación. Suma exacta garantizada por `allocateByWeights`.
+ */
+function fixedShares(
+  fixedAmount: Cop,
+  assignments: readonly LineAssignment[],
+): Cop[] {
+  return allocateByWeights(fixedAmount, assignments.map((a) => a.shareBp));
 }
 
 /** Un renglón con quién lo trabajó. Es la unidad de entrada del motor. */
@@ -401,7 +441,22 @@ export function computeCommissions(
         ruleId: rule.id,
         baseAmount,
         rateBp,
-        amount,
+        // **Un fijo se reparte entre las asignaciones, no se paga por cada una.**
+        //
+        // "Un `fixed` paga una vez por renglón" tenía un solo eje cubierto —la
+        // cantidad—, y el otro es el combo a cuatro manos que el plan describe
+        // en § Combos: con dos técnicas, un fijo de 5.000 pagaba 5.000 **a cada
+        // una**. `splitBase` se toma el trabajo de partir la base con reparto
+        // exacto y `applyRule` la ignoraba por completo.
+        //
+        // Se reparte con el mismo `allocateByWeights` que la base, así que las
+        // partes suman exacto al fijo y el peso de residuo no se pierde ni se
+        // duplica. Con una sola asignación es el fijo entero, que es el caso de
+        // todos los días. Encontrado por `gbs-money-auditor` (H2).
+        amount:
+          rule.kind === "fixed" && assignments.length > 1
+            ? fixedShares(amount, assignments)[index]
+            : amount,
         flagged: flag !== null,
         flag,
       });
