@@ -187,7 +187,7 @@ En Google Cloud, sobre un proyecto de la organización de Workspace:
 - URIs de redirección autorizadas — registra las tres desde el principio:
   - `http://localhost:3001/admin/api/auth/callback/google` (desarrollo directo)
   - `http://localhost:3000/admin/api/auth/callback/google` (desarrollo vía rewrite)
-  - `https://goldenbeautystudio.com.co/admin/api/auth/callback/google` (producción)
+  - `https://www.goldenbeautystudio.com.co/admin/api/auth/callback/google` (producción — **con `www`**, que es el host canónico)
 
 ## Tests
 

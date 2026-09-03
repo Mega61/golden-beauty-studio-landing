@@ -335,7 +335,7 @@ En la misma pantalla, **Environment variables**. Ninguna de estas entra al repo;
 | `EA_WEBHOOK_SECRET_HEADER` | `X-GBS-Webhook` |
 | `EA_WEBHOOK_SECRET_TOKEN` | secreto aleatorio, el mismo que se configure en EA |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
-| `BETTER_AUTH_URL` | `https://goldenbeautystudio.com.co/admin` |
+| `BETTER_AUTH_URL` | `https://www.goldenbeautystudio.com.co/admin` — **con `www`**, ver abajo |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | consola de Google Cloud, pantalla **Internal** |
 | `GOOGLE_WORKSPACE_DOMAIN` | `goldenbeautystudio.com.co` |
 | `TOTP_ENC_KEY` | `openssl rand -base64 32` |
@@ -474,7 +474,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://panel.goldenbeautystudio.com.co
 Si alguien abre `https://panel.goldenbeautystudio.com.co/admin` en el
 navegador, va a ver la aplicación pero **no va a poder iniciar sesión**:
 
-- `BETTER_AUTH_URL` está fijada a `https://goldenbeautystudio.com.co/admin`, así
+- `BETTER_AUTH_URL` está fijada a `https://www.goldenbeautystudio.com.co/admin`, así
   que el flujo de OAuth arranca y vuelve al dominio público, no al subdominio.
 - La cookie de sesión queda asociada al dominio público. Desde el subdominio no
   se envía, y la sesión no existe.

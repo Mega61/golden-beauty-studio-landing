@@ -450,7 +450,7 @@ Un servicio más del stack, `db-backup`, con `mysqldump` de **los dos** esquemas
 
 - **`baseURL` seteado explícitamente**, nunca derivado: detrás del rewrite el `Host` upstream es el
   origen de la VM. Igual para `trustedOrigins`.
-- Redirect URI `https://goldenbeautystudio.com.co/admin/api/auth/callback/google`.
+- Redirect URI `https://www.goldenbeautystudio.com.co/admin/api/auth/callback/google` — **con `www`**: el apex hace 307 a `www`, que es el host canónico. Sin el `www`, Google redirige al apex, el apex redirige a `www`, y la cookie de sesión —que es host-only— se queda en el host equivocado. El login falla de una forma que parece de Google y no lo es.
 
 ⚠ **Dos correcciones que B2 verificó en la fuente de Better Auth, y que este documento tenía mal:**
 
