@@ -268,7 +268,7 @@ function assertFieldsAreDecodable(resource: EaMappedResource, fields?: readonly 
   if (missing.length > 0) {
     throw new EaApiError(
       `Un "fields=" de ${resource} sin ${missing.join(", ")} devuelve registros que no se pueden ` +
-        "decodificar. Agregalos, o usa el acceso crudo.",
+        "decodificar. Agrégalos, o usa el acceso crudo.",
       { kind: "bad_request" },
     );
   }
@@ -667,6 +667,107 @@ export function decodeAppointmentWithRelations(raw: ApiShape): AppointmentWithRe
     provider: provider ? EA_CODECS.providers.fromRow(provider) : null,
     customer: customer ? EA_CODECS.customers.fromRow(customer) : null,
   };
+}
+
+/** Tope de páginas al listar un día. Un día del estudio no llega ni a una. */
+const DAY_MAX_PAGES = 20;
+const DAY_PAGE_LENGTH = 100;
+
+export type DayAppointmentsQuery = {
+  /** El día del **estudio**, en hora de pared. */
+  date: EaLocalDate;
+  /** Recorte a una técnica. `null` o ausente = todas. */
+  providerId?: number | null;
+  /**
+   * Relaciones a adjuntar. Cada pantalla pide las que dibuja y no más: Caja no
+   * necesita el servicio, y pedirlo sería una consulta por cita en EA para
+   * después tirar el dato.
+   */
+  with?: readonly string[];
+  maxPages?: number;
+  pageLength?: number;
+};
+
+/**
+ * Las citas de **un día**, con sus relaciones adjuntas.
+ *
+ * El loader compartido de las pantallas que muestran una jornada: Hoy y Caja.
+ * Antes había una copia en cada una —los mismos veinticinco renglones de
+ * disciplina de paginación— y la duplicación se sostenía solo porque ninguna de
+ * las dos era dueña de este archivo.
+ *
+ * ## Por qué va por el acceso crudo y no por `appointments.list()`
+ *
+ * Porque las relaciones que EA adjunta con `with=` vienen en **snake_case**:
+ * `Appointments_model::load()` hace un `get_where(...)->row_array()` y pega la
+ * fila de MySQL tal cual, sin pasar por `api_encode()`. El codec tipado del
+ * listado las descartaría; `decodeAppointmentWithRelations()` es el que sabe
+ * leer esa mezcla. Es lo que evita el N+1 de pedir cada clienta por su lado.
+ *
+ * ## La paginación se agota o **lanza**
+ *
+ * `Api::$default_length` de EA vale **20** y la respuesta no trae ninguna señal
+ * de que falten registros —es un arreglo pelado, sin total, sin `next`, sin
+ * `Link`—: un día al que le falta una cita se ve exactamente igual que uno
+ * completo. En Hoy eso sería una clienta invisible; en Caja, cerrar el día sin
+ * una cuenta que sí existía. Se pide de a 100 hasta que una página venga
+ * incompleta, y si se agotan las páginas se aborta en vez de devolver medio
+ * día.
+ *
+ * ## Los bloqueos no entran, y no hace falta filtrarlos
+ *
+ * Una indisponibilidad de técnica vive en la **misma tabla** que las citas
+ * (`is_unavailability = 1`), así que la pregunta es legítima. La respuesta está
+ * en la fuente de EA 1.6.0, que es la versión pineada en la VM:
+ * `Appointments_api_v1::index()` llama a `Appointments_model::get()`, y ése hace
+ * `get_where('appointments', ['is_unavailability' => false], …)`. **El filtro es
+ * de EA**, no nuestro, y este listado nunca trae bloqueos. Verificado en el
+ * modelo, no supuesto — y no se puede filtrar de este lado ni queriendo: el
+ * campo no viaja en la respuesta de la API.
+ *
+ * ## Las horas no pasan por `Date`
+ *
+ * Vuelven como las devuelve el codec: cadenas de **hora de pared**
+ * (`"YYYY-MM-DD HH:MM:SS"`), que es el tipo canónico del dominio. EA guarda
+ * datetimes locales sin zona; convertirlas a `Date` y volver a formatearlas
+ * mete dos conversiones de zona donde no hacía falta ninguna, y ahí nace el bug
+ * de cinco horas. La fecha del parámetro tampoco: se manda tal cual.
+ */
+export async function listDayAppointments(
+  ea: Pick<EaClient, "raw">,
+  query: DayAppointmentsQuery,
+): Promise<AppointmentWithRelations[]> {
+  const maxPages = query.maxPages ?? DAY_MAX_PAGES;
+  const pageLength = query.pageLength ?? DAY_PAGE_LENGTH;
+  const out: AppointmentWithRelations[] = [];
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const params = buildListParams({ with: query.with });
+    params.set("date", query.date);
+    if (query.providerId !== null && query.providerId !== undefined) {
+      params.set("providerId", String(query.providerId));
+    }
+    params.set("page", String(page));
+    params.set("length", String(pageLength));
+
+    const payload = await ea.raw({ method: "GET", path: "appointments", params });
+
+    if (!Array.isArray(payload)) {
+      throw new Error("EA devolvió algo que no es una lista de citas");
+    }
+
+    for (const raw of payload) {
+      out.push(decodeAppointmentWithRelations(raw as ApiShape));
+    }
+
+    // Página incompleta = se acabó. Es la única señal que EA da.
+    if (payload.length < pageLength) return out;
+  }
+
+  throw new Error(
+    `Las citas de ${query.date} superaron ${maxPages} páginas de ${pageLength}. ` +
+      "Se aborta en vez de devolver medio día.",
+  );
 }
 
 /** Reexportado para que quien registre un log pueda tachar el token. */

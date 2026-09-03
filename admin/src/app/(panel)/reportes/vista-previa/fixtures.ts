@@ -134,6 +134,7 @@ function itemsOf(row: Row): FinanceItemRow[] {
       qty: 1,
       unitPrice: row.service,
       lineTotal: row.service,
+      note: null,
     },
   ];
 
@@ -145,6 +146,7 @@ function itemsOf(row: Row): FinanceItemRow[] {
       qty: 1,
       unitPrice: row.extras,
       lineTotal: row.extras,
+      note: null,
     });
   }
 

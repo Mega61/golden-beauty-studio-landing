@@ -149,7 +149,7 @@ export function getDb(): Kysely<Database> {
 }
 
 /**
- * Conexión de **solo lectura** a `easyappointments`, para los reportes.
+ * Crea un pool de **solo lectura** a `easyappointments`, para los reportes.
  *
  * Se lee directo y no por la API REST porque el camino caliente — agenda, caja,
  * comisiones, reportes — hace agregación SQL sobre las citas, y la API de EA no
@@ -161,6 +161,16 @@ export function getDb(): Kysely<Database> {
  * acá sería inventar un contrato sobre una base que no es nuestra y que puede
  * cambiar en un upgrade. Los reportes que la usen escriben su SQL y lo cubre la
  * suite de contrato (capa 3).
+ *
+ * **Pasa por `createPool()` y eso no es un detalle de estilo.** De ahí sale el
+ * `SET time_zone = '-05:00'` en el evento `connection`: `mysql-transversal`
+ * corre en UTC y EA guarda sus `DATETIME` en hora de pared de Bogotá, así que
+ * un pool sin esa línea devolvería cada hora de cita **cinco horas corrida**,
+ * sin error y sin nada que lo delate hasta que un reporte no cuadre. Cualquier
+ * pool nuevo hacia cualquiera de los dos esquemas se construye acá.
+ *
+ * Devuelve un pool nuevo en cada llamada, a propósito: es la fábrica. Lo que la
+ * aplicación usa es `getEaReadOnlyPool()`, que memoiza uno por proceso.
  */
 export function createEaReadOnlyPool(
   env: NodeJS.ProcessEnv = process.env,
@@ -175,4 +185,34 @@ export function createEaReadOnlyPool(
     );
   }
   return createPool(url, { connectionLimit: 5 });
+}
+
+let eaReadOnlySingleton: Pool | null = null;
+
+/**
+ * El pool de solo lectura de EA, **uno por proceso**.
+ *
+ * Es a `createEaReadOnlyPool()` lo que `getDb()` es a `createDb()`, y por la
+ * misma razón de fondo más una propia:
+ *
+ * - **Perezoso**, porque importar este módulo no puede exigir que
+ *   `DATABASE_URL_EA_RO` exista: `next build` importa módulos para analizarlos
+ *   y corre sin las variables del stack.
+ * - **Memoizado**, porque cada pool abre hasta cinco conexiones y
+ *   `mysql-transversal` es un servidor **compartido con otras aplicaciones**.
+ *   Un pool por llamada significaba cinco conexiones más cada vez que alguien
+ *   refresca Reportes o Diagnóstico, hasta agotar `max_connections` y dejar sin
+ *   cupo a las demás aplicaciones del servidor. La memoización vivía en
+ *   `(panel)/reportes/ea-sql.ts`; acá cubre a todos los llamadores en vez de al
+ *   primero que se acordó.
+ *
+ * No se ofrece una forma de cerrarlo: vive lo que vive el proceso del servidor.
+ * Los jobs de consola, que sí arrancan y mueren, usan la fábrica y cierran lo
+ * que abrieron.
+ */
+export function getEaReadOnlyPool(): Pool {
+  if (!eaReadOnlySingleton) {
+    eaReadOnlySingleton = createEaReadOnlyPool();
+  }
+  return eaReadOnlySingleton;
 }

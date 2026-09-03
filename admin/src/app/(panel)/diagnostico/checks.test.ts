@@ -19,6 +19,7 @@ import {
   webhookTrafficCheck,
   worstLevel,
   type Check,
+  type JobRunFact,
   type RegisteredWebhook,
 } from "./checks";
 
@@ -336,29 +337,106 @@ describe("orphanCheck", () => {
 });
 
 describe("reconcileCheck", () => {
-  it("verde con rastro reciente", () => {
-    expect(reconcileCheck({ lastTouch: ago(6 * HOUR), now: NOW }).level).toBe("ok");
+  /** Una corrida terminada bien, hace `hours` horas. */
+  const corrida = (hours: number, over: Partial<JobRunFact> = {}): JobRunFact => ({
+    startedAt: ago(hours * HOUR),
+    finishedAt: ago(hours * HOUR),
+    ok: true,
+    summary: "41 citas revisadas · 0 creadas",
+    ...over,
   });
 
-  it("amarillo —nunca rojo— sin rastro o con rastro viejo", () => {
-    // El proxy no puede distinguir "no corrió" de "corrió y no había nada que
-    // hacer", y un rojo que se enciende solo en las semanas tranquilas es un
-    // rojo que se aprende a ignorar.
-    expect(reconcileCheck({ lastTouch: null, now: NOW }).level).toBe("warn");
-    expect(reconcileCheck({ lastTouch: ago(5 * DAY), now: NOW }).level).toBe("warn");
+  it("verde con una corrida reciente que terminó bien", () => {
+    expect(reconcileCheck({ lastRun: corrida(6), now: NOW }).level).toBe("ok");
   });
 
-  it("dice que es un indicio y que la señal exacta está pedida", () => {
-    const result = reconcileCheck({ lastTouch: ago(5 * DAY), now: NOW });
-    expect(result.detail).toContain("no deja marca");
-    expect(result.detail).toContain("pedida");
+  it("**verde aunque no haya reparado nada**: 'no había trabajo' ya se puede afirmar", () => {
+    // Es el cambio entero. Con el proxy —la marca de la última fila escrita—
+    // una noche tranquila no dejaba rastro y el renglón se ponía amarillo; con
+    // `job_run` la corrida consta igual.
+    const result = reconcileCheck({
+      lastRun: corrida(6, { summary: "0 citas revisadas · 0 creadas" }),
+      lastTouch: null,
+      now: NOW,
+    });
+
+    expect(result.level).toBe("ok");
+    expect(result.detail).toContain("noche tranquila");
+  });
+
+  it("**rojo** cuando no hay ninguna corrida: es 'no corrió', no 'no se sabe'", () => {
+    // Antes esto era amarillo por fuerza, porque el proxy no podía distinguir
+    // "no corrió" de "corrió y no había nada que hacer". Ahora sí.
+    const result = reconcileCheck({ lastRun: null, now: NOW });
+
+    expect(result.level).toBe("down");
+    expect(result.detail).toContain("admin-reconcile");
+    expect(result.lastSeen).toBe("nunca");
+  });
+
+  it("**rojo** cuando la última corrida falló, con su motivo", () => {
+    // "El cron está vivo y el trabajo se rompe" es un problema distinto de que
+    // no corra, y el detalle tiene que decir cuál de los dos es.
+    const result = reconcileCheck({
+      lastRun: corrida(2, { ok: false, summary: "EA no respondió en 10000 ms" }),
+      now: NOW,
+    });
+
+    expect(result.level).toBe("down");
+    expect(result.detail).toContain("EA no respondió");
+  });
+
+  it("**rojo** cuando la última corrida es vieja: el cron es diario", () => {
+    const result = reconcileCheck({ lastRun: corrida(5 * 24), now: NOW });
+
+    expect(result.level).toBe("down");
+    // Y lo dice sin la coartada del proxy: una corrida sin trabajo también deja
+    // constancia, así que esto no puede ser una racha tranquila.
+    expect(result.detail).toContain("No es una racha tranquila");
+  });
+
+  it("una marca de tiempo ilegible también es roja, no verde", () => {
+    // Una fila que no se puede fechar no prueba que el job corrió, y en este
+    // renglón la duda se resuelve del lado seguro.
+    const result = reconcileCheck({
+      lastRun: corrida(1, { startedAt: new Date(Number.NaN) }),
+      now: NOW,
+    });
+
+    expect(result.level).toBe("down");
+    expect(result.figure).toBeUndefined();
+  });
+
+  it("una corrida sin resumen no deja el detalle a medias", () => {
+    const result = reconcileCheck({ lastRun: corrida(1, { summary: null }), now: NOW });
+
+    expect(result.level).toBe("ok");
+    expect(result.detail).toContain("sin resumen");
   });
 
   it("el umbral se puede mover", () => {
-    expect(reconcileCheck({ lastTouch: ago(40 * HOUR), now: NOW }).level).toBe("warn");
-    expect(
-      reconcileCheck({ lastTouch: ago(40 * HOUR), staleHours: 72, now: NOW }).level,
-    ).toBe("ok");
+    expect(reconcileCheck({ lastRun: corrida(40), now: NOW }).level).toBe("down");
+    expect(reconcileCheck({ lastRun: corrida(40), staleHours: 72, now: NOW }).level).toBe(
+      "ok",
+    );
+  });
+
+  it("`lastTouch` es contexto y **no** decide el semáforo", () => {
+    // Es la mitad honesta del cambio: la marca de la última fila reparada sigue
+    // a la vista —"la última vez que hubo algo que reparar"— pero ya no puede
+    // pintar un rojo ni un verde por su cuenta.
+    const antigua = reconcileCheck({ lastRun: corrida(6), lastTouch: ago(30 * DAY), now: NOW });
+    const sinNada = reconcileCheck({ lastRun: corrida(6), lastTouch: null, now: NOW });
+
+    expect(antigua.level).toBe("ok");
+    expect(sinNada.level).toBe("ok");
+    expect(antigua.detail).toContain("hace 30 días");
+    expect(sinNada.detail).toContain("Todavía ninguna cuenta");
+  });
+
+  it("la última vez que se muestra es la de la corrida, no la de la fila", () => {
+    const result = reconcileCheck({ lastRun: corrida(2), lastTouch: ago(20 * DAY), now: NOW });
+    expect(result.lastSeen).toBe("hace 2 horas");
   });
 });
 

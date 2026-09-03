@@ -9,7 +9,7 @@
  *   eso es `lib/` (paquete B1), funciones puras con 100 % de cobertura de ramas.
  * - **Las escrituras a Easy!Appointments van siempre por su API REST**, nunca a
  *   sus tablas: es lo que dispara las notificaciones y el sync de Google
- *   Calendar. `createEaReadOnlyPool()` existe solo para los reportes, que
+ *   Calendar. `getEaReadOnlyPool()` existe solo para los reportes, que
  *   necesitan agregación SQL que la API de EA no ofrece.
  * - **Ninguna migración toca nada fuera de `gbs_admin`.** El esquema vive en un
  *   servidor MySQL compartido con otras aplicaciones.
@@ -20,6 +20,7 @@ export {
   createEaReadOnlyPool,
   createPool,
   getDb,
+  getEaReadOnlyPool,
   requireDatabaseUrl,
 } from "./client";
 export { isDuplicateKeyError } from "./errors";

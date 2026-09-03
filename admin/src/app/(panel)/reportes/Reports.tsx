@@ -19,6 +19,7 @@
 
 import { mapEaStatus } from "@/components/calendar";
 import { EmptyState, formatCOP, formatDuration } from "@/components/ui";
+import { stationHourOccupancy } from "@/lib/metrics";
 import {
   bookedVsPerformed,
   chairHourReport,
@@ -47,13 +48,7 @@ import {
 import styles from "./charts.module.css";
 import { DataView } from "./DataView";
 import { loadReports } from "./data";
-import {
-  occupancyByProvider,
-  slotLabel,
-  SLOTS,
-  stationHourOccupancy,
-  type SlotId,
-} from "./occupancy";
+import { occupancyByProvider, slotLabel, SLOTS, type SlotId } from "./occupancy";
 import { SERIES, statusColor } from "./palette";
 import { deltaAgainst, formatRate, NOT_MEASURABLE } from "./scale";
 
@@ -318,8 +313,10 @@ export function MonthlyReports({ data }: { data: Data }) {
     data.now,
   );
 
-  // Ocupación: `computeOccupancy()` de B1 por técnica, y la composición por
-  // hora de estación en `occupancy.ts`. Acá no se define nada.
+  // Ocupación: `computeOccupancy()` de B1 por técnica y
+  // `stationHourOccupancy()` por hora de puesto, las dos de `lib/metrics.ts`.
+  // Acá no se define nada; `occupancy.ts` solo traduce el plan de trabajo de EA
+  // a intervalos.
   const perProvider = occupancyByProvider(
     data.providers.map((provider) => ({
       eaProviderId: provider.id,

@@ -3,7 +3,14 @@ import "server-only";
 import type { Appointment, EaLocalDate } from "@/lib/ea";
 import { instantToEaDate } from "@/lib/ea";
 import { createEaClient, eaConfigFromEnv, type EaClient } from "@/lib/ea/client";
-import { createDb, createPool, requireDatabaseUrl, type Db } from "@/db";
+import {
+  createDb,
+  createPool,
+  JOB_RECONCILE,
+  repositories,
+  requireDatabaseUrl,
+  type Db,
+} from "@/db";
 
 import {
   createServicePriceCache,
@@ -114,6 +121,41 @@ function shiftDays(instant: Date, days: number): Date {
   return new Date(instant.getTime() + days * 86_400_000);
 }
 
+/** El reporte, en una línea legible. Es lo que queda en `job_run.summary`. */
+export function summarizeReconcile(report: ReconcileReport): string {
+  return (
+    `${report.from}→${report.till}: ${report.scanned} citas revisadas · ` +
+    `${report.created} creadas · ${report.repaired} reparadas · ` +
+    `${report.repriced} recongeladas · ${report.mirrored} espejadas · ` +
+    `${report.untouched} intactas · ${report.frozen} ya cerradas · ` +
+    `${report.fallback} en fallback`
+  );
+}
+
+/**
+ * Deja constancia de la corrida en `job_run`.
+ *
+ * **Es mejor esfuerzo, y a propósito.** Si esta escritura fallara —la tabla no
+ * está porque nadie corrió la migración, la base se cayó justo al final— el
+ * barrido ya hizo su trabajo y las filas de plata ya están: tumbar el job acá
+ * convertiría un problema de bitácora en una noche sin reconcile. Se grita por
+ * stderr, que es el único canal de este job, y Diagnóstico lo va a leer como
+ * "no corrió", que con la bitácora rota es la lectura conservadora correcta.
+ */
+async function recordRun(
+  db: Db,
+  input: { startedAt: Date; finishedAt: Date; ok: boolean; summary: string },
+): Promise<void> {
+  try {
+    await repositories(db).jobRuns.record({ job: JOB_RECONCILE, ...input });
+  } catch (error) {
+    console.error(
+      "reconcile: no se pudo registrar la corrida en job_run. El barrido sí corrió.",
+      error,
+    );
+  }
+}
+
 /**
  * Corre el reconcile sobre la ventana configurada.
  *
@@ -121,9 +163,47 @@ function shiftDays(instant: Date, days: number): Date {
  * el cron quiere un resumen en la salida, Diagnóstico quiere los números en
  * una tarjeta, y el test quiere afirmarlos. Un `console.log` no sirve para
  * ninguno de los tres.
+ *
+ * **Y además deja una fila en `job_run`**, que es otra cosa: el reporte se lo
+ * lleva quien llamó, la fila queda para quien pregunte mañana si esto corrió.
+ * Sin ella Diagnóstico solo podía mirar la marca de la última fila que el
+ * barrido escribió, y una noche sin nada que reparar no deja ninguna — así que
+ * una semana tranquila era indistinguible de un cron muerto. Se registran las
+ * dos formas de terminar: bien, y **fallando** (`ok = 0`), que no es lo mismo
+ * que no haber corrido.
  */
 export async function runReconcile(options: ReconcileOptions): Promise<ReconcileReport> {
   const startedAt = new Date();
+
+  let report: ReconcileReport;
+
+  try {
+    report = await scanAndFreeze(options, startedAt);
+  } catch (error) {
+    await recordRun(options.db, {
+      startedAt,
+      finishedAt: new Date(),
+      ok: false,
+      summary: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+
+  await recordRun(options.db, {
+    startedAt,
+    finishedAt: report.finishedAt,
+    ok: true,
+    summary: summarizeReconcile(report),
+  });
+
+  return report;
+}
+
+/** El barrido en sí. Lo llama `runReconcile()`, que es el que deja constancia. */
+async function scanAndFreeze(
+  options: ReconcileOptions,
+  startedAt: Date,
+): Promise<ReconcileReport> {
   const now = options.now ?? startedAt;
   const lookbackDays = options.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
   const lookaheadDays = options.lookaheadDays ?? DEFAULT_LOOKAHEAD_DAYS;

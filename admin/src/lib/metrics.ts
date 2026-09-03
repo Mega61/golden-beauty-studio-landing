@@ -169,6 +169,17 @@ export type Occupancy = {
   rate: number | null;
 };
 
+/**
+ * Ocupación de **una** técnica: qué parte de sus horas disponibles usó.
+ *
+ * ⚠ **Esta función fusiona los solapes** (`merge()`): dos citas encimadas
+ * ocupan la silla **una vez**. Para una técnica eso es lo correcto — atiende a
+ * una clienta a la vez— y para la capacidad del estudio es exactamente lo
+ * contrario de lo que hace falta: con dos estaciones, dos citas simultáneas
+ * ocupan **dos** puestos. Esa otra cuenta es `stationHourOccupancy()`, más
+ * abajo, y **las dos tienen que seguir existiendo**. No son una versión vieja y
+ * una nueva de lo mismo: son la ocupación de una persona y la de un local.
+ */
 export function computeOccupancy(input: OccupancyInput): Occupancy {
   const scheduled = merge(input.scheduled.map((i) => toRange(i, "Un tramo del plan de trabajo")));
   const blocked = merge(input.blocked.map((i) => toRange(i, "Un bloqueo")));
@@ -189,6 +200,129 @@ export function computeOccupancy(input: OccupancyInput): Occupancy {
     busyMinutes,
     overflowMinutes: totalMinutes(attended) - busyMinutes,
     rate: availableMinutes === 0 ? null : busyMinutes / availableMinutes,
+  };
+}
+
+// ── Ocupación por hora de estación ──────────────────────────────────────────
+
+/**
+ * Una jornada: cuándo se abrió y qué descansos tiene adentro.
+ *
+ * Los descansos van al **denominador** (como un bloqueo) y no restados del
+ * plan: es la misma cuenta, y así el reporte puede mostrar aparte cuántos
+ * minutos del día eran descanso.
+ *
+ * La arma quien sepa traducir el `working_plan` de EA — hoy
+ * `(panel)/reportes/occupancy.ts`, que es un mapeo de EA y no una métrica. Acá
+ * entra como dato.
+ */
+export type ScheduleWindow = {
+  open: readonly Interval[];
+  breaks: readonly Interval[];
+};
+
+export type StationOccupancy = {
+  /** Puestos del estudio. Hoy son dos. */
+  stations: number;
+  /**
+   * Minutos en que el estudio **estuvo abierto**: la unión de las jornadas de
+   * todas las técnicas, menos bloqueos. Unión y no suma: dos técnicas en el
+   * mismo turno son un turno, no dos.
+   */
+  openMinutes: number;
+  /** `stations × openMinutes`. La capacidad real del negocio. */
+  capacityMinutes: number;
+  /**
+   * Minutos de puesto usados: la **suma** de los minutos atendidos de cada
+   * técnica. Acá no se fusiona — dos citas simultáneas ocupan dos puestos, y
+   * fusionarlas es justo el error que hace que "¿me cabe otra técnica?" se
+   * responda mal.
+   */
+  usedMinutes: number;
+  /** `used / capacity`. `null` si el estudio no abrió: no es 0 %, es nada. */
+  rate: number | null;
+  /**
+   * Minutos usados **por encima** de la capacidad de puestos.
+   *
+   * Cualquier valor distinto de cero significa que hubo más citas simultáneas
+   * que puestos, es decir que alguien atendió sin silla o que la agenda
+   * permitió algo físicamente imposible. Es la señal de que hace falta revisar
+   * `lib/conflict.ts` o los datos, no un número que haya que promediar.
+   */
+  overCapacityMinutes: number;
+};
+
+/**
+ * Ocupación por hora de estación: la capacidad del **local**.
+ *
+ * ⚠ **Ésta no fusiona los solapes, y ahí está toda la diferencia con
+ * `computeOccupancy()`.** Aquélla responde "¿qué parte de sus horas usó esta
+ * técnica?" y fusiona porque una técnica atiende a una clienta a la vez.
+ * Ésta responde "¿me cabe otra técnica?", y el plan lo tiene decidido: "con dos
+ * estaciones, la capacidad del negocio son **horas de puesto, no personas**".
+ * Dos citas simultáneas ocupan **dos** puestos, y el día que se ocupen los dos
+ * el estudio está lleno aunque cada técnica esté al 50 %.
+ *
+ * **Que nadie las colapse en una.** Son dos definiciones distintas de negocio
+ * que casualmente comparten aritmética de intervalos; unificarlas haría que la
+ * pregunta "¿abro otro puesto?" se responda con la ocupación de una silla.
+ *
+ * `studioWindow` es la jornada del **estudio** —la unión de las de las
+ * técnicas— y se le pasa a `computeOccupancy()` con la lista de citas vacía
+ * justamente para que sea esa función la que haga la unión y la resta de
+ * bloqueos. Así "minutos disponibles" significa exactamente lo mismo acá y en
+ * el reporte por técnica: acá no se recalcula nada, lo único propio es cómo se
+ * combinan.
+ *
+ * La va a necesitar la reserva pública para no vender sillas que no existen, y
+ * por eso vive acá y no en la carpeta de una pantalla: dos definiciones de
+ * "ocupación de estación" en dos pantallas es exactamente lo que este módulo
+ * vino a evitar.
+ *
+ * ## Lo que no se puede medir todavía, y por qué
+ *
+ * "Ocupación **por** estación" —cuál de los dos puestos se usó— **no es
+ * calculable con los datos que existen**. Ninguna tabla registra en qué
+ * estación se atendió una cita: `appointment_finance` no tiene la columna, EA
+ * no tiene el concepto, y `lib/conflict.ts` resuelve el emparejamiento
+ * bipartito para *decidir si cabe*, sin persistir a quién le tocó cada puesto.
+ * Lo que sí se puede medir —y es lo que la pregunta "¿abro otro puesto?"
+ * necesita— es la ocupación **agregada** de las horas de puesto del estudio.
+ */
+export function stationHourOccupancy(input: {
+  stations: number;
+  studioWindow: ScheduleWindow;
+  studioBlocked: readonly Interval[];
+  /**
+   * La ocupación de cada técnica, ya calculada con `computeOccupancy()`. Solo
+   * se lee `busyMinutes`; el resto del objeto viaja porque el llamador lo tiene
+   * armado para el reporte por técnica.
+   */
+  perProvider: readonly { occupancy: Occupancy }[];
+}): StationOccupancy {
+  const stations = Math.max(0, Math.trunc(input.stations));
+
+  const open = computeOccupancy({
+    scheduled: input.studioWindow.open,
+    blocked: [...input.studioWindow.breaks, ...input.studioBlocked],
+    appointments: [],
+  });
+
+  const openMinutes = open.availableMinutes;
+  const capacityMinutes = stations * openMinutes;
+
+  const usedMinutes = input.perProvider.reduce(
+    (sum, provider) => sum + provider.occupancy.busyMinutes,
+    0,
+  );
+
+  return {
+    stations,
+    openMinutes,
+    capacityMinutes,
+    usedMinutes,
+    rate: capacityMinutes === 0 ? null : usedMinutes / capacityMinutes,
+    overCapacityMinutes: Math.max(0, usedMinutes - capacityMinutes),
   };
 }
 

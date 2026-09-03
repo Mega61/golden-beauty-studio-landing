@@ -105,12 +105,12 @@ export function Board({
             configura en la interfaz de EA o por SQL, y la única prueba de que está bien es
             que un evento real llegue y sea aceptado.
           </li>
-          <li>
-            <strong>Si el reconcile corrió.</strong> No hay tabla de corridas de trabajos, así
-            que lo que se muestra es la marca de tiempo más nueva de una fila que el reconcile
-            escribió. Una corrida sin nada que reparar no deja rastro, así que una racha
-            tranquila se ve igual que un reconcile caído.
-          </li>
+          {/* "Si el reconcile corrió" estuvo acá mientras el renglón era un
+              proxy: se mostraba la marca de la última fila que el barrido había
+              escrito, y una corrida sin nada que reparar no dejaba ninguna.
+              Ahora cada corrida deja una fila en `job_run` —termine bien o
+              mal— así que el renglón responde la pregunta de frente y puede
+              ponerse rojo. Salió de esta lista porque ya se puede comprobar. */}
           <li>
             <strong>La antigüedad del respaldo, mientras el volumen no esté montado.</strong>{" "}
             El servicio <code>db-backup</code> escribe <code>last-run.txt</code> y{" "}

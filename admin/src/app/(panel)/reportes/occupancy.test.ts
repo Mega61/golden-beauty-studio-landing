@@ -11,9 +11,7 @@ import {
   slotLabel,
   slotOf,
   SLOTS,
-  stationHourOccupancy,
   windowOverRange,
-  type DayWindow,
 } from "./occupancy";
 
 const day = (value: string) => parseEaLocalDate(value);
@@ -279,134 +277,6 @@ describe("occupancyByProvider", () => {
 
   it("sin técnicas devuelve una lista vacía", () => {
     expect(occupancyByProvider([])).toEqual([]);
-  });
-});
-
-describe("stationHourOccupancy", () => {
-  /** Jornada del estudio: lunes 9–18 con descanso 13–14 ⇒ 480 minutos. */
-  const studioWindow: DayWindow = dayWindow(MONDAY, PLAN);
-
-  function withBusy(...busyPerProvider: number[]) {
-    return stationHourOccupancy({
-      stations: 2,
-      studioWindow,
-      studioBlocked: [],
-      perProvider: busyPerProvider.map((busy, index) => ({
-        eaProviderId: index + 1,
-        name: `T${index + 1}`,
-        occupancy: {
-          availableMinutes: 480,
-          busyMinutes: busy,
-          overflowMinutes: 0,
-          rate: busy / 480,
-        },
-      })),
-    });
-  }
-
-  it("la capacidad es puestos × minutos abiertos, no personas × minutos", () => {
-    // Es el eje del plan: "con dos estaciones, la capacidad del negocio son
-    // horas de puesto, no personas".
-    const result = withBusy(0, 0, 0);
-    expect(result.openMinutes).toBe(480);
-    expect(result.capacityMinutes).toBe(960);
-    expect(result.rate).toBe(0);
-  });
-
-  it("**no fusiona** los solapes: dos citas simultáneas ocupan dos puestos", () => {
-    // Ésta es la diferencia entera con `computeOccupancy`, que fusiona porque
-    // mira una sola silla. Tres técnicas al 50 % dejan el estudio al 75 % de
-    // sus puestos, no al 50 %.
-    const result = withBusy(240, 240, 240);
-    expect(result.usedMinutes).toBe(720);
-    expect(result.rate).toBeCloseTo(720 / 960, 6);
-  });
-
-  it("dos técnicas al 100 % llenan los dos puestos", () => {
-    const result = withBusy(480, 480);
-    expect(result.rate).toBe(1);
-    expect(result.overCapacityMinutes).toBe(0);
-  });
-
-  it("tres técnicas al 100 % desbordan, y el desborde se reporta aparte", () => {
-    // Físicamente imposible con dos puestos: o alguien atendió sin silla, o la
-    // agenda permitió algo que `lib/conflict.ts` debía haber frenado. Se
-    // reporta en vez de recortarse en silencio.
-    const result = withBusy(480, 480, 480);
-    expect(result.usedMinutes).toBe(1440);
-    expect(result.overCapacityMinutes).toBe(480);
-    expect(result.rate).toBeGreaterThan(1);
-  });
-
-  it("el estudio cerrado da `null`, no 0 %", () => {
-    const result = stationHourOccupancy({
-      stations: 2,
-      studioWindow: dayWindow(SUNDAY, PLAN),
-      studioBlocked: [],
-      perProvider: [],
-    });
-    expect(result.capacityMinutes).toBe(0);
-    expect(result.rate).toBeNull();
-    expect(result.overCapacityMinutes).toBe(0);
-  });
-
-  it("sin puestos sembrados no se inventa capacidad", () => {
-    const result = stationHourOccupancy({
-      stations: 0,
-      studioWindow,
-      studioBlocked: [],
-      perProvider: [],
-    });
-    expect(result.capacityMinutes).toBe(0);
-    expect(result.rate).toBeNull();
-  });
-
-  it("un número de puestos absurdo se normaliza a entero no negativo", () => {
-    expect(
-      stationHourOccupancy({
-        stations: -3,
-        studioWindow,
-        studioBlocked: [],
-        perProvider: [],
-      }).stations,
-    ).toBe(0);
-    expect(
-      stationHourOccupancy({
-        stations: 2.7,
-        studioWindow,
-        studioBlocked: [],
-        perProvider: [],
-      }).stations,
-    ).toBe(2);
-  });
-
-  it("los minutos abiertos son la **unión** de las jornadas, no su suma", () => {
-    // Dos técnicas en el mismo turno son un turno. Sumarlas duplicaría la
-    // capacidad del estudio y haría que la ocupación se viera a la mitad.
-    const dobleTurno: DayWindow = {
-      open: [...studioWindow.open, ...studioWindow.open],
-      breaks: studioWindow.breaks,
-    };
-    const result = stationHourOccupancy({
-      stations: 2,
-      studioWindow: dobleTurno,
-      studioBlocked: [],
-      perProvider: [],
-    });
-    expect(result.openMinutes).toBe(480);
-  });
-
-  it("un bloqueo del estudio recorta la capacidad", () => {
-    const result = stationHourOccupancy({
-      stations: 2,
-      studioWindow,
-      studioBlocked: [
-        { start: at("2026-08-31 16:00:00"), end: at("2026-08-31 18:00:00") },
-      ],
-      perProvider: [],
-    });
-    expect(result.openMinutes).toBe(360);
-    expect(result.capacityMinutes).toBe(720);
   });
 });
 

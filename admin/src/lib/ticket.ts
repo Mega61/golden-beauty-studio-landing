@@ -245,6 +245,59 @@ export function assertTicketInvariant(totals: TicketTotals): void {
 }
 
 /**
+ * `precio de lista − cobrado`, en pesos. **La variación de precio.**
+ *
+ * Es la compuerta de `validateTicketClose()` con nombre propio: la misma
+ * definición, la misma aritmética, un solo lugar. Existe exportada porque el
+ * reporte "variación de precio por técnica, desglosada por motivo" necesita ese
+ * número para cada cuenta ya cerrada, y mientras no lo estuvo hubo una copia en
+ * `(panel)/reportes/variance.ts` anclada a esta compuerta por un test. La copia
+ * se borró; el test se conservó y ahora apunta acá.
+ *
+ * Positivo = se cobró menos que la lista, que es "la plata que se escapó".
+ * Cero o negativo = no hubo variación a la baja; se devuelve **0** y no un
+ * número negativo, porque el reporte suma variaciones y un cobro por encima de
+ * la lista (una corrección al alza, un renglón manual) compensaría una cortesía
+ * real y las dos desaparecerían de la vista. La compuerta no nota la diferencia:
+ * solo pregunta si es mayor que cero.
+ *
+ * El precio de lista es la suma de los renglones **positivos**: el trabajo que
+ * se hizo, a la tarifa del catálogo. Un renglón negativo no es trabajo, es una
+ * rebaja escrita como renglón, y queda del lado de la variación. Es lo que hace
+ * que las tres formas de bajar el total —el campo `discount`, un total escrito
+ * a mano, un renglón que resta— cuenten igual (H5).
+ *
+ * **Una cuenta sin renglones se reporta como sin variación, no revienta.**
+ * `computeTicketTotals()` lanza ante una lista vacía, y hace bien: "una cuenta
+ * sin renglones no es una cuenta de cero, es una cuenta que no se cerró". Pero
+ * el otro llamador es un reporte sobre filas que **ya** están en la base, y una
+ * fila así solo aparece si alguien la escribió por SQL. Lanzar en medio de la
+ * agregación tumbaría la pantalla entera —los nueve reportes— por una fila
+ * rota. Se devuelve 0 y la anomalía se ve donde corresponde: en Diagnóstico.
+ * Al cerrar no cambia nada: `validateTicketClose()` ya lanzó antes de llegar
+ * acá, porque su propio `computeTicketTotals()` corre primero.
+ */
+export function priceVariance(
+  items: readonly TicketItemInput[],
+  amountCharged: Cop,
+): Cop {
+  if (items.length === 0) return 0;
+
+  // Se pasa por `computeTicketTotals` en vez de multiplicar acá: es lo que
+  // valida el signo del renglón (`qty ≥ 1` siempre) y lo que garantiza que
+  // "renglón positivo" signifique lo mismo en los dos lados. Sin descuento ni
+  // propina: ninguno de los dos cambia `lineTotal`, que es lo único que se lee.
+  const totals = computeTicketTotals(items, 0, 0);
+
+  const listTotal = totals.lines.reduce(
+    (sum, line) => (line.lineTotal > 0 ? sum + line.lineTotal : sum),
+    0,
+  );
+
+  return Math.max(0, listTotal - amountCharged);
+}
+
+/**
  * La cuenta cuando la técnica **edita el total** en vez de aceptar el calculado.
  *
  * En la pantalla el total viene calculado y tocarlo lo hace editable. Lo que
@@ -343,11 +396,12 @@ export function validateTicketClose(input: TicketCloseInput): TicketTotals {
   // variación y no del lado de la lista. La diferencia contra lo cobrado es la
   // variación real, venga por el campo `discount`, por un total escrito a mano
   // o por un renglón que resta. Encontrado por `gbs-money-auditor` (H5).
-  const listTotal = totals.lines.reduce(
-    (sum, line) => (line.lineTotal > 0 ? sum + line.lineTotal : sum),
-    0,
-  );
-  const belowList = listTotal - totals.amountCharged;
+  //
+  // La cuenta está en `priceVariance()`, arriba, y no repetida acá: el reporte
+  // de variación necesita el mismo número y tener dos copias es cómo se
+  // separan en silencio. La compuerta es quién manda; la función solo le puso
+  // nombre.
+  const belowList = priceVariance(input.items, totals.amountCharged);
 
   if (belowList > 0 && !input.varianceReasonCode) {
     throw new TicketError(

@@ -4,6 +4,7 @@ import {
   TicketError,
   assertTicketInvariant,
   computeTicketTotals,
+  priceVariance,
   ticketFromEnteredTotal,
   validateTicketClose,
   type TicketItemInput,
@@ -386,5 +387,166 @@ describe("el caso que el plan pone como prueba de fuego", () => {
     expect(totals.lines.map((l) => l.discountShare)).toEqual([3_148, 1_111, 741]);
     expect(totals.lines.reduce((s, l) => s + l.discountShare, 0)).toBe(5_000);
     expect(totals.lines.reduce((s, l) => s + l.netTotal, 0)).toBe(130_000);
+  });
+});
+
+// ── La variación de precio ──────────────────────────────────────────────────
+
+/**
+ * Un renglón como lo describe el reporte de variación: `kind`, cantidad,
+ * precio unitario y —si es manual— la nota.
+ */
+const linea = (
+  kind: TicketItemInput["kind"],
+  qty: number,
+  unitPrice: number,
+  note?: string,
+): TicketItemInput => ({ kind, qty, unitPriceSnapshot: unitPrice, note: note ?? null });
+
+const SERVICIO = linea("servicio", 1, ACRYLIC_SCULPTED);
+
+describe("priceVariance", () => {
+  it("cobrar la lista completa no es variación", () => {
+    expect(priceVariance([SERVICIO], 115_000)).toBe(0);
+  });
+
+  it("cobrar menos que la lista es la diferencia", () => {
+    expect(priceVariance([SERVICIO], 100_000)).toBe(15_000);
+  });
+
+  it("suma los renglones positivos, no solo el servicio", () => {
+    const lines = [SERVICIO, linea("adicional", 3, 8_000)];
+    expect(priceVariance(lines, 115_000 + 24_000)).toBe(0);
+    expect(priceVariance(lines, 120_000)).toBe(19_000);
+  });
+
+  it("un renglón negativo es variación, no precio de lista", () => {
+    // "Un renglón negativo no es trabajo, es una rebaja escrita como renglón".
+    // Sin esto, agregar un renglón de −30.000 y cobrar 30.000 menos daría
+    // variación cero.
+    const lines = [SERVICIO, linea("manual", 1, -30_000, "cortesía")];
+    expect(priceVariance(lines, 85_000)).toBe(30_000);
+  });
+
+  it("cobrar **más** que la lista devuelve 0, no un negativo", () => {
+    // El reporte suma variaciones: un cobro por encima de la lista compensaría
+    // una cortesía real y las dos desaparecerían de la vista.
+    expect(priceVariance([SERVICIO], 130_000)).toBe(0);
+  });
+
+  it("una cuenta sin renglones se reporta en cero en vez de tumbar la pantalla", () => {
+    // `computeTicketTotals` lanza ante una lista vacía y hace bien: una cuenta
+    // sin renglones no se cerró. Pero el llamador del reporte lee filas que ya
+    // están en la base, y una fila así solo aparece si alguien la escribió por
+    // SQL. Lanzar ahí tumbaría los nueve reportes por una fila rota.
+    expect(priceVariance([], 0)).toBe(0);
+    expect(priceVariance([], 50_000)).toBe(0);
+  });
+
+  it("un renglón manual en cero no genera variación", () => {
+    // Es el retoque de garantía: queda contado en ocupación y en la ficha de la
+    // clienta, y no cobra. Que no aparezca como plata escapada es el punto.
+    expect(priceVariance([linea("manual", 1, 0, "garantía")], 0)).toBe(0);
+  });
+
+  it("hereda las validaciones del cálculo en vez de tener las suyas", () => {
+    // Pasa por `computeTicketTotals`, así que el signo en la cantidad se
+    // rechaza acá igual que al cerrar la cuenta, y un renglón manual sin nota
+    // también.
+    expect(() => priceVariance([linea("servicio", -2, 1_000)], 0)).toThrow(TicketError);
+    expect(() => priceVariance([linea("manual", 1, 100)], 0)).toThrow(TicketError);
+  });
+});
+
+/**
+ * **El test que anclaba la definición duplicada, ahora sobre una sola.**
+ *
+ * `priceVariance()` fue un espejo de la compuerta que vive adentro de
+ * `validateTicketClose()`, en `(panel)/reportes/variance.ts`. Lo único que
+ * hacía tolerable esa copia era que su test **no probaba números escritos a
+ * mano**: probaba que `priceVariance() > 0` exactamente cuando la compuerta
+ * exige un motivo.
+ *
+ * La copia ya no existe —la compuerta llama a esta función— así que este bloque
+ * pasó de detectar una divergencia a fijar la relación: si alguien cambia la
+ * compuerta para que pida motivo por otra razón (el campo `discount`, un
+ * umbral), esto se pone rojo, y el reporte de variación no publica una cifra
+ * que la cuenta no reconoce.
+ */
+describe("ancla: variación > 0 ⟺ la compuerta pide motivo", () => {
+  /** ¿La compuerta exige motivo para esta cuenta? Se le pregunta, no se replica. */
+  function demandsReason(items: readonly TicketItemInput[], amountCharged: number): boolean {
+    const subtotal = items.reduce(
+      (total, item) => total + item.qty * item.unitPriceSnapshot,
+      0,
+    );
+
+    try {
+      validateTicketClose({
+        items,
+        discount: subtotal - amountCharged,
+        tip: 0,
+        varianceReasonCode: null,
+      });
+      return false;
+    } catch (error) {
+      if (error instanceof TicketError) return true;
+      throw error;
+    }
+  }
+
+  const CASES: { name: string; lines: TicketItemInput[]; charged: number }[] = [
+    { name: "lista exacta", lines: [SERVICIO], charged: 115_000 },
+    { name: "un peso menos", lines: [SERVICIO], charged: 114_999 },
+    { name: "una cortesía grande", lines: [SERVICIO], charged: 80_000 },
+    { name: "gratis", lines: [SERVICIO], charged: 0 },
+    {
+      name: "con adicionales, cobrando todo",
+      lines: [SERVICIO, linea("adicional", 3, 8_000)],
+      charged: 139_000,
+    },
+    {
+      name: "con adicionales, cobrando de menos",
+      lines: [SERVICIO, linea("adicional", 3, 8_000)],
+      charged: 130_000,
+    },
+    {
+      name: "rebaja escrita como renglón negativo",
+      lines: [SERVICIO, linea("manual", 1, -15_000, "rebaja")],
+      charged: 100_000,
+    },
+    {
+      name: "renglón manual en cero, cuenta gratis coherente",
+      lines: [linea("manual", 1, 0, "garantía")],
+      charged: 0,
+    },
+  ];
+
+  for (const testCase of CASES) {
+    it(`${testCase.name}: variación > 0 ⟺ pide motivo`, () => {
+      const variance = priceVariance(testCase.lines, testCase.charged);
+      expect(variance > 0, `variación ${variance}`).toBe(
+        demandsReason(testCase.lines, testCase.charged),
+      );
+    });
+  }
+
+  it("y el monto coincide con el que dice el mensaje de error de la compuerta", () => {
+    // El mensaje lleva la cifra: "Se cobró X menos que el precio de lista".
+    const lines = [SERVICIO, linea("adicional", 2, 8_000)];
+    const charged = 100_000;
+
+    let message = "";
+    try {
+      validateTicketClose({
+        items: lines,
+        discount: 131_000 - charged,
+        varianceReasonCode: null,
+      });
+    } catch (error) {
+      message = error instanceof Error ? error.message : "";
+    }
+
+    expect(message).toContain(String(priceVariance(lines, charged)));
   });
 });

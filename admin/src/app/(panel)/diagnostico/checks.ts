@@ -453,43 +453,128 @@ export function orphanCheck(input: {
 // ── Trabajos programados ────────────────────────────────────────────────────
 
 /**
+ * Una corrida de un trabajo, como la guarda `job_run`.
+ *
+ * Entra como dato y no como fila de la base para que este archivo siga siendo
+ * puro: `data.ts` lee la fila y la traduce.
+ */
+export type JobRunFact = {
+  startedAt: Date;
+  finishedAt: Date;
+  /** `false` = la corrida terminó mal. **No** es lo mismo que no haber corrido. */
+  ok: boolean;
+  /** Resumen que dejó el job. Se muestra tal cual. */
+  summary: string | null;
+};
+
+/**
  * El último reconcile.
  *
- * ⚠ **Esto es un proxy, y está rotulado como tal en pantalla.** No existe
- * ninguna tabla de corridas de trabajos: `runReconcile()` devuelve un reporte
- * al llamador y no deja rastro en la base. Lo más cerca que se puede estar es
- * la marca de tiempo más nueva de una fila que el reconcile escribió
- * (`snapshot_source = 'reconcile'`). Eso tiene un agujero conocido: **una
- * corrida que no encontró nada que hacer no deja marca**, así que una noche
- * tranquila se ve igual que un reconcile que no corrió.
+ * **Esto era un proxy y dejó de serlo.** Antes se leía la marca de tiempo más
+ * nueva de una fila que el reconcile hubiera escrito
+ * (`MAX(updated_at) WHERE snapshot_source = 'reconcile'`), con un agujero
+ * conocido: una corrida que no encontró nada que reparar no deja ninguna fila,
+ * así que una semana tranquila se veía igual que un cron muerto. De ahí que el
+ * renglón solo pudiera ser amarillo — un rojo que se enciende solo cuando no
+ * hubo movimiento es un rojo que se aprende a ignorar.
  *
- * Lo que hace falta es una tabla `job_run(job, started_at, finished_at, ok,
- * summary)` de A2, escrita por `reconcile-cli.ts` y por el cierre diario. Está
- * pedido. Con eso este check pasa a ser exacto y en tres líneas.
+ * Con `job_run` la pregunta se contesta de frente, y son cuatro respuestas que
+ * no se confunden entre sí:
+ *
+ * - **No hay ninguna corrida** ⇒ `down`. El reconcile no es una red de
+ *   seguridad: los webhooks de EA no reintentan, así que es el mecanismo que
+ *   garantiza que toda cita quede con su precio congelado. Que nunca haya
+ *   corrido es rojo, incluso recién instalado — sobre todo recién instalado, que
+ *   es cuando el cron todavía no está.
+ * - **La última corrida falló** (`ok = false`) ⇒ `down`, con su motivo. El cron
+ *   está vivo y el trabajo se rompe; es un problema distinto y el detalle lo
+ *   dice.
+ * - **La última corrida es vieja** ⇒ `down`. El cron es diario; pasadas las
+ *   horas del umbral, no corrió.
+ * - **Corrió, bien y a tiempo** ⇒ `ok`, aunque no haya reparado nada. "No había
+ *   nada que hacer" es el resultado normal de una noche tranquila, y ahora se
+ *   puede afirmar en vez de sospechar.
+ *
+ * `lastTouch` sigue entrando, pero ya no decide nada: es la última fila de
+ * plata que el reconcile escribió, y se muestra como contexto ("la última vez
+ * que hubo algo que reparar"). Que el semáforo no dependa de ella es todo el
+ * punto de este cambio.
  */
 export function reconcileCheck(input: {
-  lastTouch: Date | null;
+  /**
+   * La última corrida. `null` = **nunca corrió**.
+   *
+   * `undefined` es otra cosa: no se pudo leer `job_run`. `data.ts` degrada esos
+   * casos a `unknown` con el motivo, igual que hace con los demás checks que
+   * dependen de `gbs_admin`.
+   */
+  lastRun: JobRunFact | null;
+  /** La última fila de plata escrita por el reconcile. Solo contexto. */
+  lastTouch?: Date | null;
   /** Horas tras las que se considera que no corrió. El cron es diario. */
   staleHours?: number;
   now: Date;
 }): Check {
   const staleHours = input.staleHours ?? 36;
-  const age = hoursSince(input.lastTouch, input.now);
+  const lastTouch = input.lastTouch ?? null;
+
+  const repaired =
+    lastTouch === null
+      ? "Todavía ninguna cuenta fue creada o reparada por el reconcile."
+      : `La última cuenta que el reconcile tocó es de ${relativeAge(lastTouch, input.now)}.`;
+
+  const title = "El reconcile nocturno corrió";
+
+  if (input.lastRun === null) {
+    return {
+      id: "reconcile",
+      title,
+      // **Rojo, y no amarillo.** Con `job_run` esto ya no es una sospecha: no
+      // hay ninguna corrida registrada. El reconcile es el mecanismo que
+      // garantiza el precio congelado de cada cita —los webhooks de EA no
+      // reintentan— así que sin él el sistema está funcionando sin red.
+      level: "down",
+      detail:
+        "No hay ninguna corrida registrada. Si el panel acaba de entrar en servicio, falta programar el servicio admin-reconcile; si ya estaba, dejó de correr. Mientras no corra, cada webhook perdido es una cita sin precio congelado, y eso se paga en la liquidación.",
+      lastSeen: "nunca",
+    };
+  }
+
+  const age = hoursSince(input.lastRun.startedAt, input.now);
+  const when = relativeAge(input.lastRun.startedAt, input.now);
+  const summary = input.lastRun.summary ?? "sin resumen";
+
+  if (!input.lastRun.ok) {
+    return {
+      id: "reconcile",
+      title,
+      level: "down",
+      detail: `La última corrida (${when}) terminó mal: ${summary}. El cron está vivo, el trabajo se rompe. Se puede repetir a mano —es idempotente por diseño— y el error queda en los logs del contenedor.`,
+      lastSeen: when,
+    };
+  }
+
+  // `age === null` es una marca de tiempo ilegible, y también es rojo: una fila
+  // de `job_run` que no se puede fechar no prueba que el job corrió, y en este
+  // renglón la duda se resuelve del lado seguro. Un verde acá sería la clase de
+  // mentira que hace que el tablero entero deje de servir.
+  if (age === null || age > staleHours) {
+    return {
+      id: "reconcile",
+      title,
+      level: "down",
+      detail: `La última corrida fue ${when} y el cron corre a diario. No es una racha tranquila: una corrida sin nada que reparar también deja constancia, así que esto es el job que no está corriendo. Revisar el servicio admin-reconcile.`,
+      figure: age === null ? undefined : `${Math.floor(age)} h`,
+      lastSeen: when,
+    };
+  }
 
   return {
     id: "reconcile",
-    title: "El reconcile nocturno dejó rastro",
-    // `warn`, nunca `down`: el proxy no puede distinguir "no corrió" de "corrió
-    // y no había nada que hacer", y un rojo que se enciende solo en las semanas
-    // tranquilas es un rojo que se aprende a ignorar.
-    level: age === null || age > staleHours ? "warn" : "ok",
-    detail:
-      age === null
-        ? "Ninguna fila fue escrita por el reconcile todavía. Es lo esperable si el panel acaba de entrar en servicio; si no, hay que revisar el servicio admin-reconcile."
-        : age > staleHours
-          ? `La última fila escrita por el reconcile es de ${relativeAge(input.lastTouch, input.now)}, y el cron corre a diario. Ojo: una corrida sin nada que reparar no deja marca, así que esto puede ser una racha tranquila. La señal exacta necesita la tabla de corridas de trabajos, que está pedida.`
-          : "Hay filas escritas por el reconcile dentro de la última corrida esperada. Es un indicio, no una confirmación: una corrida sin trabajo no deja marca.",
-    lastSeen: relativeAge(input.lastTouch, input.now),
+    title,
+    level: "ok",
+    detail: `Corrió ${when} y terminó bien: ${summary}. Que no haya reparado nada es el resultado normal de una noche tranquila — y ahora se puede afirmar, no suponer. ${repaired}`,
+    lastSeen: when,
   };
 }
 

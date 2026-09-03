@@ -4,12 +4,7 @@ import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
 import type { DayClose } from "@/db/types";
 import { instantToEaDate, isEaLocalDate, type EaLocalDate } from "@/lib/ea";
-import {
-  buildListParams,
-  createEaClient,
-  decodeAppointmentWithRelations,
-  type EaClient,
-} from "@/lib/ea/client";
+import { createEaClient, listDayAppointments, type EaClient } from "@/lib/ea/client";
 import { createIngestClient, ingestConfigFromEnv } from "@/lib/ingest-client";
 import {
   loadReview,
@@ -36,27 +31,17 @@ import {
  * archivo lee filas y las pasa.
  */
 
-/** Tope de páginas al listar el día. Un día del estudio no llega ni a una. */
-const MAX_PAGES = 20;
-const PAGE_LENGTH = 100;
-
 /**
- * Las citas de un día con `provider` y `customer` adjuntos.
+ * Las citas de un día, reducidas a lo que la compuerta del cierre necesita.
  *
- * Se pide por el acceso crudo y no por `ea.appointments.list()` porque las
- * relaciones que EA adjunta con `with=` vienen en **snake_case** —su `load()`
- * pega la fila de MySQL tal cual— y el codec tipado del listado las descarta.
- * `decodeAppointmentWithRelations()` de A1 es el que sabe leer esa mezcla.
- *
- * La paginación se agota o **lanza**. `Api::$default_length` de EA vale 20 y la
- * respuesta no trae ninguna señal de que falten registros: un día al que le
- * falta una cita se ve exactamente igual que uno completo, y en esta pantalla
- * eso significaría cerrar el día sin una cuenta que sí existía.
- *
- * Es el mismo recorrido que hace `(panel)/hoy/data.ts`. Se repite en vez de
- * importarse porque allá es una función interna de otro paquete; el lugar
- * natural para una sola copia es `lib/ea/client.ts`, que tampoco es de este
- * paquete. Queda reportado.
+ * El recorrido —el acceso crudo para poder leer las relaciones en snake_case,
+ * la paginación que **se agota o lanza**— es `listDayAppointments()` de
+ * `lib/ea/client.ts`, compartido con la pantalla Hoy. Vivía duplicado en las
+ * dos pantallas mientras ninguna era dueña de ese archivo; acá quedó solo la
+ * parte propia de Caja, que es qué relaciones se piden y a qué forma se
+ * reducen. Que la paginación no pueda mentir importa especialmente en esta
+ * pantalla: un día al que le falta una cita se ve igual que uno completo, y eso
+ * significaría cerrar el día sin una cuenta que sí existía.
  *
  * El cliente es opcional y se crea **dentro** de la función, no al construirla:
  * `createEaClient()` lanza si falta `EA_API_URL`, y ese throw tiene que caer
@@ -66,41 +51,22 @@ const PAGE_LENGTH = 100;
 export function loadDayAppointments(client?: EaClient): DayAppointmentSource {
   return async (date: EaLocalDate) => {
     const ea = client ?? createEaClient();
-    const out: DayAppointment[] = [];
 
-    for (let page = 1; page <= MAX_PAGES; page += 1) {
-      const params = buildListParams({ with: ["provider", "customer"] });
-      params.set("date", date);
-      params.set("page", String(page));
-      params.set("length", String(PAGE_LENGTH));
+    // Sin `service`: esta pantalla no dibuja el nombre del servicio agendado, y
+    // pedirlo sería una consulta más por cita en EA para tirar el dato.
+    const citas = await listDayAppointments(ea, {
+      date,
+      with: ["provider", "customer"],
+    });
 
-      const payload = await ea.raw({ method: "GET", path: "appointments", params });
-
-      if (!Array.isArray(payload)) {
-        throw new Error("EA devolvió algo que no es una lista de citas");
-      }
-
-      for (const raw of payload) {
-        const { appointment, provider, customer } = decodeAppointmentWithRelations(
-          raw as Record<string, unknown>,
-        );
-        out.push({
-          eaAppointmentId: appointment.id,
-          status: appointment.status,
-          start: appointment.start,
-          end: appointment.end,
-          customerName: personName(customer, "Sin clienta"),
-          providerName: personName(provider, "Sin asignar"),
-        });
-      }
-
-      if (payload.length < PAGE_LENGTH) return out;
-    }
-
-    throw new Error(
-      `Las citas de ${date} superaron ${MAX_PAGES} páginas de ${PAGE_LENGTH}. ` +
-        "Se aborta en vez de juzgar medio día.",
-    );
+    return citas.map(({ appointment, provider, customer }): DayAppointment => ({
+      eaAppointmentId: appointment.id,
+      status: appointment.status,
+      start: appointment.start,
+      end: appointment.end,
+      customerName: personName(customer, "Sin clienta"),
+      providerName: personName(provider, "Sin asignar"),
+    }));
   };
 }
 

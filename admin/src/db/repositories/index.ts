@@ -16,6 +16,7 @@ import { commissionEntryRepository } from "./commission-entry";
 import { commissionRuleRepository } from "./commission-rule";
 import { commissionRunRepository } from "./commission-run";
 import { dayCloseRepository } from "./day-close";
+import { jobRunRepository } from "./job-run";
 import { legacyAppointmentRepository } from "./legacy-appointment";
 import { serviceMapRepository } from "./service-map";
 import { staffTotpRepository } from "./staff-totp";
@@ -34,6 +35,7 @@ export function repositories(db: Db) {
     commissionRules: commissionRuleRepository(db),
     commissionRuns: commissionRunRepository(db),
     dayCloses: dayCloseRepository(db),
+    jobRuns: jobRunRepository(db),
     legacyAppointments: legacyAppointmentRepository(db),
     serviceMap: serviceMapRepository(db),
     staffTotp: staffTotpRepository(db),
@@ -58,6 +60,13 @@ export {
   PaidCommissionRunError,
 } from "./commission-run";
 export { dayCloseRepository } from "./day-close";
+export {
+  JOB_DAY_CLOSE_PUSH,
+  JOB_RECONCILE,
+  jobRunRepository,
+  jobRunValues,
+} from "./job-run";
+export type { JobRunInput } from "./job-run";
 export { legacyAppointmentRepository } from "./legacy-appointment";
 export { serviceMapRepository } from "./service-map";
 export { staffTotpRepository } from "./staff-totp";

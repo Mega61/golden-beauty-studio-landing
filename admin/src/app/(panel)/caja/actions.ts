@@ -142,7 +142,7 @@ export async function cerrarDia(fecha: string): Promise<CerrarDiaResult> {
     return {
       ok: false,
       kind: "error",
-      message: "No se pudo cerrar el día. Nada quedó a medias; volvé a intentar.",
+      message: "No se pudo cerrar el día. Nada quedó a medias; vuelve a intentar.",
     };
   }
 

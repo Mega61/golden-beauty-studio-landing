@@ -117,6 +117,7 @@ function toFinanceRow(
       qty: item.qty,
       unitPrice: item.unit_price_snapshot,
       lineTotal: item.line_total,
+      note: item.note,
     })),
   };
 }

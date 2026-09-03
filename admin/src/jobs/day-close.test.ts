@@ -13,9 +13,11 @@ import {
   dayBounds,
   reviewDay,
   summarizeDayTotals,
+  summarizePush,
   totalsOf,
   type DayAccount,
   type DayAppointment,
+  type PushOutcome,
 } from "./day-close";
 
 /**
@@ -177,6 +179,58 @@ describe("totalsOf", () => {
     expect(totals.tips).toBe(30_000);
     // La fila no guarda "sin método": si el día cerró, no quedaba ninguna.
     expect(totals.sinMetodo).toBe(0);
+  });
+});
+
+describe("summarizePush", () => {
+  const row: DayClose = {
+    id: 7,
+    close_date: DIA,
+    total_efectivo: 180_000,
+    total_transferencia: 0,
+    total_otro: 0,
+    total_tips: 0,
+    appointment_count: 1,
+    closed_by: "usr_1",
+    closed_at: OCHO_PM,
+    pushed_to_ingest_at: null,
+    created_at: OCHO_PM,
+  };
+
+  /**
+   * Es el resumen que queda en `job_run` cada vez que el push se intenta.
+   *
+   * Existe porque `pushed_to_ingest_at` dice si el push **llegó**, no si se
+   * intentó: "no había nada que empujar" y "el push está apagado" no dejan
+   * marca en ninguna otra parte, y son justo los casos que se confunden con
+   * "nadie apretó el botón".
+   */
+  it("nombra el día en los seis resultados posibles", () => {
+    const outcomes: PushOutcome[] = [
+      { state: "hecho", at: OCHO_PM, sent: 3 },
+      { state: "ya", at: OCHO_PM },
+      { state: "vacio" },
+      { state: "apagado" },
+      { state: "pendiente" },
+      { state: "fallo", message: "ingest respondió 502", retryable: true },
+    ];
+
+    for (const outcome of outcomes) {
+      expect(summarizePush(row, outcome), outcome.state).toContain(DIA);
+    }
+  });
+
+  it("dice cuántos movimientos salieron, y por qué falló cuando falla", () => {
+    expect(summarizePush(row, { state: "hecho", at: OCHO_PM, sent: 3 })).toContain(
+      "3 movimiento(s)",
+    );
+    expect(
+      summarizePush(row, { state: "fallo", message: "ingest respondió 502", retryable: true }),
+    ).toContain("ingest respondió 502");
+    // "Apagado" no es un fallo: hoy el contrato del cuerpo no está verificado
+    // contra el CRM y cerrar la caja no puede depender de eso. Que el resumen
+    // lo diga es lo que evita que alguien lo lea como un error.
+    expect(summarizePush(row, { state: "apagado" })).toContain("INGEST_URL");
   });
 });
 

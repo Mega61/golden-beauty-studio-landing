@@ -28,7 +28,8 @@ import "server-only";
 import { sql } from "kysely";
 
 import { getDb } from "@/db/client";
-import { repositories } from "@/db/repositories";
+import { JOB_RECONCILE, repositories } from "@/db/repositories";
+import type { JobRunRow } from "@/db/types";
 import { createEaClient, eaConfigFromEnv } from "@/lib/ea/client";
 import { instantToEaDate, type EaLocalDate } from "@/lib/ea";
 import { mapEaStatus, unmappedStatuses } from "@/components/calendar";
@@ -58,6 +59,7 @@ import {
   worstLevel,
   type Check,
   type CheckLevel,
+  type JobRunFact,
   type RegisteredWebhook,
 } from "./checks";
 
@@ -91,6 +93,24 @@ export type Diagnostics = {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Fila de `job_run` → el hecho que `checks.ts` evalúa.
+ *
+ * `undefined` (no hay ninguna corrida) se traduce a `null`, que en el check
+ * significa **nunca corrió**. `ok` viaja como `TINYINT(1)` y se traduce acá:
+ * este esquema no usa BOOLEAN, y comparar un `1` en la función pura sería
+ * meterle el detalle del driver a la lógica.
+ */
+function toJobRunFact(row: JobRunRow | undefined): JobRunFact | null {
+  if (row === undefined) return null;
+  return {
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    ok: row.ok !== 0,
+    summary: row.summary,
+  };
 }
 
 /** `T` o el motivo por el que no se pudo. Nunca lanza hacia la pantalla. */
@@ -186,8 +206,9 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
 
     const rows = await repos.appointmentFinance.listByStartRange(bounds.start, bounds.end);
 
-    // `MAX(updated_at)` de las filas que escribió el reconcile. Es el proxy del
-    // "último reconcile"; ver el comentario de `reconcileCheck()`.
+    // `MAX(updated_at)` de las filas que escribió el reconcile. **Ya no es el
+    // proxy del "último reconcile"** —eso lo contesta `job_run`— sino contexto:
+    // la última vez que el barrido encontró algo que reparar.
     const lastReconcile = await sql<{ at: Date | null }>`
       SELECT MAX(updated_at) AS at
         FROM ${sql.table("appointment_finance")}
@@ -219,10 +240,14 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
   const jobs = await probe(async () => {
     const db = getDb();
     const repos = repositories(db);
-    const [lastEvent, closes, pending] = await Promise.all([
+    const [lastEvent, closes, pending, lastReconcileRun] = await Promise.all([
       repos.webhookEvents.lastReceivedAt(),
       repos.dayCloses.listByDateRange(from, to),
       repos.dayCloses.listPendingPush(),
+      // La respuesta exacta a "¿el reconcile corrió?". Una corrida que no
+      // encontró nada que reparar también deja fila, que es justo lo que el
+      // proxy anterior no podía ver.
+      repos.jobRuns.lastRun(JOB_RECONCILE),
     ]);
 
     const pushes = closes
@@ -234,6 +259,11 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
       lastEvent: lastEvent ?? null,
       lastPush: pushes[0] ?? null,
       pending: pending.length,
+      // `undefined` (no hay filas) se traduce a `null` = **nunca corrió**, que
+      // es una afirmación y no un "no se sabe": si la consulta no se pudo
+      // hacer, la sonda entera falla y el check se degrada a `unknown` más
+      // abajo.
+      lastReconcileRun: toJobRunFact(lastReconcileRun),
     };
   });
 
@@ -296,6 +326,7 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
     }),
     webhookTrafficCheck({ lastEvent: jobs.ok ? jobs.value.lastEvent : null, now }),
     reconcileCheck({
+      lastRun: jobs.ok ? jobs.value.lastReconcileRun : null,
       lastTouch: financeFacts.ok ? financeFacts.value.lastReconcile : null,
       now,
     }),
@@ -318,14 +349,27 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
   // Si `gbs_admin` no contestó, los tres checks que dependen de ella dirían
   // "cero problemas" con cero datos, que es la mentira más peligrosa de esta
   // pantalla. Se degradan a `unknown` con el motivo.
-  if (!financeFacts.ok) {
-    for (const id of ["snapshot", "reconcile", "ingest", "webhook-traffic"]) {
+  const degrade = (ids: readonly string[], reason: string): void => {
+    for (const id of ids) {
       const check = checks.find((entry) => entry.id === id);
       if (check === undefined) continue;
       check.level = "unknown";
-      check.detail = `No se pudo leer gbs_admin: ${financeFacts.error}. Sin la base del panel esta comprobación no dice nada, y un verde acá sería falso.`;
+      check.detail = `No se pudo leer gbs_admin: ${reason}. Sin la base del panel esta comprobación no dice nada, y un verde acá sería falso.`;
       check.figure = undefined;
     }
+  };
+
+  if (!financeFacts.ok) {
+    degrade(["snapshot", "reconcile", "ingest", "webhook-traffic"], financeFacts.error);
+  }
+
+  // Y si lo que falló fue la sonda de trabajos, el renglón del reconcile no
+  // puede quedar en rojo: **"no corrió" es una afirmación**, y ahora se pinta
+  // rojo, así que hay que poder distinguirla de "no se pudo preguntar". Un rojo
+  // falso en el renglón del reconcile es exactamente lo que hace que un tablero
+  // deje de servir.
+  if (!jobs.ok) {
+    degrade(["reconcile"], jobs.error);
   }
 
   return {

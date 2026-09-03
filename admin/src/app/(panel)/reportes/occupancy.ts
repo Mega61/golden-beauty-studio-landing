@@ -1,44 +1,20 @@
 /**
- * Ocupación: del plan de trabajo de EA a la cifra que decide si cabe otra
- * técnica.
+ * Ocupación: del plan de trabajo de EA a los intervalos que la métrica come.
  *
- * Este archivo hace dos cosas, y conviene tener clara la diferencia porque una
- * es traducción y la otra es una definición nueva:
+ * Lo que hace este archivo es **traducción, no definición**. EA guarda el
+ * `working_plan` como un objeto con clave por día de la semana en inglés y
+ * horas `"HH:MM"`, más una tabla de excepciones por fecha. Convertirlo a los
+ * `Interval` que `computeOccupancy()` espera no es una métrica, es un mapeo — y
+ * va acá porque el único consumidor es este reporte.
  *
- * 1. **Traducir el `working_plan` de EA a intervalos.** Mecánico. EA guarda un
- *    objeto con clave por día de la semana en inglés y horas `"HH:MM"`, más una
- *    tabla de excepciones por fecha. Convertirlo a los `Interval` que
- *    `computeOccupancy()` espera no es una métrica, es un mapeo — y va acá
- *    porque el único consumidor es este reporte.
- *
- * 2. **Ocupación por hora de estación.** Ésta **sí es una definición nueva**, y
- *    hay que decirlo de frente: no está en `lib/metrics.ts`.
- *
- * ## La métrica que falta en `lib/metrics.ts` (y que hay que mover allá)
- *
- * `computeOccupancy()` de B1 responde "¿qué parte de sus horas usó esta
- * técnica?" y lo hace bien — **fusiona los solapes**, con el comentario "dos
- * citas encimadas ocupan la silla una vez". Para *una* técnica eso es correcto:
- * una técnica atiende a una clienta a la vez (§ Multi-técnica).
- *
- * Pero el plan insiste en otra cosa: "**con dos estaciones, la capacidad del
- * negocio son horas de puesto, no personas**", y "ocupación de estación es la
- * métrica de capacidad de verdad". Ahí fusionar es justo lo que **no** se puede
- * hacer: dos citas simultáneas ocupan **dos** puestos, y el día que se ocupen
- * los dos el estudio está lleno aunque cada técnica esté al 50 %.
- *
- * `lib/metrics.ts` no tiene esa función. **La pedí y no existe todavía**, así
- * que está implementada acá abajo (`stationHourOccupancy`), pura y con tests,
- * y **el lugar donde tiene que vivir es `lib/metrics.ts`** — es una definición
- * de negocio, la va a necesitar la reserva pública de D2 para no vender sillas
- * que no existen, y dos definiciones de "ocupación de estación" en dos
- * pantallas es exactamente lo que ese módulo vino a evitar. Moverla es un
- * `git mv` de treinta líneas más su test; no se hizo acá porque `lib/` no es de
- * este paquete.
- *
- * Mientras vive acá, **no recalcula nada de B1**: el numerador y el
- * denominador salen los dos de llamadas a `computeOccupancy()`. Lo único
- * propio es cómo se combinan.
+ * Las **definiciones** viven en `lib/metrics.ts` y se llaman, no se
+ * reimplementan: `computeOccupancy()` (la ocupación de una técnica, que fusiona
+ * los solapes porque atiende a una clienta a la vez) y `stationHourOccupancy()`
+ * (la del local, que **no** fusiona porque dos citas simultáneas ocupan dos
+ * puestos). La segunda vivió un tiempo en este archivo y se mudó a `lib/` con
+ * sus tests: es una definición de negocio, la va a necesitar la reserva pública
+ * para no vender sillas que no existen, y dos definiciones de "ocupación de
+ * estación" en dos pantallas es lo que ese módulo vino a evitar.
  *
  * ## Lo que no se puede medir todavía, y por qué
  *
@@ -49,7 +25,8 @@
  * bipartito para *decidir si cabe*, sin persistir a quién le tocó cada puesto.
  * Está reportado. Lo que sí se puede medir —y es lo que la pregunta "¿abro otro
  * puesto?" necesita— es la ocupación **agregada** de las horas de puesto del
- * estudio, que es lo que este archivo entrega.
+ * estudio, que es lo que `stationHourOccupancy()` entrega a partir de las
+ * ventanas que arma este archivo.
  */
 
 import {
@@ -90,7 +67,13 @@ function intervalOf(date: EaLocalDate, fromMin: number, toMin: number): Interval
   };
 }
 
-/** La jornada de un día: cuándo abre, y qué descansos tiene adentro. */
+/**
+ * La jornada de un día: cuándo abre, y qué descansos tiene adentro.
+ *
+ * Es la forma que `ScheduleWindow` de `lib/metrics.ts` espera —los arreglos son
+ * mutables acá porque `windowOverRange()` los va llenando— así que se le puede
+ * pasar tal cual a `stationHourOccupancy()`.
+ */
 export type DayWindow = {
   /** Vacío = ese día no se trabaja. */
   open: Interval[];
@@ -221,85 +204,6 @@ export function occupancyByProvider(
       appointments: provider.appointments,
     }),
   }));
-}
-
-// ── Ocupación por hora de estación ──────────────────────────────────────────
-
-export type StationOccupancy = {
-  /** Puestos del estudio. Hoy son dos. */
-  stations: number;
-  /**
-   * Minutos en que el estudio **estuvo abierto**: la unión de las jornadas de
-   * todas las técnicas, menos bloqueos. Unión y no suma: dos técnicas en el
-   * mismo turno son un turno, no dos.
-   */
-  openMinutes: number;
-  /** `stations × openMinutes`. La capacidad real del negocio. */
-  capacityMinutes: number;
-  /**
-   * Minutos de puesto usados: la **suma** de los minutos atendidos de cada
-   * técnica. Acá no se fusiona — dos citas simultáneas ocupan dos puestos, y
-   * fusionarlas es justo el error que hace que "¿me cabe otra técnica?" se
-   * responda mal.
-   */
-  usedMinutes: number;
-  /** `used / capacity`. `null` si el estudio no abrió: no es 0 %, es nada. */
-  rate: number | null;
-  /**
-   * Minutos usados **por encima** de la capacidad de puestos.
-   *
-   * Cualquier valor distinto de cero significa que hubo más citas simultáneas
-   * que puestos, es decir que alguien atendió sin silla o que la agenda
-   * permitió algo físicamente imposible. Es la señal de que hace falta revisar
-   * `lib/conflict.ts` o los datos, no un número que haya que promediar.
-   */
-  overCapacityMinutes: number;
-};
-
-/**
- * Ocupación por hora de estación.
- *
- * ⚠ **Candidata a `lib/metrics.ts` (B1).** Ver la cabecera de este archivo: es
- * una definición de negocio y su lugar es el módulo de definiciones, no una
- * carpeta de pantalla. Está acá porque `lib/` no es de este paquete y la
- * función no existía.
- *
- * `studioWindow` es la jornada del **estudio** —la unión de las de las
- * técnicas— y se le pasa a `computeOccupancy()` con la lista de citas vacía
- * justamente para que sea B1 el que haga la unión y la resta de bloqueos. Así
- * "minutos disponibles" significa exactamente lo mismo acá y en el reporte por
- * técnica.
- */
-export function stationHourOccupancy(input: {
-  stations: number;
-  studioWindow: DayWindow;
-  studioBlocked: readonly Interval[];
-  perProvider: readonly ProviderOccupancy[];
-}): StationOccupancy {
-  const stations = Math.max(0, Math.trunc(input.stations));
-
-  const open = computeOccupancy({
-    scheduled: input.studioWindow.open,
-    blocked: [...input.studioWindow.breaks, ...input.studioBlocked],
-    appointments: [],
-  });
-
-  const openMinutes = open.availableMinutes;
-  const capacityMinutes = stations * openMinutes;
-
-  const usedMinutes = input.perProvider.reduce(
-    (sum, provider) => sum + provider.occupancy.busyMinutes,
-    0,
-  );
-
-  return {
-    stations,
-    openMinutes,
-    capacityMinutes,
-    usedMinutes,
-    rate: capacityMinutes === 0 ? null : usedMinutes / capacityMinutes,
-    overCapacityMinutes: Math.max(0, usedMinutes - capacityMinutes),
-  };
 }
 
 // ── Franjas ─────────────────────────────────────────────────────────────────

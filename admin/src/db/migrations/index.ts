@@ -22,8 +22,15 @@
  *                        007 commission_rule ──▶ 009 commission_entry ◀── 008
  * ```
  *
- * Las demás (`002`, `006`, `010`–`012`, `014`, `015`) no tienen FK y podrían ir
- * en cualquier posición; van donde están para agrupar por tema.
+ * Las demás (`002`, `006`, `010`–`012`, `014`, `015`, `017`) no tienen FK y
+ * podrían ir en cualquier posición; van donde están para agrupar por tema.
+ *
+ * **La regla de "solo A2 escribe migraciones" se abrió dos veces, con número
+ * asignado de antemano** para que dos ramas en paralelo no eligieran el mismo:
+ * `016` (arreglo de Better Auth) y `017` (`job_run`, de la consolidación WP-E1).
+ * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
+ * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
+ * detecta que alguien editó una migración ya aplicada.
  */
 
 import type { Migration } from "./migration";
@@ -44,6 +51,7 @@ import { migration as m013 } from "./013-staff-totp";
 import { migration as m014 } from "./014-legacy-appointment";
 import { migration as m015 } from "./015-audit-log";
 import { migration as m016 } from "./016-account-issuer";
+import { migration as m017 } from "./017-job-run";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -62,6 +70,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m014,
   m015,
   m016,
+  m017,
 ];
 
 /**
@@ -89,6 +98,7 @@ export const EXPECTED_TABLES: readonly string[] = [
   "staff_totp",
   "legacy_appointment",
   "audit_log",
+  "job_run",
   // Infraestructura
   "schema_migration",
 ];

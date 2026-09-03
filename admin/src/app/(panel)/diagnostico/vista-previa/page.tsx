@@ -134,7 +134,20 @@ function build(state: State): Check[] {
     }),
     webhookTrafficCheck({ lastEvent: healthy ? ago(2) : broken ? null : ago(6), now: NOW }),
     reconcileCheck({
-      lastTouch: healthy ? ago(11) : broken ? null : ago(11),
+      // `lastRun` es lo que decide el semáforo: con `job_run`, "no corrió" es
+      // una afirmación y se pinta rojo. `lastTouch` —la última cuenta que el
+      // barrido tocó— quedó como contexto.
+      lastRun: broken
+        ? null
+        : {
+            startedAt: ago(11),
+            finishedAt: ago(11),
+            ok: healthy,
+            summary: healthy
+              ? "2026-08-24→2026-10-30: 41 citas revisadas · 0 creadas · 0 reparadas · 0 recongeladas · 0 espejadas · 41 intactas · 0 ya cerradas · 0 en fallback"
+              : "EA no respondió en 10000 ms (GET appointments)",
+          },
+      lastTouch: ago(11),
       now: NOW,
     }),
     ingestPushCheck({

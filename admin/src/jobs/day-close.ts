@@ -1,6 +1,11 @@
 import "server-only";
 
-import { isDuplicateKeyError, repositories, type Db } from "@/db";
+import {
+  isDuplicateKeyError,
+  JOB_DAY_CLOSE_PUSH,
+  repositories,
+  type Db,
+} from "@/db";
 import type { AppointmentFinance, AuthId, Cop, DayClose } from "@/db/types";
 import {
   EA_TIME_ZONE,
@@ -385,7 +390,7 @@ export function reviewDay(input: ReviewDayInput): DayReview {
   // SQL en vez de con una explicación. Se atrapa acá para que diga qué pasa.
   if (totals.efectivo < 0 || totals.transferencia < 0 || totals.otro < 0) {
     blockers.push(
-      "Algún total por método quedó negativo. Revisá las cuentas con renglones " +
+      "Algún total por método quedó negativo. Revisa las cuentas con renglones " +
         "en negativo antes de cerrar.",
     );
   }
@@ -656,15 +661,88 @@ export function dayBounds(date: EaLocalDate): [Date, Date] {
 
 // ── El push ─────────────────────────────────────────────────────────────────
 
+/** Qué pasó con el push, en una línea. Es lo que queda en `job_run.summary`. */
+export function summarizePush(row: DayClose, outcome: PushOutcome): string {
+  const day = `cierre ${row.close_date}`;
+
+  switch (outcome.state) {
+    case "hecho":
+      return `${day}: ${outcome.sent} movimiento(s) enviados`;
+    case "ya":
+      return `${day}: ya se había empujado, no se manda de nuevo`;
+    case "vacio":
+      return `${day}: sin movimientos que empujar`;
+    case "apagado":
+      return `${day}: el push está apagado (falta INGEST_URL)`;
+    case "pendiente":
+      return `${day}: otra llamada se está encargando del push`;
+    case "fallo":
+      return `${day}: falló — ${outcome.message}`;
+  }
+}
+
 /**
- * Empuja el lote de un cierre, si hace falta y se puede.
+ * Empuja el lote de un cierre y **deja constancia de que corrió**.
+ *
+ * La fila de `job_run` es para Diagnóstico, y responde algo que
+ * `pushed_to_ingest_at` no puede: esa columna dice si el push *llegó*, no si se
+ * intentó. Un intento que terminó en "no había nada que empujar" o en "el push
+ * está apagado" no deja marca en ninguna otra parte, y son justamente los casos
+ * que se confunden con "nadie apretó el botón".
+ *
+ * **La constancia es mejor esfuerzo.** Un fallo al escribir la bitácora no
+ * puede cambiar el resultado del push ni tumbar el cierre del día: la plata ya
+ * viajó o ya falló, y esa es la información que la pantalla necesita. Se grita
+ * al log del contenedor y se sigue.
+ */
+async function pushClose(
+  deps: DayCloseDeps,
+  row: DayClose,
+  now: Date,
+): Promise<PushOutcome> {
+  const startedAt = new Date();
+
+  const record = async (ok: boolean, summary: string): Promise<void> => {
+    try {
+      await repositories(deps.db).jobRuns.record({
+        job: JOB_DAY_CLOSE_PUSH,
+        startedAt,
+        finishedAt: new Date(),
+        ok,
+        summary,
+      });
+    } catch (error) {
+      console.error("[caja] no se pudo registrar el push en job_run", error);
+    }
+  };
+
+  let outcome: PushOutcome;
+
+  try {
+    outcome = await runPush(deps, row, now);
+  } catch (error) {
+    await record(false, `cierre ${row.close_date}: ${messageOf(error)}`);
+    throw error;
+  }
+
+  await record(outcome.state !== "fallo", summarizePush(row, outcome));
+
+  return outcome;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * El push en sí.
  *
  * El lote se arma **desde la base**, no desde lo que la pantalla tenía en
  * memoria: `listByDayClose()` devuelve exactamente las cuentas que quedaron
  * congeladas bajo ese cierre, así que el reintento de mañana manda el mismo
  * lote que el intento de hoy.
  */
-async function pushClose(
+async function runPush(
   deps: DayCloseDeps,
   row: DayClose,
   now: Date,

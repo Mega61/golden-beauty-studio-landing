@@ -39,7 +39,7 @@ const SERVICES: ServiceRow[] = [
 
 function finance(over: Partial<FinanceRow> = {}): FinanceRow {
   const items: FinanceItemRow[] = over.items ?? [
-    { kind: "servicio", eaServiceId: 1, pricingId: null, qty: 1, unitPrice: 115_000, lineTotal: 115_000 },
+    { kind: "servicio", eaServiceId: 1, pricingId: null, qty: 1, unitPrice: 115_000, lineTotal: 115_000, note: null },
   ];
   return {
     eaAppointmentId: 1,
@@ -418,8 +418,8 @@ describe("extrasReport", () => {
       eaProviderId: provider,
       amountCharged: 115_000 + extra,
       items: [
-        { kind: "servicio", eaServiceId: 1, pricingId: null, qty: 1, unitPrice: 115_000, lineTotal: 115_000 },
-        { kind: "adicional", eaServiceId: null, pricingId: "design", qty: 1, unitPrice: extra, lineTotal: extra },
+        { kind: "servicio", eaServiceId: 1, pricingId: null, qty: 1, unitPrice: 115_000, lineTotal: 115_000, note: null },
+        { kind: "adicional", eaServiceId: null, pricingId: "design", qty: 1, unitPrice: extra, lineTotal: extra, note: null },
       ],
     });
 
@@ -467,6 +467,26 @@ describe("extrasReport", () => {
 // ── 7 · Variación de precio ─────────────────────────────────────────────────
 
 describe("varianceReport", () => {
+  it("una cuenta con renglón manual no tumba la página", () => {
+    // `computeTicketTotals()` **lanza** ante un renglón manual sin nota, y la
+    // nota se caía en el proyector de `data.ts`. La excepción salía de un
+    // Server Component, así que un solo cobro manual en el periodo dejaba
+    // `/reportes` entero en error — no el reporte de variación: la página.
+    //
+    // Encontrado por el agente de E1 al colapsar `variance.ts`.
+    const conManual = finance({
+      eaAppointmentId: 99,
+      eaProviderId: 7,
+      amountCharged: 140_000,
+      items: [
+        { kind: "servicio", eaServiceId: 1, pricingId: null, qty: 1, unitPrice: 115_000, lineTotal: 115_000, note: null },
+        { kind: "manual", eaServiceId: null, pricingId: null, qty: 1, unitPrice: 25_000, lineTotal: 25_000, note: "Reparación de una uña" },
+      ],
+    });
+
+    expect(() => varianceReport([conManual], PROVIDERS)).not.toThrow();
+  });
+
   const rebajada = (id: number, provider: number, charged: number, reason: FinanceRow["varianceReasonCode"]) =>
     finance({
       eaAppointmentId: id,

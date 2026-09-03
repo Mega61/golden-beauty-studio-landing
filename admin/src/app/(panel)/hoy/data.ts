@@ -12,11 +12,9 @@ import {
   type EaLocalDate,
 } from "@/lib/ea";
 import {
-  buildListParams,
   createEaClient,
-  decodeAppointmentWithRelations,
+  listDayAppointments,
   type AppointmentWithRelations,
-  type EaClient,
 } from "@/lib/ea/client";
 import type { TicketCatalog } from "@/components/ticket/catalog";
 import type { TicketFinanceView, TodayAppointment } from "@/components/ticket/types";
@@ -42,10 +40,6 @@ import { loadCatalogForClose } from "./catalog-server";
  * La recíproca no aplica: sin `gbs_admin` no hay cuenta que cerrar ni catálogo
  * que mapear, y la pantalla lo dice de frente.
  */
-
-/** Tope de páginas al listar el día. Un día del estudio no llega ni a una. */
-const MAX_PAGES = 20;
-const PAGE_LENGTH = 100;
 
 export type TodayProblem = {
   /** `ea` = la agenda; `db` = la plata. */
@@ -73,54 +67,6 @@ function personName(
   if (person === null) return fallback;
   const name = [person.firstName, person.lastName].filter(Boolean).join(" ").trim();
   return name === "" ? fallback : name;
-}
-
-/**
- * Las citas de un día con `service`, `provider` y `customer` adjuntos.
- *
- * Se pide por el acceso crudo y no por `ea.appointments.list()` porque las
- * relaciones que EA adjunta con `with=` vienen en **snake_case** —su `load()`
- * pega la fila de MySQL tal cual— y el codec tipado del listado las descarta.
- * `decodeAppointmentWithRelations()` de A1 es justamente el que sabe leer esa
- * mezcla.
- *
- * La paginación se replica con la misma disciplina que `list()`: se pide de a
- * 100 hasta que una página venga incompleta, y si se agotan las páginas se
- * **lanza** en vez de devolver medio día. `Api::$default_length` de EA vale 20 y
- * no hay ninguna señal en la respuesta de que falten registros: una agenda a la
- * que le falta una cita se ve exactamente igual que una completa.
- */
-async function listDayAppointments(
-  ea: EaClient,
-  date: EaLocalDate,
-  eaProviderId: number | null,
-): Promise<AppointmentWithRelations[]> {
-  const out: AppointmentWithRelations[] = [];
-
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const params = buildListParams({ with: ["service", "provider", "customer"] });
-    params.set("date", date);
-    if (eaProviderId !== null) params.set("providerId", String(eaProviderId));
-    params.set("page", String(page));
-    params.set("length", String(PAGE_LENGTH));
-
-    const payload = await ea.raw({ method: "GET", path: "appointments", params });
-
-    if (!Array.isArray(payload)) {
-      throw new Error("EA devolvió algo que no es una lista de citas");
-    }
-
-    for (const raw of payload) {
-      out.push(decodeAppointmentWithRelations(raw as Record<string, unknown>));
-    }
-
-    if (payload.length < PAGE_LENGTH) return out;
-  }
-
-  throw new Error(
-    `Las citas de ${date} superaron ${MAX_PAGES} páginas de ${PAGE_LENGTH}. ` +
-      "Se aborta en vez de mostrar medio día.",
-  );
 }
 
 function financeViewOf(
@@ -229,7 +175,14 @@ export async function loadToday(
   try {
     const ea = createEaClient();
     const [lista, cat] = await Promise.all([
-      listDayAppointments(ea, date, soloProvider),
+      // El loader vive en `lib/ea/client.ts` y lo comparte con Caja: la
+      // disciplina de paginación —agotar o lanzar, nunca medio día— es una y
+      // está escrita una sola vez. Acá solo se dice qué relaciones se dibujan.
+      listDayAppointments(ea, {
+        date,
+        providerId: soloProvider,
+        with: ["service", "provider", "customer"],
+      }),
       // Sin base no hay `service_map`, así que el catálogo saldría sin
       // `pricing_id`. Se prefiere no armarlo: una cuenta cerrada con renglones
       // sin id de vitrina deja las reglas de comisión por categoría sin nada

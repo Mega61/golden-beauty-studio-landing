@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { parseEaLocalDate } from "./datetime";
 import { EaApiError } from "./errors";
 import {
   buildListParams,
@@ -7,6 +8,7 @@ import {
   decodeAppointmentWithRelations,
   eaConfigFromEnv,
   eaDateParam,
+  listDayAppointments,
   type EaClientConfig,
 } from "./client";
 
@@ -442,5 +444,107 @@ describe("relaciones adjuntas con with=", () => {
     expect(decoded.customer).toBeNull();
     expect(decoded.service).toBeNull();
     expect(decoded.provider).toBeNull();
+  });
+});
+
+describe("listDayAppointments — el día de Hoy y de Caja", () => {
+  const DIA = parseEaLocalDate("2026-08-31");
+
+  it("pide el día con sus relaciones y decodifica el snake_case adjunto", async () => {
+    const { ea, calls } = client(() =>
+      json([
+        {
+          ...appointment(1),
+          provider: { id: 2, first_name: "Luisa" },
+          customer: { id: 5, first_name: "Ana", phone_number: "+573001112233" },
+        },
+      ]),
+    );
+
+    const citas = await listDayAppointments(ea, {
+      date: DIA,
+      with: ["provider", "customer"],
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url.searchParams.get("date")).toBe("2026-08-31");
+    expect(calls[0].url.searchParams.get("with")).toBe("provider,customer");
+    expect(calls[0].url.searchParams.get("length")).toBe("100");
+    expect(calls[0].url.searchParams.has("providerId")).toBe(false);
+
+    // Las relaciones vienen crudas de MySQL: es lo que el codec del listado
+    // descartaría y por lo que este loader va por el acceso sin tipar.
+    expect(citas[0].provider?.firstName).toBe("Luisa");
+    expect(citas[0].customer?.phone).toBe("+573001112233");
+  });
+
+  it("las horas quedan como hora de pared, sin pasar por `Date`", async () => {
+    // EA guarda datetimes locales sin zona. Convertirlas y volver a
+    // formatearlas es el bug de cinco horas que este proyecto persigue desde el
+    // principio: la cadena tiene que salir idéntica a la que EA mandó.
+    const { ea } = client(() => json([appointment(1)]));
+
+    const citas = await listDayAppointments(ea, { date: DIA });
+
+    expect(citas[0].appointment.start).toBe("2026-08-31 14:00:00");
+    expect(citas[0].appointment.end).toBe("2026-08-31 15:30:00");
+  });
+
+  it("recorta a una técnica cuando se le pasa `providerId`", async () => {
+    const { ea, calls } = client(() => json([]));
+
+    await listDayAppointments(ea, { date: DIA, providerId: 7 });
+
+    expect(calls[0].url.searchParams.get("providerId")).toBe("7");
+  });
+
+  it("`providerId: null` es *todas*, no un filtro por cero", async () => {
+    const { ea, calls } = client(() => json([]));
+
+    await listDayAppointments(ea, { date: DIA, providerId: null });
+
+    expect(calls[0].url.searchParams.has("providerId")).toBe(false);
+  });
+
+  it("pagina hasta que una página venga incompleta", async () => {
+    // `Api::$default_length` de EA vale 20 y la respuesta es un arreglo pelado:
+    // sin total, sin `next`. La única señal de que se acabó es una página que
+    // no llenó.
+    const { ea, calls } = client((_call, index) =>
+      json(index === 0 ? [appointment(1), appointment(2)] : [appointment(3)]),
+    );
+
+    const citas = await listDayAppointments(ea, { date: DIA, pageLength: 2 });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].url.searchParams.get("page")).toBe("1");
+    expect(calls[1].url.searchParams.get("page")).toBe("2");
+    expect(citas.map((c) => c.appointment.id)).toEqual([1, 2, 3]);
+  });
+
+  it("**lanza** al agotar el tope en vez de devolver medio día", async () => {
+    // Devolver lo que alcanzó dejaría una pantalla que se ve completa y le
+    // falta una cita: en Hoy, una clienta invisible; en Caja, cerrar el día sin
+    // una cuenta que sí existía.
+    const { ea } = client(() => json([appointment(1)]));
+
+    await expect(
+      listDayAppointments(ea, { date: DIA, pageLength: 1, maxPages: 3 }),
+    ).rejects.toThrow(/medio día/);
+  });
+
+  it("un día vacío es una lista vacía, en una sola consulta", async () => {
+    const { ea, calls } = client(() => json([]));
+
+    expect(await listDayAppointments(ea, { date: DIA })).toEqual([]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("si EA no devuelve una lista, falla diciéndolo", async () => {
+    const { ea } = client(() => json({ error: "algo pasó" }));
+
+    await expect(listDayAppointments(ea, { date: DIA })).rejects.toThrow(
+      /no es una lista de citas/,
+    );
   });
 });

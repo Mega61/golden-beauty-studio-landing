@@ -550,6 +550,34 @@ export interface AuditLogTable {
 }
 
 /**
+ * Una corrida de un trabajo programado: el reconcile, el push del cierre.
+ *
+ * **Una fila por corrida, escrita al terminar.** No hay filas "en curso": un
+ * trabajo que muere a la mitad no deja fila, y eso se lee como "no corrió", que
+ * es lo correcto. `ok = 0` es una corrida que falló, que es información
+ * distinta de que no haya fila.
+ *
+ * Existe para que Diagnóstico pueda distinguir **"corrió y no había nada que
+ * hacer"** de **"no corrió"**. Antes leía la marca de tiempo de la última fila
+ * que el reconcile había escrito, y una noche sin trabajo no deja ninguna.
+ *
+ * Sin llaves foráneas, como `audit_log`: el cron no es un `user`, y esta tabla
+ * tiene que poder escribirse la noche en que lo demás está roto.
+ */
+export interface JobRunTable {
+  id: Generated<number>;
+  /** Namespace corto y estable: `reconcile`, `day-close-push`. */
+  job: string;
+  started_at: SqlDateTime;
+  finished_at: SqlDateTime;
+  /** `0` = la corrida falló. Es un `TINYINT(1)`, como `user.emailVerified`. */
+  ok: ColumnType<number, number, number>;
+  /** Resumen legible del job. Lectura humana; nada se calcula sobre esto. */
+  summary: string | null;
+  created_at: CreatedAt;
+}
+
+/**
  * El libro de migraciones aplicadas.
  *
  * `checksum` existe porque el esquema es forward-only: editar una migración ya
@@ -586,6 +614,7 @@ export interface Database {
   staff_totp: StaffTotpTable;
   legacy_appointment: LegacyAppointmentTable;
   audit_log: AuditLogTable;
+  job_run: JobRunTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -638,3 +667,6 @@ export type NewLegacyAppointment = Insertable<LegacyAppointmentTable>;
 
 export type AuditLogRow = Selectable<AuditLogTable>;
 export type NewAuditLog = Insertable<AuditLogTable>;
+
+export type JobRunRow = Selectable<JobRunTable>;
+export type NewJobRun = Insertable<JobRunTable>;

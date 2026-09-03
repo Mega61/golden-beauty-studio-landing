@@ -59,9 +59,9 @@ import "server-only";
  *    decirlo es mejor que no mostrar nada.
  */
 
-import type { Pool, RowDataPacket } from "mysql2";
+import type { RowDataPacket } from "mysql2";
 
-import { createEaReadOnlyPool } from "@/db/client";
+import { getEaReadOnlyPool } from "@/db/client";
 import {
   parseEaLocalDate,
   parseEaLocalDateTime,
@@ -74,29 +74,18 @@ import { normalizePhoneE164 } from "../clientes/identity";
 import type { AppointmentRow, ServiceRow } from "./aggregate";
 import type { Interval } from "@/lib/metrics";
 
-/**
- * El pool, uno por proceso.
- *
- * `createEaReadOnlyPool()` **crea un pool nuevo en cada llamada**, así que
- * invocarla por request abriría cinco conexiones más cada vez que alguien
- * refresca Reportes hasta agotar `max_connections` del servidor compartido. La
- * memoización va acá y no en `db/client.ts` porque ese archivo es de A2; lo
- * natural es que viva allá, junto a la de `getDb()`, y está reportado.
- */
-let pool: Pool | null = null;
-
-function eaPool(): Pool {
-  if (pool === null) pool = createEaReadOnlyPool();
-  return pool;
-}
-
 async function select<T extends RowDataPacket>(
   sql: string,
   params: readonly (string | number)[] = [],
 ): Promise<T[]> {
+  // El pool es **uno por proceso** y la memoización vive en `db/client.ts`,
+  // junto a la de `getDb()`: cada pool abre hasta cinco conexiones y
+  // `mysql-transversal` es un servidor compartido, así que uno por request
+  // agotaría `max_connections` a fuerza de refrescar esta pantalla.
+  //
   // `[...params]`: mysql2 tipa los valores como un arreglo mutable, y todo lo
   // que entra acá es `readonly` a propósito. La copia es de tres elementos.
-  const [rows] = await eaPool().promise().query<T[]>(sql, [...params]);
+  const [rows] = await getEaReadOnlyPool().promise().query<T[]>(sql, [...params]);
   return rows;
 }
 

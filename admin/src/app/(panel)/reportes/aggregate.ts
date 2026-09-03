@@ -19,11 +19,11 @@
  * Tres cosas que sí son propias de este archivo y están marcadas donde
  * aparecen:
  *
- * - **La variación de precio** (`priceVariance`) es un espejo de la compuerta
- *   de `validateTicketClose()` de B1, que no la exporta. Tiene su propio
- *   archivo, `variance.ts`, con un test que la ancla al comportamiento de B1.
- * - **La ocupación por hora de estación** vive en `occupancy.ts` y su lugar es
- *   `lib/metrics.ts`. Ver la cabecera de ese archivo.
+ * - **La variación de precio** no es propia: `priceVariance()` es la compuerta
+ *   de `validateTicketClose()` de B1, exportada. Hubo un espejo acá
+ *   (`variance.ts`) mientras B1 no la exportaba; ya no existe.
+ * - **La ocupación por hora de estación** es `stationHourOccupancy()` de
+ *   `lib/metrics.ts`; `occupancy.ts` solo traduce el plan de trabajo de EA.
  * - **El origen de la reserva no existe en EA.** Ver `noShowReport`.
  *
  * ## Lo agendado no es lo realizado
@@ -46,6 +46,7 @@ import {
   type Retention,
   type VisitRecord,
 } from "@/lib/metrics";
+import { priceVariance, type TicketItemInput } from "@/lib/ticket";
 import type {
   Cop,
   PaymentMethod,
@@ -54,7 +55,6 @@ import type {
 } from "@/db/types";
 
 import { slotOf, SLOTS, type SlotId } from "./occupancy";
-import { priceVariance } from "./variance";
 
 // ── Filas de entrada ────────────────────────────────────────────────────────
 //
@@ -85,6 +85,16 @@ export type FinanceItemRow = {
   qty: number;
   unitPrice: Cop;
   lineTotal: Cop;
+  /**
+   * Obligatoria cuando `kind === "manual"`, y por eso viaja hasta acá.
+   *
+   * Se caía del proyector, y `varianceReport()` le pasaba `null` a
+   * `priceVariance()` → `computeTicketTotals()`, que **lanza** ante un renglón
+   * manual sin nota. La excepción salía de un Server Component, así que
+   * cualquier periodo con una sola cuenta de cobro manual tumbaba `/reportes`
+   * entero — no el reporte de variación: la página.
+   */
+  note: string | null;
 };
 
 /** El encabezado de una cuenta, con sus renglones. */
@@ -565,9 +575,26 @@ export function varianceReport(
   let worst = 0;
 
   for (const row of closed) {
-    // `priceVariance` espeja la compuerta de B1 y está anclada a ella por un
-    // test. Ver `variance.ts`.
-    const amount = priceVariance(row.items, row.amountCharged ?? 0);
+    // `priceVariance` **es** la compuerta de `validateTicketClose()` de B1,
+    // exportada: acá no se define ninguna variación, se le pregunta a B1.
+    //
+    // El renglón se traduce a la forma de B1 y `note` va en `null` porque
+    // `FinanceItemRow` no la trae — es el mismo dato que se pasaba antes, así
+    // que el número no cambia. Ojo: con un renglón `kind: "manual"` eso hace
+    // lanzar a `computeTicketTotals()` ("un renglón manual exige una nota"),
+    // que es el comportamiento que ya había y está reportado como hallazgo, no
+    // arreglado acá: arreglarlo cambia las cifras del reporte.
+    const amount = priceVariance(
+      row.items.map(
+        (item): TicketItemInput => ({
+          kind: item.kind,
+          qty: item.qty,
+          unitPriceSnapshot: item.unitPrice,
+          note: item.note,
+        }),
+      ),
+      row.amountCharged ?? 0,
+    );
     if (amount <= 0) continue;
 
     if (row.varianceReasonCode === null) withoutReason += 1;
