@@ -526,6 +526,18 @@
   position: absolute;
   z-index: 10;
   display: block;
+
+  /* **Un bloque nunca puede ser más bajo que su propia hora.**
+     `minEventMinutes` del motor cae por defecto en un slot —15 min—, que a la
+     altura de fila del panel son 14 px. Menos el borde y el relleno quedan 12 px
+     de caja para una línea de 13 px: una cita de 15 minutos salía con la hora
+     **cortada por abajo**, y la hora es lo único que ese bloque alcanza a decir.
+     20 px es una línea más el relleno y los dos bordes.
+
+     Que el bloque sobresalga un par de píxeles de su franja es deliberado y es
+     lo que hace cualquier calendario: preferimos que se note que hay algo a las
+     2:00 antes que un rótulo a medio dibujar. */
+  min-height: 1.25rem;
   overflow: hidden;
   padding: 0.125rem 0.3125rem;
   border: 1px solid var(--ev-edge);
