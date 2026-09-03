@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# Vitest escribe el resumen acá cuando se le pasa un reporter JSON a mano.
+coverage-tmp/
 
 # next.js
 /.next/
