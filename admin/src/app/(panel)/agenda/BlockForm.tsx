@@ -141,7 +141,7 @@ export function BlockForm({
                     set("providerId", e.target.value === "" ? null : Number(e.target.value))
                   }
                 >
-                  <option value="">Elegí a quién…</option>
+                  <option value="">Elige a quién…</option>
                   {providers.map((provider) => (
                     <option key={provider.id} value={provider.id}>
                       {provider.name}

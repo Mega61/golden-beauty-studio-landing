@@ -43,6 +43,7 @@ import { migration as m012 } from "./012-station";
 import { migration as m013 } from "./013-staff-totp";
 import { migration as m014 } from "./014-legacy-appointment";
 import { migration as m015 } from "./015-audit-log";
+import { migration as m016 } from "./016-account-issuer";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -60,6 +61,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m013,
   m014,
   m015,
+  m016,
 ];
 
 /**

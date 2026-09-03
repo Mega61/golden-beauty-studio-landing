@@ -254,7 +254,7 @@ function assertKeywordIsAlone(query: AppointmentQuery): void {
   if (conflicting.length > 0) {
     throw new EaApiError(
       `EA ignora los filtros cuando se manda "q": ${conflicting.join(", ")} no tendrían efecto. ` +
-        "Buscá sin filtros y recortá acá, o filtrá sin q.",
+        "Busca sin filtros y recorta acá, o filtra sin q.",
       { kind: "bad_request" },
     );
   }
@@ -268,7 +268,7 @@ function assertFieldsAreDecodable(resource: EaMappedResource, fields?: readonly 
   if (missing.length > 0) {
     throw new EaApiError(
       `Un "fields=" de ${resource} sin ${missing.join(", ")} devuelve registros que no se pueden ` +
-        "decodificar. Agregalos, o usá el acceso crudo.",
+        "decodificar. Agregalos, o usa el acceso crudo.",
       { kind: "bad_request" },
     );
   }
@@ -505,7 +505,7 @@ export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaCl
 
         throw new EaApiError(
           `El listado de ${path} superó ${maxPages} páginas de ${pageLength}. Se aborta en vez de ` +
-            "devolver un resultado incompleto: acotá el rango o subí maxPages a conciencia.",
+            "devolver un resultado incompleto: acota el rango o sube maxPages a conciencia.",
           { kind: "pagination_overflow", path, method: "GET" },
         );
       },

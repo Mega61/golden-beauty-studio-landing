@@ -200,7 +200,7 @@ describe("validación", () => {
   it("una profesional sin elegir es un error del campo, no un throw", () => {
     expect(fail({ providerId: null })).toContainEqual({
       field: "providerId",
-      message: "Elegí a quién le aplica.",
+      message: "Elige a quién le aplica.",
     });
   });
 

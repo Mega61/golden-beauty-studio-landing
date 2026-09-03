@@ -66,7 +66,7 @@ export async function GET(request: Request): Promise<Response> {
   const result = await loadAgenda(dates);
 
   if (!result.ok) {
-    // 503 y no 500: EA está caído, el panel no. La pantalla lo lee como "entrá
+    // 503 y no 500: EA está caído, el panel no. La pantalla lo lee como "entra
     // en solo lectura", que es distinto de "algo se rompió acá adentro".
     return NextResponse.json({ error: result.reason }, { status: 503 });
   }

@@ -60,7 +60,7 @@ export async function entrarConCodigo(
   const userId = String(formData.get("userId") ?? "");
   const code = String(formData.get("code") ?? "");
 
-  if (!userId) return { error: "Elegí tu nombre antes de escribir el código." };
+  if (!userId) return { error: "Elige tu nombre antes de escribir el código." };
 
   try {
     await getAuth().api.signInTotp({
@@ -96,5 +96,5 @@ function mensajeDeError(error: unknown): string {
     const body = (error as { body?: { message?: unknown } }).body;
     if (body && typeof body.message === "string") return body.message;
   }
-  return "No pudimos verificar el código. Volvé a intentar.";
+  return "No pudimos verificar el código. Vuelve a intentar.";
 }

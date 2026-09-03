@@ -185,7 +185,7 @@ export async function confirmarTotp(
     if (!ok) {
       return {
         ok: false,
-        message: "Ese código no sirvió. Revisá la app y probá con el siguiente.",
+        message: "Ese código no sirvió. Revisa la app y prueba con el siguiente.",
       };
     }
     await auditLogRepository(getDb()).append({
@@ -281,7 +281,7 @@ export async function quitarDelPanel(
   if (email.toLowerCase() === session.email.toLowerCase()) {
     return {
       ok: false,
-      message: "No te podés quitar a vos misma: quedaría el panel sin dueña.",
+      message: "No te puedes quitar a vos misma: quedaría el panel sin dueña.",
     };
   }
 

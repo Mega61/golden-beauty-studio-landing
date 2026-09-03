@@ -425,7 +425,7 @@ export function AgendaClient({
 
       setFormError(
         result.status === "invalid"
-          ? (result.errors[0]?.message ?? "Revisá el formulario.")
+          ? (result.errors[0]?.message ?? "Revisa el formulario.")
           : result.message,
       );
     });
@@ -465,7 +465,7 @@ export function AgendaClient({
         onMove={() => {
           setMovingId(panel.appointment.id);
           setPanel({ kind: "none" });
-          toast({ message: "Tocá el hueco de destino.", tone: "neutral", duration: 6000 });
+          toast({ message: "Toca el hueco de destino.", tone: "neutral", duration: 6000 });
         }}
         onEdit={() => {
           setReport(null);
@@ -651,7 +651,7 @@ function Notices({
       {moving ? (
         <div className={styles.notice} role="status">
           <span style={{ flex: 1 }}>
-            <strong>Moviendo una cita.</strong> Tocá el hueco de destino.
+            <strong>Moviendo una cita.</strong> Toca el hueco de destino.
           </span>
           <Button size="sm" variant="ghost" onClick={onCancelMove}>
             Cancelar
@@ -686,7 +686,7 @@ function Notices({
       {unknown.length > 0 ? (
         <div className={styles.notice} role="status">
           <span>
-            <strong>Hay estados que el panel no reconoce.</strong> Se dibujan punteados. Revisá la
+            <strong>Hay estados que el panel no reconoce.</strong> Se dibujan punteados. Revisa la
             lista de estados en Easy!Appointments:
             <ul className={styles.noticeList}>
               {unknown.map((raw) => (

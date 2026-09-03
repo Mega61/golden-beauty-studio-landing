@@ -35,7 +35,7 @@ export default async function ProfesionalPage({
       <EmptyState
         icon="alerta"
         title="No se pudo abrir la ficha"
-        body="La agenda no respondió. Volvé a intentar en un momento; no hace falta crear nada de nuevo."
+        body="La agenda no respondió. Vuelve a intentar en un momento; no hace falta crear nada de nuevo."
       />
     );
   }

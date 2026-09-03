@@ -30,7 +30,7 @@ import mysql from "mysql2/promise";
  * levantado; si no, la gente deja de correrlo. Tres escapes, en orden:
  *
  * - `GBS_SKIP_DB_TESTS=1` — salta siempre, sin preguntar.
- * - `GBS_TEST_MYSQL_URL` — usá *ese* MySQL en vez de levantar uno. Es cómo se
+ * - `GBS_TEST_MYSQL_URL` — usa *ese* MySQL en vez de levantar uno. Es cómo se
  *   corre en CI, donde el runner ya da un servicio `mysql` y arrancar Docker
  *   adentro de Docker es innecesario.
  * - Detección: si `docker info` no contesta, se salta.
@@ -91,7 +91,7 @@ export function canRunDbTests(): boolean {
 export function skipReason(): string {
   if (canRunDbTests()) return "";
   if (process.env.GBS_SKIP_DB_TESTS === "1") return "GBS_SKIP_DB_TESTS=1";
-  return "Docker no está disponible (levantá Docker Desktop o usá GBS_TEST_MYSQL_URL)";
+  return "Docker no está disponible (levanta Docker Desktop o usa GBS_TEST_MYSQL_URL)";
 }
 
 async function waitUntilReady(url: string, deadline: number): Promise<void> {

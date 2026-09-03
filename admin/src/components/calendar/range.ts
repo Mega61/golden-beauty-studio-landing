@@ -154,7 +154,7 @@ export function fetchWindow(dates: readonly EaLocalDate[]): FetchWindow {
  * ¿Esta cita toca alguno de los días visibles?
  *
  * El recorte fino lo hace `buildDayGrid()`, día por día. Esto es el filtro
- * grueso de "descartá lo que vino de más": ahorra pasarle a cada llamada del
+ * grueso de "descarta lo que vino de más": ahorra pasarle a cada llamada del
  * motor las citas de los dos días de relleno, que en una semana son dos
  * séptimos de la carga.
  *

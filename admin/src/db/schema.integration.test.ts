@@ -148,6 +148,38 @@ describe.skipIf(!canRunDbTests())(
       }, TEST_TIMEOUT);
 
       it(
+        "account tiene la columna issuer que Better Auth 1.7 exige",
+        async () => {
+          // El login moría con `Unknown column 'account.issuer' in 'where
+          // clause'`: en 1.7 la identidad de una cuenta está scopeada por el
+          // issuer del proveedor OIDC, y la migración 001 solo creó
+          // `providerId`. La comprobación va contra la base y no contra el SQL
+          // fuente, porque lo que importa es que la columna exista después de
+          // aplicar el set completo — incluida la 016, que la agrega con un
+          // ALTER preparado para ser idempotente.
+          const { rows } = await sql<{ COLUMN_NAME: string; IS_NULLABLE: string }>`
+            SELECT COLUMN_NAME, IS_NULLABLE FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'account'
+              AND COLUMN_NAME = 'issuer'
+          `.execute(db);
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.IS_NULLABLE).toBe("NO");
+
+          const { rows: idx } = await sql<{ INDEX_NAME: string }>`
+            SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'account'
+              AND INDEX_NAME = 'uq_account_issuer'
+          `.execute(db);
+
+          expect(idx).toHaveLength(1);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
         "escribe CURRENT_TIMESTAMP en hora de Bogotá aunque el servidor esté en UTC",
         async () => {
           // `mysql-transversal` corre en UTC (verificado en la VM). Las ~20

@@ -238,7 +238,7 @@ function messageOf(error: unknown): string {
   if (error instanceof TicketError) return error.message;
   // Cualquier otra cosa es un bug nuestro, no un dato inválido. Se deja subir
   // en vez de disfrazarlo de mensaje de validación: un error de programación
-  // que aparece en pantalla como "revisá estos campos" manda a la técnica a
+  // que aparece en pantalla como "revisa estos campos" manda a la técnica a
   // buscar un problema que no está en la cuenta.
   throw error;
 }
@@ -277,7 +277,7 @@ export function draftToItems(
     if (price === null) {
       flags.push({
         label: performed.name,
-        message: "EA no tiene precio para este servicio. Escribí el total a mano.",
+        message: "EA no tiene precio para este servicio. Escribe el total a mano.",
       });
     }
 
@@ -297,7 +297,7 @@ export function draftToItems(
     if (service.listPrice === null) {
       flags.push({
         label: service.name,
-        message: "EA no tiene precio para este adicional. Escribí el total a mano.",
+        message: "EA no tiene precio para este adicional. Escribe el total a mano.",
       });
     }
 
@@ -316,7 +316,7 @@ export function draftToItems(
     if (catalog.services.some((s) => String(s.eaServiceId) === key)) continue;
     flags.push({
       label: `Adicional #${key}`,
-      message: "Ya no está en el catálogo de EA. No se cobró; revisá la cuenta.",
+      message: "Ya no está en el catálogo de EA. No se cobró; revisa la cuenta.",
     });
   }
 

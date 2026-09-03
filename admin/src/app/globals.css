@@ -491,7 +491,7 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    /* El spinner sí necesita moverse para significar "esperá". Se frena a un
+    /* El spinner sí necesita moverse para significar "espera". Se frena a un
        giro por segundo y medio en vez de desaparecer, que dejaría un aro
        quieto imposible de interpretar. */
     .ui-spinner {

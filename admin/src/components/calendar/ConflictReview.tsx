@@ -45,7 +45,7 @@ export function ConflictReview({
     <div className={styles.conflict}>
       <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>
         {report.hard
-          ? "Esto no debería poder pasar en el estudio. Revisá antes de guardar:"
+          ? "Esto no debería poder pasar en el estudio. Revisa antes de guardar:"
           : "Se puede guardar, pero sale del horario previsto:"}
       </p>
 

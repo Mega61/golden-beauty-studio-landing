@@ -57,7 +57,7 @@ export function ClientesLista({ result }: { result: ClientListResult }) {
       {result.query === null && !result.failure ? (
         <p style={meta}>
           Las {result.clients.length} clientas más recientes
-          {result.truncated ? ", de una lista más larga. Buscá para encontrar el resto." : "."}
+          {result.truncated ? ", de una lista más larga. Busca para encontrar el resto." : "."}
         </p>
       ) : null}
 
@@ -190,7 +190,7 @@ function emptyFor(result: ClientListResult): React.ReactNode {
       <EmptyState
         icon="buscar"
         title={`Ninguna clienta con «${result.query}»`}
-        body="Probá con menos letras, con el número sin espacios, o con el apellido. La búsqueda mira nombre, teléfono y correo."
+        body="Prueba con menos letras, con el número sin espacios, o con el apellido. La búsqueda mira nombre, teléfono y correo."
         secondary={
           <Link className="ui-btn ui-btn--ghost" href="/clientes">
             Ver las más recientes

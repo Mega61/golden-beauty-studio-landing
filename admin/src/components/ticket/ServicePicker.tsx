@@ -95,7 +95,7 @@ export function ServicePicker({
               color: "var(--color-carbon)",
             }}
           >
-            {selected ? selected.name : "Elegí el servicio"}
+            {selected ? selected.name : "Elige el servicio"}
           </span>
           <span
             style={{

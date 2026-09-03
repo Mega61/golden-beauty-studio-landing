@@ -158,7 +158,7 @@ export function TicketSheet({
         {storageBlocked ? (
           <Aviso tono="warn">
             Este navegador no deja guardar borradores. Si se cae el wifi antes de guardar, lo
-            escrito se pierde: terminá la cuenta antes de cambiar de pantalla.
+            escrito se pierde: termina la cuenta antes de cambiar de pantalla.
           </Aviso>
         ) : null}
 
@@ -333,7 +333,7 @@ export function TicketSheet({
             />
           ) : (
             <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
-              El método de pago lo registra recepción. Guardá la cuenta y listo.
+              El método de pago lo registra recepción. Guarda la cuenta y listo.
             </p>
           )}
 
@@ -539,7 +539,7 @@ function TotalBlock({
         {amountCharged === null ? "—" : formatCOP(amountCharged)}
       </span>
       <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
-        Tocá para cambiarlo
+        Toca para cambiarlo
       </span>
     </button>
   );

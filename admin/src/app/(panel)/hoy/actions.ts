@@ -99,7 +99,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     // no significan nada para la técnica. El detalle va al log del servidor,
     // que es donde alguien lo va a buscar.
     console.error("[hoy] cuenta con forma inválida", parsed.error.issues);
-    return rechazo("La cuenta llegó incompleta. Volvé a abrirla y guardá de nuevo.");
+    return rechazo("La cuenta llegó incompleta. Vuelve a abrirla y guarda de nuevo.");
   }
 
   const data = parsed.data;
@@ -134,7 +134,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   } catch (error) {
     unstable_rethrow(error);
     console.error("[hoy] el panel está mal configurado", error);
-    return rechazo("El panel no está bien configurado. Avisá a la dueña.");
+    return rechazo("El panel no está bien configurado. Avisa a la dueña.");
   }
 
   // --- La cita, desde EA (es quien manda sobre de quién es) ---------------

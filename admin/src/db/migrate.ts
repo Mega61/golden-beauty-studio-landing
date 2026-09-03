@@ -95,7 +95,7 @@ function assertUnchanged(
       `La migración ${migration.id} ya está aplicada pero su contenido cambió ` +
         `(libro: ${applied.checksum.slice(0, 12)}…, archivo: ${checksum.slice(0, 12)}…). ` +
         "El esquema es forward-only: una migración aplicada no se edita. " +
-        "Revertí el archivo y agregá una migración nueva con el cambio.",
+        "Revierte el archivo y agrega una migración nueva con el cambio.",
     );
   }
 }

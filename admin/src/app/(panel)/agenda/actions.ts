@@ -386,7 +386,7 @@ function failure(error: unknown, fallback: string): WriteResult {
     if (error.kind === "not_found") {
       return {
         status: "error",
-        message: "Esa cita ya no existe en Easy!Appointments. Actualizá la agenda.",
+        message: "Esa cita ya no existe en Easy!Appointments. Actualiza la agenda.",
       };
     }
     if (error.kind === "timeout" || error.kind === "network") {

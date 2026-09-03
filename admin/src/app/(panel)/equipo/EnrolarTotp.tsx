@@ -147,7 +147,7 @@ function Codigo({
       <div style={{ display: "grid", gap: "0.625rem", minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>
           <strong>Este código se muestra una sola vez.</strong> Escanealo con la
-          app de autenticación del celular y escribí abajo los seis dígitos que
+          app de autenticación del celular y escribe abajo los seis dígitos que
           aparezcan.
         </p>
 

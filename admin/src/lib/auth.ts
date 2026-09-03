@@ -202,7 +202,7 @@ function toEnrollment(row: StaffTotp): TotpEnrollment {
 function invalidCode(): APIError {
   return new APIError("UNAUTHORIZED", {
     code: "TOTP_INVALIDO",
-    message: "El código no es válido. Revisá la app y volvé a intentar.",
+    message: "El código no es válido. Revisa la app y vuelve a intentar.",
   });
 }
 

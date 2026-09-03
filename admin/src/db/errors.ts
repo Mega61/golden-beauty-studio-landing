@@ -14,7 +14,7 @@ type MysqlishError = { errno?: unknown; code?: unknown };
 /**
  * ¿Chocó contra un índice único?
  *
- * Se usa para el patrón "insertá y si ya estaba, leelo" — que es cómo el
+ * Se usa para el patrón "inserta y si ya estaba, leelo" — que es cómo el
  * webhook y el reconcile compiten por la misma cita sin pisarse. Un `SELECT`
  * previo seguido de un `INSERT` tiene una ventana entre los dos; dejar que la
  * base decida no la tiene.

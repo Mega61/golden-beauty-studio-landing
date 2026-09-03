@@ -438,7 +438,7 @@ function Paleta() {
             margin: "0.25rem 0 0.5rem",
           }}
         >
-          Tabulá por esta fila: el anillo tiene que verse igual de claro sobre las
+          Tabula por esta fila: el anillo tiene que verse igual de claro sobre las
           dos superficies.
         </p>
         <div style={{ display: "flex", gap: "1px" }}>
@@ -759,7 +759,7 @@ function Tabla() {
     <Seccion
       id="tabla"
       title="Tabla que colapsa a lista"
-      note="Tabla desde 768 px, con columnas prioritarias; tabla completa desde 1024. Por debajo, lista de dos líneas — nunca scroll lateral. Achicá la ventana y mirá la misma tabla cambiar de forma."
+      note="Tabla desde 768 px, con columnas prioritarias; tabla completa desde 1024. Por debajo, lista de dos líneas — nunca scroll lateral. Achica la ventana y mira la misma tabla cambiar de forma."
     >
       <Fila>
         <Button size="sm" onClick={() => setCargando((v) => !v)}>
@@ -1059,7 +1059,7 @@ function Vacios() {
           <EmptyState
             icon="buscar"
             title="Ninguna clienta con «mar»"
-            body="La búsqueda mira nombre y teléfono. Probá con el número completo, que es la identidad de la ficha."
+            body="La búsqueda mira nombre y teléfono. Prueba con el número completo, que es la identidad de la ficha."
             action={<Button>Limpiar la búsqueda</Button>}
             secondary={<Button variant="ghost">Crear una ficha nueva</Button>}
           />

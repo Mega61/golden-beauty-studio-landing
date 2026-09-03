@@ -155,7 +155,7 @@ export function AppointmentForm({
             value={draft.serviceId ?? ""}
             onChange={(e) => pickService(e.target.value === "" ? null : Number(e.target.value))}
           >
-            <option value="">Elegí un servicio…</option>
+            <option value="">Elige un servicio…</option>
             {services.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.name}
@@ -378,7 +378,7 @@ function CustomerPicker({
   }
 
   return (
-    <Field label="Clienta" required hint="Buscá por nombre o teléfono.">
+    <Field label="Clienta" required hint="Busca por nombre o teléfono.">
       {(wired) => (
         <>
           <TextInput

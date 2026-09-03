@@ -181,7 +181,7 @@ export function useTicketOutbox({
   // Al montar se lee el disco **y se intenta mandar lo que quedó**, sin esperar
   // el backoff. La página acaba de cargar desde el servidor: no hay mejor
   // prueba de que la red volvió. Hacer esperar cuarenta segundos a una cuenta
-  // que quedó de ayer convierte "se manda sola" en "recargá y esperá", y el
+  // que quedó de ayer convierte "se manda sola" en "recarga y espera", y el
   // caso real es exactamente ése — la técnica bloquea el celular con el wifi
   // caído y lo desbloquea cuando ya volvió.
   //

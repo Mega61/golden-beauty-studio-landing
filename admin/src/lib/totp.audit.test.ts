@@ -220,7 +220,7 @@ describe("AUDIT · el presupuesto de intentos de un atacante", () => {
   });
 
   it("un login exitoso reinicia la racha (el repo lo hace, no el plan)", () => {
-    // `planTotpAttempt()` no devuelve nada que diga "limpiá la racha"; quien lo
+    // `planTotpAttempt()` no devuelve nada que diga "limpia la racha"; quien lo
     // hace es `staffTotpRepository.consume()`. Se fija acá porque sin ese
     // reinicio, cuatro errores de dedo + un login + un error de dedo bloquearían
     // a una técnica que acaba de entrar bien.

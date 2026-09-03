@@ -13,7 +13,7 @@ import { TotpForm } from "./TotpForm";
  * Los dos caminos conviven en una sola tarjeta, y el orden es el de la
  * frecuencia real: la dueña y la recepción entran con Workspace, y las técnicas
  * — que entran más seguido y desde el celular — tocan su nombre. Una pantalla
- * con un selector "¿cómo querés entrar?" agregaría un paso a las dos.
+ * con un selector "¿cómo quieres entrar?" agregaría un paso a las dos.
  *
  * Es la **segunda y última** pantalla del panel con Cormorant (la otra es el
  * wordmark del shell). Acá la marca todavía está haciendo su trabajo: es lo
@@ -54,7 +54,7 @@ export default async function EntrarPage({
   const errorCode = typeof params.error === "string" ? params.error : null;
   const mensaje = errorCode
     ? (MENSAJES[errorCode] ??
-      "No pudimos completar la entrada. Volvé a intentar.")
+      "No pudimos completar la entrada. Vuelve a intentar.")
     : null;
 
   // Si `mysql-transversal` no responde, la grilla no se puede armar — pero el

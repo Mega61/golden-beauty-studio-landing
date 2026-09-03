@@ -181,7 +181,7 @@ export function Checkbox({
  * formulario: sin esto, "algo falló" la deja buscando a ciegas.
  */
 export function FormErrorSummary({
-  title = "Revisá estos campos antes de guardar",
+  title = "Revisa estos campos antes de guardar",
   errors,
 }: {
   title?: string;

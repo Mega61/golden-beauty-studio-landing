@@ -50,7 +50,7 @@ export default async function ClientaPage({
           <EmptyState
             icon="alerta"
             title="No se pudo abrir la ficha"
-            body="La agenda no respondió, así que no se sabe si esta clienta existe. No la crees de nuevo: volvé a intentar en un momento."
+            body="La agenda no respondió, así que no se sabe si esta clienta existe. No la crees de nuevo: vuelve a intentar en un momento."
           />
         </div>
       );

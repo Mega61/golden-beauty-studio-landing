@@ -2,7 +2,7 @@
  * Esqueletos: cargando con la forma del contenido, no un spinner en el centro
  * de la pantalla.
  *
- * La diferencia no es estética. Un spinner dice "esperá" y nada más; un
+ * La diferencia no es estética. Un spinner dice "espera" y nada más; un
  * esqueleto dice "van a venir tres filas con un nombre a la izquierda y un
  * monto a la derecha", y cuando llegan el ojo ya sabe dónde mirar. En una
  * pantalla que se refresca cada 30 s eso es la diferencia entre una interfaz

@@ -158,16 +158,16 @@ export function planBlock(form: BlockForm): BlockPlanResult {
   const errors: BlockFieldError[] = [];
 
   if (!DATE_RE.test(form.startDate)) {
-    errors.push({ field: "startDate", message: "Elegí la fecha de inicio." });
+    errors.push({ field: "startDate", message: "Elige la fecha de inicio." });
   }
   if (!DATE_RE.test(form.endDate)) {
-    errors.push({ field: "endDate", message: "Elegí la fecha de fin." });
+    errors.push({ field: "endDate", message: "Elige la fecha de fin." });
   }
   if (DATE_RE.test(form.startDate) && DATE_RE.test(form.endDate) && form.endDate < form.startDate) {
     errors.push({ field: "endDate", message: "El fin no puede ser antes del inicio." });
   }
   if (form.scope === "profesional" && form.providerId === null) {
-    errors.push({ field: "providerId", message: "Elegí a quién le aplica." });
+    errors.push({ field: "providerId", message: "Elige a quién le aplica." });
   }
 
   // Las horas solo se validan cuando hacen falta. Con `allDay` puesto, un campo
@@ -180,10 +180,10 @@ export function planBlock(form: BlockForm): BlockPlanResult {
     endMinute = parsePlanTime(form.endTime);
 
     if (startMinute === null) {
-      errors.push({ field: "startTime", message: "Escribí la hora de inicio." });
+      errors.push({ field: "startTime", message: "Escribe la hora de inicio." });
     }
     if (endMinute === null) {
-      errors.push({ field: "endTime", message: "Escribí la hora de fin." });
+      errors.push({ field: "endTime", message: "Escribe la hora de fin." });
     }
     if (startMinute !== null && endMinute !== null && endMinute <= startMinute) {
       errors.push({ field: "endTime", message: "La hora de fin tiene que ser posterior." });
