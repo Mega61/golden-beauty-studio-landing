@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/shell";
 import { ButtonLink } from "@/components/ui";
+import { requireSession } from "@/lib/dal";
 import { Gallery } from "./Gallery";
 
 /**
@@ -28,6 +29,25 @@ import { Gallery } from "./Gallery";
  * galería que solo existe en desarrollo se desactualiza sin que nadie lo note.
  * Si algún día molesta, el interruptor natural es el DAL del paquete B2 —
  * restringirla a `owner`— y no un `NODE_ENV`.
+ *
+ * ## Por qué el `requireSession()` está acá y no en un layout
+ *
+ * Esta página vive en `(dev)`, no en `(panel)`, así que **el
+ * `requireSession()` de `(panel)/layout.tsx` no la cubre**. Durante un rato no
+ * la cubrió nada: respondía 200 a cualquiera en
+ * `https://www.goldenbeautystudio.com.co/admin/galeria`, porque el rewrite de
+ * la landing manda `/admin/:path*` entero al origen y no distingue grupos de
+ * rutas. El comentario de arriba decía "detrás de la auth del panel" y era
+ * falso.
+ *
+ * Los datos son de mentira, así que no se filtró nada de nadie — pero sí la
+ * estructura del panel: los destinos de navegación por rol, los estados de
+ * cita, la forma de las pantallas. Eso es reconocimiento gratis para quien
+ * ande probando el sitio.
+ *
+ * La guarda va en la página porque es donde se puede ver: un grupo de rutas
+ * sin layout no hereda nada, y la próxima página que alguien ponga en `(dev)`
+ * va a nacer igual de abierta. **En `(dev)`, cada página se defiende sola.**
  */
 
 export const metadata = {
@@ -52,6 +72,10 @@ export default async function GaleriaPage({
   // En Next 16 los parámetros de la petición son asíncronos.
   searchParams: Promise<{ rol?: string }>;
 }) {
+  // Antes de cualquier otra cosa. Ver la nota del encabezado: en `(dev)` no
+  // hay layout que lo haga por nosotros.
+  await requireSession();
+
   const { rol } = await searchParams;
   const role = parseRol(rol);
 
