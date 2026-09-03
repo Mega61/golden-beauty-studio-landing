@@ -9,7 +9,7 @@ import type { IngestPayment } from "./ingest-payload";
  *
  * Es deliberadamente delgado: recibe un lote ya armado por
  * `buildDayClosePayments()` / `buildIngestAdjustment()`, lo pone en un sobre, lo
- * manda y clasifica la respuesta en "entró" / "reintentá" / "está mal". No
+ * manda y clasifica la respuesta en "entró" / "hay que reintentar" / "está mal". No
  * calcula un peso, no lee la base, no sabe qué es un cierre diario.
  *
  * ## Qué quedó verificado y qué sigue abierto

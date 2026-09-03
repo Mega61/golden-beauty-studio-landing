@@ -153,7 +153,7 @@ function Codigo({
 
         {secreto ? (
           <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
-            ¿No escanea? Escribilo a mano:{" "}
+            ¿No escanea? Escríbelo a mano:{" "}
             <code className="ui-num" style={{ wordBreak: "break-all", fontSize: "var(--text-xs)" }}>
               {secreto}
             </code>

@@ -60,6 +60,14 @@ export default defineConfig({
         "src/lib/dal.ts": { branches: 100, functions: 100, lines: 100 },
         "src/lib/ticket.ts": { branches: 100, functions: 100, lines: 100 },
         "src/lib/commission.ts": { branches: 100, functions: 100, lines: 100 },
+        // El motor de reglas de arriba es puro y llega al 100. Éste es el job
+        // que lo aplica sobre las cuentas de una quincena: reconstruye el neto
+        // por renglón, resuelve la regla vigente por fecha de servicio y
+        // reparte el combo a cuatro manos. Un error acá no rompe nada visible
+        // — paga de menos, o de más, y nadie lo nota hasta la quincena
+        // siguiente. Va por debajo del 100 porque quedan dos guardas que los
+        // tipos hacen inalcanzables, documentadas en el archivo.
+        "src/jobs/commission-run.ts": { branches: 95, functions: 100, lines: 98 },
         "src/lib/combo-allocation.ts": {
           branches: 100,
           functions: 100,

@@ -54,6 +54,44 @@ Separado de las promos: no rota, no es un escenario, y no depende de `NEXT_PUBLI
 
 La estrategia de testing del panel de administración (motor de comisiones, reparto de combos, llaves de ingest, contrato contra EA) vive en `docs/ADMIN-PANEL.md` § Testing.
 
+## Comisiones de las técnicas
+
+El 40 % de lo cobrado, quincenal. El motor de reglas puro vive en
+`admin/src/lib/commission.ts`; el job que lo aplica sobre una quincena, en
+`admin/src/jobs/commission-run.ts`; la pantalla, en
+`admin/src/app/(panel)/comisiones/`.
+
+- **La tasa es un dato, no una constante del código.** Vive en la tabla
+  `commission_rule`, sembrada por la migración `018` con la regla global
+  (`percent_bp = 4000`, `applies_to = 'ambos'`, `valid_from = 2026-01-01`). Se
+  guarda en **puntos básicos enteros**, nunca como decimal: `0.4` no existe en
+  coma flotante y una comisión calculada con él se desvía de a un peso.
+- **La vigencia se resuelve por fecha de servicio**, no por fecha de cálculo.
+  Subir la tasa a mitad de quincena no le cambia la plata a las citas que ya
+  pasaron.
+- **La base es lo cobrado, y la propina nunca entra.** La propina ya es 100 %
+  de la técnica; meterla en la base pagaría un 40 % encima de plata que ya era
+  suya. Hay un test que le cambia la propina a una cuenta y exige que la
+  comisión no se mueva.
+- **Nada se recalcula en retrospectiva.** El precio se congela en
+  `appointment_finance` al cerrar la cuenta, porque `ea_appointments` no guarda
+  plata. Una comisión calculada hoy con el precio de hoy sobre una cita de hace
+  un mes está mal.
+- **Una quincena pagada es de solo lectura, entera.** Volver a calcularla no
+  reescribe nada y lo reporta como `frozen`. Una corrección posterior al pago
+  no produce un renglón huérfano que ningún pago va a cubrir; se arregla por
+  fuera y a mano, que es lo que ya se hacía.
+- **Con dos técnicas y sin fila de combo, la cuenta se salta entera**
+  (`reparto-desconocido`) y sale listada en pantalla. No hay 50/50 por defecto:
+  inventar el reparto es inventar plata. El reparto a cuatro manos aplica al
+  renglón del combo; los adicionales de esa misma cuenta van completos a la
+  técnica principal, porque `appointment_finance` guarda una sola técnica
+  secundaria para toda la cuenta y no por renglón.
+- **Las quincenas son 1–15 y 16–fin de mes**, en calendario de Bogotá.
+- **Los pesos sobrantes del redondeo** se reparten con `allocateByWeights`, el
+  mismo repartidor que usa el resto del panel, para que la suma de los renglones
+  sea exactamente el total y no el total ± 2.
+
 ## Panel de administración (`/admin`)
 
 El plan completo vive en **`docs/ADMIN-PANEL.md`** — topología, modelo de datos, fases y verificación. El reparto en paquetes de trabajo y las reglas de propiedad de archivos viven en **`docs/WORK-PACKAGES.md`**, con cuatro agentes en `.claude/agents/` (`gbs-builder`, `gbs-money-auditor`, `gbs-verifier`, `gbs-ea-scout`). El runbook de despliegue en la VM (pinear EA, el SQL de `mysql-transversal`, el stack en Portainer, Caddy, y los ensayos de rollback y de restauración) vive en **`docs/DEPLOY.md`**. Cómo levantar el entorno local, qué va en cada `.env.local` y cómo validar cada paquete: **`docs/DEV-LOCAL.md`** (`deploy/compose/dev-stack.yml` levanta EA + MySQL + Mailpit; el panel corre en el host con `npm run dev`). Léelos antes de tocar nada bajo `admin/`. Lo mínimo para no romper cosas desde este repo:

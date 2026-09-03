@@ -80,7 +80,7 @@ function pushMessage(push: PushOutcome): string {
     case "vacio":
       return "No había movimientos que empujar.";
     case "pendiente":
-      return "Otro cierre simultáneo se está encargando del push. Refrescá en un momento.";
+      return "Otro cierre simultáneo se está encargando del push. Refresca en un momento.";
     case "apagado":
       return "El push está apagado (falta INGEST_URL): el día quedó cerrado sin empujar.";
     case "fallo":
@@ -129,7 +129,7 @@ export async function cerrarDia(fecha: string): Promise<CerrarDiaResult> {
     return {
       ok: false,
       kind: "config",
-      message: "El panel no está bien configurado para cerrar el día. Avisá a la dueña.",
+      message: "El panel no está bien configurado para cerrar el día. Avísale a la dueña.",
     };
   }
 

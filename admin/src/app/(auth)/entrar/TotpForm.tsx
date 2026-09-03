@@ -43,7 +43,7 @@ export function TotpForm({ people }: { people: readonly TotpLoginCandidate[] }) 
 
       <div
         role="radiogroup"
-        aria-label="Quién sos"
+        aria-label="Quién eres"
         style={{
           display: "grid",
           // `auto-fit` y no un número de columnas: con dos personas quedan dos
@@ -99,7 +99,7 @@ export function TotpForm({ people }: { people: readonly TotpLoginCandidate[] }) 
             padding: "0.625rem 0.75rem",
           }}
         >
-          Esta cuenta quedó bloqueada por intentos fallidos. Pedile a la dueña que
+          Esta cuenta quedó bloqueada por intentos fallidos. Pídele a la dueña que
           la libere desde Equipo; el código nuevo no va a servir hasta entonces.
         </p>
       ) : null}

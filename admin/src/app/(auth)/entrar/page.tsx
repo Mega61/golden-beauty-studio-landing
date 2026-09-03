@@ -34,9 +34,9 @@ export const dynamic = "force-dynamic";
 
 const MENSAJES: Record<string, string> = {
   acceso_denegado:
-    "Esa cuenta no tiene acceso al panel. Si debería tenerlo, pedile a la dueña que la agregue desde Equipo.",
+    "Esa cuenta no tiene acceso al panel. Si debería tenerlo, pídele a la dueña que la agregue desde Equipo.",
   configuracion:
-    "El panel no pudo hablar con Google. Es un problema de configuración, no tuyo: avisale a quien administra el sistema.",
+    "El panel no pudo hablar con Google. Es un problema de configuración, no tuyo: avísale a quien administra el sistema.",
 };
 
 export default async function EntrarPage({

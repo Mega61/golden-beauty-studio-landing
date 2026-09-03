@@ -281,7 +281,7 @@ export async function quitarDelPanel(
   if (email.toLowerCase() === session.email.toLowerCase()) {
     return {
       ok: false,
-      message: "No te puedes quitar a vos misma: quedaría el panel sin dueña.",
+      message: "No te puedes quitar a ti misma: quedaría el panel sin dueña.",
     };
   }
 

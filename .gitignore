@@ -15,6 +15,13 @@
 # Vitest escribe el resumen acá cuando se le pasa un reporter JSON a mano.
 coverage-tmp/
 
+# Capturas que dejan los agentes al revisar una pantalla en el navegador. Van
+# a la raiz y un `git add -A` se las lleva; paso en e02ed8b. Solo la raiz:
+# `src/app/icon.png` y todo `public/` siguen versionados.
+/*.png
+/*.jpg
+/*.jpeg
+
 # next.js
 /.next/
 /out/
