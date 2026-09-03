@@ -1,0 +1,1086 @@
+/* =============================================================================
+   La grilla de recurso — WP-C1
+   =============================================================================
+
+   Columnas = profesionales, filas = tiempo. Construida a mano con CSS Grid y no
+   comprada: las vistas de recurso de FullCalendar (`resourceTimeGrid`) son
+   licencia comercial, y por eso EA apila un calendario por columna en vez de
+   usarlas.
+
+   Vive en un módulo y no en `globals.css` porque esa hoja es de A3 y este
+   paquete no la toca. Los tokens sí son los suyos —`--color-paper`, `--hair`,
+   `--topbar-h`— que están en `:root` y se leen desde acá sin importar nada.
+
+   Tres cosas que este archivo hace a propósito:
+
+   1. **Una sola grilla para todos los días visibles**, no una por día. Así el
+      gutter de horas es uno, las filas quedan alineadas entre días sin
+      sincronizar scrolls, y `position: sticky` funciona con las reglas normales
+      en vez de con un contenedor por columna.
+
+   2. **Las filas no son celdas del grid.** El fondo de la rejilla es un
+      `repeating-linear-gradient` y los bloques van en absoluto. Los huecos
+      tocables sí son botones de verdad (ver `.slot`), porque hacen falta para
+      el teclado; lo que no existe es una celda vacía por cada cruce de fila y
+      columna solo para dibujar una raya.
+
+   3. **Lo único que scrollea de lado es `.scroller`.** § Contrato responsive:
+      ningún scroll horizontal en la página. El `overscroll-behavior: contain`
+      evita además que llegar al final de la grilla arrastre la página entera.
+   ========================================================================== */
+
+/* El marco ocupa exactamente el alto útil de la pantalla y reparte: la barra de
+   rango y los avisos toman lo que necesitan, y **la grilla se queda con el
+   resto**.
+
+   La alternativa —restarle a `100dvh` un número fijo por el cromo propio— es lo
+   que había primero y estaba mal: los avisos son de alto variable (un día sin
+   citas huérfanas no los tiene, y un día con cuatro estados sin reconocer mide
+   el doble), así que la resta acertaba solo en el caso sin avisos y en los demás
+   dejaba la última hora de la jornada debajo de la barra inferior.
+
+   Lo que sí es fijo, y por eso se resta: el cromo del shell (tokens de A3) y el
+   padding de `.ui-content`, que no cambia con los datos. */
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  min-width: 0;
+  height: calc(
+    100dvh - var(--topbar-h) - var(--bottombar-h) - var(--safe-b) - var(--cal-pad, 2.375rem)
+  );
+}
+
+@media (min-width: 48rem) {
+  .frame {
+    height: calc(100dvh - var(--topbar-h) - var(--cal-pad, 3.25rem));
+  }
+}
+
+/* --- Barra de rango -------------------------------------------------------
+   Los controles del eje horizontal: días atrás/adelante, hoy, y el selector
+   Día · 3 días · Semana. Se queda arriba de la grilla y no dentro de la
+   toolbar del shell porque en móvil la toolbar tiene una sola fila y ahí no
+   caben ni las flechas ni la fecha. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.barDate {
+  flex: 1 1 8rem;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-carbon);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barSpacer {
+  flex: 1 1 auto;
+}
+
+/* El selector de rango es un grupo de radios disfrazado de segmentos. Radios y
+   no botones: la elección es excluyente y el lector de pantalla tiene que poder
+   decir "2 de 3". */
+.modes {
+  display: inline-flex;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-paper);
+  flex: none;
+}
+
+.mode {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h);
+  padding: 0 0.625rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+
+.mode + .mode {
+  border-left: 1px solid var(--hair);
+}
+
+.mode:hover {
+  background: var(--color-ivory-deep);
+}
+
+.mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mode:has(input:checked) {
+  background: var(--color-gold-pale);
+  color: var(--color-gold-deep);
+}
+
+.mode:has(input:focus-visible) {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: -2px;
+}
+
+/* 3 días y Semana solo aparecen con barra lateral (≥1024). Por debajo, la
+   agenda es de un día — § Contrato responsive. El estado sigue siendo válido si
+   alguien llega con `?rango=semana` en un celular: se esconde el control, no la
+   vista, porque una URL compartida no puede dejar de funcionar al abrirse en
+   otro aparato. */
+.modeWide {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .modeWide {
+    display: inline-flex;
+  }
+}
+
+/* La fila que reparte a lo ancho: la grilla y, a partir de 1440, el panel de la
+   cita al lado. Los dos `min-height: 0` no son adorno — sin ellos un hijo flex
+   se niega a encogerse por debajo de su contenido, y la cadena de altos que
+   arranca en `.frame` se corta justo acá: la grilla vuelve a medir lo que mide
+   la jornada entera y se mete debajo de la barra inferior. */
+.row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* El panel persistente de ≥1440. Scrollea por dentro para no estirar la fila. */
+.rowSide {
+  width: 22rem;
+  flex: none;
+  overflow: auto;
+}
+
+/* --- El contenedor que scrollea ------------------------------------------- */
+
+.scroller {
+  /* Los tokens de la grilla se declaran **acá y no en `.grid`**, aunque los
+     consuma `.grid`. Las variables CSS heredan hacia abajo y no hacia arriba, y
+     `scroll-padding-left` —que es de este elemento— necesita el ancho del
+     gutter: con la declaración un nivel más adentro resolvía a nada y el
+     enganche de scroll dejaba la primera columna 52 px debajo del gutter
+     pegajoso al abrir. */
+  --gutter-w: 3.25rem;
+  --dayhead-h: 1.75rem;
+  --provhead-h: 2.5rem;
+  --col-min: 78vw;
+
+  position: relative;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--color-paper);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-md);
+
+  /* Se queda con lo que sobra del marco, que ya está medido en `dvh` — no en
+     `vh`: el chrome del navegador móvil colapsa al hacer scroll y con `vh` la
+     última hora de la jornada queda debajo del pliegue justo al abrir.
+
+     El `min-height` es la red. Si los avisos crecen tanto que no dejan sitio, la
+     grilla no se aplasta hasta ser inútil: el marco desborda y la **página**
+     scrollea en vertical, que está permitido. Lo que nunca puede pasar es que
+     scrollee en horizontal. */
+  flex: 1 1 auto;
+  min-height: 10rem;
+
+  /* El scroll horizontal en móvil se detiene en el borde de una columna: la
+     agenda es "una profesional a la vez, deslizable". `scroll-padding-left`
+     descuenta el gutter, que es pegajoso y taparía el inicio de la columna. */
+  scroll-snap-type: x proximity;
+  scroll-padding-left: var(--gutter-w);
+}
+
+@media (min-width: 48rem) {
+  .scroller {
+    /* Con dos o tres columnas visibles el enganche estorba: la recepción quiere
+       ver el borde de la siguiente, no que se lo corran. */
+    scroll-snap-type: none;
+  }
+}
+
+/* --- La grilla ------------------------------------------------------------ */
+
+.grid {
+  /* Solo la geometría vertical: el componente la pisa en línea con el mismo
+     número que usa su aritmética, para que CSS y JS no puedan discrepar sobre
+     cuánto mide una fila. Los anchos y los altos de encabezado viven en
+     `.scroller`. */
+  --slot-h: 14px;
+  --hour-h: 56px;
+
+  display: grid;
+  grid-template-columns: var(--gutter-w) repeat(var(--cols), minmax(var(--col-min), 1fr));
+  grid-template-rows: var(--dayhead-h) var(--provhead-h) auto;
+  min-width: 100%;
+  width: max-content;
+}
+
+@media (min-width: 48rem) {
+  .scroller {
+    --gutter-w: 3.75rem;
+    --col-min: 11rem;
+    --provhead-h: 2.75rem;
+  }
+
+  .grid {
+    width: auto;
+  }
+}
+
+/* --- Encabezados pegajosos ------------------------------------------------ */
+
+/* El cromo pegajoso va por encima de **todo** lo que vive dentro de una
+   columna. No es un detalle: mientras la grilla está scrolleada de lado, la
+   primera columna pasa por debajo del gutter, y un bloque de cita con más
+   z-index que él se dibujaría encima de las horas. */
+.corner {
+  position: sticky;
+  left: 0;
+  z-index: 60;
+  background: var(--color-cream);
+  border-right: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+
+.cornerTop {
+  top: 0;
+  grid-row: 1;
+}
+
+.cornerMid {
+  top: var(--dayhead-h);
+  grid-row: 2;
+}
+
+.dayHead {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.5rem;
+  background: var(--color-cream);
+  border-bottom: 1px solid var(--hair);
+  border-left: 1px solid var(--hair);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hoy se marca con dorado — es "la selección actual", el único trabajo que el
+   dorado tiene permitido hacer. Y con la palabra, no solo con el color. */
+.dayHeadToday {
+  color: var(--color-gold-deep);
+  background: var(--color-gold-pale);
+}
+
+.dayHeadToday::after {
+  content: "hoy";
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.625rem;
+  padding: 0 0.25rem;
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius-xs);
+}
+
+.provHead {
+  position: sticky;
+  top: var(--dayhead-h);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.0625rem;
+  padding: 0 0.5rem;
+  background: var(--color-cream);
+  border-bottom: 1px solid var(--hair);
+  border-left: 1px solid var(--hair);
+  min-width: 0;
+}
+
+.provName {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-carbon);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provMeta {
+  font-size: 0.6875rem;
+  color: var(--color-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Gutter de horas ------------------------------------------------------ */
+
+.gutter {
+  position: sticky;
+  left: 0;
+  z-index: 40;
+  grid-row: 3;
+  grid-column: 1;
+  background: var(--color-cream);
+  border-right: 1px solid var(--hair);
+}
+
+.gutterMark {
+  position: absolute;
+  right: 0.375rem;
+  /* Centrada sobre su raya: media línea hacia arriba. */
+  transform: translateY(-0.55em);
+  font-size: 0.6875rem;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+/* La primera no se centra: media línea hacia arriba la mete debajo del
+   encabezado pegajoso, que va por encima, y la hora de apertura de la jornada
+   —justo la que más se mira al abrir— desaparece. */
+.gutterMarkFirst {
+  transform: none;
+}
+
+/* --- Cuerpo de la columna ------------------------------------------------- */
+
+.col {
+  position: relative;
+  grid-row: 3;
+  border-left: 1px solid var(--hair);
+  scroll-snap-align: start;
+  min-width: 0;
+
+  /* La rejilla es fondo, no marcado: una raya fina por slot y una más marcada
+     en punto. `--hour-h` lo calcula el componente (slot × 60 / slotMinutes)
+     porque el slot no es siempre de 15 minutos: EA trae `slotInterval` por
+     servicio y fijarlo acá sería una decisión de producto escondida en una hoja
+     de estilos. */
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      var(--hair) 0 1px,
+      transparent 1px var(--slot-h)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--hair-strong) 0 1px,
+      transparent 1px var(--hour-h)
+    );
+}
+
+/* La columna que se está mirando en el panel lateral. Filete de 2 px, nunca los
+   4 px de la franja prohibida, y acompañado del `aria-current` del encabezado. */
+.colSelected {
+  box-shadow: inset 2px 0 0 var(--color-gold-dark);
+}
+
+/* --- Huecos tocables ------------------------------------------------------ */
+
+/* Un botón de verdad por slot: es lo que hace que "tocar un hueco vacío abre el
+   panel con hora y profesional prellenadas" funcione también con el teclado.
+   Van todos con `tabindex="-1"` salvo uno (tabindex móvil): 288 paradas de
+   tabulador antes de llegar a la primera cita sería peor que no tenerlas. Las
+   flechas mueven el foco entre ellos. */
+.slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.slot:hover {
+  background: color-mix(in srgb, var(--color-gold) 8%, transparent);
+}
+
+.slot:focus-visible {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: -2px;
+  z-index: 25;
+}
+
+/* El destino elegible mientras "Mover" está armado. Se tiñe la columna entera
+   para que se lea "soltá acá" sin tener que apuntar a un rectángulo de 14 px. */
+.colTarget {
+  background-color: color-mix(in srgb, var(--color-gold) 6%, transparent);
+}
+
+.colTarget .slot:hover {
+  background: color-mix(in srgb, var(--color-gold) 18%, transparent);
+}
+
+/* --- Bandas de fondo ------------------------------------------------------ */
+
+.band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Fuera de horario: tramado, no un gris plano. El gris plano se confunde con
+   una superficie del sistema; el tramado se lee como "acá no va nada" y
+   sobrevive a la impresión en blanco y negro. */
+.bandOffHours {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-ivory-deep) 0 6px,
+    var(--color-paper) 6px 12px
+  );
+  opacity: 0.85;
+}
+
+.bandBreak {
+  background: var(--color-ivory-deep);
+  border-top: 1px dashed var(--hair-strong);
+  border-bottom: 1px dashed var(--hair-strong);
+}
+
+/* Bloqueo del estudio e indisponibilidad de la técnica comparten forma —
+   diagonal más marcada— y se distinguen por la etiqueta, no por el tono: los
+   dos significan "acá no se agenda" y darles colores distintos gastaría dos
+   tonos para una sola idea. */
+.bandBlocked,
+.bandUnavailable {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-ink-mute) 26%, transparent) 0 5px,
+    transparent 5px 11px
+  );
+  border-top: 1px solid var(--hair-strong);
+  border-bottom: 1px solid var(--hair-strong);
+}
+
+/* Cuando el tramo original se salía del rango visible, el borde se abre: uno
+   cerrado mentiría sobre dónde termina. */
+.clippedTop {
+  border-top-style: dotted;
+}
+
+.clippedBottom {
+  border-bottom-style: dotted;
+}
+
+.bandLabel {
+  position: sticky;
+  left: 0;
+  display: block;
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  text-shadow: 0 0 3px var(--color-paper);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Bloques de cita ------------------------------------------------------ */
+
+.event {
+  position: absolute;
+  z-index: 10;
+  display: block;
+  overflow: hidden;
+  padding: 0.125rem 0.3125rem;
+  border: 1px solid var(--ev-edge);
+  border-left-width: 1px;
+  border-radius: var(--radius-sm);
+  background: var(--ev-fill);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.6875rem;
+  line-height: 1.15;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    box-shadow var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+
+.event:hover {
+  box-shadow: 0 1px 3px rgba(28, 23, 20, 0.16);
+  z-index: 15;
+}
+
+.event:focus-visible {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: 1px;
+  z-index: 26;
+}
+
+/* Seleccionada: la que está abierta en el panel. Anillo dorado, que es
+   "selección actual" y no un dato. */
+.eventSelected {
+  box-shadow: 0 0 0 2px var(--color-gold-dark);
+  z-index: 16;
+}
+
+/* La que está armada para moverse. Se despega y baja la opacidad: el bloque
+   fantasma se queda en su sitio para que se vea de dónde sale. */
+.eventMoving {
+  opacity: 0.55;
+  box-shadow: 0 2px 6px rgba(28, 23, 20, 0.18);
+}
+
+/* Mientras el PUT está en vuelo. El bloque ya se movió (optimista); esto dice
+   que todavía no está confirmado. */
+.eventPending {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.eventTime {
+  display: block;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eventTitle {
+  display: block;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventSub {
+  display: block;
+  color: var(--color-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* El punto de estado va dentro del bloque, porque el bloque ya usó su color
+   para el servicio. Punto **y** texto en el `title` y en el nombre accesible:
+   nunca color solo. */
+.eventDot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.25rem;
+  border-radius: 999px;
+  background: var(--ev-dot);
+  vertical-align: baseline;
+}
+
+/* Estado sin reconocer: filete punteado, igual que la pastilla de A3. Es la
+   señal que Diagnóstico necesita el día que alguien renombre un estado en EA. */
+.eventUnknown {
+  border-style: dotted;
+  border-width: 1.5px;
+}
+
+/* Flechas de continuidad: la cita empezó ayer o sigue mañana. Sin esto, un
+   bloque recortado se lee como una cita corta. */
+.eventClipTop,
+.eventClipBottom {
+  position: absolute;
+  right: 0.25rem;
+  font-size: 0.625rem;
+  line-height: 1;
+  color: var(--color-ink-soft);
+}
+
+.eventClipTop {
+  top: 0.0625rem;
+}
+
+.eventClipBottom {
+  bottom: 0.0625rem;
+}
+
+/* --- Manija de redimensionado (solo puntero fino) ------------------------- */
+
+.resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 8px;
+  cursor: ns-resize;
+  display: none;
+}
+
+.resize::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 1.5rem;
+  height: 2px;
+  margin-left: -0.75rem;
+  border-radius: 999px;
+  background: var(--ev-edge);
+  opacity: 0;
+  transition: opacity var(--dur-1) var(--ease-out);
+}
+
+/* Arrastrar sobre una grilla que scrollea es un modo de falla conocido; en
+   táctil el gesto es tocar → "Mover" → tocar destino. La manija y el arrastre
+   existen **solo** con puntero fino, y la comprobación está en los dos lados:
+   acá en CSS y con `matchMedia` en el componente, porque una media query no
+   puede desactivar un `pointerdown`. */
+@media (pointer: fine) {
+  .resize {
+    display: block;
+  }
+
+  .event:hover .resize::after,
+  .event:focus-within .resize::after {
+    opacity: 1;
+  }
+
+  .eventDraggable {
+    cursor: grab;
+  }
+
+  .eventDragging {
+    cursor: grabbing;
+    z-index: 30;
+    box-shadow: 0 4px 14px rgba(28, 23, 20, 0.24);
+  }
+}
+
+/* --- Línea de ahora ------------------------------------------------------- */
+
+.now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  height: 0;
+  border-top: 1.5px solid var(--color-gold-deep);
+  pointer-events: none;
+}
+
+.now::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -3.5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-gold-deep);
+}
+
+/* --- Contadores de lo que no se ve ---------------------------------------- */
+
+/* Una cita que desaparece de la agenda sin aviso es el peor modo de falla de
+   esta pantalla. `hiddenBefore` / `hiddenAfter` del motor se dibujan como una
+   pestaña en el borde de la columna, y son botones: llevan la jornada visible
+   hasta donde está la cita. */
+.hidden {
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 1.125rem;
+  padding: 0 0.375rem;
+  border: 1px solid var(--color-warn-line);
+  border-radius: var(--radius-xs);
+  background: var(--color-warn-tint);
+  color: var(--color-warn-ink);
+  font: inherit;
+  font-size: 0.625rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hiddenTop {
+  top: 0.125rem;
+}
+
+.hiddenBottom {
+  bottom: 0.125rem;
+}
+
+/* --- Avisos por encima de la grilla --------------------------------------- */
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--color-warn-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-warn-tint);
+  color: var(--color-warn-ink);
+  font-size: var(--text-xs);
+}
+
+.notice strong {
+  font-weight: 700;
+}
+
+.noticeList {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+}
+
+/* --- Diálogo de choques --------------------------------------------------- */
+
+.conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.conflictItem {
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+}
+
+/* Superficie tintada + filete de 1 px, nunca una franja lateral de 4 px. */
+.conflictHard {
+  border-color: var(--color-error-line);
+  background: var(--color-error-tint);
+}
+
+.conflictSoft {
+  border-color: var(--color-warn-line);
+  background: var(--color-warn-tint);
+}
+
+.conflictHead {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.conflictHard .conflictHead {
+  color: var(--color-error-ink);
+}
+
+.conflictSoft .conflictHead {
+  color: var(--color-warn-ink);
+}
+
+.conflictWith {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--color-ink);
+}
+
+.conflictWith li + li {
+  margin-top: 0.125rem;
+}
+
+/* --- Formulario de bloqueos ----------------------------------------------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.formRow {
+  display: grid;
+  gap: 0.625rem;
+}
+
+/* Sin esto, un hijo de grid se niega a bajar de su ancho intrínseco, y el de un
+   `<input type="date">` con el selector nativo adentro no cabe en media
+   columna: el segundo campo se sale del panel y aparece una barra de scroll
+   horizontal dentro de la hoja. */
+.formRow > * {
+  min-width: 0;
+}
+
+@media (min-width: 30rem) {
+  .formRow2 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.formPreview {
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--color-info-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-info-tint);
+  color: var(--color-info-ink);
+  font-size: var(--text-xs);
+}
+
+/* Los radios del alcance son fichas, no una lista de puntitos: es la pregunta
+   que decide cuál de los tres recursos de EA se escribe y merece el tamaño. */
+.choices {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-height: var(--hit);
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  cursor: pointer;
+}
+
+.choice:hover {
+  background: var(--color-ivory-deep);
+}
+
+.choice:has(input:checked) {
+  border-color: var(--color-gold-dark);
+  background: var(--color-gold-pale);
+}
+
+.choice:has(input:focus-visible) {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: 2px;
+}
+
+.choice input {
+  margin-top: 0.125rem;
+  accent-color: var(--color-gold-dark);
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.choiceText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+
+.choiceTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.choiceHint {
+  font-size: var(--text-2xs);
+  color: var(--color-ink-soft);
+}
+
+/* --- Detalle de la cita --------------------------------------------------- */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detailRows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.375rem 0.75rem;
+  font-size: var(--text-sm);
+}
+
+.detailKey {
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+.detailValue {
+  color: var(--color-ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* --- Hoja de ruta del día (impresión) ------------------------------------- */
+
+.sheet {
+  display: none;
+}
+
+@media print {
+  /* El cromo del shell no se imprime. Son clases de A3 y por eso van con
+     `:global`: la alternativa era tocar `globals.css`, que es de otro paquete.
+     La regla solo existe mientras esta hoja esté cargada, es decir, en la
+     agenda. */
+  :global(.ui-side),
+  :global(.ui-bottombar),
+  :global(.ui-topbar),
+  :global(.ui-toaster),
+  :global(.ui-skip) {
+    display: none !important;
+  }
+
+  /* **El shell deja de ser una grilla al imprimir.** `.ui-side` desaparece con
+     `display: none`, y un hijo que desaparece sale también de la grilla: el
+     `<main>` se auto-coloca entonces en la **primera** pista, que mide
+     `--sidebar-w`. La hoja de ruta salía en una columna de 240 px de ancho en
+     una página de carta. */
+  :global(.ui-shell) {
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  :global(.ui-main) {
+    padding-bottom: 0 !important;
+  }
+
+  :global(.ui-content) {
+    padding: 0 !important;
+  }
+
+  :global(body) {
+    background: #fff;
+  }
+
+  /* El marco mide la pantalla en `dvh`; en papel eso no significa nada y
+     además empujaría la hoja hacia abajo. */
+  .frame {
+    display: block;
+    height: auto;
+  }
+
+  .bar,
+  .scroller,
+  .notices {
+    display: none !important;
+  }
+
+  /* Blanco y negro, y el estado **en texto**: los tintes de la paleta no
+     sobreviven a una impresora láser, y por eso la pastilla de A3 nunca deja
+     apagar la etiqueta. El color se fuerza en toda la hoja para que ningún
+     token de marca se cuele en gris claro ilegible. */
+  .sheet,
+  .sheet * {
+    color: #000;
+    background: transparent;
+  }
+
+  .sheet {
+    display: block;
+    font-size: 10pt;
+  }
+
+  .sheetHead {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1.5pt solid #000;
+  }
+
+  .sheetTitle {
+    font-size: 13pt;
+    font-weight: 700;
+  }
+
+  .sheetDate {
+    font-size: 10pt;
+  }
+
+  /* Una columna por profesional, y que el navegador reparta. En blanco y negro:
+     los tintes de estado no sobreviven una impresora láser, así que el estado
+     va **en texto** — la misma regla que la pastilla de A3. */
+  .sheetCols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(2.2in, 1fr));
+    gap: 0.25in;
+  }
+
+  .sheetCol {
+    break-inside: avoid;
+  }
+
+  .sheetProv {
+    font-weight: 700;
+    font-size: 11pt;
+    border-bottom: 0.75pt solid #000;
+    padding-bottom: 0.05in;
+    margin-bottom: 0.05in;
+  }
+
+  .sheetItem {
+    padding: 0.04in 0;
+    border-bottom: 0.5pt dotted #666;
+    break-inside: avoid;
+  }
+
+  .sheetTime {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sheetWho {
+    display: block;
+  }
+
+  .sheetState {
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .sheetEmpty {
+    font-style: italic;
+    font-size: 9pt;
+  }
+}

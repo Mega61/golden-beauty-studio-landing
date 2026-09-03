@@ -110,7 +110,7 @@ export function Panel({
         </h2>
         <button
           type="button"
-          className="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm"
+          className="ui-btn ui-btn--ghost ui-btn--icon"
           onClick={onClose}
           aria-label={closeLabel}
         >
@@ -151,7 +151,7 @@ export function PanelInline({
         {onClose ? (
           <button
             type="button"
-            className="ui-btn ui-btn--ghost ui-btn--icon ui-btn--sm"
+            className="ui-btn ui-btn--ghost ui-btn--icon"
             onClick={onClose}
             aria-label={closeLabel}
           >

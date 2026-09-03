@@ -226,7 +226,18 @@ describe("applies_to — principal, adicionales, ambos", () => {
 describe("applyRule — el signo de la base manda", () => {
   // Los tres casos del arreglo de H3. Un fijo no puede pagar por un trabajo que
   // se anuló, ni abstenerse cuando el cobro original ya pagó.
-  const fijo = { id: 1, kind: "fixed" as const, fixedAmount: 5_000, percentBp: null };
+  const fijo: CommissionRuleInput = {
+    id: 1,
+    eaProviderId: null,
+    categoryId: null,
+    eaServiceId: null,
+    appliesTo: "ambos",
+    kind: "fixed",
+    percentBp: null,
+    fixedAmount: 5_000,
+    validFrom: "2026-01-01",
+    validTo: null,
+  };
 
   it("base positiva paga el fijo entero", () => {
     expect(applyRule(fijo, 50_000)).toEqual({ amount: 5_000, rateBp: null });
