@@ -48,6 +48,27 @@ const remotePatterns = [
  */
 const adminOrigin = process.env.ADMIN_ORIGIN?.replace(/\/$/, "");
 
+/**
+ * Una línea en el log del build que dice si el rewrite quedó activo.
+ *
+ * Sin esto, una variable ausente se manifiesta como `/admin` devolviendo 404 con
+ * `X-Matched-Path: /[lang]` — Next interpreta "admin" como un idioma — y no hay
+ * nada en ningún log que explique por qué. Costó una ronda de depuración en el
+ * primer despliegue: la variable estaba, pero no en el entorno de Production, y
+ * el síntoma es idéntico al de un rewrite mal escrito.
+ *
+ * `next.config.ts` se evalúa **en el build**, así que esto sale en la salida de
+ * build de Vercel, que es exactamente donde alguien va a mirar.
+ */
+console.log(
+  adminOrigin
+    ? `[next.config] rewrite de /admin ACTIVO → ${adminOrigin}`
+    : "[next.config] rewrite de /admin INACTIVO: ADMIN_ORIGIN no está definida " +
+        "en este entorno. /admin va a dar 404. Si esto es Production, revisar " +
+        "que la variable esté marcada para Production y que el deploy sea " +
+        "posterior a haberla creado.",
+);
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
