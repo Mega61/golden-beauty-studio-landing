@@ -393,6 +393,9 @@ cambiar una variable, esperar a Meta y conciliar un ciclo de facturación. El or
 
 Lo que todavía falta para escribir código, no para discutir el plan:
 
+> **El export real ya se vio** (2026-09-14, 173 citas) y el importador está ajustado a su forma.
+> Lo que ese archivo contestó, y lo que abrió, está en la sección de abajo.
+
 | Pregunta | Bloquea |
 | --- | --- |
 | **¿Ya le dieron "cerrar el día" en `/admin/caja` alguna vez?** O sea: ¿ya se está cobrando de verdad por el panel, o todo sigue pasando por Agenda Pro? | X1. Sin días cerrados, el backfill del pago dividido no tiene nada que migrar y el paquete se achica a la mitad |
@@ -405,3 +408,39 @@ Cuando se concrete la segunda técnica, tres datos más, y antes de su primer d�
 tasa**, si los **adicionales** pagan igual que el servicio principal, y su **correo personal** para el
 enrolamiento TOTP. Si la tasa trae escalonado por volumen de quincena ("10 % hasta X, 12 % por
 encima"), eso sí cambia el modelo: la regla actual no expresa tramos.
+
+---
+
+## Lo que enseñó el export real (2026-09-14)
+
+173 citas, del **25/05/2026 al 29/09/2026**. El importador quedó ajustado a esta forma y hay
+tests que la fijan columna por columna: el día que Agenda Pro cambie el encabezado, se ve.
+
+| Dato | Valor |
+| --- | --- |
+| Citas | 173 (171 utilizables; 2 son una cancelada que el export trae **triplicada**) |
+| Clientas únicas por teléfono | 100 |
+| Teléfonos | 173 de 173, ninguno vacío. 170 colombianos, 3 extranjeros (+52, +1) |
+| Correos | 19 de 173 |
+| Con pago asociado | 136 |
+| Estados | `Asiste` 139 · `Cancelado` 17 · `No Asiste` 10 · `Reservado` 7 |
+| Servicios distintos | 37 |
+| Origen | `Manual` 162 · `Online` 11 |
+
+**Lo caro:** `Precio lista` y `Precio real` **difieren en 96 de 173 filas**. Importar la de lista
+no falla —infla el histórico de ingresos con cifras que se ven razonables— y por eso la detección
+de columnas recorre los sinónimos en orden de especificidad en vez de quedarse con la primera
+columna que coincida.
+
+**Lo que abrió, y necesita una decisión:**
+
+> ⚠ **Atienden dos personas: Kati (136 citas) y Mariana (35).** La respuesta del 2026-09-17 fue
+> "una técnica, y la dueña no atiende", y el archivo dice otra cosa. Importa porque la regla de
+> comisión sembrada es **global**: aplica a toda cita de cualquier persona, así que hoy el motor
+> liquidaría 40 % también sobre esas 35. Las tres salidas —Mariana es la dueña y no cobra
+> comisión; es una segunda técnica con su propia tasa; o el 40 % vale para las dos— son una
+> migración de dos sentencias, pero hay que elegir una. Es la fila que X4 estaba esperando.
+
+**Dos cosas menores que el archivo también trae:** 20 de 173 apellidos son un guion bajo (se
+limpian; si no, quedan clientas llamadas "Julian \_" y ese nombre va en la confirmación), y 37
+citas sin pagar cuyo precio **no** se importa como ingreso: el precio existe, la plata no entró.
