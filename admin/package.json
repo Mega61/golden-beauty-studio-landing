@@ -14,7 +14,8 @@
     "build:migrator": "esbuild src/db/migrate-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/migrate.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
     "build:reconcile": "esbuild src/jobs/reconcile-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/reconcile.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
     "build:estados": "esbuild src/jobs/status-options-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/estados.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
-    "build:importar": "esbuild src/jobs/import-agendapro-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/importar.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning"
+    "build:importar": "esbuild src/jobs/import-agendapro-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/importar.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
+    "dev:seed": "esbuild src/jobs/dev-seed-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/dev-seed.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning && node --env-file=.env.local .next/dev-seed.js"
   },
   "dependencies": {
     "better-auth": "^1.7.2",
