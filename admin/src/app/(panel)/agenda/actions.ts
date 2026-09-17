@@ -15,6 +15,7 @@ import {
 } from "@/lib/conflict";
 import { requireOwnProvider, requireSession } from "@/lib/dal";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
+import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
 import { EaApiError } from "@/lib/ea/errors";
 import { addDays, fetchWindow } from "@/components/calendar/range";
 import type { EaLocalDate, EaLocalDateTime } from "@/lib/ea/datetime";
@@ -301,21 +302,20 @@ async function evaluate(
   const days = [eaDatePart(candidate.start), eaDatePart(candidate.end)];
   const window = fetchWindow(days);
 
-  const [appointments, unavailabilities, blockedPeriods, providers, services, exceptions] =
-    await Promise.all([
-      client.appointments.list({ from: window.from, till: window.till }),
-      client.unavailabilities.list(),
-      client.blockedPeriods.list(),
-      client.providers.list(),
-      client.services.list(),
-      client.workingPlanExceptions.list(),
-    ]);
+  // Las excepciones vienen dentro de la técnica: EA no las expone aparte.
+  const [appointments, unavailabilities, blockedPeriods, providers, services] = await Promise.all([
+    client.appointments.list({ from: window.from, till: window.till }),
+    client.unavailabilities.list(),
+    client.blockedPeriods.list(),
+    client.providers.list(),
+    client.services.list(),
+  ]);
 
   const provider = providers.find((p) => p.id === candidate.providerId);
   const gridProvider: Pick<GridProvider, "workingPlan" | "workingPlanExceptions"> | null = provider
     ? {
         workingPlan: provider.settings?.workingPlan ?? null,
-        workingPlanExceptions: exceptions.filter((e) => e.providerId === provider.id),
+        workingPlanExceptions: providerWorkingPlanExceptions(provider),
       }
     : null;
 

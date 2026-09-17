@@ -277,6 +277,34 @@ describe("errores tipados", () => {
     await expect(ea.appointments.get(999)).rejects.toMatchObject({ kind: "not_found" });
   });
 
+  /**
+   * EA corta a 100 peticiones por IP cada 120 s desde `EA_Controller`, y la API
+   * no está exenta: una agenda que refresca sola lo alcanza. Si el 429 cayera
+   * en `bad_request` quedaría como error permanente, y el panel pintaría una
+   * pantalla de error donde tocaba esperar y repetir.
+   */
+  it("429 es el único 4xx transitorio: EA limita por IP", async () => {
+    // Sin cuerpo y sin `Retry-After`, que es exactamente lo que EA manda.
+    const { ea } = client(() => new Response("", { status: 429 }));
+
+    const error = (await ea.appointments.list().catch((e: unknown) => e)) as EaApiError;
+
+    expect(error.kind).toBe("rate_limited");
+    expect(error.status).toBe(429);
+    expect(error.isTransient).toBe(true);
+    // No es configuración: el token está bien, sobran las llamadas.
+    expect(error.isConfiguration).toBe(false);
+  });
+
+  it("un 400 de verdad sigue siendo permanente", async () => {
+    const { ea } = client(() => new Response("bad", { status: 400 }));
+
+    const error = (await ea.appointments.list().catch((e: unknown) => e)) as EaApiError;
+
+    expect(error.kind).toBe("bad_request");
+    expect(error.isTransient).toBe(false);
+  });
+
   it("5xx es transitorio: es lo que dispara el modo solo-lectura", async () => {
     const { ea } = client(() => new Response("Fatal error", { status: 500 }));
 
@@ -546,5 +574,126 @@ describe("listDayAppointments — el día de Hoy y de Caja", () => {
     await expect(listDayAppointments(ea, { date: DIA })).rejects.toThrow(
       /no es una lista de citas/,
     );
+  });
+});
+
+/**
+ * `working_plan_exceptions` no es un recurso de EA por más que su `openapi.yml`
+ * lo prometa: el controlador existe y `routes.php` no lo registra. El cliente
+ * lo monta sobre `providers`, y lo que se prueba acá es que esa plomería no se
+ * note desde afuera — y que no rompa nada al escribir.
+ */
+describe("excepciones al plan de trabajo", () => {
+  const providerWith = (id: number, exceptions: unknown[]) => ({
+    id,
+    firstName: `Tecnica${id}`,
+    lastName: "X",
+    settings: { username: `t${id}`, workingPlanExceptions: exceptions },
+  });
+
+  const exception = (id: number) => ({
+    id,
+    startDate: "2026-03-10",
+    endDate: "2026-03-10",
+    startTime: "11:00:00",
+    endTime: "18:00:00",
+    breaks: [],
+  });
+
+  it("list() junta las de todas las técnicas y les pone su providerId", async () => {
+    const { ea, calls } = client(() =>
+      json([providerWith(1, [exception(10)]), providerWith(2, [exception(20), exception(21)])]),
+    );
+
+    const todas = await ea.workingPlanExceptions.list();
+
+    expect(todas.map((e) => [e.id, e.providerId])).toEqual([
+      [10, 1],
+      [20, 2],
+      [21, 2],
+    ]);
+    // Una sola consulta, y a `providers`: nunca al recurso que no existe.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url.pathname).toMatch(/providers$/);
+  });
+
+  it("el alta manda la lista entera con una más, que es como EA la guarda", async () => {
+    const { ea, calls } = client((call, i) => {
+      if (i === 0) return json(providerWith(1, [exception(10)]));
+      return json(providerWith(1, [exception(10), { ...exception(99), startDate: "2026-04-01" }]));
+    });
+
+    const creada = await ea.workingPlanExceptions.create({
+      providerId: 1,
+      startDate: parseEaLocalDate("2026-04-01"),
+      endDate: parseEaLocalDate("2026-04-01"),
+      startTime: "09:00",
+      endTime: "13:00",
+      breaks: [],
+    });
+
+    // El id es el que no estaba antes: EA no dice cuál creó.
+    expect(creada.id).toBe(99);
+    expect(creada.providerId).toBe(1);
+
+    const put = calls[1];
+    expect(put.init.method).toBe("PUT");
+    const body = JSON.parse(String(put.init.body));
+    // La existente viaja **con su id**, o EA la borraría y crearía otra.
+    expect(body.settings.workingPlanExceptions).toHaveLength(2);
+    expect(body.settings.workingPlanExceptions[0].id).toBe(10);
+  });
+
+  it("el PUT manda solo las excepciones: el resto de la técnica no viaja", async () => {
+    const { ea, calls } = client((call, i) =>
+      i === 0 ? json(providerWith(1, [])) : json(providerWith(1, [exception(50)])),
+    );
+
+    await ea.workingPlanExceptions.create({
+      providerId: 1,
+      startDate: parseEaLocalDate("2026-03-10"),
+      endDate: parseEaLocalDate("2026-03-10"),
+      startTime: "11:00",
+      endTime: "18:00",
+      breaks: [],
+    });
+
+    const body = JSON.parse(String(calls[1].init.body));
+    // Sin esto, un alta de bloqueo pisaría el nombre, el teléfono o el plan de
+    // trabajo con lo que el panel hubiera leído un segundo antes.
+    expect(Object.keys(body)).toEqual(["settings"]);
+    expect(Object.keys(body.settings)).toEqual(["workingPlanExceptions"]);
+  });
+
+  it("la baja encuentra de quién es y manda la lista sin ella", async () => {
+    const { ea, calls } = client((call, i) => {
+      if (i === 0) return json([providerWith(1, [exception(10)]), providerWith(2, [exception(20)])]);
+      return json(providerWith(2, []));
+    });
+
+    await ea.workingPlanExceptions.remove(20);
+
+    const put = calls[1];
+    expect(put.init.method).toBe("PUT");
+    // La de la técnica 2, no la de la 1.
+    expect(put.url.pathname).toMatch(/providers\/2$/);
+    expect(JSON.parse(String(put.init.body)).settings.workingPlanExceptions).toEqual([]);
+  });
+
+  it("borrar un id que no existe falla en vez de pisar la lista de alguien", async () => {
+    const { ea, calls } = client(() => json([providerWith(1, [exception(10)])]));
+
+    await expect(ea.workingPlanExceptions.remove(999)).rejects.toThrow(EaApiError);
+    // Y sobre todo: no mandó ningún PUT.
+    expect(calls).toHaveLength(1);
+  });
+
+  it("un alta sin providerId no sale a la red: no hay dónde guardarla", async () => {
+    const { ea, calls } = client(() => json([]));
+
+    await expect(
+      ea.workingPlanExceptions.create({ startDate: parseEaLocalDate("2026-03-10") }),
+    ).rejects.toThrow(/providerId/);
+    expect(calls).toHaveLength(0);
   });
 });

@@ -33,7 +33,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { instantToEaDate, addMinutes, eaLocalDateTime } from "./datetime";
+import { instantToEaDate, addMinutes, eaLocalDateTime, parseEaLocalDate } from "./datetime";
 import { createEaClient, type EaClient } from "./client";
 import { EA_WEBHOOK_ACTIONS } from "./types";
 
@@ -66,14 +66,13 @@ describe.skipIf(!enabled)("contrato contra una EA real", () => {
   });
 
   it(
-    "los trece recursos que el plan asume existen y responden",
+    "los doce recursos ruteados que el plan asume existen y responden",
     async () => {
       // `blocked_periods` y `unavailabilities` son los dos que el plan da por
       // sentados para Bloqueos y para el motor de choques de B3. Si un upgrade
       // los sacara, C1 y B3 se caen enteros.
       await expect(ea.blockedPeriods.listPage({ length: 1 })).resolves.toBeDefined();
       await expect(ea.unavailabilities.listPage({ length: 1 })).resolves.toBeDefined();
-      await expect(ea.workingPlanExceptions.listPage({ length: 1 })).resolves.toBeDefined();
       await expect(ea.appointments.listPage({ length: 1 })).resolves.toBeDefined();
       await expect(ea.customers.listPage({ length: 1 })).resolves.toBeDefined();
       await expect(ea.services.listPage({ length: 1 })).resolves.toBeDefined();
@@ -86,6 +85,93 @@ describe.skipIf(!enabled)("contrato contra una EA real", () => {
     },
     60_000,
   );
+
+  /**
+   * El recurso número trece **no existe como ruta**. El controlador
+   * `Working_plan_exceptions_api_v1.php` está en la imagen, el `openapi.yml` lo
+   * documenta, y `routes.php` no lo registra: EA devuelve su 404 de HTML.
+   *
+   * Esta prueba fija las dos mitades del hallazgo. Si algún día EA registra la
+   * ruta, la primera afirmación falla y podremos volver al recurso propio; si
+   * cambia la forma anidada, falla la segunda y se entera el panel antes que la
+   * dueña.
+   */
+  it("working_plan_exceptions no tiene ruta, y la lista vive dentro de la técnica", async () => {
+    await expect(ea.raw({ method: "GET", path: "working_plan_exceptions" })).rejects.toMatchObject({
+      kind: "not_found",
+    });
+
+    const providers = await ea.providers.list();
+    const provider = providers[0];
+    expect(provider, "la instancia de contrato necesita al menos una técnica").toBeDefined();
+
+    // La lectura anidada sí responde, y decodifica.
+    await expect(ea.workingPlanExceptions.listByProvider(provider.id)).resolves.toBeInstanceOf(
+      Array,
+    );
+  });
+
+  it("una excepción de plan se crea y se borra por la técnica", async () => {
+    const [provider] = await ea.providers.list();
+    const antes = await ea.workingPlanExceptions.listByProvider(provider.id);
+
+    const creada = await ea.workingPlanExceptions.create({
+      providerId: provider.id,
+      startDate: parseEaLocalDate("2099-12-28"),
+      endDate: parseEaLocalDate("2099-12-28"),
+      startTime: "11:00",
+      endTime: "16:00",
+      breaks: [],
+    });
+
+    try {
+      expect(creada.id).toBeGreaterThan(0);
+      expect(creada.providerId).toBe(provider.id);
+      // EA normaliza a `HH:MM:SS`; el codec lo devuelve a `HH:MM`.
+      expect(creada.startTime).toBe("11:00");
+      expect(creada.endTime).toBe("16:00");
+
+      const despues = await ea.workingPlanExceptions.listByProvider(provider.id);
+      expect(despues).toHaveLength(antes.length + 1);
+    } finally {
+      await ea.workingPlanExceptions.remove(creada.id).catch(() => undefined);
+    }
+
+    // Y el borrado deja la lista como estaba: ni de más, ni de menos.
+    const final = await ea.workingPlanExceptions.listByProvider(provider.id);
+    expect(final.map((e) => e.id).sort()).toEqual(antes.map((e) => e.id).sort());
+  });
+
+  /**
+   * La razón por la que el PUT es quirúrgico. Si EA dejara de respetar el
+   * "solo piso las claves presentes", guardar un bloqueo empezaría a borrar el
+   * plan de trabajo de la técnica, y eso se ve como horarios que desaparecen.
+   */
+  it("guardar excepciones no toca el resto de la técnica", async () => {
+    const [provider] = await ea.providers.list();
+    const antes = await ea.providers.get(provider.id);
+
+    const creada = await ea.workingPlanExceptions.create({
+      providerId: provider.id,
+      startDate: parseEaLocalDate("2099-12-29"),
+      endDate: parseEaLocalDate("2099-12-29"),
+      startTime: "10:00",
+      endTime: "14:00",
+      breaks: [],
+    });
+
+    try {
+      const despues = await ea.providers.get(provider.id);
+      expect(despues.firstName).toBe(antes.firstName);
+      expect(despues.lastName).toBe(antes.lastName);
+      expect(despues.phone).toBe(antes.phone);
+      expect(despues.services).toEqual(antes.services);
+      expect(despues.settings?.username).toBe(antes.settings?.username);
+      expect(despues.settings?.workingPlan).toEqual(antes.settings?.workingPlan);
+    } finally {
+      await ea.workingPlanExceptions.remove(creada.id).catch(() => undefined);
+    }
+  });
 
   it("appointments acepta from y till", async () => {
     const hoy = instantToEaDate(new Date());

@@ -28,6 +28,8 @@
  * - `not_found` — 404. Recurso borrado, o id que ya no existe.
  * - `bad_request` — 4xx del resto. Lo que mandamos está mal; reintentar no
  *   ayuda.
+ * - `rate_limited` — 429. EA corta a 100 peticiones por IP cada 120 s, y la API
+ *   no está exenta. Es el único 4xx transitorio: reintentar **sí** ayuda.
  * - `server` — 5xx. EA vivo pero roto.
  * - `network` — no hubo respuesta: DNS, conexión rechazada, contenedor abajo.
  * - `timeout` — hubo conexión pero no respondió a tiempo.
@@ -42,6 +44,7 @@ export type EaErrorKind =
   | "forbidden"
   | "not_found"
   | "bad_request"
+  | "rate_limited"
   | "server"
   | "network"
   | "timeout"
@@ -96,9 +99,22 @@ export class EaApiError extends Error {
    * Un 4xx nuestro no se arregla repitiéndolo. Un 5xx, un timeout o una red
    * caída sí — y son los tres que tienen que disparar el modo degradado en vez
    * de una pantalla de error.
+   *
+   * El 429 es la excepción entre los 4xx, y es real: EA limita a **100
+   * peticiones por IP cada 120 segundos** (`rate_limit_helper.php`, aplicado
+   * desde `EA_Controller::__construct()`, así que cubre la API). Una agenda que
+   * refresca cada 30 s con varias llamadas por carga lo alcanza sola. Tratarlo
+   * como error permanente pinta una pantalla de error donde correspondía
+   * esperar y repetir. EA **no manda `Retry-After`** ni cuerpo: el cuánto lo
+   * decide quien reintente.
    */
   get isTransient(): boolean {
-    return this.kind === "network" || this.kind === "timeout" || this.kind === "server";
+    return (
+      this.kind === "network" ||
+      this.kind === "timeout" ||
+      this.kind === "server" ||
+      this.kind === "rate_limited"
+    );
   }
 
   /** ¿El problema es de configuración y no de EA? Lo mira Diagnóstico. */
@@ -112,6 +128,8 @@ export function kindForStatus(status: number): EaErrorKind {
   if (status === 401) return "unauthorized";
   if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
+  // El único 4xx que sí se arregla repitiéndolo: EA limita por IP.
+  if (status === 429) return "rate_limited";
   if (status >= 500) return "server";
   return "bad_request";
 }

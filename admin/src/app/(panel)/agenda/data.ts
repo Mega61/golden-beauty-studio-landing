@@ -10,6 +10,7 @@ import {
   decodeAppointmentWithRelations,
   type EaClient,
 } from "@/lib/ea/client";
+import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
 import { EaApiError } from "@/lib/ea/errors";
 import type { EaLocalDate } from "@/lib/ea/datetime";
 import { instantToEaDate } from "@/lib/ea/datetime";
@@ -168,11 +169,13 @@ async function fetchFromEa(
 ): Promise<AgendaData> {
   const window = fetchWindow(dates);
 
-  const [rawProviders, rawServices, exceptions, unavailabilities, blockedPeriods, withRelations] =
+  // Las excepciones de plan **no se piden aparte**: EA no las expone como
+  // recurso (`GET /working_plan_exceptions` no tiene ruta) y ya vienen dentro
+  // de cada técnica, que de todas formas hay que traer.
+  const [rawProviders, rawServices, unavailabilities, blockedPeriods, withRelations] =
     await Promise.all([
       client.providers.list(),
       client.services.list(),
-      client.workingPlanExceptions.list(),
       client.unavailabilities.list(),
       client.blockedPeriods.list(),
       listAppointmentsWithRelations(client, window.from, window.till),
@@ -189,7 +192,7 @@ async function fetchFromEa(
       id: provider.id,
       name: fullName(provider.firstName, provider.lastName) ?? `Profesional ${provider.id}`,
       workingPlan: provider.settings?.workingPlan ?? null,
-      workingPlanExceptions: exceptions.filter((e) => e.providerId === provider.id),
+      workingPlanExceptions: providerWorkingPlanExceptions(provider),
     }));
 
   const visibleProviderIds = new Set(providers.map((p) => p.id));

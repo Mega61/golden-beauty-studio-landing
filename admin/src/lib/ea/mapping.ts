@@ -42,6 +42,12 @@
  *   string: `api_encode()` le hace `json_decode()`. El spec dice
  *   `type: string`. En la fila cruda sí es un string JSON — de ahí que el
  *   `kind` sea `json` y no `string`.
+ * - **`working_plan_exceptions` no es un recurso REST**, aunque el `openapi.yml`
+ *   lo documente y el controlador `Working_plan_exceptions_api_v1.php` exista.
+ *   `application/config/routes.php` nunca lo registra: los `route_api_resource()`
+ *   son diez y ése no está. `GET /working_plan_exceptions` devuelve el 404 de
+ *   EA en 1.6.0. La única puerta es `provider.settings.workingPlanExceptions`
+ *   — ver `providerWorkingPlanExceptions()` más abajo.
  *
  * ## Lo que este módulo deja caer a propósito
  *
@@ -690,6 +696,36 @@ export function availabilityFromApi(
       return time;
     }),
   };
+}
+
+/**
+ * Decodifica las excepciones de plan que vienen **anidadas** en una técnica.
+ *
+ * Es la única lectura que existe: `GET /working_plan_exceptions` no tiene ruta
+ * en EA (ver la nota del encabezado). `Providers_model::get_all_by_provider()`
+ * las serializa dentro de `settings.workingPlanExceptions` ya en camelCase y
+ * con `id`, así que se decodifican con el **mismo codec** del recurso — no hay
+ * dos formas del mismo dato — y no como un blob sin tipar.
+ *
+ * Lo único que la lista anidada no trae es `providerId`: ahí es redundante,
+ * porque ya es la lista de esa técnica. Se estampa acá para que un
+ * `WorkingPlanException` signifique lo mismo venga de donde venga.
+ */
+export function providerWorkingPlanExceptions(provider: Provider): WorkingPlanException[] {
+  const raw = provider.settings?.workingPlanExceptions;
+  if (!raw) return [];
+
+  if (!Array.isArray(raw)) {
+    throw new EaMappingError(
+      "provider.settings.workingPlanExceptions",
+      `se esperaba una lista y llegó ${typeof raw}`,
+    );
+  }
+
+  return raw.map((item) => ({
+    ...workingPlanExceptionCodec.fromApi(item as UnknownRecord),
+    providerId: provider.id,
+  }));
 }
 
 /**

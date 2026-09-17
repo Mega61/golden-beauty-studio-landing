@@ -1,0 +1,10 @@
+# Node 22, que es el que corren CI (`.github/workflows/admin-image.yml`), la
+# imagen del panel (`admin/Dockerfile`, `node:22-alpine`) y lo que pide
+# `docs/DEV-LOCAL.md`.
+#
+# No es una preferencia: en Node 26 el `sharp` que Next trae como dependencia
+# opcional no instala su binario y se cae a compilar desde fuente, así que
+# `predev`/`prebuild` de la landing mueren en `optimize-logos`. Desarrollar en
+# una versión distinta a la que construye es como se descubre en el deploy.
+[tools]
+node = "22"

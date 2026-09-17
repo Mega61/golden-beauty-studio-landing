@@ -51,6 +51,7 @@ import { EaApiError, kindForStatus, kindForThrown, safeBody, scrubSecret } from 
 import {
   EA_CODECS,
   availabilityFromApi,
+  providerWorkingPlanExceptions,
   requiredApiFields,
   type EaCodec,
   type EaMappedResource,
@@ -323,6 +324,51 @@ export type EaResourceClient<D, I, Q extends ListQuery> = {
   remove(id: number): Promise<void>;
 };
 
+/** La forma con la que EA guarda una excepción dentro de la técnica. */
+type ExceptionPayload = {
+  id?: number;
+  startDate: string | null;
+  endDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  breaks: ReadonlyArray<{ start: string; end: string }>;
+};
+
+/**
+ * Reenvía una excepción ya existente **con su id**, que es lo que hace que EA
+ * la actualice en vez de borrarla y crear otra con id nuevo.
+ */
+function toExceptionPayload(exception: WorkingPlanException): ExceptionPayload {
+  return {
+    id: exception.id,
+    startDate: exception.startDate,
+    endDate: exception.endDate,
+    startTime: exception.startTime,
+    endTime: exception.endTime,
+    breaks: exception.breaks,
+  };
+}
+
+/**
+ * Excepciones al plan de trabajo de una técnica.
+ *
+ * **No es un recurso REST**, aunque el `openapi.yml` de EA lo prometa: el
+ * controlador existe pero `routes.php` no lo registra, así que
+ * `GET /working_plan_exceptions` responde 404. Todo pasa por `providers`.
+ *
+ * De ahí las dos diferencias con `EaResourceClient`: no hay `listPage` (la
+ * lista vive dentro de la técnica, no se pagina) ni `update` (una edición es
+ * un alta con el mismo id, que es como EA la guarda).
+ */
+export type EaWorkingPlanExceptionsClient = {
+  /** Todas, de todas las técnicas. Una sola llamada a `providers`. */
+  list(): Promise<WorkingPlanException[]>;
+  /** Las de una técnica, sin traerse las demás. */
+  listByProvider(providerId: number): Promise<WorkingPlanException[]>;
+  create(input: WorkingPlanExceptionInput): Promise<WorkingPlanException>;
+  remove(id: number): Promise<void>;
+};
+
 export type EaClient = {
   appointments: EaResourceClient<Appointment, AppointmentInput, AppointmentQuery>;
   unavailabilities: EaResourceClient<Unavailability, UnavailabilityInput, ListQuery>;
@@ -334,11 +380,7 @@ export type EaClient = {
   admins: EaResourceClient<Admin, AdminInput, ListQuery>;
   blockedPeriods: EaResourceClient<BlockedPeriod, BlockedPeriodInput, ListQuery>;
   webhooks: EaResourceClient<Webhook, WebhookInput, ListQuery>;
-  workingPlanExceptions: EaResourceClient<
-    WorkingPlanException,
-    WorkingPlanExceptionInput,
-    ListQuery
-  >;
+  workingPlanExceptions: EaWorkingPlanExceptionsClient;
 
   /** Ajustes globales. No son un recurso con id: la clave es el nombre. */
   settings: {
@@ -557,6 +599,110 @@ export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaCl
     };
   }
 
+  const providers = resource<Provider, ProviderInput, ListQuery>("providers", "providers");
+
+  /**
+   * Excepciones al plan, montadas sobre `providers` porque EA no las expone
+   * como recurso (ver `EaWorkingPlanExceptionsClient`).
+   *
+   * Las escrituras son un leer-modificar-guardar sobre la lista de la técnica,
+   * que es como EA mismo las guarda: `Providers_model::save()` recorre la lista
+   * que le llega, hace upsert de cada entrada y **borra las que no estén**. Por
+   * eso un alta manda la lista entera con una más, y una baja la manda sin esa.
+   *
+   * El PUT va **quirúrgico** — solo `settings.workingPlanExceptions` — porque
+   * el `api_decode()` de EA solo pisa las claves presentes. Así una edición
+   * concurrente del nombre, el teléfono o el plan de trabajo no se pierde. Lo
+   * que sigue sin protección es la carrera contra otra edición **de la lista
+   * misma**: no hay versión ni etag que permita detectarla, y es la misma
+   * carrera que tiene la interfaz de EA.
+   */
+  const workingPlanExceptions: EaWorkingPlanExceptionsClient = {
+    async list() {
+      const all = await providers.list();
+      return all.flatMap((provider) => providerWorkingPlanExceptions(provider));
+    },
+
+    async listByProvider(providerId) {
+      return providerWorkingPlanExceptions(await providers.get(providerId));
+    },
+
+    async create(input) {
+      const providerId = input.providerId;
+      if (typeof providerId !== "number") {
+        throw new EaApiError(
+          "Una excepción de plan necesita `providerId`: se guarda dentro de la técnica, " +
+            "no en una tabla propia con id autónomo.",
+          { kind: "bad_request", path: "providers" },
+        );
+      }
+
+      const current = await workingPlanExceptions.listByProvider(providerId);
+      const before = new Set(current.map((e) => e.id));
+
+      // Sin `id`: es la nueva. Las demás van con el suyo para que EA las
+      // actualice en lugar de borrarlas.
+      const nueva: ExceptionPayload = {
+        startDate: input.startDate ?? null,
+        endDate: input.endDate ?? input.startDate ?? null,
+        startTime: input.startTime ?? null,
+        endTime: input.endTime ?? null,
+        breaks: input.breaks ?? [],
+      };
+
+      const saved = await putExceptions(providerId, [
+        ...current.map(toExceptionPayload),
+        nueva,
+      ]);
+
+      // EA no dice cuál acaba de crear: el id lo asigna MySQL. Es el que no
+      // estaba antes. Si no aparece ninguno, EA aceptó el PUT sin guardar.
+      const created = saved.find((e) => !before.has(e.id));
+      if (!created) {
+        throw new EaApiError(
+          "EA aceptó el PUT pero la excepción no quedó guardada.",
+          { kind: "bad_request", path: `providers/${providerId}` },
+        );
+      }
+      return created;
+    },
+
+    async remove(id) {
+      // La baja solo trae el id: hay que encontrar de quién es. Son unas pocas
+      // técnicas, y sin esto habría que cambiarle la firma a los llamadores.
+      const all = await providers.list();
+      const owner = all.find((provider) =>
+        providerWorkingPlanExceptions(provider).some((e) => e.id === id),
+      );
+
+      if (!owner) {
+        throw new EaApiError(`No existe una excepción de plan con id ${id}.`, {
+          kind: "not_found",
+          path: "providers",
+        });
+      }
+
+      const keep = providerWorkingPlanExceptions(owner).filter((e) => e.id !== id);
+      await putExceptions(owner.id, keep.map(toExceptionPayload));
+    },
+  };
+
+  /** El PUT quirúrgico, y la relectura de lo que quedó. */
+  async function putExceptions(
+    providerId: number,
+    exceptions: readonly ExceptionPayload[],
+  ): Promise<WorkingPlanException[]> {
+    const payload = await request({
+      method: "PUT",
+      path: `providers/${providerId}`,
+      body: { settings: { workingPlanExceptions: exceptions } },
+    });
+
+    return providerWorkingPlanExceptions(
+      EA_CODECS.providers.fromApi(expectObject(payload, `providers/${providerId}`)),
+    );
+  }
+
   return {
     appointments: resource<Appointment, AppointmentInput, AppointmentQuery>(
       "appointments",
@@ -576,7 +722,7 @@ export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaCl
       "service_categories",
       "service_categories",
     ),
-    providers: resource<Provider, ProviderInput, ListQuery>("providers", "providers"),
+    providers,
     secretaries: resource<Secretary, SecretaryInput, ListQuery>("secretaries", "secretaries"),
     admins: resource<Admin, AdminInput, ListQuery>("admins", "admins"),
     blockedPeriods: resource<BlockedPeriod, BlockedPeriodInput, ListQuery>(
@@ -584,11 +730,7 @@ export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaCl
       "blocked_periods",
     ),
     webhooks: resource<Webhook, WebhookInput, ListQuery>("webhooks", "webhooks"),
-    workingPlanExceptions: resource<
-      WorkingPlanException,
-      WorkingPlanExceptionInput,
-      ListQuery
-    >("working_plan_exceptions", "working_plan_exceptions"),
+    workingPlanExceptions,
 
     settings: {
       async list() {

@@ -11,6 +11,7 @@ import {
   customerCodec,
   parseWebhookEnvelope,
   providerCodec,
+  providerWorkingPlanExceptions,
   requiredApiFields,
   serviceCodec,
   unavailabilityCodec,
@@ -456,6 +457,67 @@ describe("excepciones al plan de trabajo", () => {
 
     expect(domain.startTime).toBe("09:00");
     expect(domain.breaks).toEqual([{ start: "12:00", end: "13:00" }]);
+  });
+});
+
+/**
+ * La lectura anidada es la **única** que existe: `GET /working_plan_exceptions`
+ * no tiene ruta en EA. Lo que se prueba acá es que el dato que llega dentro de
+ * la técnica signifique exactamente lo mismo que el que llegaba del recurso.
+ */
+describe("excepciones anidadas en la técnica", () => {
+  const providerWith = (exceptions: unknown) =>
+    providerCodec.fromApi({
+      id: 7,
+      firstName: "Lina",
+      lastName: "Gómez",
+      settings: { username: "lina", workingPlanExceptions: exceptions },
+    });
+
+  it("estampa el providerId, que la lista anidada no trae", () => {
+    const decoded = providerWorkingPlanExceptions(
+      providerWith([
+        { id: 3, startDate: "2026-01-15", endDate: "2026-01-15", startTime: "11:00", endTime: "18:00", breaks: [] },
+      ]),
+    );
+
+    expect(decoded).toHaveLength(1);
+    expect(decoded[0].providerId).toBe(7);
+    expect(decoded[0].id).toBe(3);
+  });
+
+  it("normaliza las horas igual que el recurso, con segundos y todo", () => {
+    const [exception] = providerWorkingPlanExceptions(
+      providerWith([
+        {
+          id: 4,
+          startDate: "2026-01-16",
+          endDate: "2026-01-16",
+          startTime: "11:00:00",
+          endTime: "16:00:00",
+          breaks: [],
+        },
+      ]),
+    );
+
+    expect(exception.startTime).toBe("11:00");
+    expect(exception.endTime).toBe("16:00");
+  });
+
+  it("una técnica sin excepciones da una lista vacía, no null", () => {
+    expect(providerWorkingPlanExceptions(providerWith([]))).toEqual([]);
+    expect(providerWorkingPlanExceptions(providerWith(null))).toEqual([]);
+  });
+
+  it("un día libre anidado conserva los null, que son información", () => {
+    const [exception] = providerWorkingPlanExceptions(
+      providerWith([
+        { id: 5, startDate: "2026-01-17", endDate: "2026-01-17", startTime: null, endTime: null, breaks: [] },
+      ]),
+    );
+
+    expect(exception.startTime).toBeNull();
+    expect(exception.endTime).toBeNull();
   });
 });
 
