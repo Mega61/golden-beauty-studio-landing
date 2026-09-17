@@ -12,6 +12,7 @@ import {
   BotonDesvincular,
   BotonPublicar,
   BotonPublicarTodo,
+  FormCrear,
   FormVincular,
   type OpcionServicio,
 } from "./AccionesDiff";
@@ -277,7 +278,17 @@ function accionPara(row: DiffRow, libres: readonly OpcionServicio[]): React.Reac
     return <BotonPublicar pricingId={row.pricingId} />;
   }
   if (row.state === "sin-vincular" && row.pricingId) {
-    return <FormVincular pricingId={row.pricingId} opciones={libres} />;
+    // Dos caminos, y el de arriba es el normal: lo que está en la vitrina y no
+    // en la agenda casi siempre hay que **crearlo**. Vincular es para lo que
+    // alguien ya creó a mano en EA, o para recuperar una creación que falló a
+    // la mitad. Un ítem "solo vitrina" no se agenda, así que no ofrece ninguno.
+    if (row.showcaseOnly) return null;
+    return (
+      <div style={{ display: "grid", gap: "0.375rem" }}>
+        <FormCrear pricingId={row.pricingId} />
+        <FormVincular pricingId={row.pricingId} opciones={libres} />
+      </div>
+    );
   }
   if (row.state === "mapa-roto" && row.pricingId) {
     return <BotonDesvincular pricingId={row.pricingId} />;

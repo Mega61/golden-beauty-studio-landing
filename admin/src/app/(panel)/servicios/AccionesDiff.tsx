@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui";
 
 import {
+  crearServicio,
   desvincularServicio,
   publicarPrecio,
   publicarTodo,
@@ -100,6 +101,46 @@ export function BotonDesvincular({ pricingId }: { pricingId: string }) {
 export type OpcionServicio = { id: number; label: string };
 
 /**
+ * Crear en la agenda un servicio que la vitrina tiene y EA no.
+ *
+ * El nombre es un campo de texto porque **no existe en ninguna fuente que esta
+ * app pueda leer**: `pricing.ts` guarda id, precio y duración; los nombres viven
+ * en los diccionarios de la landing. Derivarlo del id sería inventar lo que la
+ * clienta lee en su confirmación de cita, así que lo escribe quien lo crea. Es
+ * una vez por servicio, en toda su vida.
+ *
+ * El precio y la duración no están en el formulario a propósito: el servidor los
+ * relee de la vitrina. Es la misma regla que Publicar.
+ */
+export function FormCrear({ pricingId }: { pricingId: string }) {
+  const [estado, enviar, enviando] = useActionState<ActionResult | null, FormData>(
+    (_previo, formData) => crearServicio(pricingId, String(formData.get("name") ?? "")),
+    initial,
+  );
+
+  return (
+    <form action={enviar} style={{ display: "flex", gap: "0.375rem", alignItems: "center" }}>
+      <label className="ui-sr" htmlFor={`crear-${pricingId}`}>
+        Nombre con el que {pricingId} aparece en la agenda
+      </label>
+      <input
+        id={`crear-${pricingId}`}
+        name="name"
+        className="ui-input"
+        required
+        maxLength={120}
+        placeholder="Nombre para la agenda"
+        style={{ maxWidth: "14rem" }}
+      />
+      <Button type="submit" size="sm" loading={enviando}>
+        Crear
+      </Button>
+      <Resultado estado={estado} />
+    </form>
+  );
+}
+
+/**
  * Vincular un id de la vitrina con un servicio que ya existe en EA.
  *
  * El desplegable solo trae los servicios **libres**: el mapa es uno a uno en
@@ -120,11 +161,9 @@ export function FormVincular({
   );
 
   if (opciones.length === 0) {
-    return (
-      <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
-        No hay servicios libres en la agenda. Hay que crearlo allá primero.
-      </p>
-    );
+    // Sin servicios libres, vincular no es una opción — pero crear sí, y es el
+    // camino normal de un combo. El botón de crear se dibuja aparte, arriba.
+    return null;
   }
 
   return (

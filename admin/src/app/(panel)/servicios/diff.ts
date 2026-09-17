@@ -260,6 +260,69 @@ function compareFields(entry: PricingEntry, service: Service): DiffField[] {
  * Solo `desincronizado` se puede publicar: `sin-vincular` no tiene a quién
  * escribirle y `mapa-roto` le escribiría a un servicio que ya no existe.
  */
+/** Lo que se manda a `POST /services` para crear un servicio que falta. */
+export type CreatePayload = {
+  name: string;
+  price: number;
+  duration: number;
+};
+
+/** Por qué no se puede crear, o `null` si sí se puede. */
+export type CreateBlocker =
+  | "ya-vinculado"
+  | "solo-vitrina"
+  | "sin-precio"
+  | "sin-duracion"
+  | "sin-nombre";
+
+/**
+ * El payload para **crear** en EA un servicio que la vitrina tiene y la agenda
+ * no. Es el caso de los cinco combos.
+ *
+ * ## El nombre entra, no se deriva
+ *
+ * `pricing.ts` no guarda nombres: viven en los diccionarios de la landing, que
+ * esta app no importa. Derivarlo del id (`semi-permanent-hands-feet` →
+ * "Semi Permanent Hands Feet") sería inventar el texto que la clienta va a leer
+ * en su confirmación de cita, así que lo escribe una persona. Es una vez en la
+ * vida de cada servicio.
+ *
+ * ## La duración es obligatoria, el precio puede ser cero
+ *
+ * EA agenda por duración: un servicio sin ella no ocupa tiempo y el calendario
+ * no lo puede dibujar. Los ítems de `extras` con `durationMin: null` son
+ * adicionales que se cobran dentro de otra cita, no cosas que se agendan — por
+ * eso no se pueden crear desde acá y por eso el bloqueo tiene nombre propio en
+ * vez de ser un error genérico.
+ */
+export function createPayload(
+  row: DiffRow,
+  name: string,
+): { payload: CreatePayload } | { blocker: CreateBlocker } {
+  if (row.state !== "sin-vincular") return { blocker: "ya-vinculado" };
+  if (row.showcaseOnly) return { blocker: "solo-vitrina" };
+
+  const trimmed = name.trim();
+  if (trimmed === "") return { blocker: "sin-nombre" };
+
+  if (row.showcasePrice === null) return { blocker: "sin-precio" };
+  if (row.showcaseDuration === null) return { blocker: "sin-duracion" };
+
+  return {
+    payload: { name: trimmed, price: row.showcasePrice, duration: row.showcaseDuration },
+  };
+}
+
+/** El motivo, escrito para quien está mirando la pantalla. */
+export const CREATE_BLOCKER_MESSAGE: Readonly<Record<CreateBlocker, string>> = {
+  "ya-vinculado": "ya está vinculado a un servicio de la agenda.",
+  "solo-vitrina": "está marcado como solo vitrina: no se agenda, así que no va a la agenda.",
+  "sin-precio": "no tiene precio en la vitrina.",
+  "sin-duracion":
+    "no tiene duración en la vitrina. La agenda necesita minutos para poder dibujarlo; un adicional que se cobra dentro de otra cita no se crea acá.",
+  "sin-nombre": "necesita un nombre. Es el texto que la clienta ve en su confirmación.",
+};
+
 export function publishPayload(row: DiffRow): PublishPayload | null {
   if (row.state !== "desincronizado") return null;
   if (row.eaServiceId === null || row.showcasePrice === null) return null;

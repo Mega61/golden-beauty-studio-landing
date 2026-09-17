@@ -8,7 +8,7 @@ import { EaApiError } from "@/lib/ea";
 import { createEaClient } from "@/lib/ea/client";
 import { requireCapability } from "@/lib/dal";
 
-import { publishPayload } from "./diff";
+import { CREATE_BLOCKER_MESSAGE, createPayload, publishPayload } from "./diff";
 import { loadServicesView } from "./data";
 
 /**
@@ -132,13 +132,105 @@ export async function publicarTodo(): Promise<ActionResult> {
 }
 
 /**
- * Vincular un id de la vitrina con un servicio de EA.
+ * Crear en la agenda un servicio que la vitrina tiene y EA no, y vincularlo.
  *
- * **No crea el servicio en EA**, y eso es deliberado: el nombre no vive en
- * `pricing.ts` sino en los diccionarios de la landing, y derivarlo del id
- * (`polygel-sculpted` → "Polygel Sculpted") sería inventar el dato que la
- * clienta va a leer en su confirmación. Se crea a mano en EA una vez y se
- * vincula acá.
+ * Es el caso de los cinco combos: `pricing.ts` los tiene con su precio y su
+ * duración propios —más cortos y más baratos que la suma de sus partes— y en EA
+ * no existen, así que hoy **un combo no se puede agendar como una sola cita**.
+ *
+ * ## El nombre lo escribe una persona, y por eso es un parámetro
+ *
+ * Es la única pieza que no está en la vitrina: los nombres viven en los
+ * diccionarios de la landing, que esta app no importa. Derivarlo del id sería
+ * inventar el texto que la clienta lee en su confirmación de cita. El precio y
+ * la duración **no** viajan desde el navegador: se releen de la vitrina en el
+ * servidor, igual que al publicar.
+ *
+ * ## Crear y vincular es un solo acto, y no es atómico
+ *
+ * Son dos sistemas: `POST /services` en EA y una fila en `service_map`. Si lo
+ * segundo falla, el servicio queda creado en la agenda y sin vincular — y eso
+ * es recuperable **desde la misma pantalla**, porque aparece como
+ * `solo-en-ea` y el desplegable de Vincular lo ofrece. El mensaje lo dice con
+ * esas palabras en vez de dejar a alguien adivinando si tiene que borrarlo allá.
+ * El orden importa: al revés quedaría una fila del mapa apuntando a un servicio
+ * inexistente, que es el estado `mapa-roto` y ése sí no se arregla solo.
+ */
+export async function crearServicio(
+  pricingId: string,
+  name: string,
+): Promise<ActionResult> {
+  const session = await requireCapability("catalogo:publicar");
+
+  const view = await loadServicesView();
+  if (view.diff === null) {
+    return {
+      ok: false,
+      message: "No se puede crear sin haber podido leer las tres fuentes (vitrina, agenda y mapa).",
+    };
+  }
+
+  const row = view.diff.rows.find((candidate) => candidate.pricingId === pricingId);
+  if (!row) {
+    return { ok: false, message: `"${pricingId}" ya no está en la vitrina.` };
+  }
+
+  const result = createPayload(row, name);
+  if ("blocker" in result) {
+    return { ok: false, message: `"${pricingId}" ${CREATE_BLOCKER_MESSAGE[result.blocker]}` };
+  }
+
+  const { payload } = result;
+
+  let eaServiceId: number;
+  try {
+    const ea = createEaClient();
+    const created = await ea.services.create({
+      name: payload.name,
+      price: payload.price,
+      duration: payload.duration,
+    });
+    eaServiceId = created.id;
+  } catch (error) {
+    return { ok: false, message: describeWriteFailure(error) };
+  }
+
+  const at = new Date();
+  try {
+    const db = getDb();
+    await serviceMapRepository(db).link(pricingId, eaServiceId);
+    await serviceMapRepository(db).markPublished(pricingId, at);
+    await auditLogRepository(db).append({
+      actorUserId: session.userId,
+      action: "catalogo.crear",
+      entity: "service_map",
+      entityId: pricingId,
+      after: { ea_service_id: eaServiceId, ...payload },
+      at,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        `"${payload.name}" se creó en la agenda (id ${eaServiceId}) pero no se pudo vincular. ` +
+        `Aparece abajo como "solo en la agenda" y se puede vincular desde ahí; no hay que borrarlo. ` +
+        describeWriteFailure(error),
+    };
+  }
+
+  revalidatePath("/servicios");
+  return {
+    ok: true,
+    message: `"${payload.name}" quedó creado en la agenda y vinculado a "${pricingId}".`,
+  };
+}
+
+/**
+ * Vincular un id de la vitrina con un servicio de EA **que ya existe**.
+ *
+ * Para lo que todavía no existe está `crearServicio()`, que lo crea y lo vincula
+ * de una. Este camino es el de un servicio que alguien ya había creado a mano en
+ * EA, o el de recuperar una creación que falló a la mitad.
  */
 export async function vincularServicio(
   pricingId: string,
