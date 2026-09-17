@@ -627,6 +627,52 @@ export interface SchemaMigrationTable {
 
 // ── El esquema completo ─────────────────────────────────────────────────────
 
+/** Qué mensaje es. Define la plantilla y cuándo se manda. */
+export type WaMessageKind = "recordatorio_24h" | "recordatorio_2h" | "confirmacion";
+
+/**
+ * Estado de un mensaje.
+ *
+ * `enviado` significa **que Meta lo aceptó**, no que llegó. La diferencia entre
+ * `enviado` y `entregado` es exactamente la pregunta que se hace alguien cuando
+ * una clienta dice que no le avisaron.
+ */
+export type WaMessageStatus =
+  | "pendiente"
+  | "enviado"
+  | "entregado"
+  | "leido"
+  | "fallido"
+  | "omitido";
+
+/**
+ * Un recordatorio de WhatsApp. **El texto no se guarda**, solo qué plantilla y
+ * para qué cita: el mensaje lleva el nombre de la clienta y la hora de su cita,
+ * y una tabla de log sin retención no es lugar para eso.
+ */
+export interface WaMessageTable {
+  id: Generated<number>;
+  ea_appointment_id: number;
+  kind: WaMessageKind;
+  phone_e164: string;
+  template_name: string;
+  status: Generated<WaMessageStatus>;
+  provider_message_id: string | null;
+  error: string | null;
+  skip_reason: string | null;
+  scheduled_for: SqlDateTime;
+  sent_at: SqlDateTime | null;
+  updated_at: UpdatedAt;
+  created_at: CreatedAt;
+}
+
+/** La baja. Es de la persona —del número— y no de un mensaje ni de una ficha. */
+export interface WaOptoutTable {
+  phone_e164: string;
+  reason: string | null;
+  created_at: CreatedAt;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -651,6 +697,8 @@ export interface Database {
   legacy_appointment: LegacyAppointmentTable;
   audit_log: AuditLogTable;
   job_run: JobRunTable;
+  wa_message: WaMessageTable;
+  wa_optout: WaOptoutTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -674,6 +722,13 @@ export type NewAppointmentFinanceItem = Insertable<AppointmentFinanceItemTable>;
 
 export type AppointmentPayment = Selectable<AppointmentPaymentTable>;
 export type NewAppointmentPayment = Insertable<AppointmentPaymentTable>;
+
+export type WaMessage = Selectable<WaMessageTable>;
+export type NewWaMessage = Insertable<WaMessageTable>;
+export type WaMessageUpdate = Updateable<WaMessageTable>;
+
+export type WaOptout = Selectable<WaOptoutTable>;
+export type NewWaOptout = Insertable<WaOptoutTable>;
 
 export type DayClose = Selectable<DayCloseTable>;
 export type NewDayClose = Insertable<DayCloseTable>;

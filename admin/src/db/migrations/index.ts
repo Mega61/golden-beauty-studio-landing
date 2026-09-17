@@ -29,7 +29,8 @@
  * asignado de antemano** para que dos ramas en paralelo no eligieran el mismo:
  * `016` (arreglo de Better Auth), `017` (`job_run`, de la consolidación WP-E1),
  * `018` (la regla de comisión del 40 %, que siembra datos sobre la tabla que ya
- * creó la `007`) y `019` (`appointment_payment`, el pago dividido de X1).
+ * creó la `007`) y `019` (`appointment_payment`, el pago dividido de X1) y `020` (`wa_message`,
+ * los recordatorios de X7).
  * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
  * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
  * detecta que alguien editó una migración ya aplicada.
@@ -56,6 +57,7 @@ import { migration as m016 } from "./016-account-issuer";
 import { migration as m017 } from "./017-job-run";
 import { migration as m018 } from "./018-commission-rule";
 import { migration as m019 } from "./019-appointment-payment";
+import { migration as m020 } from "./020-wa-message";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -77,6 +79,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m017,
   m018,
   m019,
+  m020,
 ];
 
 /**
@@ -106,6 +109,8 @@ export const EXPECTED_TABLES: readonly string[] = [
   "legacy_appointment",
   "audit_log",
   "job_run",
+  "wa_message",
+  "wa_optout",
   // Infraestructura
   "schema_migration",
 ];
