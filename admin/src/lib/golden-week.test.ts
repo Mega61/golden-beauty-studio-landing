@@ -469,7 +469,7 @@ describe("golden week — 24 al 29 de agosto de 2026", () => {
         eaAppointmentId: a.eaAppointmentId,
         amountCharged: a.totals.amountCharged,
         tip: a.totals.tip,
-        paymentMethod: a.method,
+        payments: [{ method: a.method, amount: a.totals.amountCharged }],
         paidOn: a.date,
         eaProviderId: a.eaProviderId,
         performedServiceId: a.performedServiceId,

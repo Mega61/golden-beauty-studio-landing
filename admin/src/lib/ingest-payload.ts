@@ -46,7 +46,9 @@
 import {
   buildPaymentAdjustmentSourceTxId,
   buildPaymentSourceTxId,
+  buildPaymentSplitSourceTxId,
 } from "./ingest-id";
+import type { TicketPayment } from "./ticket";
 
 import type { Cop, PaymentMethod } from "@/db/types";
 
@@ -80,7 +82,16 @@ export type FinanceForIngest = {
   /** `null` es un error de programación acá: una cuenta sin cerrar no se empuja. */
   amountCharged: Cop | null;
   tip: Cop;
-  paymentMethod: PaymentMethod | null;
+  /**
+   * Con qué método —o métodos— entró la plata. Vacío = la cuenta no se cobró y
+   * no se puede empujar.
+   *
+   * Es una lista y no un enum porque una cuenta se puede partir entre efectivo
+   * y transferencia, y entonces **son dos movimientos**: la plata aterrizó en
+   * el cajón y en el banco, y Actual Budget los quiere separados o ninguna de
+   * las dos conciliaciones cuadra.
+   */
+  payments: readonly TicketPayment[];
   /** Fecha de caja `YYYY-MM-DD`. Cae siempre en la fecha de la cita. */
   paidOn: string | null;
   eaProviderId: number | null;
@@ -127,20 +138,16 @@ function baseOf(
   finance: FinanceForIngest,
   amount: Cop,
   sourceTxId: string,
+  method: PaymentMethod,
+  tip: Cop,
 ): IngestPayment {
-  if (finance.paymentMethod === null) {
-    throw new IngestPayloadError(
-      `La cita ${finance.eaAppointmentId} no tiene método de pago y no se puede empujar`,
-    );
-  }
-
-  if (!isPaymentMethod(finance.paymentMethod)) {
+  if (!isPaymentMethod(method)) {
     // Solo alcanzable si una fila trae un valor que el enum de la base no
     // debería permitir. Mejor reventar acá que mandarle a Strapi un `method`
     // que su enum rechaza con un 400 en mitad del push del día.
     throw new IngestPayloadError(
       `Método de pago desconocido en la cita ${finance.eaAppointmentId}: ` +
-        JSON.stringify(finance.paymentMethod),
+        JSON.stringify(method),
     );
   }
 
@@ -152,7 +159,7 @@ function baseOf(
   }
 
   assertPesos(amount, `El monto de la cita ${finance.eaAppointmentId}`);
-  assertPesos(finance.tip, `La propina de la cita ${finance.eaAppointmentId}`);
+  assertPesos(tip, `La propina de la cita ${finance.eaAppointmentId}`);
 
   return {
     source_tx_id: sourceTxId,
@@ -160,24 +167,114 @@ function baseOf(
     // La propina viaja **al lado** del monto, nunca sumada: no es ingreso del
     // estudio y meterla adentro inflaría el ingreso del mes con plata que es
     // de la técnica.
-    tip: finance.tip,
-    method: finance.paymentMethod,
+    tip,
+    method,
     paid_on: finance.paidOn,
   };
 }
 
-/** El pago de una cita cerrada, tal como sale en el push del cierre diario. */
-export function buildIngestPayment(finance: FinanceForIngest): IngestPayment {
+/**
+ * Los pagos de la cuenta, verificados contra lo cobrado.
+ *
+ * Es la última compuerta antes de que las cifras salgan del panel, y por eso
+ * repite una invariante que `lib/ticket.ts` ya cuida al cerrar: lo que sale de
+ * acá no vuelve —Actual no actualiza— y la fila pudo haberse escrito por otro
+ * camino (un reproceso, una corrección a mano en la base) que no pasó por el
+ * cierre.
+ */
+function paymentsOf(finance: FinanceForIngest, amountCharged: Cop): readonly TicketPayment[] {
+  if (finance.payments.length === 0) {
+    throw new IngestPayloadError(
+      `La cita ${finance.eaAppointmentId} no tiene método de pago y no se puede empujar`,
+    );
+  }
+
+  const total = finance.payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+  if (total !== amountCharged) {
+    throw new IngestPayloadError(
+      `Los pagos de la cita ${finance.eaAppointmentId} suman ${total} y la cuenta ` +
+        `cobra ${amountCharged}. No se empuja una cifra que no cuadra.`,
+    );
+  }
+
+  return finance.payments;
+}
+
+/**
+ * El método con el que se empuja **un ajuste** de una cuenta partida.
+ *
+ * Un ajuste es una corrección posterior al cierre y no trae método propio: la
+ * pantalla pide monto y motivo, no por dónde entró la diferencia. Con un solo
+ * método no hay pregunta; con dos hay que elegir uno, porque `Payment.method`
+ * en Strapi es obligatorio.
+ *
+ * Se elige **el pago más grande**, y con empate el primero. No es la verdad —
+ * la verdad es que nadie registró por dónde entró la corrección— pero es
+ * determinista, es la apuesta más probable, y está en un solo lugar en vez de
+ * repartida. El día que los ajustes de cuentas partidas dejen de ser una
+ * rareza, lo correcto es que la pantalla pregunte; queda dicho acá para que ese
+ * cambio sea una decisión y no un descubrimiento.
+ */
+function adjustmentMethodOf(payments: readonly TicketPayment[]): PaymentMethod {
+  let best = payments[0];
+  for (const payment of payments) {
+    if (payment.amount > best.amount) best = payment;
+  }
+  return best.method;
+}
+
+/**
+ * Los pagos de una cita cerrada, tal como salen en el push del cierre diario.
+ *
+ * Devuelve **uno por método**: una cuenta cobrada toda en efectivo es un
+ * movimiento, y una partida entre efectivo y transferencia son dos.
+ *
+ * ## Las dos llaves, y por qué no son una sola forma
+ *
+ * Con un método la llave es `ea-appt:<id>` pelada; con dos o más lleva el
+ * método adentro. Uniformar sería más bonito y costaría el ingreso histórico:
+ * las filas que ya están en Strapi y en Actual se llavean con la forma pelada,
+ * y re-llavearlas las importaría de nuevo como movimientos nuevos, en silencio.
+ * Ver `buildPaymentSplitSourceTxId()`.
+ *
+ * ## La propina va en un solo movimiento
+ *
+ * En el primer pago, y cero en los demás. No se prorratea: la propina no es
+ * ingreso del estudio, no participa del descuento y no tiene por qué partirse
+ * igual que el cobro. Repartirla entre los movimientos daría dos cifras que
+ * suman bien y que por separado no significan nada; ponerla entera en cada uno
+ * la duplicaría.
+ */
+export function buildIngestPayment(finance: FinanceForIngest): IngestPayment[] {
   if (finance.amountCharged === null) {
     throw new IngestPayloadError(
       `La cita ${finance.eaAppointmentId} no tiene cuenta cerrada y no se puede empujar`,
     );
   }
 
-  return baseOf(
-    finance,
-    finance.amountCharged,
-    buildPaymentSourceTxId(finance.eaAppointmentId),
+  const payments = paymentsOf(finance, finance.amountCharged);
+
+  if (payments.length === 1) {
+    return [
+      baseOf(
+        finance,
+        payments[0].amount,
+        buildPaymentSourceTxId(finance.eaAppointmentId),
+        payments[0].method,
+        finance.tip,
+      ),
+    ];
+  }
+
+  return payments.map((payment, index) =>
+    baseOf(
+      finance,
+      payment.amount,
+      buildPaymentSplitSourceTxId(finance.eaAppointmentId, payment.method),
+      payment.method,
+      index === 0 ? finance.tip : 0,
+    ),
   );
 }
 
@@ -204,18 +301,23 @@ export function buildIngestAdjustment(
     );
   }
 
-  return {
-    ...baseOf(
-      finance,
-      delta,
-      // Llave propia, con la secuencia adentro: reusar la del pago le pisaría
-      // el monto a la fila original en vez de agregar un movimiento.
-      buildPaymentAdjustmentSourceTxId(finance.eaAppointmentId, sequence),
-    ),
+  if (finance.payments.length === 0) {
+    throw new IngestPayloadError(
+      `La cita ${finance.eaAppointmentId} no tiene método de pago y no se puede empujar`,
+    );
+  }
+
+  return baseOf(
+    finance,
+    delta,
+    // Llave propia, con la secuencia adentro: reusar la del pago le pisaría
+    // el monto a la fila original en vez de agregar un movimiento.
+    buildPaymentAdjustmentSourceTxId(finance.eaAppointmentId, sequence),
+    adjustmentMethodOf(finance.payments),
     // La propina no se re-empuja con el ajuste: si cambió, cambió como parte
     // del delta que el llamador calculó.
-    tip: 0,
-  };
+    0,
+  );
 }
 
 /**
@@ -229,7 +331,7 @@ export function buildIngestAdjustment(
 export function buildDayClosePayments(
   finances: readonly FinanceForIngest[],
 ): IngestPayment[] {
-  const payments = finances.map((finance) => buildIngestPayment(finance));
+  const payments = finances.flatMap((finance) => buildIngestPayment(finance));
 
   // **Dos movimientos con el mismo `source_tx_id` no pueden salir en el mismo
   // lote.** Es la llave UNIQUE de `Payment` y la que usa `upsertPayment()`:

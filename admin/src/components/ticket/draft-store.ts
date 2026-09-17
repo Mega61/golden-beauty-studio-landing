@@ -38,7 +38,11 @@
  * ya sería un dato de otra persona en pantalla.
  */
 
-import { DRAFT_VERSION, type TicketDraft } from "./draft";
+import {
+  DRAFT_VERSION,
+  DRAFT_VERSION_SINGLE_METHOD,
+  type TicketDraft,
+} from "./draft";
 import type { PaymentMethod, VarianceReasonCode } from "@/db/types";
 
 /**
@@ -214,7 +218,13 @@ function str(value: unknown): string {
  */
 export function parseDraft(raw: unknown): TicketDraft | null {
   if (!isRecord(raw)) return null;
-  if (raw.version !== DRAFT_VERSION) return null;
+  // Se aceptan la versión actual **y** la anterior. Un borrador de la versión 1
+  // guardaba un solo método de pago; descartarlo acá le borraría a la técnica lo
+  // que dejó escrito entre dos clientas, que es justo lo que el borrador local
+  // existe para que no pase.
+  if (raw.version !== DRAFT_VERSION && raw.version !== DRAFT_VERSION_SINGLE_METHOD) {
+    return null;
+  }
 
   const eaAppointmentId = intOrNull(raw.eaAppointmentId);
   if (eaAppointmentId === null || eaAppointmentId <= 0) return null;
@@ -254,9 +264,7 @@ export function parseDraft(raw: unknown): TicketDraft | null {
       ? (reason as VarianceReasonCode)
       : null;
 
-  const method = raw.paymentMethod;
-  const paymentMethod =
-    typeof method === "string" && METHODS.includes(method) ? (method as PaymentMethod) : null;
+  const payments = parsePayments(raw);
 
   const tip = intOrNull(raw.tip) ?? 0;
   const updatedAt = intOrNull(raw.updatedAt) ?? 0;
@@ -271,10 +279,51 @@ export function parseDraft(raw: unknown): TicketDraft | null {
     varianceReasonCode,
     varianceReason: str(raw.varianceReason),
     notes: str(raw.notes),
-    paymentMethod,
+    payments,
     tip: tip < 0 ? 0 : tip,
     updatedAt,
   };
+}
+
+/**
+ * Los pagos de un borrador guardado, en cualquiera de las dos versiones.
+ *
+ * **Versión 1** traía `paymentMethod`, un método y nada más. Se convierte a un
+ * pago único con monto cero: para un solo pago el monto no se lee —
+ * `draftToPayments()` le pone todo lo cobrado— así que no hace falta conocer el
+ * total para migrar, que es precisamente por qué el monto del pago único no se
+ * guarda.
+ *
+ * Todo lo que no se reconoce cae a "sin cobrar". Un borrador es una comodidad,
+ * no un registro: **ante la duda se pierde el método, nunca se inventa uno**,
+ * porque un método inventado viaja hasta Actual Budget y ahí ya no vuelve.
+ */
+function parsePayments(raw: Record<string, unknown>): TicketDraft["payments"] {
+  if (Array.isArray(raw.payments)) {
+    const payments: { method: PaymentMethod; amount: number }[] = [];
+
+    for (const entry of raw.payments) {
+      if (!isRecord(entry)) continue;
+      const method = entry.method;
+      if (typeof method !== "string" || !METHODS.includes(method)) continue;
+      const amount = intOrNull(entry.amount);
+      if (amount === null || amount < 0) continue;
+      // Dos pagos del mismo método no son un caso real y `lib/ticket.ts` los
+      // rechaza al cerrar. Descartarlos acá evita restaurar una hoja que no se
+      // puede guardar.
+      if (payments.some((p) => p.method === method)) continue;
+      payments.push({ method: method as PaymentMethod, amount });
+    }
+
+    return payments;
+  }
+
+  const legacy = raw.paymentMethod;
+  if (typeof legacy === "string" && METHODS.includes(legacy)) {
+    return [{ method: legacy as PaymentMethod, amount: 0 }];
+  }
+
+  return [];
 }
 
 function parseJson(text: string | null): unknown {

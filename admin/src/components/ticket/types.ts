@@ -17,10 +17,10 @@
 import type {
   Cop,
   FinanceItemKind,
-  PaymentMethod,
   SnapshotSource,
   VarianceReasonCode,
 } from "@/db/types";
+import type { TicketPayment } from "@/lib/ticket";
 
 /**
  * Un renglón ya guardado.
@@ -46,7 +46,8 @@ export type TicketFinanceView = {
   discount: Cop;
   tip: Cop;
   amountCharged: Cop | null;
-  paymentMethod: PaymentMethod | null;
+  /** Con qué método —o métodos— se cobró. Vacío = todavía no se cobró. */
+  payments: readonly TicketPayment[];
   /** Observaciones internas. **Nunca** se copian a las notas de la cita en EA. */
   serviceNotes: string;
   varianceReasonCode: VarianceReasonCode | null;
@@ -94,7 +95,14 @@ export type CloseTicketInput = {
   varianceReasonCode: VarianceReasonCode | null;
   varianceReason: string;
   notes: string;
-  paymentMethod: PaymentMethod | null;
+  /**
+   * Cómo se cobró. Vacío = no se cobró.
+   *
+   * Con **un** pago el monto que viaje acá no se usa: el servidor le pone todo
+   * lo cobrado, porque es él quien calcula el total definitivo. Con dos, los
+   * montos son datos escritos y el servidor verifica que sumen.
+   */
+  payments: readonly TicketPayment[];
   tip: number;
   /** Rastro del intento, para la bitácora. Ver `draft-store.ts`. */
   clientRequestId: string;

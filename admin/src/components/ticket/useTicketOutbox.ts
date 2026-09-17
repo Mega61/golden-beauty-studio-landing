@@ -160,7 +160,11 @@ export function useTicketOutbox({
       varianceReasonCode: p.draft.varianceReasonCode,
       varianceReason: p.draft.varianceReason,
       notes: p.draft.notes,
-      paymentMethod: p.draft.paymentMethod,
+      // Se manda tal cual quedó en el borrador. Con **un** método el monto que
+      // viaje acá no se usa: el servidor le pone todo lo cobrado, porque es él
+      // quien conoce el total definitivo. Con dos, los montos son datos que
+      // alguien escribió y el servidor verifica que sumen.
+      payments: p.draft.payments,
       tip: p.draft.tip,
       clientRequestId: p.clientRequestId,
     });

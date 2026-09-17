@@ -53,7 +53,7 @@ function finance(over: Partial<FinanceRow> = {}): FinanceRow {
     discount: 0,
     amountCharged: 115_000,
     tip: 0,
-    paymentMethod: "efectivo",
+    payments: [{ method: "efectivo", amount: 115_000 }],
     varianceReasonCode: null,
     closed: true,
     ...over,
@@ -85,7 +85,7 @@ describe("dailyClose", () => {
         finance({
           eaAppointmentId: 2,
           amountCharged: 95_000,
-          paymentMethod: "transferencia",
+          payments: [{ method: "transferencia", amount: 95_000 }],
           eaProviderId: 8,
         }),
       ],
@@ -143,7 +143,7 @@ describe("dailyClose", () => {
     // Sumarla a "otro" escondería un dato que falta detrás de una categoría
     // que existe.
     const result = dailyClose(
-      [finance({ paymentMethod: null })],
+      [finance({ payments: [] })],
       [appointment()],
       PROVIDERS,
     );

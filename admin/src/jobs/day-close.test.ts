@@ -52,20 +52,37 @@ function cita(over: Partial<DayAppointment> & { eaAppointmentId: number }): DayA
   };
 }
 
+/**
+ * Una cuenta del día.
+ *
+ * `paymentMethod` es una comodidad de estos tests, no un campo de `DayAccount`:
+ * arma un pago único por todo lo cobrado, que es como se cobra casi siempre.
+ * `null` deja la cuenta sin cobrar. Para una cuenta partida se pasa `payments`.
+ */
 function cuenta(
-  over: Partial<DayAccount> & { eaAppointmentId: number; financeId: number },
+  over: Partial<DayAccount> & {
+    eaAppointmentId: number;
+    financeId: number;
+    paymentMethod?: PaymentMethod | null;
+  },
 ): DayAccount {
+  const { paymentMethod, ...rest } = over;
+  const amountCharged = rest.amountCharged === undefined ? 180_000 : rest.amountCharged;
+
   return {
-    amountCharged: 180_000,
+    amountCharged,
     tip: 0,
-    paymentMethod: "efectivo",
+    payments:
+      paymentMethod === null
+        ? []
+        : [{ method: paymentMethod ?? "efectivo", amount: amountCharged ?? 0 }],
     paidOn: DIA,
     eaProviderId: 3,
     performedServiceId: 5,
     closedAt: new Date("2026-09-03T15:40:00Z"),
     dayCloseId: null,
     pushedToIngestAt: null,
-    ...over,
+    ...rest,
   };
 }
 
@@ -509,4 +526,78 @@ describe("reviewDay", () => {
       expect(review.canClose).toBe(true);
     },
   );
+});
+
+describe("la cuenta partida en los totales del día", () => {
+  const partida = (over: Partial<DayAccount> = {}) =>
+    cuenta({
+      eaAppointmentId: 9,
+      financeId: 9,
+      amountCharged: 100_000,
+      payments: [
+        { method: "efectivo", amount: 60_000 },
+        { method: "transferencia", amount: 40_000 },
+      ],
+      ...over,
+    });
+
+  it("aporta su parte a cada método, no entera a uno solo", () => {
+    // Meterla completa en cualquiera de los dos descuadraría el arqueo del
+    // cajón contra la pantalla, que es el número con el que se decide si
+    // creerle al sistema.
+    const totals = summarizeDayTotals([partida()]);
+
+    expect(totals.efectivo).toBe(60_000);
+    expect(totals.transferencia).toBe(40_000);
+    expect(totals.otro).toBe(0);
+    expect(totals.sinMetodo).toBe(0);
+  });
+
+  it("cuenta como **una** cuenta, no como dos", () => {
+    expect(summarizeDayTotals([partida()]).count).toBe(1);
+  });
+
+  it("el ingreso del día es lo cobrado, no la suma de los pagos por su lado", () => {
+    const totals = summarizeDayTotals([partida()]);
+
+    expect(totals.ingreso).toBe(100_000);
+    expect(totals.efectivo + totals.transferencia + totals.otro).toBe(totals.ingreso);
+  });
+
+  it("mezclada con cuentas simples, los totales siguen cuadrando", () => {
+    const totals = summarizeDayTotals([
+      cuenta({ eaAppointmentId: 1, financeId: 1, amountCharged: 180_000 }),
+      partida(),
+      cuenta({
+        eaAppointmentId: 3,
+        financeId: 3,
+        amountCharged: 50_000,
+        paymentMethod: "transferencia",
+      }),
+    ]);
+
+    expect(totals.efectivo).toBe(240_000);
+    expect(totals.transferencia).toBe(90_000);
+    expect(totals.ingreso).toBe(330_000);
+    expect(totals.count).toBe(3);
+  });
+
+  it("la propina sigue aparte y no se parte entre métodos", () => {
+    // La propina no es ingreso del estudio: meterla en los totales por método
+    // inflaría el ingreso del mes con plata que es de la técnica.
+    const totals = summarizeDayTotals([partida({ tip: 15_000 })]);
+
+    expect(totals.tips).toBe(15_000);
+    expect(totals.efectivo + totals.transferencia).toBe(100_000);
+  });
+
+  it("una cuenta cerrada sin pagos sigue contando como sin método", () => {
+    // Es lo que Caja le reclama a recepción, y lo que impide cerrar el día.
+    const totals = summarizeDayTotals([
+      cuenta({ eaAppointmentId: 1, financeId: 1, amountCharged: 70_000, paymentMethod: null }),
+    ]);
+
+    expect(totals.sinMetodo).toBe(70_000);
+    expect(totals.ingreso).toBe(70_000);
+  });
 });

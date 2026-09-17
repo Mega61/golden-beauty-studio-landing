@@ -8,26 +8,46 @@ import {
   buildIngestPayment,
   type FinanceForIngest,
 } from "./ingest-payload";
+import type { PaymentMethod } from "@/db/types";
 
 /**
  * AUDITORÍA ADVERSARIAL — `gbs-money-auditor`, paquete B1.
  */
 
-const finance = (over: Partial<FinanceForIngest> = {}): FinanceForIngest => ({
+/**
+ * La cuenta de prueba.
+ *
+ * `paymentMethod` es una comodidad de estos tests, no un campo del tipo: arma un
+ * pago único por todo lo cobrado, que es el 95 % de las cuentas. `null` deja la
+ * cuenta sin cobrar. Para una cuenta partida se pasa `payments` directo.
+ */
+const AMOUNT = 115_000;
+
+const finance = (
+  over: Partial<FinanceForIngest> & { paymentMethod?: PaymentMethod | null } = {},
+): FinanceForIngest => {
+  const { paymentMethod, ...rest } = over;
+  const charged = rest.amountCharged === undefined ? AMOUNT : rest.amountCharged;
+
+  return {
   eaAppointmentId: 501,
-  amountCharged: 115_000,
+  amountCharged: AMOUNT,
   tip: 10_000,
-  paymentMethod: "efectivo",
   paidOn: "2026-08-31",
   eaProviderId: 7,
   performedServiceId: 6,
-  ...over,
-});
+  payments:
+    paymentMethod === null
+      ? []
+      : [{ method: paymentMethod ?? "efectivo", amount: charged ?? 0 }],
+  ...rest,
+  };
+};
 
 describe("AUDIT · lo que sale del panel", () => {
   it("el método está siempre dentro del enum, y nada más pasa", () => {
     for (const method of PAYMENT_METHODS) {
-      expect(buildIngestPayment(finance({ paymentMethod: method })).method).toBe(method);
+      expect(buildIngestPayment(finance({ paymentMethod: method }))[0].method).toBe(method);
     }
 
     for (const basura of ["Efectivo", "EFECTIVO", "tarjeta", "datafono", "", " efectivo", "otro "]) {
@@ -40,7 +60,7 @@ describe("AUDIT · lo que sale del panel", () => {
   it("la propina nunca entra al monto, para ninguna combinación", () => {
     for (const amount of [0, 1, 95_000, 115_000]) {
       for (const tip of [0, 5_000, 50_000]) {
-        const p = buildIngestPayment(finance({ amountCharged: amount, tip }));
+        const p = buildIngestPayment(finance({ amountCharged: amount, tip }))[0];
         expect(p.amount).toBe(amount);
         expect(p.tip).toBe(tip);
       }
@@ -78,7 +98,7 @@ describe("AUDIT · lo que sale del panel", () => {
   it("el ajuste nunca reusa la llave del pago, para ninguna cita ni secuencia", () => {
     for (let ea = 1; ea <= 500; ea += 1) {
       const f = finance({ eaAppointmentId: ea });
-      const llaves = new Set([buildIngestPayment(f).source_tx_id]);
+      const llaves = new Set(buildIngestPayment(f).map((p) => p.source_tx_id));
 
       for (let seq = 1; seq <= 6; seq += 1) {
         const ajuste = buildIngestAdjustment(f, -1_000 * seq, seq);

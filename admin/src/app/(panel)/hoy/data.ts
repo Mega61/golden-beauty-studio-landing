@@ -2,7 +2,11 @@ import "server-only";
 
 import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
-import type { AppointmentFinance, AppointmentFinanceItem } from "@/db/types";
+import type {
+  AppointmentFinance,
+  AppointmentFinanceItem,
+  AppointmentPayment,
+} from "@/db/types";
 import {
   EA_TIME_ZONE,
   parseEaLocalDateTime,
@@ -72,6 +76,7 @@ function personName(
 function financeViewOf(
   row: AppointmentFinance | undefined,
   items: readonly AppointmentFinanceItem[],
+  payments: readonly AppointmentPayment[],
 ): TicketFinanceView {
   if (row === undefined) {
     return {
@@ -80,7 +85,7 @@ function financeViewOf(
       discount: 0,
       tip: 0,
       amountCharged: null,
-      paymentMethod: null,
+      payments: [],
       serviceNotes: "",
       varianceReasonCode: null,
       varianceReason: "",
@@ -105,7 +110,10 @@ function financeViewOf(
     discount: row.discount,
     tip: row.tip,
     amountCharged: row.amount_charged,
-    paymentMethod: row.payment_method,
+    payments: payments.map((payment) => ({
+      method: payment.method,
+      amount: payment.amount,
+    })),
     serviceNotes: row.service_notes ?? "",
     varianceReasonCode: row.variance_reason_code,
     varianceReason: row.variance_reason ?? "",
@@ -141,6 +149,7 @@ export async function loadToday(
   // --- La plata -----------------------------------------------------------
   let financeRows: AppointmentFinance[] = [];
   let financeItems: AppointmentFinanceItem[] = [];
+  let financePayments: AppointmentPayment[] = [];
   let db: ReturnType<typeof getDb> | null = null;
 
   try {
@@ -150,6 +159,10 @@ export async function loadToday(
     // Los renglones se traen en una sola consulta para todo el día: una por
     // cuenta serían veinte idas y vueltas para pintar una lista.
     financeItems = await repos.appointmentFinanceItems.listByFinanceIds(
+      financeRows.map((r) => r.id),
+    );
+    // Los pagos, igual: una consulta para el día entero.
+    financePayments = await repos.appointmentPayments.listByFinanceIds(
       financeRows.map((r) => r.id),
     );
   } catch (error) {
@@ -165,8 +178,19 @@ export async function loadToday(
     else itemsByFinanceId.set(item.appointment_finance_id, [item]);
   }
 
+  const paymentsByFinanceId = new Map<number, AppointmentPayment[]>();
+  for (const payment of financePayments) {
+    const bucket = paymentsByFinanceId.get(payment.appointment_finance_id);
+    if (bucket) bucket.push(payment);
+    else paymentsByFinanceId.set(payment.appointment_finance_id, [payment]);
+  }
+
   const viewFor = (row: AppointmentFinance | undefined): TicketFinanceView =>
-    financeViewOf(row, row === undefined ? [] : (itemsByFinanceId.get(row.id) ?? []));
+    financeViewOf(
+      row,
+      row === undefined ? [] : (itemsByFinanceId.get(row.id) ?? []),
+      row === undefined ? [] : (paymentsByFinanceId.get(row.id) ?? []),
+    );
 
   // --- La agenda ----------------------------------------------------------
   let catalog: TicketCatalog = { services: [] };

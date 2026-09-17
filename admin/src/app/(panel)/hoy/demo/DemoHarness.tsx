@@ -4,6 +4,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 
 import { Checkbox } from "@/components/ui";
 import {
+  DRAFT_VERSION,
   priceDraft,
   type CloseTicketInput,
   type CloseTicketResult,
@@ -106,7 +107,7 @@ export function DemoHarness() {
     }
 
     const cita = CITAS_DEMO.find((c) => c.eaAppointmentId === input.eaAppointmentId);
-    const draft: TicketDraft = { ...input, version: 1, updatedAt: Date.now() };
+    const draft: TicketDraft = { ...input, version: DRAFT_VERSION, updatedAt: Date.now() };
     const r = priceDraft(draft, CATALOGO_DEMO, {
       bookedServiceId: cita?.bookedServiceId ?? null,
       bookedSnapshot: cita?.finance.snapshot ?? null,

@@ -80,7 +80,9 @@ type Row = {
   service: number;
   charged: number | null;
   tip?: number;
-  method?: FinanceRow["paymentMethod"];
+  method?: FinanceRow["payments"][number]["method"];
+  /** Para la cuenta partida: los pagos completos, en vez de un solo método. */
+  payments?: FinanceRow["payments"];
   reason?: FinanceRow["varianceReasonCode"];
   extras?: number;
   status?: string;
@@ -166,7 +168,11 @@ function financeOf(row: Row, month: string): FinanceRow {
     discount: 0,
     amountCharged: row.charged,
     tip: row.tip ?? 0,
-    paymentMethod: row.method ?? null,
+    payments:
+      row.payments ??
+      (row.method === undefined || row.charged === null
+        ? []
+        : [{ method: row.method, amount: row.charged }]),
     varianceReasonCode: row.reason ?? null,
     closed: row.charged !== null,
     items: itemsOf(row),

@@ -513,6 +513,78 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
+        "el backfill de la 019 convierte el método viejo en un pago, y es idempotente",
+        async () => {
+          // La migración corre sobre una base vacía en este contenedor, así que
+          // el backfill no tendría nada que hacer. Se ejecuta su sentencia a
+          // mano sobre una cuenta ya sembrada, que es la situación real: filas
+          // escritas antes de que existiera `appointment_payment`.
+          const { financeId } = await seedClosedTicket(db);
+          await db
+            .deleteFrom("appointment_payment")
+            .where("appointment_finance_id", "=", financeId)
+            .execute();
+
+          const backfill = MIGRATIONS.find((m) => m.id === "019-appointment-payment")
+            ?.statements[1];
+          if (backfill === undefined) throw new Error("falta el backfill de la 019");
+
+          await sql.raw(backfill).execute(db);
+          await sql.raw(backfill).execute(db);
+
+          const pagos = await db
+            .selectFrom("appointment_payment")
+            .selectAll()
+            .where("appointment_finance_id", "=", financeId)
+            .execute();
+
+          // Una sola fila después de dos corridas: el DDL hace commit implícito
+          // y una migración que falla a la mitad se retoma desde el principio,
+          // así que cada sentencia tiene que aguantar repetirse.
+          expect(pagos).toHaveLength(1);
+          expect(pagos[0].method).toBe("efectivo");
+          expect(pagos[0].amount).toBe(100_000);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "no acepta un pago de cero ni uno negativo",
+        async () => {
+          const { financeId } = await seedClosedTicket(db);
+
+          for (const amount of [0, -1_000]) {
+            await expect(
+              db
+                .insertInto("appointment_payment")
+                .values({ appointment_finance_id: financeId, method: "efectivo", amount })
+                .execute(),
+              String(amount),
+            ).rejects.toThrow();
+          }
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "borrar la cuenta se lleva sus pagos",
+        async () => {
+          const { financeId } = await seedClosedTicket(db);
+
+          await db.deleteFrom("appointment_finance").where("id", "=", financeId).execute();
+
+          const pagos = await db
+            .selectFrom("appointment_payment")
+            .selectAll()
+            .where("appointment_finance_id", "=", financeId)
+            .execute();
+
+          expect(pagos).toHaveLength(0);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
         "devuelve las fechas de calendario como texto, no como instantes",
         async () => {
           // Un `DATE` convertido a `Date` queda a medianoche local, y en
@@ -1170,6 +1242,9 @@ async function seedClosedTicket(
       unit_price_snapshot: 100_000,
       line_total: 100_000,
     },
+  ]);
+  await repositories(db).appointmentPayments.replaceForFinance(row.id, [
+    { method: "efectivo", amount: 100_000 },
   ]);
   const items = await appointmentFinanceItems.listByFinanceId(row.id);
   return { financeId: row.id, itemId: items[0].id };

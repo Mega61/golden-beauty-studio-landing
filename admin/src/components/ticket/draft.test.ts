@@ -7,6 +7,7 @@ import {
   bumpExtra,
   draftFromFinance,
   draftToItems,
+  draftToPayments,
   emptyDraft,
   isDirty,
   priceDraft,
@@ -140,7 +141,7 @@ describe("isDirty", () => {
     ["motivo", { varianceReasonCode: "cortesia" as const }],
     ["detalle", { varianceReason: "porque sí" }],
     ["observaciones", { notes: "se rompió una" }],
-    ["método", { paymentMethod: "efectivo" as const }],
+    ["método", { payments: [{ method: "efectivo" as const, amount: 0 }] }],
     ["propina", { tip: 5_000 }],
   ])("detecta un cambio en %s", (_que, patch) => {
     expect(isDirty({ ...base, ...patch }, base)).toBe(true);
@@ -346,7 +347,7 @@ describe("draftFromFinance", () => {
       discount: 15_000,
       tip: 5_000,
       amountCharged: 100_000,
-      paymentMethod: "efectivo",
+      payments: [{ method: "efectivo", amount: 0 }],
       serviceNotes: "cambió de servicio",
       varianceReasonCode: "cambio_servicio",
       varianceReason: "pidió forrado",
@@ -372,7 +373,7 @@ describe("draftFromFinance", () => {
       discount: 0,
       tip: 0,
       amountCharged: 100_000,
-      paymentMethod: null,
+      payments: [],
       serviceNotes: "",
       varianceReasonCode: null,
       varianceReason: "",
@@ -387,7 +388,7 @@ describe("draftFromFinance", () => {
       discount: 0,
       tip: 0,
       amountCharged: null,
-      paymentMethod: null,
+      payments: [],
       serviceNotes: "",
       varianceReasonCode: null,
       varianceReason: "",
@@ -404,7 +405,7 @@ describe("draftFromFinance", () => {
       discount: 0,
       tip: 0,
       amountCharged: 0,
-      paymentMethod: null,
+      payments: [],
       serviceNotes: "",
       varianceReasonCode: null,
       varianceReason: "",
@@ -422,7 +423,7 @@ describe("draftFromFinance", () => {
       discount: 0,
       tip: 0,
       amountCharged: 0,
-      paymentMethod: null,
+      payments: [],
       serviceNotes: "",
       varianceReasonCode: null,
       varianceReason: "",
@@ -441,7 +442,7 @@ describe("draftFromFinance", () => {
       discount: 0,
       tip: 0,
       amountCharged: 0,
-      paymentMethod: null,
+      payments: [],
       serviceNotes: "",
       varianceReasonCode: null,
       varianceReason: "",
@@ -463,5 +464,63 @@ describe("appendNoteChip", () => {
 
   it("no repite un chip que ya está", () => {
     expect(appendNoteChip("Llegó Tarde", "llegó tarde")).toBe("Llegó Tarde");
+  });
+});
+
+describe("draftToPayments", () => {
+  const base = emptyDraft(1, PRESS_ON);
+
+  it("sin método, no hay pagos: la cuenta queda cerrada sin cobrar", () => {
+    // Es un estado legítimo — la técnica cierra lo que hizo y el método lo
+    // registra recepción — y es lo que Caja reclama.
+    expect(draftToPayments(base, 115_000)).toEqual([]);
+  });
+
+  it("con un método, el monto es todo lo cobrado", () => {
+    // No se le pide a nadie: pedirlo sería una casilla más para equivocarse en
+    // el 95 % de las cuentas.
+    const draft = { ...base, payments: [{ method: "efectivo" as const, amount: 0 }] };
+
+    expect(draftToPayments(draft, 115_000)).toEqual([
+      { method: "efectivo", amount: 115_000 },
+    ]);
+  });
+
+  it("y el monto que traiga el borrador se ignora, no se respeta", () => {
+    // De esto depende que un borrador de la versión 1 —que no guardaba monto—
+    // se pueda migrar sin conocer el total.
+    const draft = { ...base, payments: [{ method: "efectivo" as const, amount: 7 }] };
+
+    expect(draftToPayments(draft, 115_000)[0].amount).toBe(115_000);
+  });
+
+  it("con dos métodos, los montos escritos se mandan tal cual", () => {
+    const draft = {
+      ...base,
+      payments: [
+        { method: "efectivo" as const, amount: 60_000 },
+        { method: "transferencia" as const, amount: 40_000 },
+      ],
+    };
+
+    expect(draftToPayments(draft, 100_000)).toEqual([
+      { method: "efectivo", amount: 60_000 },
+      { method: "transferencia", amount: 40_000 },
+    ]);
+  });
+
+  it("con dos métodos que no suman, los manda igual: quien valida es el servidor", () => {
+    // Esta función reparte, no juzga. La compuerta es
+    // `assertPaymentsCoverCharge()`, y tenerla en dos lugares es tenerla mal en
+    // uno de los dos.
+    const draft = {
+      ...base,
+      payments: [
+        { method: "efectivo" as const, amount: 60_000 },
+        { method: "transferencia" as const, amount: 30_000 },
+      ],
+    };
+
+    expect(draftToPayments(draft, 100_000).reduce((s, p) => s + p.amount, 0)).toBe(90_000);
   });
 });

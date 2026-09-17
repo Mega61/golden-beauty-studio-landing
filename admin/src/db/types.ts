@@ -221,6 +221,14 @@ export interface AppointmentFinanceTable {
   /** Va aparte y **nunca** entra a la base de comisión ni al ingreso. */
   tip: Generated<Cop>;
 
+  /**
+   * ⚠ **Ya no se lee. La fuente del método de pago es `appointment_payment`.**
+   *
+   * Sobrevive porque el set de migraciones es forward-only y porque el rollback
+   * por digest necesita que la imagen anterior encuentre su columna. El código
+   * nuevo la escribe como shim: con un solo método, su método; con dos, `null`.
+   * Leerla de vuelta sería concluir "sin cobrar" sobre una cuenta dividida.
+   */
   payment_method: PaymentMethod | null;
   /** Se cobra siempre el mismo día: cae en la fecha de la cita. */
   paid_at: SqlDateTime | null;
@@ -261,6 +269,33 @@ export interface AppointmentFinanceItemTable {
   line_total: Cop;
   /** Obligatoria para `kind = 'manual'`: lo valida `lib/ticket.ts`. */
   note: string | null;
+  created_at: CreatedAt;
+}
+
+/**
+ * Los pagos de una cuenta. **Es la única fuente de verdad del método de pago.**
+ *
+ * Una cuenta se puede cobrar con más de un método: una parte en efectivo y el
+ * resto por transferencia es un caso real del estudio, confirmado el
+ * 2026-09-17. Antes de la migración `019` eso no se podía registrar sin mentir
+ * en uno de los dos, y la mentira salía por el cierre del día, descuadrando el
+ * efectivo contra lo que hay en el cajón.
+ *
+ * ⚠ **`AppointmentFinanceTable.payment_method` ya no se lee.** Sigue existiendo
+ * porque el set de migraciones es forward-only y porque el rollback por digest
+ * necesita que el código viejo encuentre su columna; se escribe como shim (un
+ * solo método ⇒ su método, dos ⇒ `null`). Leerla es un bug: una cuenta dividida
+ * la deja en `null` y el lector concluiría "sin cobrar" sobre plata cobrada.
+ *
+ * La invariante `Σ amount == amount_charged` cruza dos tablas, así que no es un
+ * CHECK: vive en `lib/ticket.ts`, junto a la de los renglones.
+ */
+export interface AppointmentPaymentTable {
+  id: Generated<number>;
+  appointment_finance_id: number;
+  method: PaymentMethod;
+  /** Siempre > 0. Una devolución sería un ajuste con id propio, no un negativo. */
+  amount: Cop;
   created_at: CreatedAt;
 }
 
@@ -603,6 +638,7 @@ export interface Database {
   allowed_user: AllowedUserTable;
   appointment_finance: AppointmentFinanceTable;
   appointment_finance_item: AppointmentFinanceItemTable;
+  appointment_payment: AppointmentPaymentTable;
   day_close: DayCloseTable;
   webhook_event: WebhookEventTable;
   commission_rule: CommissionRuleTable;
@@ -635,6 +671,9 @@ export type AppointmentFinanceUpdate = Updateable<AppointmentFinanceTable>;
 
 export type AppointmentFinanceItem = Selectable<AppointmentFinanceItemTable>;
 export type NewAppointmentFinanceItem = Insertable<AppointmentFinanceItemTable>;
+
+export type AppointmentPayment = Selectable<AppointmentPaymentTable>;
+export type NewAppointmentPayment = Insertable<AppointmentPaymentTable>;
 
 export type DayClose = Selectable<DayCloseTable>;
 export type NewDayClose = Insertable<DayCloseTable>;

@@ -145,10 +145,52 @@ export function buildAgendaproImportedId(txId: string): string {
   return `${AGENDAPRO_TX_PREFIX}${txId}`;
 }
 
-/** La llave de la fila `Payment` en Strapi para una cita. */
+/** La llave de la fila `Payment` en Strapi para una cita cobrada con un método. */
 export function buildPaymentSourceTxId(eaAppointmentId: number): string {
   assertEaId(eaAppointmentId, "El id de la cita");
   return `${EA_PAYMENT_PREFIX}${eaAppointmentId}`;
+}
+
+/**
+ * La llave de **uno de los pagos** de una cuenta cobrada con más de un método.
+ *
+ * Una cuenta partida entre efectivo y transferencia no es un movimiento: son
+ * dos, porque la plata aterrizó en dos lugares distintos —el cajón y el banco—
+ * y Actual Budget los quiere separados o la conciliación de ninguno de los dos
+ * cuadra.
+ *
+ * ## Por qué una cuenta de un solo método conserva `ea-appt:<id>` pelado
+ *
+ * Es tentador uniformar y darle a todo el sufijo del método. Sería un error
+ * caro: **las filas que ya están en Strapi y en Actual se llavean
+ * `ea-appt:<id>`**, y re-llavearlas las volvería a importar como movimientos
+ * nuevos — duplicando el ingreso histórico completo, en silencio, que es
+ * exactamente el modo de falla contra el que existe este módulo. Así que la
+ * regla es una sola y se lee sin tabla: *un método, la llave de la cuenta; dos
+ * o más, una llave por método.*
+ *
+ * El método va con su nombre completo y no con un código de dos letras: `ef` y
+ * `tr` obligarían a un mapa que alguien tiene que mantener sincronizado con el
+ * enum, y un mapa desactualizado acá produce una llave que colisiona o que no
+ * se puede leer de vuelta. `efectivo` no puede chocar con `adj<n>` ni con
+ * ningún id futuro que este módulo produzca.
+ */
+export function buildPaymentSplitSourceTxId(
+  eaAppointmentId: number,
+  method: string,
+): string {
+  assertEaId(eaAppointmentId, "El id de la cita");
+
+  if (!/^[a-z]+$/.test(method)) {
+    // El método viaja dentro de una llave única e inmutable. Cualquier cosa
+    // fuera de este alfabeto —un espacio, un `:`, una mayúscula— produciría dos
+    // llaves distintas para el mismo método según cómo venga escrito.
+    throw new IngestIdError(
+      `El método de pago tiene que ser minúsculas sin separadores, y llegó ${JSON.stringify(method)}`,
+    );
+  }
+
+  return `${EA_PAYMENT_PREFIX}${eaAppointmentId}:${method}`;
 }
 
 /**
