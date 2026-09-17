@@ -13,6 +13,29 @@ const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 
 const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL?.trim() || null;
 
+/**
+ * The booking destination for a given locale.
+ *
+ * `NEXT_PUBLIC_BOOKING_URL` is one value and the site is bilingual, which is
+ * fine while it points at an external booking tool — Agenda Pro has its own
+ * language handling and the URL is the same for everyone.
+ *
+ * It stops being fine the day it points at our own `/reservar`: a bare
+ * `/reservar` would send an English visitor to the Spanish flow, and a
+ * hardcoded `/es/reservar` would do it on purpose. So a **relative** value gets
+ * the locale prefixed; an absolute one is passed through untouched.
+ *
+ * That is what makes retiring Agenda Pro an env change and not a code change:
+ * set the variable to `/reservar` and every CTA on both languages follows.
+ */
+export function bookingHref(lang: string): string | null {
+  if (bookingUrl === null) return null;
+  if (/^https?:\/\//i.test(bookingUrl)) return bookingUrl;
+  // Anything else is treated as a path on this site. Leading slash normalised so
+  // both `/reservar` and `reservar` work — the variable is typed by a person.
+  return `/${lang}/${bookingUrl.replace(/^\/+/, "")}`;
+}
+
 const wppNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() || null;
 const wppGreeting =
   process.env.NEXT_PUBLIC_WHATSAPP_GREETING?.trim() || "Hola Golden";

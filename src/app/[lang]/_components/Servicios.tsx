@@ -1,5 +1,5 @@
 import { EyebrowLabel, PrimaryCTA } from "./atoms";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 import { getPricing } from "@/data/pricing";
 import {
   formatPrice,
@@ -114,7 +114,7 @@ export default async function Servicios({
 
         <div className="mt-10 px-5 text-center md:mt-16 md:px-0">
           <p className="mb-6 font-sans text-[12px] text-ink-mute">{dict.footnote}</p>
-          <PrimaryCTA href={siteConfig.bookingUrl} trackLocation="services">
+          <PrimaryCTA href={bookingHref(lang)} trackLocation="services">
             {dict.cta}
           </PrimaryCTA>
         </div>

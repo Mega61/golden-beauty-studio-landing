@@ -174,3 +174,51 @@ describe("derived URLs", () => {
     expect(siteConfig.mapsEmbedUrl).not.toContain("Sabaneta");
   });
 });
+
+describe("bookingHref", () => {
+  it("passes an absolute URL through untouched", async () => {
+    // Agenda Pro today: one URL for both languages, and it handles its own
+    // locale. Prefixing it would produce `/es/https://…`.
+    const { bookingHref } = await loadConfig({
+      NEXT_PUBLIC_BOOKING_URL: "https://agendapro.com/golden",
+    });
+
+    expect(bookingHref("es")).toBe("https://agendapro.com/golden");
+    expect(bookingHref("en")).toBe("https://agendapro.com/golden");
+  });
+
+  it("prefixes the locale on a relative path", async () => {
+    // The day the variable points at our own flow. A bare `/reservar` would
+    // send an English visitor to the Spanish page.
+    const { bookingHref } = await loadConfig({
+      NEXT_PUBLIC_BOOKING_URL: "/reservar",
+    });
+
+    expect(bookingHref("es")).toBe("/es/reservar");
+    expect(bookingHref("en")).toBe("/en/reservar");
+  });
+
+  it("tolerates a value written without the leading slash", async () => {
+    // The variable is typed by a person, in a Portainer form.
+    const { bookingHref } = await loadConfig({ NEXT_PUBLIC_BOOKING_URL: "reservar" });
+    expect(bookingHref("es")).toBe("/es/reservar");
+  });
+
+  it("is null when unset, so every CTA disappears instead of breaking", async () => {
+    const { bookingHref } = await loadConfig({ NEXT_PUBLIC_BOOKING_URL: undefined });
+    expect(bookingHref("es")).toBeNull();
+  });
+
+  it("is null for an empty value, not an empty href", async () => {
+    // An empty string would render a link to the current page.
+    const { bookingHref } = await loadConfig({ NEXT_PUBLIC_BOOKING_URL: "   " });
+    expect(bookingHref("es")).toBeNull();
+  });
+
+  it("matches https and http, case-insensitively", async () => {
+    const { bookingHref } = await loadConfig({
+      NEXT_PUBLIC_BOOKING_URL: "HTTPS://agendapro.com/golden",
+    });
+    expect(bookingHref("es")).toBe("HTTPS://agendapro.com/golden");
+  });
+});
