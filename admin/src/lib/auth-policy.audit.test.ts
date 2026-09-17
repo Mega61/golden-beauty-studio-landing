@@ -38,6 +38,8 @@ const TODAS: Capability[] = [
   "liquidacion:ver-todas",
   "comisiones:administrar",
   "equipo:administrar",
+  "clientes:editar",
+  "clientes:fusionar",
   "catalogo:publicar",
   "diagnostico:ver",
   "ea:avanzado",
@@ -65,6 +67,10 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "liquidacion:ver-todas": false,
     "comisiones:administrar": false,
     "equipo:administrar": false,
+    // Recepción crea y corrige clientas: es trabajo de mostrador, con la
+    // clienta enfrente. Fusionar no, porque borra una fila de EA.
+    "clientes:editar": true,
+    "clientes:fusionar": false,
     "catalogo:publicar": false,
     "diagnostico:ver": true,
     "ea:avanzado": false,
@@ -82,6 +88,8 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "liquidacion:ver-todas": false,
     "comisiones:administrar": false,
     "equipo:administrar": false,
+    "clientes:editar": false,
+    "clientes:fusionar": false,
     "catalogo:publicar": false,
     "diagnostico:ver": false,
     "ea:avanzado": false,
@@ -89,7 +97,7 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
 };
 
 describe("AUDIT · la matriz completa, celda por celda, contra el plan", () => {
-  it("45 celdas × las dos posiciones de TICKET_STAFF_COBRA", () => {
+  it("51 celdas × las dos posiciones de TICKET_STAFF_COBRA", () => {
     for (const role of ["owner", "admin", "staff"] as UserRole[]) {
       for (const capability of TODAS) {
         const esperado = DEL_PLAN[role][capability];
