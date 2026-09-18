@@ -476,12 +476,13 @@ function AltaRapida({
 
   return (
     <div style={{ display: "grid", gap: "0.375rem", marginTop: "0.375rem" }}>
-      <Field label="Nombre" required>
+      <Field label="Nombre y apellido" required hint="La agenda exige los dos.">
         {(w) => (
           <TextInput
             {...w}
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ana Ríos"
             maxLength={120}
             autoComplete="off"
           />
