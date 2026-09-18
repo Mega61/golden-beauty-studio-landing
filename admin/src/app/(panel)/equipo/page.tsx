@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+import { AppShell } from "@/components/shell";
+import type { Role } from "@/components/shell/nav";
+import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
 
 import { loadEquipoView } from "./data";
@@ -25,11 +28,20 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/** `admin` en la base es "recepción" en la navegación. */
+function navRole(role: UserRole): Role {
+  return role === "admin" ? "reception" : role;
+}
+
 export default async function EquipoPage() {
-  await requireCapability("agenda:ver-todas");
+  const session = await requireCapability("agenda:ver-todas");
   const puedeAdministrar = await sessionCan("equipo:administrar");
 
   const view = await loadEquipoView();
 
-  return <EquipoVista view={view} puedeAdministrar={puedeAdministrar} />;
+  return (
+    <AppShell role={navRole(session.role)} title="Equipo">
+      <EquipoVista view={view} puedeAdministrar={puedeAdministrar} />
+    </AppShell>
+  );
 }

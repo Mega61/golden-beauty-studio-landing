@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+import { AppShell } from "@/components/shell";
+import type { Role } from "@/components/shell/nav";
+import type { UserRole } from "@/db/types";
 import { requireCapability } from "@/lib/dal";
 
 import { ClientesLista } from "./ClientesLista";
@@ -24,12 +27,18 @@ export const metadata: Metadata = {
 /** Lee la sesión y consulta EA en cada visita: nada de esto se puede cachear. */
 export const dynamic = "force-dynamic";
 
+
+/** `admin` en la base es "recepción" en la navegación. */
+function navRole(role: UserRole): Role {
+  return role === "admin" ? "reception" : role;
+}
+
 export default async function ClientesPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireCapability("agenda:ver-todas");
+  const session = await requireCapability("agenda:ver-todas");
 
   const params = await searchParams;
   const raw = params.q;
@@ -37,5 +46,9 @@ export default async function ClientesPage({
 
   const result = await searchClients(query);
 
-  return <ClientesLista result={result} />;
+  return (
+    <AppShell role={navRole(session.role)} title="Clientas">
+      <ClientesLista result={result} />
+    </AppShell>
+  );
 }

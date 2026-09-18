@@ -38,6 +38,16 @@ import { describeMerge, planMerge } from "./merge";
 export type ClientActionResult = {
   ok: boolean;
   message: string;
+  /**
+   * La clienta recién creada, solo en el alta y solo cuando salió bien.
+   *
+   * Existe porque el formulario de **cita** crea clientas sin salir de la
+   * pantalla: sin el id habría que buscarla de nuevo justo después de crearla,
+   * y esa segunda búsqueda puede no encontrarla —la de EA es por texto y el
+   * nombre recién escrito puede estar mal tipeado— dejando a alguien con la
+   * clienta creada y la cita sin poder armarse.
+   */
+  customer?: { id: number; name: string };
 };
 
 const MAX_NAME = 120;
@@ -143,7 +153,14 @@ export async function crearClienta(input: ClientInput): Promise<ClientActionResu
     });
 
     revalidatePath("/clientes");
-    return { ok: true, message: `${payload.firstName} quedó creada.` };
+    return {
+      ok: true,
+      message: `${payload.firstName} quedó creada.`,
+      customer: {
+        id: created.id,
+        name: [payload.firstName, payload.lastName].filter(Boolean).join(" "),
+      },
+    };
   } catch (error) {
     unstable_rethrow(error);
     return { ok: false, message: describeEaFailure(error, "No se pudo crear la clienta.") };

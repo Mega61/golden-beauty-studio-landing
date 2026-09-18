@@ -112,16 +112,38 @@ export const DESTINATIONS: readonly Destination[] = [
   },
   {
     id: "avanzado",
+    // El único destino que NO es una pantalla del panel: abre la interfaz
+    // propia de Easy!Appointments, para lo que el panel no reconstruye.
+    //
+    // `href` vacío a propósito: la URL real depende del despliegue —en local es
+    // `localhost:8081`, en producción el subdominio de la agenda— y este
+    // archivo no puede saberla. La pone `destinationsFor()` desde la variable
+    // de entorno, y **sin esa variable el destino no se dibuja**.
+    //
+    // Estuvo apuntando a `/avanzado`, una ruta que nunca existió: el enlace
+    // abría una pestaña nueva en un 404. Un enlace que no lleva a ningún lado
+    // es peor que no tener el enlace, porque cuesta un clic descubrirlo y deja
+    // la sensación de que el panel está roto.
     label: "Avanzado (EA)",
-    href: "/avanzado",
+    href: "",
     icon: "externo",
     roles: ONLY_OWNER,
     external: true,
   },
 ];
 
-export function destinationsFor(role: Role): Destination[] {
-  return DESTINATIONS.filter((d) => d.roles.includes(role));
+/**
+ * Los destinos que un rol ve.
+ *
+ * `eaUrl` es la interfaz de EA **como la ve un navegador**, no la interna con
+ * la que el panel habla por API: en producción esa es `http://golden-agenda/…`,
+ * que no resuelve fuera de la red de Docker. Sin ella, "Avanzado (EA)" se
+ * omite en vez de dibujarse roto.
+ */
+export function destinationsFor(role: Role, eaUrl?: string | null): Destination[] {
+  return DESTINATIONS.filter((d) => d.roles.includes(role))
+    .filter((d) => d.id !== "avanzado" || Boolean(eaUrl))
+    .map((d) => (d.id === "avanzado" ? { ...d, href: eaUrl as string } : d));
 }
 
 /**

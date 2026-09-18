@@ -18,10 +18,10 @@ import { activeDestinationId, destinationsFor, type Role } from "./nav";
  * En modo riel el nombre no desaparece del todo: viaja en `title` y en
  * `aria-label`, así que el destino nunca depende de reconocer un dibujo.
  */
-export function SideNav({ role }: { role: Role }) {
+export function SideNav({ role, eaUrl }: { role: Role; eaUrl?: string | null }) {
   const pathname = usePathname();
   const activeId = activeDestinationId(pathname, role);
-  const items = destinationsFor(role);
+  const items = destinationsFor(role, eaUrl);
 
   return (
     <aside className="ui-side">

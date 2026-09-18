@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+import { AppShell } from "@/components/shell";
+import type { Role } from "@/components/shell/nav";
+import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
 
 import { loadServicesView } from "./data";
@@ -26,11 +29,20 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+/** `admin` en la base es "recepción" en la navegación. */
+function navRole(role: UserRole): Role {
+  return role === "admin" ? "reception" : role;
+}
+
 export default async function ServiciosPage() {
-  await requireCapability("agenda:ver-todas");
+  const session = await requireCapability("agenda:ver-todas");
   const puedePublicar = await sessionCan("catalogo:publicar");
 
   const view = await loadServicesView();
 
-  return <ServiciosVista view={view} puedePublicar={puedePublicar} />;
+  return (
+    <AppShell role={navRole(session.role)} title="Servicios">
+      <ServiciosVista view={view} puedePublicar={puedePublicar} />
+    </AppShell>
+  );
 }

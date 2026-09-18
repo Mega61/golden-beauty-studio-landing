@@ -10,6 +10,7 @@ import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { formatDuration, formatPhoneCO } from "@/components/ui/format";
 import { STATUS_IDS, STATUS_META } from "@/components/ui/status";
 import type { ConflictReport } from "@/lib/conflict";
+import { crearClienta } from "../clientes/actions";
 import { findCustomers } from "./actions";
 
 /**
@@ -412,9 +413,133 @@ function CustomerPicker({
               ))}
             </ul>
           ) : null}
+
+          {/*
+            Crear sin salir del formulario.
+
+            Sin esto, agendar a una clienta que no está en la agenda era
+            imposible desde acá: el campo solo sabía buscar. En un estudio el
+            caso es el más común que hay —suena el teléfono y es alguien
+            nuevo— y la salida era irse a Clientas, crearla, volver, y rearmar
+            la cita desde cero.
+          */}
+          {trimmed.length >= 2 && shown.length === 0 ? (
+            <AltaRapida termino={trimmed} onCreada={onPick} />
+          ) : null}
         </>
       )}
     </Field>
+  );
+}
+
+/**
+ * Alta de clienta desde el formulario de cita: nombre y teléfono, nada más.
+ *
+ * Los otros campos —correo, notas— se llenan después en la ficha. Acá hay una
+ * clienta esperando al teléfono, y cada campo de más es una razón para no
+ * usarlo y volver a apuntar el nombre en un papel.
+ *
+ * **El teléfono es obligatorio igual**, y no por rigor: es la identidad de la
+ * clienta en todo el panel. Una clienta sin número es una que mañana se
+ * duplica, porque nada la puede reconocer.
+ */
+function AltaRapida({
+  termino,
+  onCreada,
+}: {
+  termino: string;
+  onCreada: (customer: Found) => void;
+}) {
+  const pareceTelefono = /^[\d+\s()-]+$/.test(termino);
+
+  const [abierto, setAbierto] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  // Lo que ya escribió se aprovecha: si buscó por nombre, arranca como nombre;
+  // si buscó por número, como teléfono. Volver a escribirlo sería cobrarle el
+  // haber buscado primero.
+  const [nombre, setNombre] = useState(pareceTelefono ? "" : termino);
+  const [telefono, setTelefono] = useState(pareceTelefono ? termino : "");
+
+  if (!abierto) {
+    return (
+      <div style={{ marginTop: "0.375rem" }}>
+        <p style={{ margin: "0 0 0.25rem", fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+          No aparece ninguna.
+        </p>
+        <Button size="sm" onClick={() => setAbierto(true)}>
+          Crear «{termino}»
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gap: "0.375rem", marginTop: "0.375rem" }}>
+      <Field label="Nombre" required>
+        {(w) => (
+          <TextInput
+            {...w}
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            maxLength={120}
+            autoComplete="off"
+          />
+        )}
+      </Field>
+      <Field label="Teléfono" required hint="Es la identidad de la clienta.">
+        {(w) => (
+          <TextInput
+            {...w}
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            inputMode="tel"
+            maxLength={30}
+            autoComplete="off"
+          />
+        )}
+      </Field>
+
+      {error ? (
+        <p role="status" style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-error-ink)" }}>
+          {error}
+        </p>
+      ) : null}
+
+      <div style={{ display: "flex", gap: "0.375rem" }}>
+        <Button
+          size="sm"
+          variant="primary"
+          loading={guardando}
+          onClick={async () => {
+            setGuardando(true);
+            setError(null);
+            const r = await crearClienta({
+              firstName: nombre,
+              lastName: "",
+              phone: telefono,
+              email: "",
+              notes: "",
+            });
+            setGuardando(false);
+
+            // Se selecciona sola: quien la creó estaba armando una cita, no
+            // dando de alta a alguien. Devolverlo al buscador sería cobrarle
+            // el paso dos veces.
+            if (r.ok && r.customer) {
+              onCreada({ id: r.customer.id, name: r.customer.name, phone: telefono });
+              return;
+            }
+            setError(r.message);
+          }}
+        >
+          Crear y usar
+        </Button>
+        <Button size="sm" onClick={() => setAbierto(false)}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
   );
 }
 
