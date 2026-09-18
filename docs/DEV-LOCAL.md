@@ -50,6 +50,13 @@ versión es cómo se descubre en producción que un endpoint cambió:
 echo "EA_VERSION=1.6.0" >> deploy/compose/.env    # el tag real que tenga la VM
 ```
 
+Los tres puertos publicados son variables (`EA_PORT`, `MYSQL_PORT`, `MAILPIT_PORT`) con los valores
+de arriba por defecto. Si otro proyecto tuyo ya tiene el 8080, el despliegue falla entero con
+`Bind for 0.0.0.0:8080 failed: port is already allocated`; se arregla con
+`EA_PORT=8081 docker compose …` —o con una variable del stack en Portainer— sin editar el archivo
+compartido. `BASE_URL` de EA sigue a la variable sola, que es obligatorio: EA arma con ese valor los
+enlaces de sus correos, y un puerto desalineado los deja rotos sin que nada falle.
+
 **Verificación:** `http://localhost:8080` muestra el asistente de instalación de EA, y
 `http://localhost:8025` abre Mailpit.
 

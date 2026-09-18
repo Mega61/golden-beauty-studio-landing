@@ -15,10 +15,28 @@
 #
 #   docker compose -f deploy/compose/dev-stack.yml up -d
 #
-# Puertos elegidos para no chocar con lo que suele estar ocupado en Windows:
+# Puertos elegidos para no chocar con lo que suele estar ocupado:
 #   8080 → EA          (80 lo toma cualquier cosa)
 #   3307 → MySQL       (3306 lo toma un MySQL local si existe)
 #   8025 → Mailpit     (bandeja de correo falsa; EA manda sus notificaciones acá)
+#
+# **Los tres son variables**, y no por gusto: 8080 es de los puertos más
+# disputados que hay, y en una máquina con varios proyectos alguien ya lo tiene.
+# El síntoma es un fallo del despliegue entero —"Bind for 0.0.0.0:8080 failed:
+# port is already allocated"— y con el puerto hardcodeado la única salida era
+# editar este archivo, que es compartido, para arreglar un choque que es de una
+# sola máquina. Con la variable se cambia donde corresponde: en las variables
+# de entorno del stack.
+#
+#   EA_PORT=8081 docker compose -f deploy/compose/dev-stack.yml up -d
+#
+# o, en Portainer, una variable más al lado de EA_VERSION.
+#
+# ⚠ `BASE_URL` de EA **tiene que seguir al puerto**, y por eso está
+# interpolada con la misma variable. EA construye con ese valor los enlaces de
+# sus correos y los de cancelación que le llegan a la clienta: si el puerto
+# cambia y `BASE_URL` no, EA sigue funcionando y manda enlaces rotos — que es
+# la clase de falla que no se ve hasta que alguien de afuera hace clic.
 
 name: gbs-dev
 
@@ -31,9 +49,9 @@ services:
     container_name: gbs-dev-agenda
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${EA_PORT:-8080}:80"
     environment:
-      BASE_URL: http://localhost:8080
+      BASE_URL: http://localhost:${EA_PORT:-8080}
       DEBUG_MODE: "TRUE"
       DB_HOST: mysql-transversal
       DB_NAME: easyappointments
@@ -58,7 +76,7 @@ services:
     container_name: gbs-dev-mysql
     restart: unless-stopped
     ports:
-      - "3307:3306"
+      - "${MYSQL_PORT:-3307}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: secret
       MYSQL_DATABASE: easyappointments
@@ -86,7 +104,7 @@ services:
     container_name: gbs-dev-mailpit
     restart: unless-stopped
     ports:
-      - "8025:8025"
+      - "${MAILPIT_PORT:-8025}:8025"
 
 volumes:
   mysql-data:

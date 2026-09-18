@@ -27,6 +27,17 @@ docker compose -f deploy/compose/dev-stack.yml ps      # los tres en running/hea
 Esto levanta MySQL (puerto **3307**, para no chocar con ningún MySQL tuyo), Easy!Appointments
 (**8080**) y Mailpit (**8025**).
 
+**Los tres puertos son variables.** 8080 es de los más disputados que hay, y si otro proyecto tuyo
+ya lo tiene, el despliegue falla entero con `Bind for 0.0.0.0:8080 failed: port is already
+allocated`. Se resuelve sin editar el archivo:
+
+```bash
+EA_PORT=8081 docker compose -f deploy/compose/dev-stack.yml up -d
+```
+
+`BASE_URL` de EA sigue a la variable sola. Las otras dos son `MYSQL_PORT` y `MAILPIT_PORT`.
+Para saber quién tiene el puerto ocupado: `docker ps --format "{{.Names}}\t{{.Ports}}" | grep 8080`.
+
 La base `gbs_admin`, el usuario de escritura y el de **solo lectura** sobre `easyappointments`
 los crea el propio stack la primera vez. Si levantaste el stack antes de que existiera ese
 script, no corrió —los `docker-entrypoint-initdb.d` solo se ejecutan con el volumen vacío— y se
@@ -34,7 +45,8 @@ arregla con `down -v` y volver a subir.
 
 ## 2. Instalar Easy!Appointments (una vez)
 
-`http://localhost:8080` y completa el asistente. Anota el **token de API** (Ajustes → API).
+`http://localhost:8080` —o el puerto que hayas puesto en `EA_PORT`— y completa el asistente.
+Anota el **token de API** (Ajustes → API).
 
 > **Se puede saltar para una primera mirada.** El panel no se cae si EA no responde: entra en
 > **solo lectura con una banda de aviso**, que es su comportamiento diseñado. Lo comprobé sin
@@ -49,7 +61,7 @@ Lo mínimo para arrancar:
 ```bash
 DATABASE_URL="mysql://gbs_admin:gbs_admin_dev@127.0.0.1:3307/gbs_admin"
 DATABASE_URL_EA_RO="mysql://gbs_ea_ro:gbs_ea_ro_dev@127.0.0.1:3307/easyappointments"
-EA_API_URL="http://localhost:8080/index.php/api/v1"
+EA_API_URL="http://localhost:8080/index.php/api/v1"   # ← el mismo puerto de EA_PORT
 EA_API_TOKEN="<el del paso 2>"
 EA_WEBHOOK_SECRET_HEADER="X-GBS-Webhook"
 EA_WEBHOOK_SECRET_TOKEN="dev-webhook-secret"
