@@ -4,3 +4,7 @@ next-env.d.ts
 *.tsbuildinfo
 .env*.local
 coverage/
+
+# Playwright: trazas, capturas y reporte de la última corrida.
+test-results/
+playwright-report/

@@ -194,8 +194,34 @@ historia por `source_id`— así que se puede probar sin miedo.
 ## Los tests
 
 ```bash
-cd admin && npm test          # 1.866
+cd admin && npm test          # 1.870 unitarios
+cd admin && npm run e2e       # 35 de punta a punta, con Playwright
 cd ..     && npm test         # 96, la landing
+```
+
+### Por qué hay una suite E2E además de los 1.870
+
+Porque los 1.870 pasaban con tres bugs adentro: cinco pantallas sin barra de navegación, un
+destino del menú apuntando a una ruta que nunca se creó, y el alta de clienta fallando contra
+EA por un campo obligatorio. **Ninguno de esos tests abre el panel.** Las funciones puras
+estaban bien; lo roto era el pegamento, y el pegamento solo se ve cargando la página.
+
+Lo que la suite E2E cubre es exactamente eso: que la pantalla monte, que el enlace lleve a
+algún lado, que el formulario guarde **de verdad contra EA**. No repite la aritmética del
+ticket ni el prorrateo del descuento — eso ya está cubierto donde corresponde.
+
+**Corre contra el entorno real, sin dobles.** Un doble de EA habría aceptado feliz el payload
+sin apellido que EA rechaza con un 500, que es justo el bug que se escapó.
+
+Necesita el stack arriba y el panel corriendo; si falta algo, `global-setup` lo dice con el
+comando que lo arregla en vez de fallar con veinte errores de red. Al terminar borra las
+clientas y citas que creó, para que una corrida no le cambie el resultado a la siguiente.
+
+```bash
+npm run e2e -- --project=escritorio     # solo escritorio
+npm run e2e -- -g "alta de clienta"     # un grupo
+npm run e2e:ui                          # modo interactivo
+npx playwright show-trace test-results/<carpeta>/trace.zip   # autopsia de un fallo
 ```
 
 Los de integración contra MySQL **se saltan solos** si Docker no está: no fallan, dicen que se
