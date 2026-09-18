@@ -54,8 +54,8 @@ import {
 import {
   linearScale,
   MARK,
-  niceTicks,
   sparklinePath,
+  type AxisTick,
   type Delta,
 } from "./scale";
 
@@ -217,17 +217,6 @@ export type BarDatum = {
  * barra en el tono de acento y el resto en gris. Es la respuesta honesta a "el
  * reporte tiene ocho barras y la historia es una sola".
  */
-export type AxisTick = { value: number; label: string };
-
-/** Las marcas de eje de un reporte, ya formateadas en el servidor. */
-export function axisTicks(
-  max: number,
-  format: (value: number) => string,
-  count = 4,
-): AxisTick[] {
-  return niceTicks(max, count).map((value) => ({ value, label: format(value) }));
-}
-
 export function BarRows({
   data,
   axis,

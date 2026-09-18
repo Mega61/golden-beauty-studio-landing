@@ -15,6 +15,7 @@ import {
   type Column,
 } from "@/components/ui";
 
+import { EditarClienta, FusionarClienta } from "./AccionesClienta";
 import type { ClientProfile } from "./data";
 import type { HistoryEntry } from "./history";
 
@@ -93,9 +94,32 @@ export function FichaClienta({ profile }: { profile: ClientProfile }) {
             <Aviso tono="warn">
               Esta clienta tiene <strong>{client.eaCustomerIds.length} fichas</strong> en
               Easy!Appointments con el mismo teléfono. El panel las muestra como
-              una sola; la agenda sigue viéndolas separadas hasta que alguien las
-              una allá.
+              una sola; la agenda sigue viéndolas separadas hasta unirlas.
             </Aviso>
+          ) : null}
+
+          {/*
+            Fusionar y corregir son excluyentes a propósito: con varias fichas,
+            corregir una dejaría a las otras con el dato viejo, que es
+            exactamente cómo se pierde una corrección. Primero se unen.
+
+            Los botones se dibujan siempre y el permiso lo comprueba el DAL
+            dentro de la acción: esconder un botón no es un permiso, porque la
+            Server Action que hay detrás sigue existiendo.
+          */}
+          {client.merged ? (
+            <FusionarClienta eaCustomerIds={client.eaCustomerIds} />
+          ) : client.eaCustomerIds.length === 1 ? (
+            <EditarClienta
+              eaCustomerId={client.eaCustomerIds[0]}
+              valores={{
+                firstName: client.name.split(" ")[0] ?? "",
+                lastName: client.name.split(" ").slice(1).join(" "),
+                phone: client.phone ?? "",
+                email: client.email ?? "",
+                notes: client.notes ?? "",
+              }}
+            />
           ) : null}
 
           {client.suspiciousEmails.length > 0 ? (

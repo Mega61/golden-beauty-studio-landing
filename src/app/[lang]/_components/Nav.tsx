@@ -3,7 +3,7 @@ import Logo from "./Logo";
 import MobileMenu from "./MobileMenu";
 import { PrimaryCTA } from "./atoms";
 import type { Locale } from "../dictionaries";
-import { siteConfig, type SectionKey } from "@/config/site";
+import { bookingHref, siteConfig, type SectionKey } from "@/config/site";
 
 type NavItemKey =
   | "trabajo"
@@ -76,7 +76,9 @@ export default function Nav({
       ...a,
       href: a.route ? a.hash : onLanding ? a.hash : `/${lang}${a.hash}`,
     }));
-  const { bookingUrl } = siteConfig;
+  // Locale-aware: an absolute URL passes through, a relative one gets the
+  // language prefixed. See `bookingHref` in `src/config/site.ts`.
+  const bookingUrl = bookingHref(lang);
 
   return (
     <header

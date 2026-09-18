@@ -6,7 +6,7 @@ import {
   repositories,
   type Db,
 } from "@/db";
-import type { AppointmentFinance, AuthId, Cop, DayClose } from "@/db/types";
+import type { AppointmentFinance, AuthId, Cop, DayClose, PaymentMethod } from "@/db/types";
 import {
   EA_TIME_ZONE,
   eaLocalToInstant,
@@ -109,14 +109,31 @@ export type DayAppointment = {
   providerName: string;
 };
 
-/** Fila de plata → la forma que este módulo y el push consumen. */
-export function toDayAccount(row: AppointmentFinance): DayAccount {
+/**
+ * Fila de plata → la forma que este módulo y el push consumen.
+ *
+ * Los pagos llegan aparte porque viven en su propia tabla: una cuenta se puede
+ * cobrar con más de un método, y `appointment_finance.payment_method` ya no se
+ * lee (es un shim de rollback que una cuenta partida deja en `null`). Quien
+ * llama los trae con `appointmentPayments.listByFinanceIds()`, en una sola
+ * consulta para todo el día.
+ *
+ * El valor por defecto es la lista vacía, que significa **cuenta sin cobrar** —
+ * el estado que Caja le reclama a recepción y que impide cerrar el día.
+ */
+export function toDayAccount(
+  row: AppointmentFinance,
+  payments: readonly { method: PaymentMethod; amount: Cop }[] = [],
+): DayAccount {
   return {
     financeId: row.id,
     eaAppointmentId: row.ea_appointment_id,
     amountCharged: row.amount_charged,
     tip: row.tip,
-    paymentMethod: row.payment_method,
+    payments: payments.map((payment) => ({
+      method: payment.method,
+      amount: payment.amount,
+    })),
     // Base caja: se cobra siempre el mismo día, así que la fecha del cobro es
     // la del instante que la cuenta guardó — no la del proceso que lo lee.
     paidOn: row.paid_at === null ? null : instantToEaDate(row.paid_at),
@@ -183,19 +200,28 @@ export function summarizeDayTotals(accounts: readonly DayAccount[]): DayTotals {
     totals.tips += account.tip;
     totals.ingreso += amount;
 
-    switch (account.paymentMethod) {
-      case "efectivo":
-        totals.efectivo += amount;
-        break;
-      case "transferencia":
-        totals.transferencia += amount;
-        break;
-      case "otro":
-        totals.otro += amount;
-        break;
-      default:
-        totals.sinMetodo += amount;
-        break;
+    if (account.payments.length === 0) {
+      totals.sinMetodo += amount;
+      continue;
+    }
+
+    // Se suma **pago por pago**, no la cuenta entera a un método: una cuenta
+    // partida 60/40 aporta 60.000 al efectivo y 40.000 a la transferencia, y
+    // meterla completa en cualquiera de los dos descuadraría el arqueo del
+    // cajón contra la pantalla — que es el número con el que se decide si
+    // creerle al sistema.
+    for (const payment of account.payments) {
+      switch (payment.method) {
+        case "efectivo":
+          totals.efectivo += payment.amount;
+          break;
+        case "transferencia":
+          totals.transferencia += payment.amount;
+          break;
+        default:
+          totals.otro += payment.amount;
+          break;
+      }
     }
   }
 
@@ -411,7 +437,7 @@ function missingOf(account: DayAccount): string | null {
   if (account.amountCharged === null) {
     return "Sin monto cobrado";
   }
-  if (account.paymentMethod === null) {
+  if (account.payments.length === 0) {
     return "Falta el método de pago";
   }
   if (account.paidOn === null) {
@@ -648,9 +674,33 @@ export async function loadReview(
   return reviewDay({
     date,
     appointments,
-    accounts: rows.map(toDayAccount),
+    accounts: await withPayments(repos, rows),
     now,
   });
+}
+
+/**
+ * Las cuentas de un conjunto de filas, con sus pagos ya pegados.
+ *
+ * Una sola consulta para todas: un día de veinte citas serían veinte viajes a
+ * la base si cada cuenta cargara los suyos.
+ */
+async function withPayments(
+  repos: ReturnType<typeof repositories>,
+  rows: readonly AppointmentFinance[],
+): Promise<DayAccount[]> {
+  const payments = await repos.appointmentPayments.listByFinanceIds(
+    rows.map((row) => row.id),
+  );
+
+  const byFinance = new Map<number, { method: PaymentMethod; amount: Cop }[]>();
+  for (const payment of payments) {
+    const list = byFinance.get(payment.appointment_finance_id) ?? [];
+    list.push({ method: payment.method, amount: payment.amount });
+    byFinance.set(payment.appointment_finance_id, list);
+  }
+
+  return rows.map((row) => toDayAccount(row, byFinance.get(row.id) ?? []));
 }
 
 /** Los dos instantes que delimitan un día del estudio. `to` exclusivo. */
@@ -752,7 +802,10 @@ async function runPush(
   }
 
   const repos = repositories(deps.db);
-  const accounts = (await repos.appointmentFinance.listByDayClose(row.id)).map(toDayAccount);
+  const accounts = await withPayments(
+    repos,
+    await repos.appointmentFinance.listByDayClose(row.id),
+  );
 
   let payments: IngestPayment[];
   try {
@@ -905,7 +958,10 @@ export async function recordAdjustment(
     };
   }
 
-  const account = toDayAccount(row);
+  // Con sus pagos: el ajuste necesita un método, y con una cuenta partida lo
+  // elige `buildIngestAdjustment()`. Sin ellos toda corrección fallaría como
+  // "sin método de pago", incluso sobre una cuenta que sí se cobró.
+  const [account] = await withPayments(repositories(deps.db), [row]);
   const sequence = (await countAdjustments(deps.db, row.id)) + 1;
 
   // El movimiento se arma **antes** de escribir. Si el ajuste no puede viajar
@@ -987,7 +1043,9 @@ export async function retryAdjustmentPush(
   if (pendientes.length === 0) return { state: "vacio" };
   if (deps.ingest === null) return { state: "apagado" };
 
-  const account = toDayAccount(row);
+  // Con sus pagos, igual que al registrarlo: el reintento arma el mismo
+  // movimiento del primer intento, y sin método no armaría ninguno.
+  const [account] = await withPayments(repositories(deps.db), [row]);
   let ultimo: PushOutcome = { state: "vacio" };
 
   for (const { sequence, delta } of pendientes) {

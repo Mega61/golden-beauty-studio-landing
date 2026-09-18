@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   TicketError,
+  assertPaymentsCoverCharge,
   assertTicketInvariant,
   computeTicketTotals,
   priceVariance,
   ticketFromEnteredTotal,
   validateTicketClose,
   type TicketItemInput,
+  type TicketPayment,
   type TicketTotals,
 } from "./ticket";
 
@@ -548,5 +550,92 @@ describe("ancla: variación > 0 ⟺ la compuerta pide motivo", () => {
     }
 
     expect(message).toContain(String(priceVariance(lines, charged)));
+  });
+});
+
+describe("assertPaymentsCoverCharge", () => {
+  const efectivo = (amount: number): TicketPayment => ({ method: "efectivo", amount });
+  const transferencia = (amount: number): TicketPayment => ({
+    method: "transferencia",
+    amount,
+  });
+
+  it("acepta un solo método que cubre el total", () => {
+    expect(() => assertPaymentsCoverCharge([efectivo(115_000)], 115_000)).not.toThrow();
+  });
+
+  it("acepta el caso que motivó la tabla: parte en efectivo y el resto transferido", () => {
+    // Es el caso real que la dueña describió el 2026-09-17.
+    expect(() =>
+      assertPaymentsCoverCharge([efectivo(60_000), transferencia(40_000)], 100_000),
+    ).not.toThrow();
+  });
+
+  it("acepta una lista vacía: la cuenta está cerrada pero sin cobrar", () => {
+    // Es el estado que Caja le reclama a recepción, y el que impide cerrar el
+    // día. Rechazarlo obligaría a la técnica a inventar un método.
+    expect(() => assertPaymentsCoverCharge([], 115_000)).not.toThrow();
+  });
+
+  it("rechaza pagos que no suman lo cobrado", () => {
+    expect(() =>
+      assertPaymentsCoverCharge([efectivo(60_000), transferencia(30_000)], 100_000),
+    ).toThrow(TicketError);
+  });
+
+  it("rechaza pagos que suman de más", () => {
+    // Sobra plata es tan roto como que falte: el cierre del día no cuadraría
+    // contra el cajón y nadie sabría por cuál de las dos cuentas.
+    expect(() =>
+      assertPaymentsCoverCharge([efectivo(60_000), transferencia(50_000)], 100_000),
+    ).toThrow(TicketError);
+  });
+
+  it("el mensaje dice las dos cifras, porque quien lo lee está cobrando", () => {
+    let message = "";
+    try {
+      assertPaymentsCoverCharge([efectivo(60_000), transferencia(30_000)], 100_000);
+    } catch (error) {
+      message = error instanceof Error ? error.message : "";
+    }
+
+    expect(message).toContain("90000");
+    expect(message).toContain("100000");
+  });
+
+  it("rechaza un pago de cero", () => {
+    expect(() => assertPaymentsCoverCharge([efectivo(0)], 0)).toThrow(TicketError);
+  });
+
+  it("rechaza un pago negativo", () => {
+    // Una devolución no existe en la v1, y si existiera sería un ajuste con id
+    // propio — nunca un pago con el signo cambiado.
+    expect(() =>
+      assertPaymentsCoverCharge([efectivo(120_000), transferencia(-20_000)], 100_000),
+    ).toThrow(TicketError);
+  });
+
+  it("rechaza dos pagos del mismo método", () => {
+    // Sumarlos en silencio escondería un 60.000 digitado dos veces donde iba
+    // 60.000 y 40.000, y eso aparece después como un cierre que no cuadra.
+    expect(() =>
+      assertPaymentsCoverCharge([efectivo(60_000), efectivo(40_000)], 100_000),
+    ).toThrow(TicketError);
+  });
+
+  it("rechaza un monto que no es entero de pesos", () => {
+    expect(() => assertPaymentsCoverCharge([efectivo(100_000.5)], 100_000.5)).toThrow(
+      TicketError,
+    );
+  });
+
+  it("la propina queda fuera: los pagos cubren lo cobrado, no lo entregado", () => {
+    // La clienta entrega 115.000 + 10.000 de propina, pero los totales por
+    // método miden ingreso del estudio. Si la invariante pidiera `amountPaid`,
+    // el ingreso del mes vendría inflado con plata de la técnica.
+    const totals = computeTicketTotals([servicio(115_000)], 0, 10_000);
+
+    expect(totals.amountPaid).toBe(125_000);
+    expect(() => assertPaymentsCoverCharge([efectivo(115_000)], totals.amountCharged)).not.toThrow();
   });
 });

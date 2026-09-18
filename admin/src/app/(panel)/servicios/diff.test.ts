@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Service } from "@/lib/ea";
 import type { ServiceMap } from "@/db/types";
 
-import { buildCatalogDiff, publishPayload } from "./diff";
+import { buildCatalogDiff, createPayload, publishPayload } from "./diff";
 import type { PricingEntry } from "./pricing-parse";
 
 function entry(patch: Partial<PricingEntry> & { id: string }): PricingEntry {
@@ -216,5 +216,102 @@ describe("publishPayload", () => {
       price: 11000,
       duration: null,
     });
+  });
+});
+
+describe("createPayload", () => {
+  /** Una fila `sin-vincular`: en la vitrina, sin servicio en la agenda. */
+  function sinVincular(patch: Partial<PricingEntry> & { id: string }) {
+    const diff = buildCatalogDiff([entry(patch)], [], []);
+    return diff.rows[0];
+  }
+
+  const COMBO = {
+    id: "semi-permanent-hands-feet",
+    categoryId: "combos",
+    priceCOP: 95_000,
+    durationMin: 120,
+  };
+
+  it("arma el payload de un combo con el nombre que escribió una persona", () => {
+    const result = createPayload(sinVincular(COMBO), "Semipermanente manos y pies");
+
+    expect(result).toEqual({
+      payload: {
+        name: "Semipermanente manos y pies",
+        price: 95_000,
+        duration: 120,
+      },
+    });
+  });
+
+  it("el precio y la duración salen de la vitrina, no de quien llama", () => {
+    // Es la misma regla que `publishPayload`: el monto no viaja desde el
+    // navegador. Acá se hace evidente porque la firma ni siquiera los acepta.
+    const result = createPayload(sinVincular(COMBO), "X");
+    expect(result).toMatchObject({ payload: { price: 95_000, duration: 120 } });
+  });
+
+  it("recorta el nombre", () => {
+    expect(createPayload(sinVincular(COMBO), "  Combo  ")).toMatchObject({
+      payload: { name: "Combo" },
+    });
+  });
+
+  it("sin nombre no se crea nada", () => {
+    // El nombre es el texto que la clienta lee en su confirmación. Un servicio
+    // llamado "" en la agenda es peor que no tenerlo.
+    for (const name of ["", "   ", "\t"]) {
+      expect(createPayload(sinVincular(COMBO), name), JSON.stringify(name)).toEqual({
+        blocker: "sin-nombre",
+      });
+    }
+  });
+
+  it("no crea lo que ya está vinculado", () => {
+    const diff = buildCatalogDiff(
+      [entry(COMBO)],
+      [service({ id: 7, price: 95_000, duration: 120 })],
+      [mapping(COMBO.id, 7)],
+    );
+
+    expect(createPayload(diff.rows[0], "Combo")).toEqual({ blocker: "ya-vinculado" });
+  });
+
+  it("no crea lo que está marcado como solo vitrina", () => {
+    expect(
+      createPayload(sinVincular({ ...COMBO, showcaseOnly: true }), "Combo"),
+    ).toEqual({ blocker: "solo-vitrina" });
+  });
+
+  it("no crea un adicional sin duración propia", () => {
+    // `design-per-nail` se cobra dentro de otra cita: no ocupa tiempo y el
+    // calendario no lo podría dibujar. Que el bloqueo tenga nombre propio es lo
+    // que deja explicarlo en pantalla en vez de mostrar un error de EA.
+    expect(
+      createPayload(
+        sinVincular({ id: "design-per-nail", categoryId: "extras", durationMin: null }),
+        "Diseño por uña",
+      ),
+    ).toEqual({ blocker: "sin-duracion" });
+  });
+
+  it("los cinco combos reales de la vitrina se pueden crear", () => {
+    // Es el caso que motiva la función: hoy no existen en la agenda, así que un
+    // combo no se puede agendar como una sola cita.
+    const combos = [
+      { id: "polygel-overlay-hands-semi-feet", priceCOP: 135_000, durationMin: 150 },
+      { id: "builder-gel-overlay-hands-semi-feet", priceCOP: 130_000, durationMin: 150 },
+      { id: "acrylic-overlay-hands-semi-feet", priceCOP: 125_000, durationMin: 150 },
+      { id: "semi-permanent-hands-feet", priceCOP: 95_000, durationMin: 120 },
+      { id: "semi-permanent-hands-traditional-feet", priceCOP: 77_000, durationMin: 120 },
+    ];
+
+    for (const combo of combos) {
+      const result = createPayload(sinVincular({ ...combo, categoryId: "combos" }), "Combo");
+      expect(result, combo.id).toMatchObject({
+        payload: { price: combo.priceCOP, duration: combo.durationMin },
+      });
+    }
   });
 });

@@ -20,35 +20,56 @@ import type { PaymentMethod } from "@/db/types";
  * ids que salen de `lib/ingest-id.ts` y de ningún otro lado.
  */
 
-const finance = (over: Partial<FinanceForIngest> = {}): FinanceForIngest => ({
+/**
+ * La cuenta de prueba.
+ *
+ * `paymentMethod` es una comodidad de estos tests, no un campo del tipo: arma un
+ * pago único por todo lo cobrado, que es el 95 % de las cuentas. `null` deja la
+ * cuenta sin cobrar. Para una cuenta partida se pasa `payments` directo.
+ */
+const AMOUNT = 130_000;
+
+const finance = (
+  over: Partial<FinanceForIngest> & { paymentMethod?: PaymentMethod | null } = {},
+): FinanceForIngest => {
+  const { paymentMethod, ...rest } = over;
+  const charged = rest.amountCharged === undefined ? AMOUNT : rest.amountCharged;
+
+  return {
   eaAppointmentId: 42,
-  amountCharged: 130_000,
+  amountCharged: AMOUNT,
   tip: 10_000,
-  paymentMethod: "efectivo",
   paidOn: "2026-08-31",
   eaProviderId: 2,
   performedServiceId: 12,
-  ...over,
-});
+  payments:
+    paymentMethod === null
+      ? []
+      : [{ method: paymentMethod ?? "efectivo", amount: charged ?? 0 }],
+  ...rest,
+  };
+};
 
 describe("buildIngestPayment", () => {
   it("arma el pago de una cita cerrada", () => {
     // Los cinco campos que `Payment` tiene en Strapi, y ni uno más: mandar
     // `source`, `ea_appointment_id` o `imported_id` era mandar columnas que el
     // content type no tiene.
-    expect(buildIngestPayment(finance())).toEqual({
-      source_tx_id: "ea-appt:42",
-      amount: 130_000,
-      tip: 10_000,
-      method: "efectivo",
-      paid_on: "2026-08-31",
-    });
+    expect(buildIngestPayment(finance())).toEqual([
+      {
+        source_tx_id: "ea-appt:42",
+        amount: 130_000,
+        tip: 10_000,
+        method: "efectivo",
+        paid_on: "2026-08-31",
+      },
+    ]);
   });
 
   it("la propina viaja al lado del monto, nunca sumada", () => {
     // Meterla adentro inflaría el ingreso del mes con plata que es de la
     // técnica, y ese error no se ve hasta que alguien compara con la caja.
-    const pago = buildIngestPayment(finance({ amountCharged: 100_000, tip: 50_000 }));
+    const pago = buildIngestPayment(finance({ amountCharged: 100_000, tip: 50_000 }))[0];
 
     expect(pago.amount).toBe(100_000);
     expect(pago.tip).toBe(50_000);
@@ -64,7 +85,7 @@ describe("buildIngestPayment", () => {
 
   it("los tres métodos válidos pasan", () => {
     for (const method of PAYMENT_METHODS) {
-      expect(buildIngestPayment(finance({ paymentMethod: method })).method).toBe(method);
+      expect(buildIngestPayment(finance({ paymentMethod: method }))[0].method).toBe(method);
     }
   });
 
@@ -92,7 +113,7 @@ describe("buildIngestPayment", () => {
   });
 
   it("un cobro de cero es válido: la cortesía existe", () => {
-    expect(buildIngestPayment(finance({ amountCharged: 0, tip: 0 })).amount).toBe(0);
+    expect(buildIngestPayment(finance({ amountCharged: 0, tip: 0 }))[0].amount).toBe(0);
   });
 });
 
@@ -113,7 +134,7 @@ describe("buildIngestAdjustment — corregir después del cierre", () => {
     // `Payment.tx_id` es UNIQUE y `upsertPayment()` llavea por ahí: un ajuste
     // que la reusara no crearía un movimiento, le PISARÍA el monto al pago —
     // y el ingreso del día quedaría corto por el monto original, en silencio.
-    const pago = buildIngestPayment(finance());
+    const pago = buildIngestPayment(finance())[0];
     const ajuste = buildIngestAdjustment(finance(), 5_000, 1);
 
     expect(ajuste.source_tx_id).not.toBe(pago.source_tx_id);
@@ -185,5 +206,104 @@ describe("isPaymentMethod", () => {
     for (const value of ["Efectivo", "tarjeta", "", null, undefined, 1, {}]) {
       expect(isPaymentMethod(value)).toBe(false);
     }
+  });
+});
+
+describe("la cuenta partida entre dos métodos", () => {
+  const partida = (over: Partial<FinanceForIngest> = {}) =>
+    finance({
+      amountCharged: 100_000,
+      payments: [
+        { method: "efectivo", amount: 60_000 },
+        { method: "transferencia", amount: 40_000 },
+      ],
+      ...over,
+    });
+
+  it("sale como dos movimientos, uno por método", () => {
+    // La plata aterrizó en dos lugares —el cajón y el banco— y Actual Budget
+    // los quiere separados, o ninguna de las dos conciliaciones cuadra.
+    const pagos = buildIngestPayment(partida());
+
+    expect(pagos).toHaveLength(2);
+    expect(pagos.map((p) => p.method)).toEqual(["efectivo", "transferencia"]);
+    expect(pagos.map((p) => p.amount)).toEqual([60_000, 40_000]);
+  });
+
+  it("cada movimiento lleva el método en su llave, y no la llave pelada", () => {
+    // La llave pelada es la de las filas que **ya están** en Strapi y en Actual.
+    // Reusarla acá dejaría dos movimientos con el mismo tx_id: el segundo le
+    // pisaría el monto al primero, sin error visible.
+    expect(buildIngestPayment(partida()).map((p) => p.source_tx_id)).toEqual([
+      "ea-appt:42:efectivo",
+      "ea-appt:42:transferencia",
+    ]);
+  });
+
+  it("la cuenta de un solo método conserva la llave pelada", () => {
+    // Uniformar sería más bonito y costaría el ingreso histórico completo.
+    expect(buildIngestPayment(finance())[0].source_tx_id).toBe("ea-appt:42");
+  });
+
+  it("la propina va entera en el primer movimiento y en ninguno más", () => {
+    // Prorratearla daría dos cifras que suman bien y que por separado no
+    // significan nada; ponerla entera en cada uno la duplicaría.
+    const pagos = buildIngestPayment(partida({ tip: 15_000 }));
+
+    expect(pagos.map((p) => p.tip)).toEqual([15_000, 0]);
+    expect(pagos.reduce((sum, p) => sum + p.tip, 0)).toBe(15_000);
+  });
+
+  it("los montos suman exactamente lo cobrado", () => {
+    const pagos = buildIngestPayment(partida());
+    expect(pagos.reduce((sum, p) => sum + p.amount, 0)).toBe(100_000);
+  });
+
+  it("no se empuja una cuenta cuyos pagos no cuadran", () => {
+    // Es la última compuerta antes de que la cifra salga del panel, y lo que
+    // sale de acá no vuelve: Actual no actualiza.
+    expect(() =>
+      buildIngestPayment(
+        partida({
+          payments: [
+            { method: "efectivo", amount: 60_000 },
+            { method: "transferencia", amount: 30_000 },
+          ],
+        }),
+      ),
+    ).toThrow(/no cuadra/);
+  });
+
+  it("el lote del día mezcla cuentas simples y partidas sin repetir llaves", () => {
+    const pagos = buildDayClosePayments([
+      finance({ eaAppointmentId: 1, amountCharged: 50_000, tip: 0 }),
+      partida({ eaAppointmentId: 2, tip: 0 }),
+      finance({ eaAppointmentId: 3, amountCharged: 80_000, tip: 0 }),
+    ]);
+
+    expect(pagos).toHaveLength(4);
+    expect(new Set(pagos.map((p) => p.source_tx_id)).size).toBe(4);
+  });
+
+  it("el ajuste de una cuenta partida usa el método del pago más grande", () => {
+    // Nadie registró por dónde entró la corrección: la pantalla pide monto y
+    // motivo. Se elige el pago mayor porque es la apuesta más probable, es
+    // determinista, y está en un solo lugar.
+    expect(buildIngestAdjustment(partida(), -5_000, 1).method).toBe("efectivo");
+  });
+
+  it("y con el reparto al revés, el otro", () => {
+    const ajuste = buildIngestAdjustment(
+      partida({
+        payments: [
+          { method: "efectivo", amount: 20_000 },
+          { method: "transferencia", amount: 80_000 },
+        ],
+      }),
+      -5_000,
+      1,
+    );
+
+    expect(ajuste.method).toBe("transferencia");
   });
 });

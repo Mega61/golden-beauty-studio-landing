@@ -29,7 +29,11 @@ import "server-only";
 
 import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
-import type { AppointmentFinance, AppointmentFinanceItem } from "@/db/types";
+import type {
+  AppointmentFinance,
+  AppointmentFinanceItem,
+  AppointmentPayment,
+} from "@/db/types";
 import { instantToEaLocal, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea";
 import type { Interval } from "@/lib/metrics";
 
@@ -91,6 +95,7 @@ function messageOf(error: unknown): string {
 function toFinanceRow(
   row: AppointmentFinance,
   items: readonly AppointmentFinanceItem[],
+  payments: readonly AppointmentPayment[],
 ): FinanceRow {
   return {
     eaAppointmentId: row.ea_appointment_id,
@@ -104,7 +109,10 @@ function toFinanceRow(
     discount: row.discount,
     amountCharged: row.amount_charged,
     tip: row.tip,
-    paymentMethod: row.payment_method,
+    payments: payments.map((payment) => ({
+      method: payment.method,
+      amount: payment.amount,
+    })),
     varianceReasonCode: row.variance_reason_code,
     // "Cerrada" es tener `closed_at`. El `amount_charged` puede ser 0 de verdad
     // —un retoque de garantía— y usarlo como señal de cierre haría desaparecer
@@ -150,6 +158,11 @@ async function loadFinance(
     rows.map((row) => row.id),
   );
 
+  // Los pagos, igual: una sola consulta para el periodo entero.
+  const payments = await repos.appointmentPayments.listByFinanceIds(
+    rows.map((row) => row.id),
+  );
+
   const byFinance = new Map<number, AppointmentFinanceItem[]>();
   for (const item of items) {
     const bucket = byFinance.get(item.appointment_finance_id) ?? [];
@@ -157,7 +170,16 @@ async function loadFinance(
     byFinance.set(item.appointment_finance_id, bucket);
   }
 
-  return rows.map((row) => toFinanceRow(row, byFinance.get(row.id) ?? []));
+  const paymentsByFinance = new Map<number, AppointmentPayment[]>();
+  for (const payment of payments) {
+    const bucket = paymentsByFinance.get(payment.appointment_finance_id) ?? [];
+    bucket.push(payment);
+    paymentsByFinance.set(payment.appointment_finance_id, bucket);
+  }
+
+  return rows.map((row) =>
+    toFinanceRow(row, byFinance.get(row.id) ?? [], paymentsByFinance.get(row.id) ?? []),
+  );
 }
 
 /**

@@ -35,7 +35,6 @@ import {
   VARIANCE_LABEL,
 } from "./aggregate";
 import {
-  axisTicks,
   BarRows,
   ChartFrame,
   Heatmap,
@@ -50,7 +49,7 @@ import { DataView } from "./DataView";
 import { loadReports } from "./data";
 import { occupancyByProvider, slotLabel, SLOTS, type SlotId } from "./occupancy";
 import { SERIES, statusColor } from "./palette";
-import { deltaAgainst, formatRate, NOT_MEASURABLE } from "./scale";
+import { axisTicks, deltaAgainst, formatRate, NOT_MEASURABLE } from "./scale";
 
 export type Data = Awaited<ReturnType<typeof loadReports>>;
 

@@ -1,7 +1,7 @@
 import "server-only";
 import { BIO_COPY as ES } from "./bio.es";
 import { BIO_COPY as EN } from "./bio.en";
-import { siteConfig, business } from "@/config/site";
+import { bookingHref, siteConfig, business } from "@/config/site";
 import type { Locale } from "@/app/[lang]/dictionaries";
 import type { BioCopy, BioData, BioLink, BioPromo, BioSocial } from "./bio.types";
 import type { PromoScenario } from "./promos.types";
@@ -31,7 +31,9 @@ function mapsHref(): string {
  */
 export async function getBio(lang: Locale): Promise<BioData> {
   const copy = BY_LANG[lang];
-  const { bookingUrl, whatsappUrl, instagramUrl, tiktokUrl } = siteConfig;
+  const { whatsappUrl, instagramUrl, tiktokUrl } = siteConfig;
+  // Locale-aware: see `bookingHref` in `src/config/site.ts`.
+  const bookingUrl = bookingHref(lang);
 
   // Destinations reuse the site-wide env (the same values the landing uses);
   // `servicios` and `maps` have no env var, so they get a computed default.

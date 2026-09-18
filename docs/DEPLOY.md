@@ -661,6 +661,113 @@ que ese día sea encender algo y no escribirlo bajo presión.
 
 ---
 
+## Preparar EA para el corte — la lista de estados
+
+**Antes de que exista una sola cita real.** EA guarda el estado de cada cita como
+**texto plano en la fila**, y `appointment_status_options` es solo lo que ofrece el
+desplegable: cambiar la lista después **no migra las citas viejas**. Se hace una vez,
+en una agenda vacía, y ahí es gratis.
+
+EA trae cinco (`Booked`, `Confirmed`, `Rescheduled`, `Cancelled`, `Draft`) y **ninguno
+de los dos que el motor de comisiones necesita**: sin `Completada` y `No asistió` no hay
+forma de distinguir una cita atendida de una que la clienta no honró, y la quincena se
+liquidaría sobre las dos.
+
+El script viaja en la imagen del panel, así que se corre desde el contenedor:
+
+```bash
+# 1. Ver el plan. No escribe nada.
+docker exec gbs-admin node scripts/estados.js
+
+# 2. Si el plan dice "escribir", aplicarlo.
+docker exec gbs-admin node scripts/estados.js --aplicar
+```
+
+Tres desenlaces posibles, y los tres son correctos:
+
+| Salida | Qué significa |
+| --- | --- |
+| `la lista ya es la correcta` | Ya se corrió. No se escribe nada. |
+| `ejecución en seco` | Se puede aplicar. Volver a correr con `--aplicar`. |
+| `⚠ NO se escribió` | **Hay citas usando estados que se perderían.** El script los lista. Se decide a mano: o se agregan esos estados a `STATUS_OPTIONS` en `src/jobs/status-options.ts`, o se cambian esas citas primero. El script no elige por nadie. |
+
+La bandera se escribe entera —`--aplicar`, no `-a`— a propósito: es una operación de una
+sola dirección sobre un ajuste que EA no deshace.
+
+Después, Diagnóstico vigila que la lista no cambie (`status-options`), y muestra las
+cadenas que el panel no supo traducir. Las dos señales juntas dicen si alguien la movió
+y si ya empezó a hacer daño.
+
+## Preparar EA para el corte — los combos
+
+Los cinco combos de `src/data/pricing.ts` tienen precio y duración propios —más cortos y
+más baratos que la suma de sus partes— y **no existen como servicios en EA**, así que hoy
+un combo no se puede agendar como una sola cita.
+
+Se crean desde el panel, en **`/admin/servicios`**: las filas en estado *sin vincular*
+traen un campo de nombre y un botón **Crear**. El panel manda a EA el precio y la duración
+leídos de la vitrina —no del formulario— y deja la fila de `service_map` vinculada, así que
+a partir de ahí el combo se publica y se agenda como cualquier otro servicio.
+
+**El nombre lo escribe una persona, y no es un descuido.** `pricing.ts` guarda id, precio y
+duración; los nombres viven en los diccionarios de la landing, que la app del panel no
+importa. Derivarlo del id (`semi-permanent-hands-feet` → "Semi Permanent Hands Feet") sería
+inventar el texto que la clienta lee en su confirmación de cita.
+
+Si la creación en EA funciona pero el vínculo falla, el servicio queda creado y sin vincular:
+aparece abajo como *solo en la agenda* y el desplegable de **Vincular** lo ofrece. **No hay
+que borrarlo en EA** — el mensaje de error lo dice con esas palabras.
+
+---
+
+## El corte — importar el export de Agenda Pro
+
+Trae las clientas con su teléfono y la historia. Sin esto, los números que importan siguen
+del otro lado y el primer mes post-corte contaría la base entera como clientas nuevas.
+
+El export se guarda como **CSV** (si sale en `.xlsx`, se abre y se guarda como CSV — es un
+paso manual de diez segundos y evita una dependencia de parseo para siempre) y se copia a
+la VM:
+
+```bash
+docker cp citas.csv gbs-admin:/tmp/citas.csv
+
+# 1. Plan. No escribe nada. Se LEE.
+docker exec gbs-admin node scripts/importar.js /tmp/citas.csv
+
+# 2. Si el plan se ve bien, aplicarlo.
+docker exec gbs-admin node scripts/importar.js /tmp/citas.csv --aplicar
+```
+
+**Lo que hay que mirar en el plan, en este orden:**
+
+1. **Las columnas detectadas.** El script imprime qué columna usó para cada campo. El mapeo
+   se adivina por el nombre del encabezado, y una detección equivocada que se ve es un
+   ajuste de treinta segundos — una que no se ve es una base importada al revés. Se anula
+   con `--col-phone=2`, `--col-amount=6`, etc. (el número es la posición, desde 0).
+   **Sin columna de teléfono el script no corre**: es la llave de la identidad.
+2. **El rango de fechas.** Es lo que delata un mes leído como día: si el rango arranca en un
+   año en que el estudio no existía, las fechas se están leyendo `MM/DD` cuando el archivo
+   trae `DD/MM`. El parser asume **día primero**, que es lo que usa Colombia.
+3. **Las filas sin teléfono utilizable.** El script las lista con nombre y con lo que traía
+   la casilla. Son clientas a las que hay que pedirles el número; se pierden si nadie las
+   mira, y ése es el modo de falla silencioso de todo este paso.
+4. **Cuántas citas traen monto.** Las que no, quedan en `NULL` — que significa *el export no
+   traía la plata*, no *fue gratis*. Un cero sería una mentira que después se suma.
+
+Banderas útiles: `--solo-clientas` y `--solo-historia` corren una mitad sola, que sirve para
+importar las clientas primero, revisarlas en `/admin/clientes`, y recién después la historia.
+
+**Correrlo dos veces no duplica nada**: las clientas se deduplican por teléfono normalizado
+contra lo que EA ya tiene, y la historia por `source_id` en `legacy_appointment`.
+
+⚠ **Nada de esto se empuja a Strapi ni a Actual Budget.** La plata del histórico ya está en
+Actual, metida por el scraper nocturno con `imported_id = agendapro-tx:<id>`.
+`legacy_appointment` existe solo para que los reportes del panel tengan pasado. Empujarla
+otra vez duplicaría el ingreso histórico completo, en silencio.
+
+---
+
 ## Verificación de infraestructura
 
 Lo que hay que poder responder que sí antes de dar el despliegue por hecho. Lo

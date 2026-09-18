@@ -180,23 +180,49 @@ describe("parseDraft", () => {
   it("descarta un motivo y un método que no están en el enum", () => {
     const d = parseDraft({ ...base, varianceReasonCode: "porque-si", paymentMethod: "bitcoin" });
     expect(d?.varianceReasonCode).toBeNull();
-    expect(d?.paymentMethod).toBeNull();
+    expect(d?.payments).toEqual([]);
   });
 
   it("descarta un motivo y un método que ni siquiera son texto", () => {
     const d = parseDraft({ ...base, varianceReasonCode: 3, paymentMethod: {} });
     expect(d?.varianceReasonCode).toBeNull();
-    expect(d?.paymentMethod).toBeNull();
+    expect(d?.payments).toEqual([]);
+  });
+
+  it("migra un borrador de la versión 1, que traía un solo método", () => {
+    // Hay borradores con esta forma en los celulares del equipo. Descartarlos
+    // al subir la versión le borraría a la técnica lo que dejó escrito entre
+    // dos clientas, que es justo lo que el borrador local existe para evitar.
+    const v1: Record<string, unknown> = { ...base, version: 1, paymentMethod: "efectivo" };
+    delete v1.payments;
+    const d = parseDraft(v1);
+    expect(d?.payments).toEqual([{ method: "efectivo", amount: 0 }]);
+    // El monto migrado es cero y **no importa**: con un solo pago lo pone
+    // `draftToPayments()` con todo lo cobrado.
+    expect(d?.notes).toBe(base.notes);
+  });
+
+  it("descarta un segundo pago del mismo método", () => {
+    // `lib/ticket.ts` los rechaza al cerrar; restaurar una hoja que no se puede
+    // guardar sería devolverle a la técnica un formulario trabado.
+    const d = parseDraft({
+      ...base,
+      payments: [
+        { method: "efectivo", amount: 60_000 },
+        { method: "efectivo", amount: 40_000 },
+      ],
+    });
+    expect(d?.payments).toEqual([{ method: "efectivo", amount: 60_000 }]);
   });
 
   it("conserva el motivo y el método válidos", () => {
     const d = parseDraft({
       ...base,
       varianceReasonCode: "cortesia",
-      paymentMethod: "transferencia",
+      payments: [{ method: "transferencia", amount: 0 }],
     });
     expect(d?.varianceReasonCode).toBe("cortesia");
-    expect(d?.paymentMethod).toBe("transferencia");
+    expect(d?.payments).toEqual([{ method: "transferencia", amount: 0 }]);
   });
 
   it("una propina negativa vuelve como cero", () => {

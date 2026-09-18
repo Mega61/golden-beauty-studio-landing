@@ -41,11 +41,23 @@ Tres supuestos resultaron falsos, y cada uno **achica** el trabajo:
 API REST en `/index.php/api/v1/` (o `/api/v1/` con URL rewriting activo). Auth: HTTP Basic, **o** un
 token Bearer configurado en EA Settings (migración `017_add_api_token_setting.php`).
 
-**Trece recursos**, todos descritos en el `openapi.yml` que viene dentro del repo de EA (su propio
-`docker-compose.yml` levanta un `swagger-ui` para leerlo — no hace falta adivinar ningún contrato):
-`appointments`, `availabilities`, `unavailabilities`, `customers`, `services`, `service_categories`,
-`providers`, `secretaries`, `admins`, `settings`, `webhooks`, `blocked_periods`,
-`working_plan_exceptions`.
+**Trece recursos** descritos en el `openapi.yml` que viene dentro del repo de EA (su propio
+`docker-compose.yml` levanta un `swagger-ui` para leerlo): `appointments`, `availabilities`,
+`unavailabilities`, `customers`, `services`, `service_categories`, `providers`, `secretaries`,
+`admins`, `settings`, `webhooks`, `blocked_periods`, `working_plan_exceptions`.
+
+⚠ **Doce de los trece tienen ruta. `working_plan_exceptions` no.** El spec lo documenta y
+`application/controllers/api/v1/Working_plan_exceptions_api_v1.php` existe en la imagen, pero
+`application/config/routes.php` nunca lo registra — los `route_api_resource()` son diez, más los
+explícitos de `settings` y `availabilities` — así que `GET /working_plan_exceptions` devuelve el 404
+de EA. Verificado contra 1.6.0. La lista vive dentro de la técnica, en
+`provider.settings.workingPlanExceptions`, y las escrituras son un `PUT /providers/{id}` que manda
+**solo** esa clave: `Providers_model::save()` hace upsert de lo que le llega y borra lo que falta, y
+su `api_decode()` solo pisa las claves presentes. Lo implementa `EaWorkingPlanExceptionsClient` en
+`lib/ea/client.ts`; lo fija la suite de contrato.
+
+Es la razón por la que la capa 3 existe: **el `openapi.yml` de EA no es el contrato, es una
+aspiración.** Leer el spec no reemplaza ejercitar el endpoint.
 
 `appointments` soporta `page`, `length`, `sort`, `q`, `fields`, `with`, `date`, `from`, `till`,
 `serviceId`, `providerId`, `customerId`. Los payloads son camelCase; las columnas de la BD no.

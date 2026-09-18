@@ -9,6 +9,7 @@ import {
   type Column,
 } from "@/components/ui";
 
+import { NuevaClienta } from "./AccionesClienta";
 import { clientHref, type ClientListResult } from "./data";
 import type { ResolvedClient } from "./identity";
 
@@ -53,6 +54,14 @@ export function ClientesLista({ result }: { result: ClientListResult }) {
           Buscar
         </button>
       </Form>
+
+      {/*
+        El alta va **debajo del buscador** y plegada: casi siempre la clienta ya
+        existe, y el primer gesto correcto es buscarla. Un formulario de alta
+        arriba y desplegado invita a crear la duplicada que después hay que
+        fusionar.
+      */}
+      <NuevaClienta />
 
       {result.query === null && !result.failure ? (
         <p style={meta}>

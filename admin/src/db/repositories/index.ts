@@ -10,6 +10,7 @@
 import { allowedUserRepository } from "./allowed-user";
 import { appointmentFinanceRepository } from "./appointment-finance";
 import { appointmentFinanceItemRepository } from "./appointment-finance-item";
+import { appointmentPaymentRepository } from "./appointment-payment";
 import { auditLogRepository } from "./audit-log";
 import { comboRepository } from "./combo";
 import { commissionEntryRepository } from "./commission-entry";
@@ -29,6 +30,7 @@ export function repositories(db: Db) {
     allowedUsers: allowedUserRepository(db),
     appointmentFinance: appointmentFinanceRepository(db),
     appointmentFinanceItems: appointmentFinanceItemRepository(db),
+    appointmentPayments: appointmentPaymentRepository(db),
     auditLog: auditLogRepository(db),
     combos: comboRepository(db),
     commissionEntries: commissionEntryRepository(db),
@@ -50,6 +52,7 @@ export { allowedUserRepository } from "./allowed-user";
 export { appointmentFinanceRepository } from "./appointment-finance";
 export type { EnsureResult } from "./appointment-finance";
 export { appointmentFinanceItemRepository } from "./appointment-finance-item";
+export { appointmentPaymentRepository } from "./appointment-payment";
 export { auditLogRepository } from "./audit-log";
 export type { AuditEntry } from "./audit-log";
 export { comboRepository } from "./combo";

@@ -229,6 +229,53 @@
     "footnote": "One-week warranty on product lift (excluding charms or rhinestones).",
     "cta": "Book my appointment"
   },
+  "reservar": {
+    "meta": {
+      "title": "Book an appointment — Golden Beauty Studio",
+      "description": "Book your appointment at Golden Beauty Studio, Sabaneta. Pick the service, the technician and a time that works."
+    },
+    "eyebrow": "Booking",
+    "title": "Book your appointment",
+    "intro": "Four steps and you're done. If you'd rather write to us, we're on WhatsApp too.",
+    "steps": {
+      "service": "What are you booking?",
+      "provider": "With whom?",
+      "slot": "Which day and time?",
+      "details": "Your details"
+    },
+    "anyProvider": "Anyone",
+    "anyProviderHint": "Whoever has the slot",
+    "duration": "{min} min",
+    "back": "Back",
+    "next": "Continue",
+    "confirm": "Confirm appointment",
+    "sending": "Confirming…",
+    "labels": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "phone": "Mobile",
+      "phoneHint": "So we can confirm and let you know if anything changes.",
+      "notes": "Anything we should know? (optional)"
+    },
+    "noSlots": "No times left that day. Try another one.",
+    "loadingSlots": "Looking for times…",
+    "pickDate": "Pick a day",
+    "success": {
+      "title": "You're booked!",
+      "body": "See you on {date} at {time} with {provider}.",
+      "note": "Need to change it? Write to us on WhatsApp.",
+      "again": "Book another"
+    },
+    "errors": {
+      "taken": "That time was just taken. Pick another and we'll carry on.",
+      "phone": "Check the mobile number: we need 10 digits.",
+      "validation": "Something's missing or mistyped. Please check and try again.",
+      "rate_limited": "Too many attempts in a row. Give it a moment.",
+      "captcha": "We couldn't verify you're a person. Please try again.",
+      "spam": "We couldn't process the form. Reload the page and try again.",
+      "unavailable": "We couldn't reach the calendar. Try again shortly, or write to us on WhatsApp."
+    }
+  },
   "faq": {
     "eyebrow": "Frequently asked",
     "title1": "What people ask us,",

@@ -437,10 +437,17 @@ describe.skipIf(!canRunDbTests())(
             now: OCHO_PM,
           });
 
-          await db
-            .updateTable("appointment_finance")
-            .set({ payment_method: null })
+          // Se le quita el método a la fila ya congelada. Hay que borrar el
+          // pago, no vaciar la columna del encabezado: la columna es un shim de
+          // rollback y nadie la lee.
+          const [congelada] = await db
+            .selectFrom("appointment_finance")
+            .select("id")
             .where("ea_appointment_id", "=", 1)
+            .execute();
+          await db
+            .deleteFrom("appointment_payment")
+            .where("appointment_finance_id", "=", congelada.id)
             .execute();
 
           const outcome = await retryDayPush(deps([cita({ eaAppointmentId: 1 })]), {
@@ -755,10 +762,17 @@ describe.skipIf(!canRunDbTests())(
           // puede quedar un renglón en la base que nadie va a poder conciliar
           // contra Actual Budget.
           await diaCerrado();
-          await db
-            .updateTable("appointment_finance")
-            .set({ payment_method: null })
+          // Se le quita el método a la fila ya congelada. Hay que borrar el
+          // pago, no vaciar la columna del encabezado: la columna es un shim de
+          // rollback y nadie la lee.
+          const [congelada] = await db
+            .selectFrom("appointment_finance")
+            .select("id")
             .where("ea_appointment_id", "=", 1)
+            .execute();
+          await db
+            .deleteFrom("appointment_payment")
+            .where("appointment_finance_id", "=", congelada.id)
             .execute();
 
           const antes = await renglones(db);
@@ -902,7 +916,8 @@ async function sembrarCuenta(
     hora?: string;
   },
 ): Promise<number> {
-  const { appointmentFinance, appointmentFinanceItems } = repositories(db);
+  const { appointmentFinance, appointmentFinanceItems, appointmentPayments } =
+    repositories(db);
   const start = eaLocalToInstant(dt(`2026-09-03 ${opts.hora ?? "09:00:00"}`));
   const monto = opts.monto ?? 180_000;
   const metodo = opts.metodo === undefined ? "efectivo" : opts.metodo;
@@ -932,6 +947,18 @@ async function sembrarCuenta(
       note: null,
     },
   ]);
+
+  // El método vive en `appointment_payment`, que es la fuente. La columna del
+  // encabezado se escribe igual, como shim de rollback, que es lo que hace la
+  // Server Action de verdad.
+  // `replaceForFinance` y no un INSERT suelto: `appointmentFinance.ensure()` es
+  // idempotente por `ea_appointment_id`, así que sembrar dos veces la misma cita
+  // reusa la fila — y un insert acumularía un segundo pago, dejando la cuenta
+  // cobrada al doble. Reemplazar es además lo que hace la Server Action.
+  await appointmentPayments.replaceForFinance(
+    row.id,
+    metodo === null ? [] : [{ method: metodo, amount: monto }],
+  );
 
   await appointmentFinance.update(row.id, {
     amount_charged: monto,

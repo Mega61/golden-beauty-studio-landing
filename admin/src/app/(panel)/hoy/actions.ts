@@ -11,10 +11,21 @@ import { instantToEaLocal } from "@/lib/ea";
 import { createEaClient } from "@/lib/ea/client";
 import { ForbiddenError, requireCapability, requireOwnProvider } from "@/lib/dal";
 import { can } from "@/lib/auth-policy";
-import { TicketError, ticketFromEnteredTotal, validateTicketClose } from "@/lib/ticket";
+import {
+  TicketError,
+  assertPaymentsCoverCharge,
+  ticketFromEnteredTotal,
+  validateTicketClose,
+} from "@/lib/ticket";
 import { upsertAppointmentFinance } from "@/jobs/snapshot";
-import { draftToItems, type TicketDraft } from "@/components/ticket/draft";
+import {
+  DRAFT_VERSION,
+  draftToItems,
+  draftToPayments,
+  type TicketDraft,
+} from "@/components/ticket/draft";
 import type { CloseTicketInput, CloseTicketResult } from "@/components/ticket/types";
+import type { PaymentMethod } from "@/db/types";
 import { loadCatalogForClose } from "./catalog-server";
 
 /**
@@ -78,7 +89,9 @@ const InputSchema = z.object({
   varianceReasonCode: z.enum(REASONS).nullable(),
   varianceReason: z.string().max(500),
   notes: z.string().max(4000),
-  paymentMethod: z.enum(METHODS).nullable(),
+  payments: z
+    .array(z.object({ method: z.enum(METHODS), amount: z.number().int().min(0).max(MAX_PESOS) }))
+    .max(METHODS.length),
   tip: z.number().int().min(0).max(MAX_PESOS),
   clientRequestId: z.string().max(64),
 });
@@ -117,7 +130,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // El método de pago es una capacidad aparte (`TICKET_STAFF_COBRA`). Se
   // **rechaza** en vez de descartarlo en silencio: guardar la cuenta sin el
   // método que la técnica sí registró la dejaría creyendo que quedó cobrada.
-  if (data.paymentMethod !== null && !can(session.role, "cuenta:cobrar", { staffCobra: staffCobra() })) {
+  if (data.payments.length > 0 && !can(session.role, "cuenta:cobrar", { staffCobra: staffCobra() })) {
     return rechazo("En este estudio el método de pago lo registra recepción.");
   }
 
@@ -165,10 +178,15 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   const repos = repositories(db);
   let financeId: number;
   let existing;
+  // Los pagos que la cuenta ya tenía, para la bitácora: el "antes" de una
+  // corrección tiene que decir con qué se había cobrado, y eso ya no vive en la
+  // fila del encabezado.
+  let existingPayments: { method: PaymentMethod; amount: number }[] = [];
   try {
     const outcome = await upsertAppointmentFinance({ db, ea }, appointment, "reconcile");
     financeId = outcome.financeId;
     existing = await repos.appointmentFinance.findById(financeId);
+    existingPayments = await repos.appointmentPayments.listByFinanceId(financeId);
   } catch (error) {
     unstable_rethrow(error);
     console.error("[hoy] no se pudo asegurar la fila de plata", error);
@@ -196,7 +214,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   if (catalog === null) return masTarde("No se pudo leer el catálogo de EA. Se reintenta solo.");
 
   const draft: TicketDraft = {
-    version: 1,
+    version: DRAFT_VERSION,
     eaAppointmentId: data.eaAppointmentId,
     performedServiceId: data.performedServiceId,
     extras: data.extras,
@@ -205,7 +223,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     varianceReasonCode: data.varianceReasonCode,
     varianceReason: data.varianceReason,
     notes: data.notes,
-    paymentMethod: data.paymentMethod,
+    payments: data.payments,
     tip: data.tip,
     updatedAt: Date.now(),
   };
@@ -238,8 +256,21 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // la hora en que la técnica alcanzó a cerrar la cuenta. Sin método de pago
   // registrado no hay plata recibida todavía, así que queda `null` — es lo que
   // la pantalla de Caja tiene que reclamarle a recepción.
-  const paidAt =
-    data.paymentMethod === null ? null : (existing.appointment_start_at ?? now);
+  // Los pagos definitivos los resuelve el servidor, no la pantalla: con un solo
+  // método el monto es **todo lo cobrado**, y el total definitivo lo acaba de
+  // calcular esta función. Con dos, los montos vienen escritos y solo se
+  // verifican.
+  const payments = draftToPayments(draft, totals.amountCharged);
+
+  try {
+    assertPaymentsCoverCharge(payments, totals.amountCharged);
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof TicketError) return rechazo(error.message);
+    throw error;
+  }
+
+  const paidAt = payments.length === 0 ? null : (existing.appointment_start_at ?? now);
 
   const rows: Omit<NewAppointmentFinanceItem, "appointment_finance_id">[] = totals.lines.map(
     (line) => ({
@@ -258,7 +289,11 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     discount: totals.discount,
     tip: totals.tip,
     amount_charged: totals.amountCharged,
-    payment_method: data.paymentMethod,
+    // Shim de rollback, no fuente de verdad: la fuente es `appointment_payment`.
+    // Con un solo método se escribe ése, y con dos queda en `null` — el código
+    // de la imagen anterior lo muestra como "sin método", que es visible y
+    // reclamable, en vez de afirmar un método que no fue.
+    payment_method: payments.length === 1 ? payments[0].method : null,
     paid_at: paidAt,
     service_notes: data.notes.trim() === "" ? null : data.notes,
     variance_reason_code: data.varianceReasonCode,
@@ -277,6 +312,10 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     await db.transaction().execute(async (trx) => {
       const tx = repositories(trx);
       await tx.appointmentFinanceItems.replaceForFinance(financeId, rows);
+      await tx.appointmentPayments.replaceForFinance(
+        financeId,
+        payments.map((payment) => ({ method: payment.method, amount: payment.amount })),
+      );
       await tx.appointmentFinance.update(financeId, patch);
       // La cuenta se puede corregir; lo que no se puede es corregirla sin dejar
       // huella. El antes y el después van completos, en la misma transacción:
@@ -291,7 +330,10 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
           discount: existing.discount,
           tip: existing.tip,
           amount_charged: existing.amount_charged,
-          payment_method: existing.payment_method,
+          payments: existingPayments.map((payment) => ({
+            method: payment.method,
+            amount: payment.amount,
+          })),
           closed_at: existing.closed_at,
         },
         after: { ...patch, clientRequestId: data.clientRequestId },

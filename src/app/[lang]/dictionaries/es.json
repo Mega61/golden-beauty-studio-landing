@@ -229,6 +229,53 @@
     "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería)",
     "cta": "Reservar mi cita"
   },
+  "reservar": {
+    "meta": {
+      "title": "Reservar cita — Golden Beauty Studio",
+      "description": "Agenda tu cita en Golden Beauty Studio, Sabaneta. Elige el servicio, la técnica y la hora que te sirva."
+    },
+    "eyebrow": "Reservar",
+    "title": "Agenda tu cita",
+    "intro": "Cuatro pasos y listo. Si prefieres escribirnos, también estamos por WhatsApp.",
+    "steps": {
+      "service": "¿Qué te vas a hacer?",
+      "provider": "¿Con quién?",
+      "slot": "¿Qué día y a qué hora?",
+      "details": "Tus datos"
+    },
+    "anyProvider": "Cualquiera",
+    "anyProviderHint": "La que tenga el espacio",
+    "duration": "{min} min",
+    "back": "Volver",
+    "next": "Continuar",
+    "confirm": "Confirmar cita",
+    "sending": "Confirmando…",
+    "labels": {
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "phone": "Celular",
+      "phoneHint": "Para confirmarte y avisarte si algo cambia.",
+      "notes": "¿Algo que debamos saber? (opcional)"
+    },
+    "noSlots": "No quedan horas libres ese día. Prueba con otro.",
+    "loadingSlots": "Buscando horas…",
+    "pickDate": "Elige un día",
+    "success": {
+      "title": "¡Lista tu cita!",
+      "body": "Te esperamos el {date} a las {time} con {provider}.",
+      "note": "Si necesitas cambiarla, escríbenos por WhatsApp.",
+      "again": "Reservar otra"
+    },
+    "errors": {
+      "taken": "Justo tomaron esa hora. Elige otra y seguimos.",
+      "phone": "Revisa el celular: necesitamos 10 dígitos.",
+      "validation": "Falta algo o quedó mal escrito. Revisa y vuelve a intentar.",
+      "rate_limited": "Demasiados intentos seguidos. Espera un momento.",
+      "captcha": "No pudimos verificar que eres una persona. Intenta de nuevo.",
+      "spam": "No pudimos procesar el formulario. Recarga la página e intenta otra vez.",
+      "unavailable": "No pudimos conectar con la agenda. Intenta en un momento o escríbenos por WhatsApp."
+    }
+  },
   "faq": {
     "eyebrow": "Preguntas frecuentes",
     "title1": "Lo que nos preguntan,",

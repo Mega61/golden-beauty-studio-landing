@@ -72,6 +72,18 @@ RUN npm run build:migrator
 # congelado — el webhook solo lo adelanta.
 RUN npm run build:reconcile
 
+# El fijador de la lista de estados de EA. Queda en `scripts/estados.js` y se
+# corre **a mano, una vez, antes del corte** — no hay servicio ni cron que lo
+# llame. Viaja en la imagen porque el único lugar desde donde se puede hablar
+# con EA es la VM, y ahí no hay un árbol de fuentes: hay contenedores.
+RUN npm run build:estados
+
+# El importador del export de Agenda Pro. `scripts/importar.js`, también a mano y
+# también con ejecución en seco por defecto. Es lo que trae las clientas con su
+# teléfono y la historia que los reportes necesitan para no contar la base entera
+# como clientas nuevas el primer mes.
+RUN npm run build:importar
+
 # `public/` puede no existir todavía (hoy no existe). Crearlo acá hace que el
 # `COPY` de abajo funcione igual, en vez de romper el build el día que alguien
 # borre el último archivo estático — o el día que agregue el primero.

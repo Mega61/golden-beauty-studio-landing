@@ -397,6 +397,23 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 /**
+ * Con qué se pagó la cuenta, en una celda.
+ *
+ * Con un solo método basta el nombre. **Con dos van los montos**, aunque la
+ * celda crezca: quien mira esta columna está cuadrando el cajón contra la
+ * pantalla, y "Efectivo + Transferencia" sin cifras no le sirve para saber
+ * cuánto efectivo debería estar contando.
+ */
+function describeMethods(row: DayAccount): string {
+  if (row.payments.length === 0) return "Sin método";
+  if (row.payments.length === 1) return METHOD_LABEL[row.payments[0].method];
+
+  return row.payments
+    .map((payment) => `${METHOD_LABEL[payment.method]} ${formatPesos(payment.amount)}`)
+    .join(" + ");
+}
+
+/**
  * Las columnas de las cuentas cerradas, con el nombre de la clienta resuelto.
  *
  * Son una función y no una constante porque `DayAccount` viene de `gbs_admin` y
@@ -425,9 +442,8 @@ function accountColumns(
     header: "Método",
     from: "siempre",
     listSlot: "secondary",
-    render: (row) =>
-      row.paymentMethod === null ? "Sin método" : METHOD_LABEL[row.paymentMethod],
-    text: (row) => (row.paymentMethod === null ? "Sin método" : METHOD_LABEL[row.paymentMethod]),
+    render: (row) => describeMethods(row),
+    text: (row) => describeMethods(row),
   },
   {
     key: "push",

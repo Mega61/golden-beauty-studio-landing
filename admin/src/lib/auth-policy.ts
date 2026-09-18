@@ -225,6 +225,11 @@ export function isAllowedIdentity(
  * - `liquidacion:ver-todas` — la quincena de todo el equipo.
  * - `comisiones:administrar` — reglas y `commission_run`.
  * - `equipo:administrar` — allowlist, enrolamiento TOTP, revocación de sesiones.
+ * - `clientes:editar` — crear una clienta y corregir su teléfono o su nombre.
+ *   Es trabajo de mostrador: recepción lo necesita con la clienta enfrente.
+ * - `clientes:fusionar` — unir dos filas de EA en una. **Borra una fila de
+ *   clienta**, así que es de la dueña: es la única operación del panel que
+ *   destruye un registro de EA en vez de agregarle uno.
  * - `catalogo:publicar` — el diff `pricing.ts` ↔ EA en el sentido de escritura.
  * - `diagnostico:ver` — el tablero de estado del sistema.
  * - `ea:avanzado` — el link a la interfaz de EA.
@@ -242,6 +247,8 @@ export type Capability =
   | "liquidacion:ver-todas"
   | "comisiones:administrar"
   | "equipo:administrar"
+  | "clientes:editar"
+  | "clientes:fusionar"
   | "catalogo:publicar"
   | "diagnostico:ver"
   | "ea:avanzado";
@@ -282,6 +289,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "liquidacion:ver-todas",
     "comisiones:administrar",
     "equipo:administrar",
+    "clientes:editar",
+    "clientes:fusionar",
     "catalogo:publicar",
     "diagnostico:ver",
     "ea:avanzado",
@@ -297,6 +306,7 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "caja:cerrar-dia",
     "reportes:ver",
     "agenda:ver-todas",
+    "clientes:editar",
     "diagnostico:ver",
   ]),
 

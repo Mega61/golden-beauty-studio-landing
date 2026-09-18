@@ -36,13 +36,13 @@ const FINANZA: FinanceForIngest = {
   eaAppointmentId: 41,
   amountCharged: 180_000,
   tip: 20_000,
-  paymentMethod: "efectivo",
+  payments: [{ method: "efectivo", amount: 180_000 }],
   paidOn: "2026-09-03",
   eaProviderId: 3,
   performedServiceId: 5,
 };
 
-const PAGO = buildIngestPayment(FINANZA);
+const PAGO = buildIngestPayment(FINANZA)[0];
 const AJUSTE = buildIngestAdjustment(FINANZA, 20_000, 1);
 
 /** Un `fetch` de mentira que registra lo que le pidieron. */

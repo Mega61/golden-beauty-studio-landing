@@ -11,9 +11,11 @@ import {
   Panel,
   TextArea,
   formatCOP,
+  formatPesos,
   formatTimeRange,
 } from "@/components/ui";
-import type { PaymentMethod } from "@/db/types";
+import type { Cop, PaymentMethod } from "@/db/types";
+import type { TicketPayment } from "@/lib/ticket";
 import { ExtrasChips } from "./ExtrasChips";
 import { CambioTag, ServicePicker } from "./ServicePicker";
 import type { TicketCatalog } from "./catalog";
@@ -327,9 +329,10 @@ export function TicketSheet({
         <Paso n={5} titulo="Cobro">
           {canCharge ? (
             <MetodoPago
-              value={draft.paymentMethod}
+              payments={draft.payments}
+              amountCharged={amountCharged ?? 0}
               disabled={bloqueado}
-              onChange={(paymentMethod) => patch({ paymentMethod })}
+              onChange={(payments) => patch({ payments })}
             />
           ) : (
             <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
@@ -681,14 +684,69 @@ function RenglonManual({
 }
 
 function MetodoPago({
-  value,
+  payments,
+  amountCharged,
   disabled,
   onChange,
 }: {
-  value: PaymentMethod | null;
+  payments: readonly TicketPayment[];
+  amountCharged: Cop;
   disabled: boolean;
-  onChange: (method: PaymentMethod | null) => void;
+  onChange: (payments: TicketPayment[]) => void;
 }) {
+  const selected = payments.map((payment) => payment.method);
+  const dividido = payments.length > 1;
+
+  /**
+   * Tocar un método.
+   *
+   * Con ninguno seleccionado, lo elige. Con ése ya elegido, lo suelta. Con otro
+   * ya elegido, **lo agrega**: es el caso de la cuenta partida, y llegar a él
+   * tiene que costar un toque, no un menú escondido — pasa lo suficiente como
+   * para que esconderlo signifique que alguien va a mentir en el método.
+   *
+   * Al agregar el segundo, el primero se queda con lo que ya tenía escrito (o
+   * con todo lo cobrado, si venía solo) y el segundo arranca con el resto. Es
+   * la repartición que la persona iba a escribir de todos modos.
+   */
+  function toggle(method: PaymentMethod): void {
+    const existing = payments.find((payment) => payment.method === method);
+
+    if (existing) {
+      onChange(payments.filter((payment) => payment.method !== method));
+      return;
+    }
+
+    if (payments.length === 0) {
+      onChange([{ method, amount: amountCharged }]);
+      return;
+    }
+
+    const asignado = payments.reduce(
+      (sum, payment, index) => sum + (index === 0 && payments.length === 1 ? amountCharged : payment.amount),
+      0,
+    );
+    const resto = Math.max(amountCharged - asignado, 0);
+
+    onChange([
+      ...payments.map((payment, index) =>
+        index === 0 && payments.length === 1
+          ? { ...payment, amount: amountCharged }
+          : payment,
+      ),
+      { method, amount: resto },
+    ]);
+  }
+
+  function setAmount(method: PaymentMethod, amount: Cop): void {
+    onChange(
+      payments.map((payment) => (payment.method === method ? { ...payment, amount } : payment)),
+    );
+  }
+
+  const asignado = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const falta = amountCharged - asignado;
+
   return (
     <fieldset style={{ margin: 0, padding: 0, border: 0, display: "grid", gap: "0.375rem" }}>
       <legend
@@ -708,15 +766,49 @@ function MetodoPago({
           <button
             key={m.method}
             type="button"
-            className={`ui-btn ${value === m.method ? "ui-btn--primary" : "ui-btn--secondary"}`}
-            aria-pressed={value === m.method}
+            className={`ui-btn ${selected.includes(m.method) ? "ui-btn--primary" : "ui-btn--secondary"}`}
+            aria-pressed={selected.includes(m.method)}
             disabled={disabled}
-            onClick={() => onChange(value === m.method ? null : m.method)}
+            onClick={() => toggle(m.method)}
           >
             {m.label}
           </button>
         ))}
       </div>
+
+      {dividido && (
+        <>
+          {payments.map((payment) => (
+            <MoneyInput
+              key={payment.method}
+              label={PAYMENT_METHODS.find((m) => m.method === payment.method)?.label ?? payment.method}
+              value={payment.amount === 0 ? null : payment.amount}
+              disabled={disabled}
+              max={9_999_999}
+              onValueChange={(pesos) => setAmount(payment.method, pesos ?? 0)}
+            />
+          ))}
+
+          {/*
+            La cifra que falta —o que sobra— se dice acá y no al guardar. El
+            servidor igual rechaza una cuenta que no cuadra, pero descubrirlo al
+            tocar "Guardar", con la clienta esperando, es tarde.
+          */}
+          <p
+            style={{
+              margin: 0,
+              fontSize: "var(--text-2xs)",
+              color: falta === 0 ? "var(--color-ink-soft)" : "var(--color-alerta)",
+            }}
+          >
+            {falta === 0
+              ? "Los dos montos suman lo cobrado."
+              : falta > 0
+                ? `Faltan ${formatPesos(falta)} por asignar.`
+                : `Sobran ${formatPesos(-falta)}: los montos suman más que la cuenta.`}
+          </p>
+        </>
+      )}
     </fieldset>
   );
 }

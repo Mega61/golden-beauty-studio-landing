@@ -27,6 +27,8 @@ export {
 
 export {
   DRAFT_VERSION,
+  DRAFT_VERSION_SINGLE_METHOD,
+  draftToPayments,
   NOTE_CHIPS,
   PAYMENT_METHODS,
   VARIANCE_REASONS,

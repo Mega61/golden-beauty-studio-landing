@@ -55,17 +55,29 @@ function cuenta(
   financeId: number,
   eaAppointmentId: number,
   amountCharged: number | null,
-  paymentMethod: DayAccount["paymentMethod"],
+  /**
+   * El método, o `null` para una cuenta cerrada sin cobrar. Con un monto se
+   * arma un pago único por todo lo cobrado; para una cuenta partida se pasa la
+   * lista completa.
+   */
+  payment: DayAccount["payments"][number]["method"] | DayAccount["payments"] | null,
   tip = 0,
   pushed = false,
 ): DayAccount {
+  const payments: DayAccount["payments"] =
+    payment === null
+      ? []
+      : typeof payment === "string"
+        ? [{ method: payment, amount: amountCharged ?? 0 }]
+        : payment;
+
   return {
     financeId,
     eaAppointmentId,
     amountCharged,
     tip,
-    paymentMethod,
-    paidOn: paymentMethod === null ? null : DIA,
+    payments,
+    paidOn: payments.length === 0 ? null : DIA,
     eaProviderId: 3,
     performedServiceId: 5,
     closedAt: new Date("2026-09-03T20:10:00Z"),

@@ -31,7 +31,7 @@
 
 import { allocateByWeights } from "./combo-allocation";
 
-import type { Cop, FinanceItemKind, VarianceReasonCode } from "@/db/types";
+import type { Cop, FinanceItemKind, PaymentMethod, VarianceReasonCode } from "@/db/types";
 
 /** Una cuenta mal armada. Es data inválida, no un error de red ni de base. */
 export class TicketError extends Error {
@@ -351,6 +351,82 @@ export function ticketFromEnteredTotal(
     varianceReasonCode: variance?.varianceReasonCode ?? null,
     varianceReason: variance?.varianceReason ?? null,
   });
+}
+
+// ── Pagos ───────────────────────────────────────────────────────────────────
+
+/**
+ * Una entrada de plata: con qué método, y cuánta.
+ *
+ * Espeja `appointment_payment` sin las columnas que pone la base. Una cuenta
+ * puede tener más de una: la clienta paga una parte en efectivo y transfiere el
+ * resto, que es un caso real del estudio.
+ */
+export type TicketPayment = {
+  method: PaymentMethod;
+  /** Entero de pesos, siempre > 0. */
+  amount: Cop;
+};
+
+/**
+ * La segunda invariante cruzada de la cuenta:
+ *
+ * > **`Σ payments.amount === amountCharged`**
+ *
+ * Vive acá y no en un `CHECK` porque cruza dos tablas y MySQL no lo puede
+ * expresar — la misma razón por la que `Σ line_total − discount ===
+ * amount_charged` tampoco está en el esquema.
+ *
+ * **La propina queda fuera, igual que en todo el resto del archivo.** Lo que la
+ * clienta entrega de la mano es `amountCharged + tip`, pero los totales por
+ * método del cierre diario miden ingreso del estudio, y meter la propina
+ * adentro inflaría el ingreso del mes con plata que es de la técnica. Que el
+ * efectivo del cajón incluya las propinas es cierto y es otro número; `tip` ya
+ * existe y se muestra aparte.
+ *
+ * Una lista **vacía es válida**: es una cuenta cerrada sin cobrar todavía, que
+ * es exactamente lo que la pantalla de Caja le reclama a recepción y lo que
+ * impide cerrar el día. Lo que no es válido es una lista que no sume.
+ */
+export function assertPaymentsCoverCharge(
+  payments: readonly TicketPayment[],
+  amountCharged: Cop,
+): void {
+  if (payments.length === 0) return;
+
+  const seen = new Set<PaymentMethod>();
+
+  for (const payment of payments) {
+    assertPesos(payment.amount, `El monto de un pago (${payment.method})`);
+
+    if (payment.amount <= 0) {
+      // Un pago de cero no es un pago y uno negativo es una devolución, que en
+      // la v1 no existe (§ Fuera de alcance). El CHECK de la base dice lo
+      // mismo; acá revienta antes, con el nombre del método adentro.
+      throw new TicketError(
+        `Un pago tiene que ser mayor que cero, y el de ${payment.method} llegó ${payment.amount}`,
+      );
+    }
+
+    if (seen.has(payment.method)) {
+      // Dos pagos del mismo método en una cuenta no son un caso real: son el
+      // mismo método dos veces, y sumarlos en silencio escondería un error de
+      // digitación (60.000 y 60.000 donde iban 60.000 y 40.000) que después
+      // aparece como un cierre de caja que no cuadra.
+      throw new TicketError(`La cuenta tiene dos pagos en ${payment.method}. Únelos en uno.`);
+    }
+
+    seen.add(payment.method);
+  }
+
+  const total = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+  if (total !== amountCharged) {
+    throw new TicketError(
+      `Los pagos suman ${total} y la cuenta cobra ${amountCharged}. ` +
+        "La diferencia no se guarda: o sobra plata o falta.",
+    );
+  }
 }
 
 /** Lo que la técnica manda al tocar "Guardar". */

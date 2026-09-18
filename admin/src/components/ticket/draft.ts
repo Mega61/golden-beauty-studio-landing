@@ -30,13 +30,24 @@ import {
   computeTicketTotals,
   validateTicketClose,
   type TicketItemInput,
+  type TicketPayment,
   type TicketTotals,
 } from "@/lib/ticket";
 import type { Cop, PaymentMethod, VarianceReasonCode } from "@/db/types";
 import { findService, type TicketCatalog } from "./catalog";
 
 /** Sube cuando la forma guardada deja de ser legible por el código nuevo. */
-export const DRAFT_VERSION = 1;
+export const DRAFT_VERSION = 2;
+
+/**
+ * La versión anterior, que guardaba **un** método de pago por cuenta.
+ *
+ * Se lee todavía, y no por nostalgia: hay borradores con esa forma en el
+ * `localStorage` de los celulares del equipo. Descartarlos al subir la versión
+ * —que es lo que hacía el parser— le borraría a la técnica lo que dejó escrito
+ * entre dos clientas. La conversión vive en `draft-store.ts`.
+ */
+export const DRAFT_VERSION_SINGLE_METHOD = 1;
 
 /**
  * Lo que la técnica lleva escrito de una cuenta.
@@ -60,7 +71,15 @@ export type TicketDraft = {
   varianceReason: string;
   /** **No viajan a las notas de la cita en EA.** Ver `actions.ts`. */
   notes: string;
-  paymentMethod: PaymentMethod | null;
+  /**
+   * Cómo se cobró. Vacío = todavía no se cobró.
+   *
+   * Con **un** pago el monto que se guarde acá no se lee: lo pone
+   * `draftToPayments()` con todo lo cobrado, porque "efectivo" significa
+   * "efectivo, todo". Solo cuando hay dos el monto es un dato que alguien
+   * escribió y que hay que respetar.
+   */
+  payments: readonly TicketPayment[];
   tip: Cop;
   /** Epoch ms de la última tecla. Sirve para ordenar y para depurar. */
   updatedAt: number;
@@ -96,7 +115,7 @@ export function emptyDraft(
     varianceReasonCode: null,
     varianceReason: "",
     notes: "",
-    paymentMethod: null,
+    payments: [],
     tip: 0,
     updatedAt: now,
   };
@@ -122,7 +141,7 @@ export function draftFromFinance(
     discount: Cop;
     tip: Cop;
     amountCharged: Cop | null;
-    paymentMethod: PaymentMethod | null;
+    payments: readonly TicketPayment[];
     serviceNotes: string;
     varianceReasonCode: VarianceReasonCode | null;
     varianceReason: string;
@@ -162,10 +181,35 @@ export function draftFromFinance(
     varianceReasonCode: finance.varianceReasonCode,
     varianceReason: finance.varianceReason,
     notes: finance.serviceNotes,
-    paymentMethod: finance.paymentMethod,
+    payments: finance.payments,
     tip: finance.tip,
     updatedAt: now,
   };
+}
+
+/**
+ * Los pagos que se mandan al servidor, a partir del borrador y del total.
+ *
+ * **Con un solo método el monto no se le pide a nadie**: es todo lo cobrado, y
+ * pedirlo sería una casilla más para equivocarse en el 95 % de las cuentas.
+ * Con dos, cada monto es un dato escrito y se manda tal cual — el servidor
+ * verifica que sumen, y si no suman rechaza.
+ *
+ * Que el monto del pago único se derive acá y no se guarde en el borrador es
+ * también lo que deja migrar los borradores de la versión 1 sin conocer el
+ * total: ese campo no se lee.
+ */
+export function draftToPayments(
+  draft: TicketDraft,
+  amountCharged: Cop,
+): TicketPayment[] {
+  if (draft.payments.length === 0) return [];
+
+  if (draft.payments.length === 1) {
+    return [{ method: draft.payments[0].method, amount: amountCharged }];
+  }
+
+  return draft.payments.map((payment) => ({ ...payment }));
 }
 
 /** ¿Hay algo escrito que se pueda perder? Decide si el panel se cierra al tocar afuera. */
@@ -178,7 +222,7 @@ export function isDirty(draft: TicketDraft, baseline: TicketDraft): boolean {
     draft.varianceReasonCode !== baseline.varianceReasonCode ||
     draft.varianceReason !== baseline.varianceReason ||
     draft.notes !== baseline.notes ||
-    draft.paymentMethod !== baseline.paymentMethod ||
+    JSON.stringify(draft.payments) !== JSON.stringify(baseline.payments) ||
     draft.tip !== baseline.tip
   );
 }

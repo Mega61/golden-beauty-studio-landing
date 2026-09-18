@@ -111,7 +111,14 @@ export type FinanceRow = {
   /** `null` = la cuenta no está cerrada. **No es cero.** */
   amountCharged: Cop | null;
   tip: Cop;
-  paymentMethod: PaymentMethod | null;
+  /**
+   * Con qué método —o métodos— entró la plata. Vacío = la cuenta no se cobró.
+   *
+   * Es una lista porque una cuenta se puede partir entre efectivo y
+   * transferencia. El total por método suma **pago por pago**, no la cuenta
+   * entera al método "principal": no existe tal cosa.
+   */
+  payments: readonly { method: PaymentMethod; amount: Cop }[];
   varianceReasonCode: VarianceReasonCode | null;
   closed: boolean;
   items: FinanceItemRow[];
@@ -225,11 +232,24 @@ export function dailyClose(
   const tips = closed.reduce((total, row) => total + row.tip, 0);
 
   const byMethod = PAYMENT_METHODS.map((method) => {
-    const rows = closed.filter((row) => row.paymentMethod === method);
+    // Se suma pago por pago y se cuentan **cuentas**, no pagos: "3 cuentas en
+    // efectivo" es lo que alguien compara contra el cajón. Una cuenta partida
+    // aporta su parte a cada método y cuenta una vez en cada uno — que es lo
+    // honesto: esa cuenta sí tocó los dos.
+    const rows = closed.filter((row) =>
+      row.payments.some((payment) => payment.method === method),
+    );
     return {
       method,
       label: PAYMENT_LABEL[method],
-      amount: rows.reduce((total, row) => total + (chargedOf(row) ?? 0), 0),
+      amount: rows.reduce(
+        (total, row) =>
+          total +
+          row.payments
+            .filter((payment) => payment.method === method)
+            .reduce((sum, payment) => sum + payment.amount, 0),
+        0,
+      ),
       count: rows.length,
     };
   });
@@ -248,7 +268,7 @@ export function dailyClose(
     })
     .sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name, "es"));
 
-  const withoutMethod = closed.filter((row) => row.paymentMethod === null).length;
+  const withoutMethod = closed.filter((row) => row.payments.length === 0).length;
 
   const blockers: string[] = [];
   if (pending.length > 0) {

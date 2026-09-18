@@ -112,6 +112,27 @@ export function niceTicks(max: number, count = 4): number[] {
 }
 
 /** El tope del eje: la última marca. Es lo que hay que pasarle a `linearScale`. */
+export type AxisTick = { value: number; label: string };
+
+/**
+ * Las marcas de eje de un reporte, ya formateadas.
+ *
+ * **Vive acá y no en `Charts.tsx` porque la llama el servidor.** Estuvo del
+ * otro lado —en un módulo `"use client"`— y el síntoma no fue un error de
+ * compilación sino un 500 en `/reportes` en tiempo de ejecución: "Attempted to
+ * call axisTicks() from the server". Una función pura exportada desde un módulo
+ * cliente no se puede invocar desde un componente de servidor, aunque no toque
+ * ningún hook. Su propio comentario decía "ya formateadas en el servidor", así
+ * que el archivo era el equivocado desde el principio.
+ */
+export function axisTicks(
+  max: number,
+  format: (value: number) => string,
+  count = 4,
+): AxisTick[] {
+  return niceTicks(max, count).map((value) => ({ value, label: format(value) }));
+}
+
 export function axisMax(max: number, count = 4): number {
   const ticks = niceTicks(max, count);
   return ticks[ticks.length - 1] ?? 0;

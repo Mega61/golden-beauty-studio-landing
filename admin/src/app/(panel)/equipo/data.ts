@@ -6,6 +6,7 @@ import type { AllowedUser } from "@/db/types";
 import {
   EA_TIME_ZONE,
   EaApiError,
+  providerWorkingPlanExceptions,
   type Provider,
   type Service,
   type WorkingPlanException,
@@ -229,16 +230,13 @@ export async function loadMemberDetail(
   let exceptions: WorkingPlanException[] = [];
   try {
     const ea = createEaClient();
-    // **Las excepciones se piden por su propio recurso, no se leen del blob de
-    // `settings`.** EA las guarda dentro de `user_settings` como JSON y su
-    // forma exacta no está garantizada; `GET /working_plan_exceptions` sí
-    // tiene codec tipado en A1. El recurso no acepta filtro por profesional,
-    // así que se traen todas y se filtra acá: son unas pocas filas.
-    [provider, services, exceptions] = await Promise.all([
-      ea.providers.get(providerId),
-      ea.services.list(),
-      ea.workingPlanExceptions.list(),
-    ]);
+    // **Las excepciones se leen de la técnica, porque no hay otra puerta.** El
+    // plan las pedía por su propio recurso — `GET /working_plan_exceptions`,
+    // que el `openapi.yml` documenta — pero EA nunca registra esa ruta y
+    // responde 404. Venían acá dentro todo el tiempo, y se decodifican con el
+    // mismo codec tipado de A1: `providerWorkingPlanExceptions()`.
+    [provider, services] = await Promise.all([ea.providers.get(providerId), ea.services.list()]);
+    exceptions = providerWorkingPlanExceptions(provider);
   } catch (error) {
     if (error instanceof EaApiError && error.kind === "not_found") return null;
     throw error;
@@ -264,10 +262,8 @@ export async function loadMemberDetail(
       account,
     },
     plan: buildWeekPlan(provider.settings?.workingPlan ?? null),
-    exceptions: upcomingExceptions(
-      exceptions.filter((exception) => exception.providerId === providerId),
-      todayInStudio(),
-    ),
+    // Ya son solo las de esta técnica: salieron de su propio registro.
+    exceptions: upcomingExceptions(exceptions, todayInStudio()),
     eaPublicUrl: eaPublicUrl(),
   };
 }
