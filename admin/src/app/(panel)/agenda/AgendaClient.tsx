@@ -126,7 +126,17 @@ export function AgendaClient({
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const response = await fetch(`datos?dias=${dateKey}`, {
+        // **Absoluta, no relativa.** `fetch("datos?…")` desde `/admin/agenda`
+        // —sin barra final— resuelve contra `/admin/`, no contra
+        // `/admin/agenda/`: pedía `/admin/datos`, que no existe. El fallo era
+        // invisible porque el `catch` de abajo se traga los errores de red a
+        // propósito, así que la agenda simplemente no se actualizaba nunca:
+        // una cita recién creada no aparecía hasta recargar a mano, y el
+        // sondeo de 30 s tampoco traía nada.
+        //
+        // `basePath` va explícito porque `fetch` no lo agrega —solo lo hacen
+        // `<Link>` y el router— y la app entera vive bajo `/admin`.
+        const response = await fetch(`/admin/agenda/datos?dias=${dateKey}`, {
           signal,
           cache: "no-store",
         });
