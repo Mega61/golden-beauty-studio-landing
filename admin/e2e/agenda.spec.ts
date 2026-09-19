@@ -124,8 +124,22 @@ test.describe("crear una cita", () => {
       .poll(contarCitasEnEa, { timeout: 15_000, message: "EA no recibió ninguna cita" })
       .toBe(antes + 1);
 
-    // Y además quedó dibujada, que es donde alguien la busca.
-    await expect(panel.locator(`:text("${marca}"):visible`).first()).toBeVisible();
+    // Y además quedó dibujada.
+    //
+    // Se busca por el **nombre accesible**, no por el texto visible: el bloque
+    // de la grilla solo pinta la hora —el espacio da para eso— y el resto
+    // viaja en su `aria-label` ("8 – 8:30 a. m. · Ana Ríos · Forrado ·
+    // Reservada"). Buscar texto visible daba rojo con la cita perfectamente
+    // dibujada, que es un test mintiendo sobre la pantalla.
+    // **Sin recargar.** La cita tiene que aparecer sola: la agenda se refresca
+    // al guardar y sondea cada 30 s. Este test tuvo un `reload()` durante un
+    // rato y con él pasaba en verde escondiendo el bug real — el refresco
+    // pedía `/admin/datos` en vez de `/admin/agenda/datos`, así que la agenda
+    // no se actualizaba nunca y había que recargar a mano.
+    await expect(
+      panel.locator(`[aria-label*="${marca}"]`).first(),
+      "la cita no aparece en la grilla",
+    ).toBeVisible({ timeout: 15_000 });
   });
 });
 

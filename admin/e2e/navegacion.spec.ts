@@ -76,14 +76,21 @@ test.describe("el catálogo de destinos", () => {
 });
 
 test.describe("la sesión", () => {
-  test("sin sesión, cualquier pantalla manda a entrar", async ({ page }) => {
+  test.describe("sin entrar", () => {
+    // Explícitamente **sin** la sesión que el proyecto `setup` dejó: este es el
+    // único bloque que necesita un navegador anónimo, y sin esta línea heredaba
+    // la cookie de los demás y comprobaba lo contrario de lo que dice.
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("cualquier pantalla manda a entrar", async ({ page }) => {
     // Esconder un enlace no es un permiso. La compuerta es el DAL, y esto lo
     // comprueba pidiendo la URL a mano, que es lo que haría alguien.
-    for (const { ruta } of PANTALLAS) {
-      const r = await page.request.get(ruta, { maxRedirects: 0 });
-      expect([302, 307], `${ruta} no redirigió: ${r.status()}`).toContain(r.status());
-      expect(r.headers()["location"]).toContain("/entrar");
-    }
+      for (const { ruta } of PANTALLAS) {
+        const r = await page.request.get(ruta, { maxRedirects: 0 });
+        expect([302, 307], `${ruta} no redirigió: ${r.status()}`).toContain(r.status());
+        expect(r.headers()["location"]).toContain("/entrar");
+      }
+    });
   });
 
   test("la raíz del panel lleva a Hoy y no a un 404", async ({ panel }) => {

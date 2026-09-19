@@ -661,6 +661,31 @@ que ese día sea encender algo y no escribirlo bajo presión.
 
 ---
 
+## Preparar EA para el corte — el correo opcional
+
+**Un ajuste, y sin él el alta de clientas está rota.**
+
+`require_email` viene en **1** en una instalación nueva de Easy!Appointments, y con eso su API
+**rechaza con un 500 cualquier clienta sin correo**. El estudio trabaja al revés: la mayoría de
+las clientas no tiene correo, y el panel se niega a inventar uno — un correo falso viaja como
+invitado del evento de Google, rebota, y ensucia la ficha para siempre.
+
+El síntoma, si nadie lo mira, es que recepción no puede dar de alta a nadie y el panel dice *"la
+agenda no respondió"*, que es un mensaje que invita a reintentar algo que no se va a arreglar.
+
+Se comprueba y se corrige desde la interfaz de EA (**Ajustes → Reservas**, "Correo obligatorio"),
+o por SQL:
+
+```sql
+SELECT value FROM ea_settings WHERE name = 'require_email';   -- tiene que dar 0
+UPDATE ea_settings SET value = '0' WHERE name = 'require_email';
+```
+
+La suite E2E corre con este ajuste en 0 justamente para probar la configuración real del estudio
+(`admin/scripts/ci-prepare-ea.sh`).
+
+---
+
 ## Preparar EA para el corte — la lista de estados
 
 **Antes de que exista una sola cita real.** EA guarda el estado de cada cita como

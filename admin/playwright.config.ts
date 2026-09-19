@@ -25,6 +25,9 @@ import { defineConfig, devices } from "@playwright/test";
  * dejan de ser estables. El estudio tiene tres personas y la suite tarda menos
  * de un minuto: no hay nada que ganar corriéndola en paralelo.
  */
+/** La sesión que deja el proyecto `setup`. Es una cookie: no se commitea. */
+const ESTADO = "e2e/.auth/panel.json";
+
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
@@ -55,15 +58,35 @@ export default defineConfig({
 
   projects: [
     {
+      /**
+       * Entra una vez y deja la sesión guardada para los demás.
+       *
+       * No es una optimización: `/sign-in/totp` tiene un tope de 10 intentos
+       * por minuto —para que nadie recorra la grilla de códigos— y un login
+       * por test lo revienta con un `429` a mitad de suite. En desarrollo no
+       * se nota porque Better Auth no aplica el límite ahí, que es justo la
+       * diferencia que hace inútil el "en mi máquina pasa".
+       */
+      name: "setup",
+      testMatch: /auth\.setup\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
       name: "escritorio",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+        storageState: ESTADO,
+      },
     },
     {
       // El panel se usa de pie, con el celular en la mano, y la barra lateral
       // desaparece por debajo de 768 px: la navegación móvil es otro árbol de
       // componentes y merece su propia corrida.
       name: "movil",
-      use: { ...devices["Pixel 7"] },
+      dependencies: ["setup"],
+      use: { ...devices["Pixel 7"], storageState: ESTADO },
       testMatch: /(navegacion|hoy)\.spec\.ts/,
     },
   ],

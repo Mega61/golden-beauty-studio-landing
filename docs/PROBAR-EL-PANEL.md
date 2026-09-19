@@ -224,6 +224,40 @@ npm run e2e:ui                          # modo interactivo
 npx playwright show-trace test-results/<carpeta>/trace.zip   # autopsia de un fallo
 ```
 
+### Reproducir CI en tu máquina
+
+CI no usa tu entorno: levanta **el suyo**, efímero, en puertos altos, y corre al lado del tuyo
+sin tocarlo. Lo mismo se puede hacer local, y es lo primero que conviene intentar cuando CI se
+pone rojo y en tu máquina pasa:
+
+```bash
+cd admin
+npm run e2e:up     # levanta MySQL + EA, instala EA, migra — un par de minutos
+npm run build      # el panel en modo producción, que es contra lo que corre CI
+(cd .next/standalone && PORT=13001 node --env-file=../../.env.ci.local server.js &)
+npm run e2e:ci
+npm run e2e:down   # se lleva todo, incluidos los volúmenes
+```
+
+**Modo producción y no `npm run dev`, y no es un detalle:** el límite de 10 intentos de login
+por minuto **solo se aplica fuera de desarrollo**. La suite lo descubrió con un `429` a mitad
+de corrida que en dev no aparecía nunca — la versión exacta de "en mi máquina pasa".
+
+### Una configuración de EA de la que depende todo
+
+`require_email` tiene que estar en **0** en Easy!Appointments.
+
+Viene en **1** en una instalación nueva, y con eso su API **rechaza con un 500 cualquier
+clienta sin correo**. El estudio trabaja al revés: la mayoría no tiene correo, y el panel se
+niega a inventar uno — un correo falso viaja como invitado del evento de Google, rebota, y
+ensucia la ficha para siempre.
+
+Se comprueba así, y está en el runbook de `docs/DEPLOY.md`:
+
+```sql
+SELECT value FROM ea_settings WHERE name = 'require_email';   -- tiene que dar 0
+```
+
 Los de integración contra MySQL **se saltan solos** si Docker no está: no fallan, dicen que se
 saltaron. Con el stack arriba corren contra una base efímera de verdad.
 

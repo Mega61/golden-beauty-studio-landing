@@ -3,6 +3,8 @@ node_modules/
 next-env.d.ts
 *.tsbuildinfo
 .env*.local
+# Lo escribe scripts/ci-env.sh; no lleva secretos pero es generado.
+.env.ci.local
 coverage/
 
 # Playwright: trazas, capturas y reporte de la última corrida.

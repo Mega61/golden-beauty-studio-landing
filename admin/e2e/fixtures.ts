@@ -35,6 +35,17 @@ import { test as base, expect, type Page } from "@playwright/test";
 export const E2E_EMAIL = "e2e@goldenbeautystudio.com.co";
 
 /**
+ * Contra qué entorno corre.
+ *
+ * Por defecto el de desarrollo de quien está en su máquina; en CI apuntan al
+ * stack efímero. Están acá y no repartidos por los archivos porque son lo
+ * único que cambia entre los dos entornos — el resto de la suite no sabe ni
+ * tiene por qué saber dónde está corriendo.
+ */
+export const ENV_FILE = process.env.E2E_ENV_FILE ?? ".env.local";
+export const MYSQL_CONTAINER = process.env.E2E_MYSQL_CONTAINER ?? "gbs-dev-mysql";
+
+/**
  * Siembra la cuenta y devuelve un código TOTP válido ahora mismo.
  *
  * Reusa `dev:seed`, el mismo camino documentado para entrar a mano. No inventa
@@ -44,7 +55,7 @@ export const E2E_EMAIL = "e2e@goldenbeautystudio.com.co";
 function seedAccount(): { userId: string; code: string } {
   const out = execFileSync(
     "node",
-    ["--env-file=.env.local", ".next/dev-seed.js", `--email=${E2E_EMAIL}`, "--rol=owner", "--nombre=E2E"],
+    [`--env-file=${ENV_FILE}`, ".next/dev-seed.js", `--email=${E2E_EMAIL}`, "--rol=owner", "--nombre=E2E"],
     { encoding: "utf8" },
   );
 
@@ -63,7 +74,7 @@ function seedAccount(): { userId: string; code: string } {
 export function queryOne(sql: string): string | null {
   const out = execFileSync(
     "docker",
-    ["exec", "gbs-dev-mysql", "mysql", "-uroot", "-psecret", "-N", "-B", "gbs_admin", "-e", sql],
+    ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "-N", "-B", "gbs_admin", "-e", sql],
     { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
   ).trim();
   return out === "" ? null : out.split("\n")[0];
@@ -89,10 +100,18 @@ export async function signIn(page: Page): Promise<void> {
   }
 }
 
+/**
+ * Una página ya autenticada.
+ *
+ * La sesión **no se crea acá**: viene del `storageState` que dejó el proyecto
+ * `setup`. Entrar en cada test reventaba el tope de 10 logins por minuto de
+ * `/sign-in/totp` con un `429` a mitad de suite.
+ *
+ * La fixture se queda igual para que los tests no cambien: piden `panel` y
+ * reciben una página adentro, sin saber cómo llegó la cookie.
+ */
 export const test = base.extend<{ panel: Page }>({
-  /** Una página ya autenticada. Es lo que usa casi todo. */
   panel: async ({ page }, use) => {
-    await signIn(page);
     await use(page);
   },
 });
@@ -116,7 +135,7 @@ export { expect };
 export function contarCitasEnEa(): number {
   const n = execFileSync(
     "docker",
-    ["exec", "gbs-dev-mysql", "mysql", "-uroot", "-psecret", "-N", "-B", "easyappointments",
+    ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "-N", "-B", "easyappointments",
      "-e", "SELECT COUNT(*) FROM ea_appointments WHERE is_unavailability=0"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
   ).trim();
@@ -161,7 +180,7 @@ export function limpiarDatosDePrueba(): void {
   for (const q of sql) {
     execFileSync(
       "docker",
-      ["exec", "gbs-dev-mysql", "mysql", "-uroot", "-psecret", "easyappointments", "-e", q],
+      ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "easyappointments", "-e", q],
       { stdio: ["ignore", "ignore", "ignore"] },
     );
   }

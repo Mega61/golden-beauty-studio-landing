@@ -1,0 +1,161 @@
+# La suite de punta a punta del panel, contra un entorno real y efímero.
+#
+# ── Por qué existe, además de los 1.870 unitarios ───────────────────────────
+#
+# Porque los 1.870 pasaban con tres defectos adentro: cinco pantallas sin barra
+# de navegación, un destino del menú apuntando a una ruta que nunca se creó, y
+# el alta de clienta fallando contra la API de EA por un campo obligatorio.
+# Ninguno de esos tests abre el panel. Las funciones puras estaban bien; lo
+# roto era el pegamento, y el pegamento solo se ve cargando la página.
+#
+# Construyendo esta suite apareció un cuarto: la agenda pedía `/admin/datos` en
+# vez de `/admin/agenda/datos` —un `fetch` relativo resuelto contra el
+# directorio equivocado— así que una cita recién creada no aparecía hasta
+# recargar a mano.
+#
+# ── Sin dobles ──────────────────────────────────────────────────────────────
+#
+# MySQL y Easy!Appointments de verdad, en contenedores que nacen y mueren con
+# la corrida. Un doble de EA habría aceptado feliz el payload sin apellido que
+# EA rechaza con un 500, que es justo el bug que se escapó.
+#
+# ── Por qué es un workflow aparte y no un paso de `admin-image.yml` ─────────
+#
+# Porque tardan cosas distintas y fallan por motivos distintos. El de la imagen
+# es la compuerta del **despliegue**: si se pone rojo, no hay imagen. Éste es la
+# compuerta de la **revisión**: corre en los PR, donde todavía se puede
+# arreglar barato. Meterlos juntos haría que un E2E inestable bloqueara un
+# despliegue urgente, y ésa es la presión que termina en `--no-verify`.
+
+name: admin e2e
+
+on:
+  pull_request:
+    paths:
+      - "admin/**"
+      - "deploy/compose/ci-stack.yml"
+      - "deploy/compose/dev-init/**"
+      - ".github/workflows/admin-e2e.yml"
+  push:
+    branches: [master]
+    paths:
+      - "admin/**"
+      - "deploy/compose/ci-stack.yml"
+      - "deploy/compose/dev-init/**"
+      - ".github/workflows/admin-e2e.yml"
+  workflow_dispatch:
+
+# Un PR que recibe tres pushes seguidos no necesita tres corridas completas:
+# la última es la que cuenta. Al revés que en `admin-image.yml`, donde cancelar
+# dejaría una imagen publicada sin su digest en el repo.
+concurrency:
+  group: admin-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: admin
+
+    env:
+      # Los mismos puertos que usa el stack local, para que un fallo de CI se
+      # reproduzca con los comandos tal cual salen del log.
+      CI_EA_PORT: "18080"
+      CI_MYSQL_PORT: "33307"
+      CI_PANEL_PORT: "13001"
+      # No es un secreto: el entorno entero se crea y se destruye en esta
+      # corrida. Meterlo en `secrets` enseñaría a tratar los de verdad igual.
+      EA_CI_TOKEN: "ci-token-no-secreto-para-pruebas-0000"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      # ── El entorno ────────────────────────────────────────────────────────
+      - name: Levantar MySQL y Easy!Appointments
+        working-directory: .
+        run: docker compose -p gbs-ci -f deploy/compose/ci-stack.yml up -d --wait
+
+      - name: Preparar EA (instalar, token, jornada)
+        run: ./scripts/ci-prepare-ea.sh gbs-ci ../deploy/compose/ci-stack.yml
+
+      - name: Escribir el entorno del panel
+        run: ./scripts/ci-env.sh
+
+      - name: Migrar gbs_admin
+        run: |
+          npm run build:migrator
+          node --env-file=.env.ci.local .next/standalone/scripts/migrate.js
+
+      # ── El panel ──────────────────────────────────────────────────────────
+      # En **modo producción**, no `next dev`. Es lo que se despliega, y la
+      # diferencia no es cosmética: el límite de intentos del login solo se
+      # aplica fuera de desarrollo, y la suite lo descubrió con un 429 a mitad
+      # de corrida.
+      - name: Construir el panel
+        run: npm run build
+
+      - name: Arrancar el panel
+        run: |
+          # `standalone` no copia `public/` ni `.next/static`: hay que ponerlos
+          # a mano, igual que hace el Dockerfile. Sin esto la página carga sin
+          # CSS y media suite falla por elementos "no visibles".
+          cp -r public .next/standalone/ 2>/dev/null || true
+          cp -r .next/static .next/standalone/.next/
+          cd .next/standalone
+          PORT=$CI_PANEL_PORT HOSTNAME=127.0.0.1 \
+            node --env-file=../../.env.ci.local server.js > /tmp/panel.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf "http://localhost:${CI_PANEL_PORT}/admin/api/health" >/dev/null && exit 0
+            sleep 2
+          done
+          echo "el panel no respondió"; cat /tmp/panel.log; exit 1
+
+      # ── La suite ──────────────────────────────────────────────────────────
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Correr los E2E
+        run: npx playwright test
+        env:
+          E2E_BASE_URL: http://localhost:13001
+          E2E_ENV_FILE: .env.ci.local
+          E2E_MYSQL_CONTAINER: gbs-ci-mysql-1
+
+      # ── Cuando falla ──────────────────────────────────────────────────────
+      # El reporte y las trazas son la diferencia entre "falló el test 12" y
+      # poder ver la pantalla en el instante del fallo. `if: failure()` porque
+      # en verde no los mira nadie y pesan.
+      - name: Guardar el reporte
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            admin/playwright-report/
+            admin/test-results/
+          retention-days: 7
+
+      - name: Logs del panel y de EA
+        if: failure()
+        working-directory: .
+        run: |
+          echo "── panel ──"; tail -100 /tmp/panel.log || true
+          echo "── easyappointments ──"
+          docker compose -p gbs-ci -f deploy/compose/ci-stack.yml logs --tail 100 easyappointments || true
+
+      - name: Bajar el entorno
+        if: always()
+        working-directory: .
+        run: docker compose -p gbs-ci -f deploy/compose/ci-stack.yml down -v

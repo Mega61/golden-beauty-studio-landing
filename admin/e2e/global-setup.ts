@@ -13,6 +13,8 @@ import { existsSync } from "node:fs";
  */
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3001";
+const ENV_FILE = process.env.E2E_ENV_FILE ?? ".env.local";
+const MYSQL = process.env.E2E_MYSQL_CONTAINER ?? "gbs-dev-mysql";
 
 function fail(titulo: string, comoArreglar: string): never {
   throw new Error(`\n✗ ${titulo}\n\n  ${comoArreglar}\n`);
@@ -35,16 +37,16 @@ export default async function globalSetup(): Promise<void> {
   }
 
   // 2. `.env.local`, sin el cual no hay ni base ni EA.
-  if (!existsSync(".env.local")) {
+  if (!existsSync(ENV_FILE)) {
     fail(
-      "Falta admin/.env.local.",
+      `Falta admin/${ENV_FILE}.`,
       "Está documentado en docs/PROBAR-EL-PANEL.md § 3.",
     );
   }
 
   // 3. MySQL del stack de desarrollo.
   try {
-    execFileSync("docker", ["exec", "gbs-dev-mysql", "mysqladmin", "ping", "-psecret"], {
+    execFileSync("docker", ["exec", MYSQL, "mysqladmin", "ping", "-psecret"], {
       stdio: "ignore",
     });
   } catch {
@@ -58,7 +60,7 @@ export default async function globalSetup(): Promise<void> {
   //    de un test, y encontrarlo desde ahí cuesta una hora.
   const tablas = execFileSync(
     "docker",
-    ["exec", "gbs-dev-mysql", "mysql", "-uroot", "-psecret", "-N", "-B", "-e",
+    ["exec", MYSQL, "mysql", "-uroot", "-psecret", "-N", "-B", "-e",
      "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='gbs_admin' AND table_name IN ('appointment_payment','wa_message')"],
     { encoding: "utf8" },
   ).trim();
@@ -66,7 +68,7 @@ export default async function globalSetup(): Promise<void> {
   if (tablas !== "2") {
     fail(
       "A la base le faltan migraciones.",
-      "npm run build:migrator && node --env-file=.env.local .next/standalone/scripts/migrate.js",
+      `npm run build:migrator && node --env-file=${ENV_FILE} .next/standalone/scripts/migrate.js`,
     );
   }
 
@@ -87,13 +89,13 @@ export default async function globalSetup(): Promise<void> {
   //    entran en solo lectura, así que media suite fallaría por "no encuentro
   //    el botón" cuando lo que pasa es que EA está apagada.
   const eaUrl = /EA_API_URL="?([^"\n]+)"?/.exec(
-    execFileSync("cat", [".env.local"], { encoding: "utf8" }),
+    execFileSync("cat", [ENV_FILE], { encoding: "utf8" }),
   )?.[1];
 
-  if (!eaUrl) fail("No hay EA_API_URL en .env.local.", "Ver docs/PROBAR-EL-PANEL.md § 3.");
+  if (!eaUrl) fail(`No hay EA_API_URL en ${ENV_FILE}.`, "Ver docs/PROBAR-EL-PANEL.md § 3.");
 
   const token = /EA_API_TOKEN="?([^"\n]+)"?/.exec(
-    execFileSync("cat", [".env.local"], { encoding: "utf8" }),
+    execFileSync("cat", [ENV_FILE], { encoding: "utf8" }),
   )?.[1];
 
   try {
