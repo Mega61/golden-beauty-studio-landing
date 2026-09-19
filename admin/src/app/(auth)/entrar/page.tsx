@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Logotipo } from "@/components/shell/Wordmark";
 
 import { Button } from "@/components/ui";
 import { listTotpLoginCandidates, type TotpLoginCandidate } from "@/lib/auth";
@@ -74,13 +75,8 @@ export default async function EntrarPage({
       className="ui-card"
       style={{ display: "grid", gap: "1.5rem", padding: "1.75rem 1.5rem" }}
     >
-      <header style={{ display: "grid", gap: "0.25rem" }}>
-        <span
-          className="ui-wordmark"
-          style={{ fontSize: "1.625rem", display: "block" }}
-        >
-          Golden Beauty
-        </span>
+      <header style={{ display: "grid", gap: "0.6rem" }}>
+        <Logotipo />
         <p style={{ color: "var(--color-ink-soft)", fontSize: "var(--text-sm)" }}>
           Panel del estudio
         </p>

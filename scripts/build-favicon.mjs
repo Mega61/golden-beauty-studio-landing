@@ -4,6 +4,8 @@
 // the Open Graph image consume:
 //
 //   src/app/icon.png              → 256×256  (browser tab favicon, downscaled)
+//   admin/src/app/icon.png        → 256×256  (la pestaña del panel: el MISMO sello)
+//   admin/src/app/apple-icon.png  → 180×180
 //   src/app/apple-icon.png        → 180×180  (iOS home screen)
 //   public/icons/icon-192.png     → 192×192  (PWA manifest / Android)
 //   public/icons/icon-512.png     → 512×512  (PWA manifest / splash)
@@ -23,6 +25,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
 const APP_DIR = path.join(ROOT, "src", "app");
+const ADMIN_APP_DIR = path.join(ROOT, "admin", "src", "app");
 const ICONS_DIR = path.join(PUBLIC, "icons");
 const OG_DIR = path.join(PUBLIC, "og");
 
@@ -104,6 +107,15 @@ async function main() {
       { out: path.join(APP_DIR, "apple-icon.png"), size: 180, bg: TRANSPARENT },
       { out: path.join(ICONS_DIR, "icon-192.png"), size: 192, bg: TRANSPARENT },
       { out: path.join(ICONS_DIR, "icon-512.png"), size: 512, bg: TRANSPARENT },
+      // El panel usa **el mismo sello**, no uno propio. Tuvo un monograma
+      // dibujado a mano durante un tiempo y el resultado era que la pestaña
+      // del panel y la de la landing parecían de dos negocios distintos.
+      //
+      // Se genera desde acá y se commitea, en vez de generarse en el build de
+      // `admin/`: el contexto de esa imagen es `admin/` y no alcanza ni las
+      // fuentes de la marca ni `sharp`. Un solo origen, dos destinos.
+      { out: path.join(ADMIN_APP_DIR, "icon.png"), size: 256, bg: TRANSPARENT },
+      { out: path.join(ADMIN_APP_DIR, "apple-icon.png"), size: 180, bg: TRANSPARENT },
     ];
     for (const { out, size, bg } of squares) {
       if (!(await needsRebuild(ROUND_SVG, out))) {
