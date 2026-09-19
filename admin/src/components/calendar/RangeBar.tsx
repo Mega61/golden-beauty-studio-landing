@@ -69,10 +69,25 @@ export function RangeBar({
         Hoy
       </Button>
 
+      {/*
+        La fecha, larga o corta según quepa. Dos nodos y no un `matchMedia`:
+        el ancho lo decide CSS sin esperar a que hidrate, y sin arriesgar que
+        el servidor pinte una y el navegador la otra.
+
+        A 390 px la larga se truncaba a "Viernes 18 de se…", que es peor que
+        la corta entera: quien mira la agenda necesita el día, no el adjetivo.
+      */}
       <span className={styles.barDate}>
-        {first === last
-          ? capitalize(formatDateLong(`${first} 00:00:00`))
-          : `${capitalize(formatDateLong(`${first} 00:00:00`))} – ${formatDateShort(`${last} 00:00:00`)}`}
+        <span className={styles.barDateLong}>
+          {first === last
+            ? capitalize(formatDateLong(`${first} 00:00:00`))
+            : `${capitalize(formatDateLong(`${first} 00:00:00`))} – ${formatDateShort(`${last} 00:00:00`)}`}
+        </span>
+        <span className={styles.barDateShort}>
+          {first === last
+            ? capitalize(formatDateShort(`${first} 00:00:00`))
+            : `${capitalize(formatDateShort(`${first} 00:00:00`))} – ${formatDateShort(`${last} 00:00:00`)}`}
+        </span>
       </span>
 
       <div className={styles.modes} role="radiogroup" aria-label="Rango de la agenda">

@@ -118,7 +118,7 @@ function clientColumns(): Array<Column<ResolvedClient>> {
       width: "34%",
       text: (row) => row.name || "Sin nombre",
       render: (row) => (
-        <Link href={clientHref(row.key)} style={{ fontWeight: 600 }}>
+        <Link className="ui-list__link" href={clientHref(row.key)} style={{ fontWeight: 600 }}>
           {row.name || "Sin nombre"}
         </Link>
       ),

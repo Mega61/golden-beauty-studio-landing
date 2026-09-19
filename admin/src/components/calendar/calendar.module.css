@@ -141,6 +141,39 @@
    alguien llega con `?rango=semana` en un celular: se esconde el control, no la
    vista, porque una URL compartida no puede dejar de funcionar al abrirse en
    otro aparato. */
+/* La fecha larga solo cuando hay sitio; debajo, la corta. */
+.barDateShort {
+  display: inline;
+}
+.barDateLong {
+  display: none;
+}
+@media (min-width: 40rem) {
+  .barDateShort {
+    display: none;
+  }
+  .barDateLong {
+    display: inline;
+  }
+}
+
+/*
+ * Con un solo rango disponible, el selector no selecciona nada.
+ *
+ * Debajo de 1024 px «3 días» y «Semana» están ocultos, así que quedaba un
+ * control de una sola opción —«Día»— ocupando la fila más disputada de la
+ * pantalla y empujando la fecha fuera de vista. Un radiogroup de un elemento
+ * no es una elección: es ruido con borde.
+ */
+.modes {
+  display: none;
+}
+@media (min-width: 64rem) {
+  .modes {
+    display: inline-flex;
+  }
+}
+
 .modeWide {
   display: none;
 }

@@ -140,7 +140,7 @@ function memberColumns(): Array<Column<TeamMember>> {
       width: "26%",
       text: (row) => row.name,
       render: (row) => (
-        <Link href={`/equipo/${row.provider.id}`} style={{ fontWeight: 600 }}>
+        <Link className="ui-list__link" href={`/equipo/${row.provider.id}`} style={{ fontWeight: 600 }}>
           {row.name}
         </Link>
       ),

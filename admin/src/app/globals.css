@@ -467,6 +467,25 @@
     font-size: var(--text-xs);
     padding-inline: 0.625rem;
   }
+
+  /**
+   * Con el dedo, el botón pequeño deja de ser pequeño.
+   *
+   * 34 px es cómodo con un ratón y queda por debajo del objetivo táctil de 44
+   * que el resto del sistema respeta (`--hit`). La consulta es por **tipo de
+   * puntero y no por ancho de pantalla**: una tablet de 1024 px se usa con el
+   * dedo y una ventana angosta en un portátil, con el ratón. Decidirlo por
+   * ancho acierta en el teléfono y falla en los dos casos de al lado.
+   *
+   * El tamaño del texto no sube: lo que hace falta es superficie, y agrandar
+   * la letra reflowaría toolbars que ya están ajustadas.
+   */
+  @media (pointer: coarse) {
+    .ui-btn--sm {
+      min-height: var(--hit);
+      padding-inline: 0.875rem;
+    }
+  }
   .ui-btn--icon {
     padding-inline: 0;
     width: var(--control-h);
@@ -863,7 +882,37 @@
   .ui-list > li {
     display: block;
   }
+  /**
+   * Un enlace que ocupa **toda** la fila, sin dejar de ser un enlace.
+   *
+   * La fila ya medía los 44 px del objetivo táctil, pero lo que navegaba era
+   * el `<a>` del nombre: 140 × 17 px. En una tabla de clientas eso son treinta
+   * objetivos del tamaño de una línea de texto, y en el teléfono —que es el
+   * dispositivo principal— tocar al lado del nombre no hacía nada.
+   *
+   * Se resuelve con un pseudo-elemento que cubre la fila, no convirtiendo la
+   * fila en botón: así sigue siendo un enlace de verdad —abrible en pestaña
+   * nueva, con su menú contextual, copiable— que es justo lo que se pierde al
+   * cablear un `onClick` sobre un `div`.
+   *
+   * Lo que queda por encima (una acción secundaria, un badge) necesita su
+   * propio `position: relative`, y por eso `.ui-list__trail` lo trae.
+   *
+   * ⚠ **Acotado a `.ui-list__row`, y no es un detalle de especificidad.** El
+   * mismo componente pinta una tabla en escritorio, donde el enlace vive en un
+   * `<td>` sin ancestro posicionado: el `inset: 0` se resolvía contra el
+   * bloque contenedor inicial y tapaba **la página entera** con una capa
+   * invisible. El síntoma era que ningún botón respondía al clic, y la suite
+   * E2E lo encontró de una.
+   */
+  .ui-list__row .ui-list__link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
   .ui-list__row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -878,6 +927,10 @@
     text-align: left;
     cursor: pointer;
   }
+  .ui-list__trail {
+    position: relative;
+  }
+
   .ui-list__row:last-child {
     border-bottom: 0;
   }
