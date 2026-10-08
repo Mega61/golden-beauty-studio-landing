@@ -33,11 +33,14 @@ function SlideBody({
   tag,
   title,
   cta,
+  compact = false,
   children,
 }: {
   tag: string;
   title: string;
   cta: string;
+  /** Narrow column beside a poster: a smaller headline so it fits three lines. */
+  compact?: boolean;
   children?: React.ReactNode;
 }) {
   return (
@@ -68,7 +71,11 @@ function SlideBody({
       <span className="relative block">
         <span
           className="block font-display italic"
-          style={{ fontSize: 23, lineHeight: 1.1, color: "var(--color-ivory)" }}
+          style={{
+            fontSize: compact ? 20 : 23,
+            lineHeight: 1.1,
+            color: "var(--color-ivory)",
+          }}
         >
           {title}
         </span>
@@ -126,6 +133,9 @@ function PromoSlide({
   active: boolean;
   reduced: boolean;
 }) {
+  if (promo.poster && promo.image) {
+    return <PosterSlide promo={promo} active={active} reduced={reduced} />;
+  }
   return (
     <BioLink
       href={promo.href}
@@ -161,6 +171,58 @@ function PromoSlide({
           style={{ mixBlendMode: "soft-light", opacity: 0.22 }}
         />
       </SlideBody>
+    </BioLink>
+  );
+}
+
+// Clear of the carousel dots (9px inset + 24px target).
+const POSTER_TOP = 38;
+
+/**
+ * A promo whose image is a portrait flyer. Used as a background, the flyer's
+ * own headline would fight the band's — two titles, one dimmed and cropped.
+ * Instead it sits whole at 4:5 in the bottom-right corner, and the copy takes
+ * the left column. The poster is on the right, not the left, so the eyebrow
+ * keeps the top-left corner it has on every other slide.
+ */
+function PosterSlide({
+  promo,
+  active,
+  reduced,
+}: {
+  promo: BioPromo;
+  active: boolean;
+  reduced: boolean;
+}) {
+  return (
+    <BioLink
+      href={promo.href}
+      linkKey="promo"
+      label={promo.tag}
+      kind="promo"
+      external={/^https?:\/\//i.test(promo.href)}
+      className="absolute inset-0 flex overflow-hidden no-underline"
+      style={{ ...layerStyle(active, reduced), padding: 0 }}
+    >
+      <span
+        aria-hidden
+        className="bg-marble absolute inset-0"
+        style={{ opacity: 0.1 }}
+      />
+      <span
+        className="relative flex min-w-0 flex-1 flex-col justify-between"
+        style={{ padding: "20px 14px 20px 20px" }}
+      >
+        <SlideBody tag={promo.tag} title={promo.title} cta={promo.cta} compact />
+      </span>
+      {/* Starts below the dots' row, so they sit on carbon and never on the
+          flyer's headline; bottom and right stay flush with the band. */}
+      <span
+        className="relative block shrink-0 self-end"
+        style={{ height: `calc(100% - ${POSTER_TOP}px)`, aspectRatio: "4 / 5" }}
+      >
+        <Image src={promo.image!} alt="" fill sizes="170px" className="object-cover" />
+      </span>
     </BioLink>
   );
 }

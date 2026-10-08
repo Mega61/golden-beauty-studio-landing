@@ -106,6 +106,7 @@ export async function getBio(lang: Locale): Promise<BioData> {
  *
  * tag   ← scenario.label  (period descriptor)
  * title ← featured item's headline, falling back to the strip message
+ *         (reversed for a portrait flyer: see `poster` below)
  * href  ← always the landing's promo section (`/es#promos`)
  *
  * The banner deliberately ignores each scenario's own CTA (which usually points
@@ -119,7 +120,13 @@ export function scenarioToBioPromo(
 ): BioPromo | null {
   if (!scenario) return null;
   const featured = scenario.items.find((i) => i.featured) ?? scenario.items[0];
-  const title = featured?.title ?? scenario.strip?.message;
+  // A flyer already shows its own headline, and at poster size its prices are
+  // too small to read — so a poster slide leads with the strip message, which
+  // carries the offer itself ("Press On a $80.000 todos los sábados").
+  const poster = Boolean(featured?.image_url && featured.image_orientation === "portrait");
+  const title = poster
+    ? (scenario.strip?.message ?? featured?.title)
+    : (featured?.title ?? scenario.strip?.message);
   if (!title) return null;
   const href = `/${lang}#promos`;
   return {
@@ -127,6 +134,7 @@ export function scenarioToBioPromo(
     title,
     href,
     image: featured?.image_url,
+    ...(poster ? { poster: true } : {}),
     cta: BY_LANG[lang].promoCta,
   };
 }

@@ -1,4 +1,5 @@
 import type { PromosBySlug } from "./promos.types";
+import { promoPrice, promoPriceRows } from "./promo-prices";
 import { siteConfig } from "@/config/site";
 
 const BOOKING = siteConfig.bookingUrl ?? "#contacto";
@@ -158,18 +159,99 @@ export const PROMOS_DATA: PromosBySlug = {
     ],
   },
 
+  // Weekday promos. Recurring, no starts_at/ends_at: they run while listed in
+  // NEXT_PUBLIC_ACTIVE_PROMO. Amounts live in `promo-prices.ts`, shared with
+  // the Spanish file. The flyers are in Spanish; the card's copy carries the
+  // English version of everything printed on them.
+  "sabado-press": {
+    slug: "sabado-press",
+    label: "Press On Saturday",
+    active: true,
+    strip: {
+      tag: "Press On Saturday",
+      message: `Saturdays: Press On ${promoPrice("sabado-press", "press-on", "en")}`,
+      cta: "Book now",
+      href: BOOKING,
+      accent: "gold",
+    },
+    items: [
+      {
+        id: "sabado-press-on",
+        eyebrow: "Every Saturday",
+        title: "Press On Saturday",
+        body:
+          "Press On at a Saturday price. The same set as always, with your length and design, for less — Saturdays only.",
+        cta_label: "Book a Saturday",
+        cta_href: BOOKING,
+        image_url: "/promos/sabado-press.webp",
+        image_orientation: "portrait",
+        image_alt: `Sábado de Press flyer (Spanish): Press On for ${promoPrice("sabado-press", "press-on", "en")}, every Saturday at Golden Beauty Studio.`,
+        price_rows: promoPriceRows("sabado-press", "en", { "press-on": "Press On" }),
+        accent: "gold",
+        featured: true,
+        terms_label: "Terms",
+        terms: [
+          "The price applies to Press On appointments done on a Saturday.",
+          "Cannot be combined with other promotions, including the 10% first-visit discount.",
+          "Online booking shows the regular price; the Saturday price is applied when you pay at the studio.",
+          "Per-nail designs are charged separately, per the price list.",
+        ],
+      },
+    ],
+  },
+
+  "miercoles-pies": {
+    slug: "miercoles-pies",
+    label: "Pedicure Wednesday",
+    active: true,
+    strip: {
+      tag: "Pedicure Wednesday",
+      message: `Wednesdays: pedicures from ${promoPrice("miercoles-pies", "traditional-feet", "en")}`,
+      cta: "Book now",
+      href: BOOKING,
+      accent: "ink",
+    },
+    items: [
+      {
+        id: "miercoles-pies",
+        eyebrow: "Every Wednesday",
+        title: "Pedicure Wednesday",
+        body:
+          "Classic or semi-permanent pedicure at a Wednesday price. A midweek appointment, so you reach the weekend ready.",
+        cta_label: "Book a Wednesday",
+        cta_href: BOOKING,
+        image_url: "/promos/miercoles-pies.webp",
+        image_orientation: "portrait",
+        image_alt: `Miércoles de pies flyer (Spanish): classic pedicure ${promoPrice("miercoles-pies", "traditional-feet", "en")}, semi-permanent ${promoPrice("miercoles-pies", "semi-permanent-feet", "en")}, every Wednesday at Golden Beauty Studio.`,
+        price_rows: promoPriceRows("miercoles-pies", "en", {
+          "traditional-feet": "Classic",
+          "semi-permanent-feet": "Semi-permanent",
+        }),
+        accent: "ink",
+        featured: true,
+        terms_label: "Terms",
+        terms: [
+          "The price applies to pedicures done on a Wednesday: classic or semi-permanent.",
+          "Cannot be combined with other promotions, including the 10% first-visit discount.",
+          "Online booking shows the regular price; the Wednesday price is applied when you pay at the studio.",
+          "Deep cleaning and designs are charged separately, per the price list.",
+        ],
+      },
+    ],
+  },
+
   "primera-visita": {
     slug: "primera-visita",
     label: "First visit",
     active: true,
     // Evergreen: no starts_at/ends_at — meant to run year-round alongside
-    // whichever seasonal promo is active.
+    // whichever promos are active.
     strip: {
       tag: "First visit",
-      message:
-        "10% off your first appointment at the studio — new clients only.",
+      message: "10% off your first appointment",
       cta: "Book now",
       href: BOOKING,
+      until: "New clients only",
       accent: "ink",
     },
     items: [
@@ -178,13 +260,23 @@ export const PROMOS_DATA: PromosBySlug = {
         eyebrow: "Welcome",
         title: "10% off your first visit",
         body:
-          "If it's your first appointment at Golden, take 10% off the service you choose. No deadline — the benefit is valid once, when you book your first appointment.",
+          "If it's your first appointment at Golden, take 10% off the service you choose — on every service we offer. Valid once.",
         cta_label: "Book my first appointment",
         cta_href: BOOKING,
         ribbon: "New clients only",
-        image_url: "/primera-visita.jpg",
+        image_url: "/promos/primera-visita.webp",
+        image_orientation: "portrait",
+        image_alt:
+          "Flyer (Spanish): 10% off your first visit on every service — Press On, Polygel, Builder Gel, Acrylic, Rubber Base, semi-permanent pedicure and manicure.",
         accent: "ink",
         featured: true,
+        terms_label: "Terms",
+        terms: [
+          "New clients only, with no previous appointments at the studio.",
+          "The 10% comes off the first appointment's service; add-ons are charged at the regular price.",
+          "Cannot be combined with other promotions, including Press On Saturday and Pedicure Wednesday.",
+          "Online booking shows the regular price; the discount is applied when you pay at the studio.",
+        ],
       },
     ],
   },
