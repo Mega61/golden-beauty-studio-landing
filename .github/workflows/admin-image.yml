@@ -29,6 +29,12 @@ on:
     branches: [master]
     paths:
       - "admin/**"
+      # La vitrina y su generador: la composición de los combos se hornea desde
+      # ahí a `admin/src/data/`, así que un cambio de precios sin regenerar
+      # tiene que poner el pipeline rojo el mismo día, no la próxima vez que
+      # alguien toque `admin/`.
+      - "src/data/pricing.ts"
+      - "scripts/build-combo-map.mjs"
       - ".github/workflows/admin-image.yml"
   # Para reconstruir sin cambios de código (por ejemplo, tras un cambio de base
   # en `node:22-alpine`).
@@ -73,6 +79,14 @@ jobs:
       # Si algo de acá falla, no hay imagen. Es todo el punto de que el build
       # esté después: una imagen que se publica igual convierte el pipeline en
       # decoración.
+      # La composición de los combos se hornea en `admin/src/data/` desde la
+      # vitrina de la landing, porque la imagen del panel no contiene la
+      # landing. Un archivo generado que quedó viejo es peor que no tenerlo:
+      # parece al día, y el panel ofrecería combinaciones que ya no existen.
+      # `--check` no escribe; compara y falla.
+      - name: La composición de los combos está al día
+        run: node ../scripts/build-combo-map.mjs --check
+
       - name: Lint
         run: npm run lint
 
@@ -88,8 +102,18 @@ jobs:
       # `TZ` fijada: EA guarda datetimes locales sin zona y los tests de mapeo
       # dependen de la zona del proceso. Un runner en UTC los pasaría por
       # casualidad o los rompería por casualidad; ninguna de las dos sirve.
-      - name: Tests
-        run: npm test
+      # Con cobertura, **no** `npm test` a secas.
+      #
+      # `vitest.config.mts` declara umbrales por archivo sobre los módulos que
+      # deciden un monto o quién entra: 100 % de ramas en comisiones, ticket,
+      # combos, conflictos, TOTP, DAL. Un umbral que ningún pipeline evalúa no
+      # es un umbral, es un comentario — y así fue como una rama de
+      # `ingest-id.ts` se quedó sin test sin que nadie se enterara.
+      #
+      # El costo es unos segundos de instrumentación; el beneficio es que la
+      # próxima rama sin cubrir en un módulo de plata no llega a la imagen.
+      - name: Tests (con umbrales de cobertura)
+        run: npm run test:coverage
         env:
           TZ: America/Bogota
 

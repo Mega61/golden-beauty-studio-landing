@@ -379,6 +379,9 @@ export function AgendaClient({
           endTime: hhmm(minute + 60),
           notes: "",
           status: "Reservada",
+          // Arranca apagado siempre: forzar el horario es una decisión de ese
+          // turno, no una preferencia que se quede pegada al formulario.
+          allowOutsideHours: false,
         },
       });
     },
@@ -397,6 +400,7 @@ export function AgendaClient({
         end: `${draft.date} ${draft.endTime}:00`,
         notes: draft.notes,
         status: draft.status,
+        allowOutsideHours: draft.allowOutsideHours,
         force,
       });
 
@@ -497,6 +501,8 @@ export function AgendaClient({
         draft={panel.draft}
         providers={data.providers.map((p) => ({ id: p.id, name: p.name }))}
         services={data.services}
+        combos={data.combos}
+        combosReason={data.combosReason}
         meta={data.meta}
         report={report}
         error={formError}
@@ -864,5 +870,6 @@ function draftFrom(appointment: Appointment, meta: AgendaData["meta"]): Appointm
     endTime: appointment.end.slice(11, 16),
     notes: appointment.notes ?? "",
     status: appointment.status,
+    allowOutsideHours: false,
   };
 }

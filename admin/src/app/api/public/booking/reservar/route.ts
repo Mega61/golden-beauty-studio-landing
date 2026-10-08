@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   if (!Number.isInteger(serviceId) || serviceId <= 0) return bad("serviceId");
   if (!isEaLocalDate(date)) return bad("date");
-  if (!/^\d{2}:\d{2}$/.test(time)) return bad("time");
+  if (!isWallTime(time)) return bad("time");
   if (providerId !== null && (!Number.isInteger(providerId) || providerId <= 0)) {
     return bad("providerId");
   }
@@ -101,6 +101,21 @@ export async function POST(req: NextRequest) {
 }
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
+
+/**
+ * `HH:MM` de un reloj que existe.
+ *
+ * El patrón de antes era `/^\d{2}:\d{2}$/`, que acepta `25:99`. Con eso, una
+ * hora imposible pasaba la validación, no encontraba hueco y salía como **409
+ * `taken`** — "esa hora se acaba de ocupar" sobre una hora que no existe. Es
+ * una mentira barata de arreglar y cara de depurar desde el otro lado: quien
+ * integra ve una carrera perdida donde hay un bug suyo.
+ */
+function isWallTime(value: string): boolean {
+  const m = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!m) return false;
+  return Number(m[1]) <= 23 && Number(m[2]) <= 59;
+}
 
 function str(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

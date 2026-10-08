@@ -743,6 +743,36 @@ Si la creación en EA funciona pero el vínculo falla, el servicio queda creado 
 aparece abajo como *solo en la agenda* y el desplegable de **Vincular** lo ofrece. **No hay
 que borrarlo en EA** — el mensaje de error lo dice con esas palabras.
 
+### Componer un combo: no hay paso siguiente
+
+En la agenda y en `/reservar` **a un combo no se llega eligiéndolo de la lista**:
+se elige el servicio de manos, aparece "¿también pies?", y al resolver el par la
+cita pasa a ser el combo (con la suma de las dos mitades tachada al lado de su
+precio). Eso necesita saber de qué se compone cada combo, y esa composición
+**viaja horneada dentro de la imagen** — `admin/src/data/combo-composition.ts`,
+generado desde la vitrina y commiteado. No hay botón que apretar ni archivo que
+montar: en cuanto los tres servicios existen en EA y están vinculados en
+`service_map`, el combo se compone.
+
+La tabla `gbs_admin.combo` sigue existiendo, pero ya no para agendar: de ahí
+sacan las comisiones el reparto de un combo trabajado a cuatro manos
+(`allocation_hands_bp`). La rellena el **reconcile nocturno**, y su resumen dice
+cuántos combos quedaron sincronizados y nombra los que todavía no se pueden
+componer porque a alguna de sus tres partes le falta publicarse. Si nunca se
+llena, el síntoma es que esas cuentas se saltan en la liquidación como
+`reparto-desconocido`.
+
+### `PRICING_SOURCE_PATH` — para el diff de Servicios, no para los combos
+
+La pantalla de Servicios compara la vitrina contra el catálogo de EA, y para eso
+sí necesita leer `src/data/pricing.ts`, que no está en la imagen. Hay que montar
+el archivo en el contenedor y apuntarle `PRICING_SOURCE_PATH`; sin eso la
+pantalla entra en su estado de "no pude leer la vitrina" y **no se puede crear ni
+vincular ningún servicio** — que es el paso de arriba.
+
+Lo que **no** depende de eso es agendar: un combo ya vinculado se compone aunque
+el archivo falte, porque su composición va horneada.
+
 ---
 
 ## El corte — importar el export de Agenda Pro

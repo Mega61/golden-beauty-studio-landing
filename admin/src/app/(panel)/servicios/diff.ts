@@ -260,11 +260,31 @@ function compareFields(entry: PricingEntry, service: Service): DiffField[] {
  * Solo `desincronizado` se puede publicar: `sin-vincular` no tiene a quién
  * escribirle y `mapa-roto` le escribiría a un servicio que ya no existe.
  */
-/** Lo que se manda a `POST /services` para crear un servicio que falta. */
+/**
+ * Lo que se manda a `POST /services` para crear un servicio que falta.
+ *
+ * ## `attendantsNumber` no es opcional, aunque el tipo de EA diga que sí
+ *
+ * `Services_model::save()` lee `$service['attendants_number']` sin comprobar
+ * que exista: sin el campo, EA responde **200 con una página de warnings de
+ * PHP** en vez de JSON, el cliente no la puede decodificar y el panel reporta
+ * "la agenda no aceptó la escritura". O sea: crear un servicio desde el panel
+ * **no funcionaba nunca** contra una EA de verdad, y el mensaje no decía por
+ * qué.
+ *
+ * Lo encontró la suite E2E, que es exactamente para lo que existe: ningún
+ * unitario puede ver esto, porque el error vive del otro lado de la red.
+ *
+ * Va en **1** y no se ofrece en el formulario: `attendants_number` es cuántas
+ * clientas atiende una técnica **a la vez** con ese servicio, y en un estudio de
+ * uñas eso es una. El día que haya un servicio grupal, es un campo más en la
+ * vitrina, no un valor que alguien adivine al crear.
+ */
 export type CreatePayload = {
   name: string;
   price: number;
   duration: number;
+  attendantsNumber: number;
 };
 
 /** Por qué no se puede crear, o `null` si sí se puede. */
@@ -309,7 +329,12 @@ export function createPayload(
   if (row.showcaseDuration === null) return { blocker: "sin-duracion" };
 
   return {
-    payload: { name: trimmed, price: row.showcasePrice, duration: row.showcaseDuration },
+    payload: {
+      name: trimmed,
+      price: row.showcasePrice,
+      duration: row.showcaseDuration,
+      attendantsNumber: 1,
+    },
   };
 }
 

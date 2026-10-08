@@ -260,6 +260,13 @@
     "noSlots": "No quedan horas libres ese día. Prueba con otro.",
     "loadingSlots": "Buscando horas…",
     "pickDate": "Elige un día",
+    "combo": {
+      "askFeet": "¿También pies?",
+      "askHands": "¿También manos?",
+      "none": "No, solo eso",
+      "hint": "Se agenda como un solo turno, con precio de combo.",
+      "saving": "Ahorras {amount}"
+    },
     "success": {
       "title": "¡Lista tu cita!",
       "body": "Te esperamos el {date} a las {time} con {provider}.",

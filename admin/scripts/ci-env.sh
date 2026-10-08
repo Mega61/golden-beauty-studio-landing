@@ -25,6 +25,23 @@ cat > "$SALIDA" <<EOF
 DATABASE_URL="mysql://gbs_admin:gbs_admin_dev@127.0.0.1:${MYSQL_PORT}/gbs_admin"
 DATABASE_URL_EA_RO="mysql://gbs_ea_ro:gbs_ea_ro_dev@127.0.0.1:${MYSQL_PORT}/easyappointments"
 
+# La vitrina, en ruta absoluta.
+#
+# El panel corre desde .next/standalone, así que las rutas que intenta por
+# defecto servicios/pricing-source.ts —relativas al cwd— no alcanzan
+# src/data/pricing.ts. Sin esto la pantalla de Servicios entra en su estado de
+# "no pude leer la vitrina" y no se puede crear ni vincular ningún servicio,
+# que es justo lo que la suite necesita hacer para probar los combos.
+#
+# No es una comodidad de CI: espeja lo que hay que montar en la VM, donde la
+# imagen del panel tampoco contiene la landing (ver docs/DEPLOY.md). Lo que NO
+# depende de esto es componer un combo en la agenda: esa composición va
+# horneada en la imagen, en admin/src/data/combo-composition.ts.
+#
+# Sin comillas invertidas en este comentario: está dentro del heredoc que
+# interpola, y bash las ejecutaría como comando (lo dice la nota de arriba).
+PRICING_SOURCE_PATH="$(cd ../src/data && pwd)/pricing.ts"
+
 EA_API_URL="http://localhost:${EA_PORT}/index.php/api/v1"
 EA_API_TOKEN="${TOKEN}"
 EA_PUBLIC_URL="http://localhost:${EA_PORT}"

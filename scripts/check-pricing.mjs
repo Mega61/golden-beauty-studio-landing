@@ -35,11 +35,41 @@ function parsePricing(source) {
       i++;
     }
     const itemsBody = source.slice(catRegex.lastIndex, i - 1);
-    const itemIds = [...itemsBody.matchAll(/\{\s*id:\s*"([^"]+)"/g)].map((x) => x[1]);
-    out.push({ id: catId, itemIds });
+    out.push({ id: catId, items: parseItems(itemsBody) });
     catRegex.lastIndex = i;
   }
   return out;
+}
+
+// One entry per `{ ... }` at the top level of an `items: [ ... ]` body. Split by
+// brace depth rather than by regex so a nested object — `composedOf: { hands,
+// feet }` — stays inside its own item instead of being read as another one.
+function parseItems(itemsBody) {
+  const items = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i < itemsBody.length; i += 1) {
+    const ch = itemsBody[i];
+    if (ch === "{") {
+      if (depth === 0) from = i + 1;
+      depth += 1;
+    } else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) items.push(readItem(itemsBody.slice(from, i)));
+    }
+  }
+  return items.filter((item) => item.id !== null);
+}
+
+function readItem(body) {
+  const id = /(^|[\s,{])id:\s*"([^"]+)"/.exec(body);
+  const composed = /composedOf:\s*\{\s*hands:\s*"([^"]+)"\s*,\s*feet:\s*"([^"]+)"\s*,?\s*\}/.exec(
+    body,
+  );
+  return {
+    id: id ? id[2] : null,
+    composedOf: composed ? { hands: composed[1], feet: composed[2] } : null,
+  };
 }
 
 async function main() {
@@ -72,6 +102,56 @@ async function main() {
   }
 
   const errors = [];
+
+  // Combos are never picked from a list: both the admin agenda and the public
+  // booking flow reach them by choosing the hands service and the feet service
+  // they replace. A combo without `composedOf` is therefore unreachable, and a
+  // `composedOf` pointing at an id that doesn't exist is a dead end at booking
+  // time — neither can be allowed to ship.
+  const standalone = new Set(
+    cats.filter((c) => c.id !== "combos").flatMap((c) => c.items.map((it) => it.id)),
+  );
+  const seenPairs = new Map();
+
+  for (const cat of cats) {
+    for (const item of cat.items) {
+      if (cat.id !== "combos") {
+        if (item.composedOf) {
+          errors.push(
+            `pricing.ts: "${item.id}" is in "${cat.id}" but declares composedOf — only combos may.`,
+          );
+        }
+        continue;
+      }
+      if (!item.composedOf) {
+        errors.push(
+          `pricing.ts: combo "${item.id}" has no composedOf, so nothing can reach it. ` +
+            'Add { hands: "<id>", feet: "<id>" }.',
+        );
+        continue;
+      }
+      for (const side of ["hands", "feet"]) {
+        const part = item.composedOf[side];
+        if (!standalone.has(part)) {
+          errors.push(
+            `pricing.ts: combo "${item.id}" points its ${side} at "${part}", which is not a standalone service in this file.`,
+          );
+        }
+      }
+      // Two combos for the same pair would make the resolution ambiguous, and
+      // whichever one won would be chosen by array order — a price decided by
+      // where someone happened to paste a line.
+      const key = `${item.composedOf.hands}+${item.composedOf.feet}`;
+      const previous = seenPairs.get(key);
+      if (previous) {
+        errors.push(
+          `pricing.ts: combos "${previous}" and "${item.id}" both claim the pair ${key}. A pair maps to one combo.`,
+        );
+      } else {
+        seenPairs.set(key, item.id);
+      }
+    }
+  }
 
   for (const [lang, dict] of [
     ["es", es],
@@ -122,7 +202,7 @@ async function main() {
         );
         continue;
       }
-      for (const itemId of cat.itemIds) {
+      for (const { id: itemId } of cat.items) {
         const itemCopy = catCopy.items[itemId];
         if (!itemCopy) {
           errors.push(
@@ -137,7 +217,7 @@ async function main() {
         }
       }
       for (const extraId of Object.keys(catCopy.items)) {
-        if (!cat.itemIds.includes(extraId)) {
+        if (!cat.items.some((it) => it.id === extraId)) {
           errors.push(
             `${lang}: servicios.categories.${cat.id}.items.${extraId} has no matching entry in src/data/pricing.ts (orphaned translation)`,
           );
@@ -159,7 +239,7 @@ async function main() {
     process.exit(1);
   }
 
-  const totalItems = cats.reduce((n, c) => n + c.itemIds.length, 0);
+  const totalItems = cats.reduce((n, c) => n + c.items.length, 0);
   console.log(
     `[check-pricing] OK — ${cats.length} categories, ${totalItems} items, both locales aligned.`,
   );

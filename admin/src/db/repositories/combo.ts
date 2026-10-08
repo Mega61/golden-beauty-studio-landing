@@ -59,6 +59,30 @@ export function comboRepository(db: Db) {
         .where("id", "=", existing.id)
         .execute();
     },
+
+    /**
+     * Borra las composiciones que la vitrina ya no declara.
+     *
+     * Es la otra mitad de sincronizar: sin esto, un combo retirado de
+     * `pricing.ts` se seguiría pudiendo componer desde la agenda para siempre,
+     * porque su fila quedaría acá sin que nada la contradiga.
+     *
+     * Con la lista vacía **no borra nada**. Es deliberado: "la vitrina no
+     * declaró ningún combo" y "no pude leer la vitrina" llegan hasta acá como
+     * el mismo arreglo vacío, y de las dos lecturas posibles la que borra la
+     * tabla entera es la que no se puede deshacer. Vaciarla, cuando de verdad
+     * haga falta, es una fila a la vez.
+     */
+    async removeExcept(eaServiceIds: readonly number[]): Promise<number> {
+      if (eaServiceIds.length === 0) return 0;
+
+      const result = await db
+        .deleteFrom("combo")
+        .where("ea_service_id", "not in", [...eaServiceIds])
+        .executeTakeFirst();
+
+      return Number(result.numDeletedRows ?? 0);
+    },
   };
 }
 

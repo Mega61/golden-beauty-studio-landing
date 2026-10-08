@@ -35,9 +35,21 @@ type Service = {
   durationMin: number;
   priceCOP: number;
   category: string | null;
+  /** Se llega a él componiendo, no eligiéndolo: fuera de la lista del paso 1. */
+  isCombo?: boolean;
 };
 type Provider = { id: number; name: string; serviceIds: number[] };
 type Slot = { time: string; start: string; end: string; providerIds: number[] };
+
+/**
+ * Un combo, con las dos mitades que reemplaza. Lo manda el panel.
+ *
+ * Es lo que permite el paso que de verdad importa acá: **el combo no está en la
+ * lista**. Se elige "semipermanente en manos" y aparece "¿también pies?". Es
+ * como se piensa una cita, y evita que alguien busque un combo entre veinticinco
+ * filas justo en el primer paso, que es donde más se abandona un formulario.
+ */
+type Combo = { serviceId: number; handsServiceId: number; feetServiceId: number };
 
 type Dict = {
   steps: { service: string; provider: string; slot: string; details: string };
@@ -58,6 +70,13 @@ type Dict = {
   noSlots: string;
   loadingSlots: string;
   pickDate: string;
+  combo: {
+    askFeet: string;
+    askHands: string;
+    none: string;
+    hint: string;
+    saving: string;
+  };
   success: { title: string; body: string; note: string; again: string };
   errors: Record<string, string>;
 };
@@ -77,10 +96,16 @@ export default function ReservaFlow({
   today: string;
   whatsappHref: string | null;
 }) {
-  const [catalog, setCatalog] = useState<{ services: Service[]; providers: Provider[] } | null>(
-    null,
-  );
+  const [catalog, setCatalog] = useState<{
+    services: Service[];
+    providers: Provider[];
+    combos: Combo[];
+  } | null>(null);
   const [service, setService] = useState<Service | null>(null);
+  // Cuál de las dos mitades se eligió primero. Solo sirve para que la lista del
+  // paso 1 no salte sola de "pies" a "manos" debajo del dedo al elegir el
+  // acompañante; el par real se deriva del servicio, no de acá.
+  const [firstPick, setFirstPick] = useState<number | null>(null);
   const [providerId, setProviderId] = useState<number | null>(null);
   const [date, setDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[] | null>(null);
@@ -116,8 +141,15 @@ export default function ReservaFlow({
       try {
         const res = await fetch("/api/reservas/catalogo");
         if (!res.ok) throw new Error(String(res.status));
-        const body = (await res.json()) as { services: Service[]; providers: Provider[] };
-        if (alive) setCatalog(body);
+        const body = (await res.json()) as {
+          services: Service[];
+          providers: Provider[];
+          combos?: Combo[];
+        };
+        // Un panel viejo, o uno que no pudo leer la vitrina, no manda `combos`.
+        // Entonces los combos se listan como cualquier servicio y componer
+        // queda apagado — que es exactamente como funcionaba antes.
+        if (alive) setCatalog({ ...body, combos: body.combos ?? [] });
       } catch {
         if (alive) setError(dict.errors.unavailable);
       }
@@ -163,6 +195,10 @@ export default function ReservaFlow({
     if (!catalog) return [];
     const out = new Map<string, Service[]>();
     for (const s of catalog.services) {
+      // Los combos no se listan: se llega a ellos componiendo. Dejarlos también
+      // acá sería dar dos caminos al mismo sitio, y el de la lista es el que se
+      // toma por error cuando lo que se quería era la mitad de al lado.
+      if (s.isCombo) continue;
       const key = s.category ?? "";
       const list = out.get(key);
       if (list) list.push(s);
@@ -170,6 +206,106 @@ export default function ReservaFlow({
     }
     return [...out.entries()];
   }, [catalog]);
+
+  // ── El combo, derivado del servicio elegido ──────────────────────────────
+  //
+  // Igual que en la agenda del panel: el par sale de `service`, no de un estado
+  // paralelo. Así no existe el momento en que el par dice una cosa y lo que se
+  // va a reservar dice otra.
+  const composed = useMemo(
+    () => catalog?.combos.find((c) => c.serviceId === service?.id) ?? null,
+    [catalog, service],
+  );
+
+  const baseId = composed
+    ? firstPick === composed.feetServiceId
+      ? composed.feetServiceId
+      : composed.handsServiceId
+    : (service?.id ?? null);
+
+  const partnerId = composed
+    ? baseId === composed.handsServiceId
+      ? composed.feetServiceId
+      : composed.handsServiceId
+    : null;
+
+  const base = useMemo(
+    () => catalog?.services.find((s) => s.id === baseId) ?? null,
+    [catalog, baseId],
+  );
+
+  /** Con qué se puede acompañar lo elegido. Vacío = no hay combo para esto. */
+  const partners = useMemo(() => {
+    if (!catalog || baseId === null) return [];
+    const ids = new Set<number>();
+    for (const c of catalog.combos) {
+      if (c.handsServiceId === baseId) ids.add(c.feetServiceId);
+      else if (c.feetServiceId === baseId) ids.add(c.handsServiceId);
+    }
+    return catalog.services.filter((s) => ids.has(s.id));
+  }, [catalog, baseId]);
+
+  /** El servicio elegido es la mitad de pies de algún combo. Cambia la pregunta. */
+  const baseIsFeet = useMemo(
+    () => (catalog?.combos ?? []).some((c) => c.feetServiceId === baseId),
+    [catalog, baseId],
+  );
+
+  /**
+   * La suma de las dos mitades, **solo para tacharla**.
+   *
+   * Lo que se cobra y lo que dura es del combo y sale de EA; acá no se suma
+   * nada para decidir un precio. Un combo que no ahorra no se tacha: un tachado
+   * que no ahorra nada es publicidad falsa.
+   */
+  const partsSum = useMemo(() => {
+    if (!composed || !service || !catalog) return null;
+    const hands = catalog.services.find((s) => s.id === composed.handsServiceId);
+    const feet = catalog.services.find((s) => s.id === composed.feetServiceId);
+    if (!hands || !feet) return null;
+
+    const price = hands.priceCOP + feet.priceCOP;
+    const saving = price - service.priceCOP;
+    return saving > 0 ? { price, durationMin: hands.durationMin + feet.durationMin, saving } : null;
+  }, [composed, service, catalog]);
+
+  /** Elegir un servicio del paso 1. Deshace cualquier combo que hubiera. */
+  const chooseService = (s: Service) => {
+    setService(s);
+    setFirstPick(s.id);
+    setProviderId(null);
+    setSlot(null);
+    setSlots(null);
+  };
+
+  /**
+   * Poner o quitar la otra mitad.
+   *
+   * Al ponerla, lo que se reserva pasa a ser **el combo**: otro servicio, con su
+   * precio y su duración propios. Por eso se reinician la técnica y la hora — la
+   * disponibilidad de un turno de dos horas no es la de uno de una.
+   */
+  const choosePartner = (partner: Service | null) => {
+    if (!catalog || baseId === null) return;
+
+    const next =
+      partner === null
+        ? base
+        : (catalog.services.find(
+            (s) =>
+              s.id ===
+              catalog.combos.find(
+                (c) =>
+                  (c.handsServiceId === baseId && c.feetServiceId === partner.id) ||
+                  (c.feetServiceId === baseId && c.handsServiceId === partner.id),
+              )?.serviceId,
+          ) ?? base);
+
+    setService(next);
+    setProviderId(null);
+    setSlot(null);
+    setSlots(null);
+  };
 
   const providers = useMemo(
     () =>
@@ -264,6 +400,7 @@ export default function ReservaFlow({
             onClick={() => {
               setBooked(null);
               setService(null);
+              setFirstPick(null);
               setProviderId(null);
               setDate(null);
               setSlot(null);
@@ -305,13 +442,8 @@ export default function ReservaFlow({
                 {items.map((s) => (
                   <li key={s.id}>
                     <Choice
-                      selected={service?.id === s.id}
-                      onClick={() => {
-                        setService(s);
-                        setProviderId(null);
-                        setSlot(null);
-                        setSlots(null);
-                      }}
+                      selected={baseId === s.id}
+                      onClick={() => chooseService(s)}
                     >
                       <span className="font-sans text-sm text-ink">{s.name}</span>
                       <span className="font-sans text-xs text-ink-mute">
@@ -324,6 +456,57 @@ export default function ReservaFlow({
               </ul>
             </div>
           ))
+        )}
+
+        {/* La otra mitad. Aparece solo cuando lo elegido forma un combo, y solo
+            ofrece lo que forma uno de verdad: un par sin combo no tiene precio
+            que mostrar, y ofrecerlo sería un callejón que se descubre recién al
+            pedir los horarios. */}
+        {partners.length > 0 && (
+          <div className="mt-6 rounded-2xl border border-gold/30 bg-gold-pale/40 p-4">
+            <p className="font-sans text-sm font-semibold text-ink">
+              {baseIsFeet ? dict.combo.askHands : dict.combo.askFeet}
+            </p>
+            <p className="mt-0.5 font-sans text-xs text-ink-mute">{dict.combo.hint}</p>
+
+            <ul className="mt-3 grid gap-2">
+              {partners.map((p) => (
+                <li key={p.id}>
+                  <Choice selected={partnerId === p.id} onClick={() => choosePartner(p)}>
+                    <span className="font-sans text-sm text-ink">{p.name}</span>
+                  </Choice>
+                </li>
+              ))}
+              <li>
+                <Choice selected={partnerId === null} onClick={() => choosePartner(null)}>
+                  <span className="font-sans text-sm text-ink">{dict.combo.none}</span>
+                </Choice>
+              </li>
+            </ul>
+
+            {/* El antes y el después. Lo tachado es la suma de las dos mitades —
+                el precio que NO se va a cobrar— y al lado, lo que de verdad
+                cuesta el combo. */}
+            {composed && service && (
+              <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-sans text-sm">
+                {partsSum && (
+                  <span className="text-ink-mute line-through">
+                    {formatCOP(partsSum.price, lang)} ·{" "}
+                    {dict.duration.replace("{min}", String(partsSum.durationMin))}
+                  </span>
+                )}
+                <span className="font-semibold text-ink">
+                  {formatCOP(service.priceCOP, lang)} ·{" "}
+                  {dict.duration.replace("{min}", String(service.durationMin))}
+                </span>
+                {partsSum && (
+                  <span className="font-semibold text-gold-deep">
+                    {dict.combo.saving.replace("{amount}", formatCOP(partsSum.saving, lang))}
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
         )}
       </Step>
 

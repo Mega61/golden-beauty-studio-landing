@@ -9,6 +9,7 @@ import {
   buildEaAdjustmentImportedId,
   buildEaImportedId,
   buildPaymentSourceTxId,
+  buildPaymentSplitSourceTxId,
   parseImportedId,
 } from "./ingest-id";
 
@@ -187,5 +188,44 @@ describe("parseImportedId — leer de vuelta", () => {
       source: "agendapro",
       txId: "1:adj1",
     });
+  });
+});
+
+describe("buildPaymentSplitSourceTxId — la llave de una cuenta cobrada a medias", () => {
+  it("pega el método al id de la cita", () => {
+    expect(buildPaymentSplitSourceTxId(42, "efectivo")).toBe(`${EA_PAYMENT_PREFIX}42:efectivo`);
+    expect(buildPaymentSplitSourceTxId(42, "transferencia")).toBe(
+      `${EA_PAYMENT_PREFIX}42:transferencia`,
+    );
+  });
+
+  it("dos métodos de la misma cuenta dan llaves distintas", () => {
+    // Es para lo que existe: una cuenta cobrada mitad en efectivo y mitad por
+    // transferencia son dos filas `Payment` en Strapi, y `tx_id` es UNIQUE. Si
+    // colisionaran, el upsert pisaría una con la otra y la mitad de la plata
+    // desaparecería del presupuesto.
+    expect(buildPaymentSplitSourceTxId(42, "efectivo")).not.toBe(
+      buildPaymentSplitSourceTxId(42, "transferencia"),
+    );
+  });
+
+  it("rechaza un método que no sea minúsculas sin separadores", () => {
+    // El método viaja dentro de una llave inmutable: "Efectivo", "efectivo " y
+    // "efectivo" producirían tres llaves para el mismo método, y con eso tres
+    // filas en Actual para un solo cobro. Se rechaza en vez de normalizar, que
+    // es lo que deja el error a la vista de quien lo introdujo.
+    for (const malo of ["Efectivo", "efectivo ", "tarjeta-debito", "tarjeta_debito", "", "efectivo:1", "1234"]) {
+      expect(() => buildPaymentSplitSourceTxId(42, malo), JSON.stringify(malo)).toThrow(
+        IngestIdError,
+      );
+    }
+  });
+
+  it("rechaza un id de cita que no es un id de cita", () => {
+    for (const malo of [0, -1, 1.5, Number.NaN]) {
+      expect(() => buildPaymentSplitSourceTxId(malo, "efectivo"), String(malo)).toThrow(
+        IngestIdError,
+      );
+    }
   });
 });

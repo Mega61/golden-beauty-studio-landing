@@ -1129,3 +1129,88 @@
     font-size: 9pt;
   }
 }
+
+/* --- Combos: la suma tachada y el precio que de verdad se cobra ------------ */
+
+/* Un combo no se elige de una lista: se compone eligiendo sus dos mitades (ver
+   `lib/combos.ts`). Este bloque es lo que aparece cuando el par resuelve, y su
+   trabajo es uno solo — que el descuento se **vea**. Un combo que cuesta menos
+   que sus partes sin decirlo en ninguna parte se lee como un precio arbitrario,
+   y quien está al teléfono no puede defenderlo. */
+.combo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--color-ok-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-ok-tint);
+  color: var(--color-ok-ink);
+  font-size: var(--text-xs);
+}
+
+.comboName {
+  flex-basis: 100%;
+  font-weight: 600;
+}
+
+/* La suma de las partes. Tachada y en el color apagado: es el precio que **no**
+   se va a cobrar, y tiene que leerse como referencia, nunca como el monto. */
+.comboWas {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.comboNow {
+  font-weight: 700;
+}
+
+.comboSaving {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+/* --- Correr la jornada visible -------------------------------------------- */
+
+/* La grilla arranca en el plan de trabajo, que es lo correcto el 95 % de los
+   días. El 5 % restante —"entra a las 7 porque la clienta viaja"— necesitaba
+   antes que hubiera una cita escondida para poder ampliar, o sea que había que
+   crear la cita para poder ver dónde crearla. Estos dos botones viven en el
+   gutter de horas y están siempre, independientes de si hay algo oculto. */
+.stretch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 41;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: var(--color-cream);
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stretch:hover {
+  color: var(--color-gold-dark);
+  background: color-mix(in srgb, var(--color-gold) 12%, var(--color-cream));
+}
+
+.stretch:focus-visible {
+  outline: 2px solid var(--color-gold-dark);
+  outline-offset: -2px;
+}
+
+.stretchTop {
+  top: 0;
+}
+
+.stretchBottom {
+  bottom: 0;
+}

@@ -173,12 +173,21 @@ export function previewData(today: EaLocalDate): AgendaData {
     },
 
     services: [
-      { id: 1, name: "Acrílicas esculpidas", duration: 150, attendantsNumber: 1 },
-      { id: 2, name: "Semipermanente", duration: 90, attendantsNumber: 1 },
-      { id: 3, name: "Diseño extra", duration: 15, attendantsNumber: 1 },
-      { id: 4, name: "Spa de pies", duration: 120, attendantsNumber: 2 },
-      { id: 5, name: "Combo manos y pies", duration: 210, attendantsNumber: 1 },
+      { id: 1, name: "Acrílicas esculpidas", duration: 150, attendantsNumber: 1, priceCOP: 115000 },
+      { id: 2, name: "Semipermanente", duration: 90, attendantsNumber: 1, priceCOP: 50000 },
+      { id: 3, name: "Diseño extra", duration: 15, attendantsNumber: 1, priceCOP: 10000 },
+      { id: 4, name: "Spa de pies", duration: 120, attendantsNumber: 2, priceCOP: 55000 },
+      // El combo cuesta y dura **menos** que sus dos mitades (105.000 y 210
+      // minutos). Está así a propósito: es lo que hace visible el tachado del
+      // formulario, y una galería donde el combo valiera la suma no probaría
+      // nada.
+      { id: 5, name: "Combo manos y pies", duration: 180, attendantsNumber: 1, priceCOP: 95000 },
     ],
+
+    // Semipermanente (manos) + Spa de pies = el combo. No se elige de la lista:
+    // se llega a él eligiendo sus dos mitades. Ver `lib/combos.ts`.
+    combos: [{ eaServiceId: 5, handsEaServiceId: 2, feetEaServiceId: 4 }],
+    combosReason: null,
 
     capacities: [
       { id: 1, attendantsNumber: 1, category: null },

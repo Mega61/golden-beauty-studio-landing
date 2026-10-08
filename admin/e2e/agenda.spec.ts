@@ -45,7 +45,19 @@ test.describe("crear una cita", () => {
     await expect(crear, "no ofreció crear la clienta que no encontró").toBeVisible();
     await crear.click();
 
-    await panel.getByRole("textbox", { name: /^Nombre y apellido/ }).fill(`${marca} Perez`);
+    // Nombre y apellido llegan **ya repartidos** desde lo que se escribió en el
+    // buscador. Es la mitad del punto de este flujo: quien abre el alta acaba
+    // de teclear el nombre, y pedírselo otra vez —debajo del que ya escribió—
+    // es el momento en que la clienta se apunta en un papel.
+    const nombre = panel.getByRole("textbox", { name: /^Nombre\b/ });
+    const apellido = panel.getByRole("textbox", { name: /^Apellido\b/ });
+    await expect(nombre, "el nombre no llegó prellenado").toHaveValue(marca);
+    await expect(apellido, "el apellido no llegó prellenado").toHaveValue("Perez");
+
+    // Y el buscador ya no está: verlo con el mismo nombre arriba se lee como
+    // "escríbelo otra vez".
+    await expect(panel.getByRole("textbox", { name: /^Clienta/ })).toHaveCount(0);
+
     await panel.getByRole("textbox", { name: /^Teléfono/ }).fill(phoneNuevo());
     await panel.getByRole("button", { name: /crear y usar/i }).click();
 
@@ -53,6 +65,43 @@ test.describe("crear una cita", () => {
     // alta a alguien. Devolverlo al buscador sería cobrarle el paso dos veces.
     await expect(panel.getByText(`${marca} Perez`)).toBeVisible();
     await expect(panel.getByRole("button", { name: /cambiar/i })).toBeVisible();
+  });
+
+  test("el apellido es un campo propio, no lo adivina el servidor", async ({ panel }) => {
+    // Antes era un solo campo y el servidor partía en el primer espacio: "Ana
+    // María Ríos" quedaba nombre "Ana", apellido "María Ríos" — mal, en la
+    // ficha de una persona real, y para siempre. Ahora la partición es una
+    // sugerencia editable, y esto fija que se pueda corregir.
+    const marca = `Dos${Date.now().toString().slice(-6)}`;
+
+    await panel.goto("/admin/agenda");
+    await panel.getByRole("button", { name: /nueva cita/i }).click();
+    await panel.getByRole("textbox", { name: /^Clienta/ }).fill(`${marca} Maria Rios`);
+    await panel.getByRole("button", { name: /crear «/i }).click();
+
+    // La sugerencia parte en el primer espacio, que acá es la partición
+    // equivocada.
+    await expect(panel.getByRole("textbox", { name: /^Apellido\b/ })).toHaveValue("Maria Rios");
+
+    // Y se corrige sin pelear con nada.
+    await panel.getByRole("textbox", { name: /^Nombre\b/ }).fill(`${marca} Maria`);
+    await panel.getByRole("textbox", { name: /^Apellido\b/ }).fill("Rios");
+    await panel.getByRole("textbox", { name: /^Teléfono/ }).fill(phoneNuevo());
+    await panel.getByRole("button", { name: /crear y usar/i }).click();
+
+    await expect(panel.getByText(`${marca} Maria Rios`)).toBeVisible();
+  });
+
+  test("un número en el buscador va al teléfono, no al nombre", async ({ panel }) => {
+    await panel.goto("/admin/agenda");
+    await panel.getByRole("button", { name: /nueva cita/i }).click();
+
+    const numero = phoneNuevo();
+    await panel.getByRole("textbox", { name: /^Clienta/ }).fill(numero);
+    await panel.getByRole("button", { name: /crear «/i }).click();
+
+    await expect(panel.getByRole("textbox", { name: /^Teléfono/ })).toHaveValue(numero);
+    await expect(panel.getByRole("textbox", { name: /^Nombre\b/ })).toHaveValue("");
   });
 
   test("agendar de punta a punta deja la cita en la agenda", async ({ panel }) => {
@@ -68,7 +117,8 @@ test.describe("crear una cita", () => {
 
     await panel.getByRole("textbox", { name: /^Clienta/ }).fill(`${marca} Test`);
     await panel.getByRole("button", { name: /crear «/i }).click();
-    await panel.getByRole("textbox", { name: /^Nombre y apellido/ }).fill(`${marca} Test`);
+    await panel.getByRole("textbox", { name: /^Nombre\b/ }).fill(marca);
+    await panel.getByRole("textbox", { name: /^Apellido\b/ }).fill("Test");
     await panel.getByRole("textbox", { name: /^Teléfono/ }).fill(phoneNuevo());
     await panel.getByRole("button", { name: /crear y usar/i }).click();
     await expect(panel.getByRole("button", { name: /cambiar/i })).toBeVisible();

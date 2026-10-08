@@ -7,6 +7,7 @@ import { stationRepository } from "@/db/repositories";
 
 import type { GridProvider } from "@/lib/calendar-layout";
 import {
+  allowingOutsideHours,
   checkConflicts,
   type ConflictInput,
   type ConflictReport,
@@ -66,6 +67,16 @@ export type AppointmentWrite = {
   status?: string;
   /** Guardar de todas formas. */
   force?: boolean;
+  /**
+   * Agendar aunque quede fuera del plan de trabajo de la profesional.
+   *
+   * Es `force` con puntería: descarta los motivos de horario —fuera de plan,
+   * excepción del día, descanso— y **deja en pie todo lo demás**. Una doble
+   * reserva o un puesto que no alcanza siguen frenando el guardado y pidiendo
+   * confirmación aparte, que es la diferencia entre "hoy me quedo hasta las 9"
+   * y "siéntala encima de la clienta de las 8". Ver `allowingOutsideHours()`.
+   */
+  allowOutsideHours?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -91,13 +102,17 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
 
   try {
     const client = createEaClient();
-    const report = await evaluate(client, {
+    const raw = await evaluate(client, {
       id: input.id ?? null,
       providerId: input.providerId,
       serviceId: input.serviceId,
       start,
       end,
     });
+
+    // El filtro va en el servidor y no en el formulario, por la misma razón que
+    // el chequeo entero: la acción se puede invocar sin pasar por la pantalla.
+    const report = input.allowOutsideHours === true ? allowingOutsideHours(raw) : raw;
 
     if (!report.ok && input.force !== true) {
       return { status: "conflict", report };

@@ -260,6 +260,13 @@
     "noSlots": "No times left that day. Try another one.",
     "loadingSlots": "Looking for times…",
     "pickDate": "Pick a day",
+    "combo": {
+      "askFeet": "Feet as well?",
+      "askHands": "Hands as well?",
+      "none": "No, just that",
+      "hint": "Booked as a single appointment, at the combo price.",
+      "saving": "You save {amount}"
+    },
     "success": {
       "title": "You're booked!",
       "body": "See you on {date} at {time} with {provider}.",

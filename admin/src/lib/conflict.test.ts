@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  allowingOutsideHours,
   checkConflicts,
   DEFAULT_FREE_STATUSES,
   normalizeStatus,
@@ -1011,5 +1012,104 @@ describe("checkConflicts · forma del reporte", () => {
       if (original === undefined) delete process.env.TZ;
       else process.env.TZ = original;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Forzar el horario sin forzar todo lo demás
+// ---------------------------------------------------------------------------
+
+describe("allowingOutsideHours", () => {
+  it("deja pasar una cita fuera del plan de la profesional", () => {
+    const report = check({
+      candidate: {
+        providerId: 1,
+        serviceId: 10,
+        start: dt("2026-08-31 19:00:00"),
+        end: dt("2026-08-31 20:00:00"),
+      },
+      provider: { workingPlan: plan() },
+      stations: TWO_OPEN_STATIONS,
+    });
+    expect(reasons(report)).toEqual(["outside-working-plan"]);
+
+    const forced = allowingOutsideHours(report);
+    expect(forced.ok).toBe(true);
+    expect(forced.conflicts).toEqual([]);
+  });
+
+  it("también deja pasar el día libre y el descanso", () => {
+    const report = check({
+      candidate: {
+        providerId: 1,
+        serviceId: 10,
+        start: dt("2026-08-30 10:00:00"),
+        end: dt("2026-08-30 11:00:00"),
+      },
+      // Domingo: `plan()` lo deja en `null`.
+      provider: { workingPlan: plan() },
+      stations: TWO_OPEN_STATIONS,
+    });
+    expect(reasons(report)).toEqual(["outside-working-plan"]);
+    expect(allowingOutsideHours(report).ok).toBe(true);
+  });
+
+  it("NO deja pasar una doble reserva: eso no es política de horario", () => {
+    // Es la razón de existir de esta función. "Guardar de todas formas" fuerza
+    // las dos cosas con el mismo clic; acá la jornada se puede decidir y la
+    // silla ocupada no.
+    const report = check({
+      appointments: [appointment("2026-08-31 09:30:00", "2026-08-31 10:30:00")],
+      provider: { workingPlan: plan() },
+      stations: TWO_OPEN_STATIONS,
+    });
+    expect(reasons(report)).toContain("provider-busy");
+
+    const forced = allowingOutsideHours(report);
+    expect(forced.ok).toBe(false);
+    expect(forced.hard).toBe(true);
+    expect(reasons(forced)).toContain("provider-busy");
+  });
+
+  it("tampoco tapa un bloqueo del estudio ni una indisponibilidad", () => {
+    // Son marcas que alguien escribió sobre un día concreto —"el estudio cierra
+    // el 25"—, no la jornada por defecto. Ignorarlas con la casilla del horario
+    // sería pasar por encima de una decisión sin volver a leerla.
+    const report = check({
+      blockedPeriods: [blockedPeriod("2026-08-31 00:00:00", "2026-09-01 00:00:00", "Festivo")],
+      unavailabilities: [unavailability("2026-08-31 09:00:00", "2026-08-31 12:00:00")],
+      provider: { workingPlan: plan() },
+      stations: TWO_OPEN_STATIONS,
+    });
+
+    const forced = allowingOutsideHours(report);
+    expect(reasons(forced)).toEqual(
+      expect.arrayContaining(["blocked-period", "provider-unavailable"]),
+    );
+    expect(forced.ok).toBe(false);
+  });
+
+  it("recalcula `hard` al quedarse solo con un motivo suave", () => {
+    const report = check({
+      candidate: {
+        providerId: 1,
+        serviceId: 10,
+        start: dt("2026-08-31 19:00:00"),
+        end: dt("2026-08-31 20:00:00"),
+      },
+      unavailabilities: [unavailability("2026-08-31 19:00:00", "2026-08-31 20:00:00")],
+      provider: { workingPlan: plan() },
+      stations: TWO_OPEN_STATIONS,
+    });
+
+    const forced = allowingOutsideHours(report);
+    expect(forced.ok).toBe(false);
+    expect(forced.hard).toBe(false);
+    expect(reasons(forced)).toEqual(["provider-unavailable"]);
+  });
+
+  it("devuelve el mismo objeto cuando no hay nada que quitar", () => {
+    const report = check({ provider: { workingPlan: plan() }, stations: TWO_OPEN_STATIONS });
+    expect(allowingOutsideHours(report)).toBe(report);
   });
 });

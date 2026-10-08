@@ -26,6 +26,8 @@ import type {
   MetaIndex,
   ServiceOption,
 } from "@/components/calendar/types";
+import { loadComboCompositions } from "@/lib/combo-source";
+import type { ComboComposition } from "@/lib/combos";
 
 /**
  * Todo lo que la agenda le pide a EA y a `gbs_admin` para pintar un rango.
@@ -78,6 +80,18 @@ export type AgendaData = {
   capacities: ServiceCapacity[];
   /** Los puestos del estudio, de `gbs_admin`. Ver § El estudio tiene dos puestos. */
   stations: StationSlot[];
+  /**
+   * Los combos, en ids de EA. Es cómo el formulario ofrece "¿y pies?" después
+   * de elegir un servicio de manos, en vez de pedir que se busque el combo en
+   * la lista. Ver `lib/combos.ts`.
+   */
+  combos: ComboComposition[];
+  /**
+   * Por qué no hay combos que componer. `null` = sí los hay (o de verdad no
+   * existe ninguno). Con texto, el formulario lo dice en vez de esconder la
+   * función sin explicación.
+   */
+  combosReason: string | null;
   /** ISO. Lo muestra la barra: "actualizado hace 12 s". */
   fetchedAt: string;
 };
@@ -169,6 +183,11 @@ async function fetchFromEa(
 ): Promise<AgendaData> {
   const window = fetchWindow(dates);
 
+  // La composición de los combos sale de la vitrina más `service_map`, no de EA.
+  // Va acá y no en `Promise.all` de arriba porque no toca EA y porque su fallo
+  // no es el fallo de la agenda: devuelve el motivo y la pantalla sigue.
+  const combos = await loadComboCompositions();
+
   // Las excepciones de plan **no se piden aparte**: EA no las expone como
   // recurso (`GET /working_plan_exceptions` no tiene ruta) y ya vienen dentro
   // de cada técnica, que de todas formas hay que traer.
@@ -220,6 +239,7 @@ async function fetchFromEa(
         name: service.name ?? `Servicio ${service.id}`,
         duration: service.duration,
         attendantsNumber: service.attendantsNumber,
+        priceCOP: service.price,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "es")),
     capacities: rawServices.map<ServiceCapacity>((service) => ({
@@ -234,6 +254,8 @@ async function fetchFromEa(
       category: null,
     })),
     stations,
+    combos: combos.combos,
+    combosReason: combos.reason,
     fetchedAt: new Date().toISOString(),
   };
 }

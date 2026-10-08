@@ -143,6 +143,23 @@ export function contarCitasEnEa(): number {
 }
 
 /**
+ * Una consulta de una sola celda contra la base de **Easy!Appointments**.
+ *
+ * El gemelo de `queryOne`, sobre el otro esquema. Existe porque hay
+ * afirmaciones que la pantalla no puede sostener: una cita fuera de la jornada
+ * visible no se dibuja, así que "quedó guardada con el servicio correcto" se
+ * comprueba donde el dato está, no donde se ve.
+ */
+export function queryEa(sql: string): string | null {
+  const out = execFileSync(
+    "docker",
+    ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "-N", "-B", "easyappointments", "-e", sql],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+  ).trim();
+  return out === "" ? null : out.split("\n")[0];
+}
+
+/**
  * El aviso que deja una acción en la pantalla.
  *
  * El shell monta un `<div role="status">` vacío para los toasts, así que
@@ -170,11 +187,11 @@ export function limpiarDatosDePrueba(): void {
   const sql = [
     // Primero las citas: `ea_appointments` referencia a la clienta.
     `DELETE a FROM ea_appointments a JOIN ea_users c ON c.id = a.id_users_customer
-       WHERE c.first_name REGEXP '^(Cita|Nueva|Dx|Prueba|Repetida|Bitacora|Ana|Solonombre|T[0-9])'
+       WHERE c.first_name REGEXP '^(Cbo|Cita|Cja|Dos|Nueva|Dx|Prueba|Repetida|Bitacora|Ana|Solonombre|Web|T[0-9])'
          AND c.last_name REGEXP '^(Test|Perez|Prueba|Dos|Bitacora|Ríos|Nostico|Uno|-)'`,
     `DELETE FROM ea_users
        WHERE id_roles = (SELECT id FROM ea_roles WHERE slug = 'customer')
-         AND first_name REGEXP '^(Cita|Nueva|Dx|Prueba|Repetida|Bitacora|Solonombre|T[0-9])'`,
+         AND first_name REGEXP '^(Cbo|Cita|Cja|Dos|Nueva|Dx|Prueba|Repetida|Bitacora|Solonombre|Web|T[0-9])'`,
   ];
 
   for (const q of sql) {

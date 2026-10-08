@@ -82,7 +82,14 @@ export type ResourceGridProps = {
   onPickAppointment: (appointment: GridEvent["appointment"]) => void;
   onMove: (pick: MovePick) => void;
   onResize: (pick: ResizePick) => void;
-  /** Correr el inicio o el fin de la jornada visible para descubrir una oculta. */
+  /**
+   * Correr el inicio o el fin de la jornada visible.
+   *
+   * Lo llaman dos cosas distintas: el aviso de "hay 2 citas antes" y los dos
+   * botones del gutter, que están **siempre**. Los segundos existen porque
+   * agendar fuera de horario necesitaba antes que ya hubiera algo escondido
+   * ahí: había que crear la cita para poder ver dónde crearla.
+   */
   onRevealHidden: (direction: -1 | 1) => void;
 };
 
@@ -369,6 +376,39 @@ export function ResourceGrid({
             se escribe siempre porque una jornada de 8 a 20 cruza el mediodía y
             "8" a secas es ambiguo en una hoja impresa. */}
         <div className={styles.gutter} style={{ height: bodyHeight }}>
+          {/* Correr la jornada visible, sin depender de que haya una cita
+              escondida. La grilla arranca en el plan de trabajo —correcto casi
+              siempre— y estos dos botones son lo que hace agendable el casi:
+              "entra a las 7 porque la clienta viaja" es un martes cualquiera en
+              un estudio. Van en el gutter y no por columna: la ventana visible
+              es una sola para toda la grilla. */}
+          {range.startMinute > 0 ? (
+            <button
+              type="button"
+              className={`${styles.stretch} ${styles.stretchTop}`}
+              onClick={() => onRevealHidden(-1)}
+              // El gutter mide 3.25 rem: la etiqueta entera no cabe. Va en el
+              // `title` y en el `aria-label`, que es donde igual la iba a leer
+              // quien la necesite — con el lector de pantalla o al dudar.
+              title="Mostrar una hora más temprano"
+              aria-label="Mostrar una hora más temprano"
+            >
+              ↑ 1 h
+            </button>
+          ) : null}
+
+          {range.endMinute < 24 * 60 ? (
+            <button
+              type="button"
+              className={`${styles.stretch} ${styles.stretchBottom}`}
+              onClick={() => onRevealHidden(1)}
+              title="Mostrar una hora más tarde"
+              aria-label="Mostrar una hora más tarde"
+            >
+              ↓ 1 h
+            </button>
+          ) : null}
+
           {slotMinutes
             .filter((minute) => minute % 60 === 0)
             .map((minute) => (

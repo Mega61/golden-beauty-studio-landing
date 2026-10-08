@@ -1396,14 +1396,33 @@ concreta del riesgo "actualizaciones de EA" listado abajo, y se corre después d
 
 ### Capa 4 — E2E (Playwright)
 
-Lo que Vitest no puede: los Server Components `async`. Playwright ya se usa en el CRM
-(`automation/agendapro-pull`), así que no es herramienta nueva.
+Lo que Vitest no puede: los Server Components `async`, y sobre todo **el pegamento**. Los tres
+defectos que llegaron a producción —pantallas sin navegación, un destino del menú apuntando a una
+ruta inexistente, el alta de clienta fallando contra EA por un campo obligatorio— pasaron con la
+suite unitaria en verde, porque ninguno de esos tests abre el panel.
 
-- Login: redirige sin sesión, entra con cuenta de Workspace.
-- La agenda renderiza el día y permite crear una cita.
+Corre contra un stack efímero de verdad (`deploy/compose/ci-stack.yml`): MySQL y Easy!Appointments
+en contenedores, **sin dobles**. Un doble de EA habría aceptado feliz el payload que EA rechaza,
+que es justo el bug que se escapó — y volvió a pasar: `POST /services` exige `attendants_number`,
+que el panel no mandaba, así que crear un servicio desde el panel no funcionó nunca hasta que este
+E2E lo encontró.
+
+- Login: redirige sin sesión, entra con cuenta de Workspace. · `navegacion.spec.ts`
+- La agenda renderiza el día y permite crear una cita, incluida la clienta nueva desde el mismo
+  formulario, con nombre y apellido separados. · `agenda.spec.ts`
 - Mover una cita encima de otra ofrece "Guardar de todas formas" en vez de guardar callado.
-- Reserva pública de punta a punta, y Turnstile rechazando un envío sin token.
-- Cerrar una cita en caja.
+- Agendar **fuera del horario** de la técnica con la casilla, y que esa casilla **no** tape una
+  doble reserva; correr la jornada visible sin depender de que haya una cita escondida. ·
+  `horario.spec.ts`
+- Componer un combo eligiendo sus dos mitades: que el combo no esté en la lista, que la suma salga
+  tachada contra su precio, y que se guarde **una** cita con el servicio del combo. · `combos.spec.ts`
+- Reserva pública de punta a punta (catálogo → horarios → confirmar), con la forma **exacta** de lo
+  que sale a internet y el 409 de la carrera perdida. · `reserva-publica.spec.ts`
+  (Turnstile se prueba en la landing, `src/app/api/reservas/guards.test.ts`: es su proxy quien lo
+  verifica, y el panel no lo ve.)
+- Cerrar una cita en caja, hasta la fila de `appointment_finance` con su método de pago y la
+  invariante comprobada en SQL. · `caja.spec.ts`
+- Ergonomía táctil: ningún objetivo por debajo de 44 px en las nueve pantallas. · `movil.spec.ts`
 
 ### El test que reemplaza la conciliación manual
 
@@ -1421,6 +1440,10 @@ como el fixture esperado.
 - **CI en cada PR**: `npm run lint && npm test` en la landing y en `admin/`. En `admin/` los tests son
   **compuerta del build de la imagen**: si fallan, no hay imagen y no hay despliegue. En la landing no
   corren en `prebuild` — un test lento o inestable no debe poder bloquear un deploy de la landing.
+- **Los umbrales se evalúan en CI**, con `npm run test:coverage` y no `npm test`. Un umbral que ningún
+  pipeline mira no es un umbral, es un comentario: así fue como una rama de `ingest-id.ts` —la que
+  rechaza un método de pago mal escrito, que produce llaves duplicadas en Actual Budget— se quedó sin
+  test sin que nadie se enterara.
 - **Lo que NO se testea:** EA en sí, Strapi en sí, Actual Budget en sí. Se testean nuestras
   suposiciones sobre ellos (capa 3) y nuestros mapeos hacia ellos (capa 1).
 

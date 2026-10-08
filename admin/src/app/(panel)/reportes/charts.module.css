@@ -209,6 +209,20 @@
   inset: 0;
   padding: 0;
   position: absolute;
+
+  /* El blanco no puede ser más chico que un dedo, aunque la fila sí lo sea.
+     La pista mide lo que mida la barra, y con pocas series eso puede quedar en
+     38 px — por debajo del mínimo táctil del panel, que se usa sobre todo desde
+     el teléfono. Se crece hacia los dos lados desde el centro, así que el
+     blanco se agranda sin mover ni un píxel de lo que se ve.
+
+     Lo encontró la suite E2E de ergonomía, y solo cuando hubo datos de verdad
+     en los reportes: con la base vacía no hay barras que medir y el defecto no
+     existía para nadie. */
+  min-height: var(--hit);
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
 }
 
 .barHit:focus-visible {

@@ -14,6 +14,7 @@ function entry(patch: Partial<PricingEntry> & { id: string }): PricingEntry {
     durationMin: patch.durationMin === undefined ? 150 : patch.durationMin,
     fromPrice: patch.fromPrice ?? false,
     showcaseOnly: patch.showcaseOnly ?? false,
+    composedOf: patch.composedOf ?? null,
   };
 }
 
@@ -241,8 +242,22 @@ describe("createPayload", () => {
         name: "Semipermanente manos y pies",
         price: 95_000,
         duration: 120,
+        attendantsNumber: 1,
       },
     });
+  });
+
+  it("siempre manda `attendantsNumber`, que EA exige sin decirlo", () => {
+    // `Services_model::save()` lee `attendants_number` sin comprobar que
+    // exista: sin el campo EA responde 200 con una página de warnings de PHP,
+    // el cliente no la decodifica, y el panel dice "la agenda no aceptó la
+    // escritura" sin decir por qué. Crear un servicio no funcionó nunca contra
+    // una EA de verdad hasta que la suite E2E lo encontró.
+    for (const name of ["Combo", "Semipermanente manos"]) {
+      expect(createPayload(sinVincular(COMBO), name)).toMatchObject({
+        payload: { attendantsNumber: 1 },
+      });
+    }
   });
 
   it("el precio y la duración salen de la vitrina, no de quien llama", () => {

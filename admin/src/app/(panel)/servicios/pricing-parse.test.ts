@@ -63,6 +63,7 @@ describe("parsePricingSource", () => {
         durationMin: 150,
         fromPrice: false,
         showcaseOnly: false,
+        composedOf: null,
       },
       {
         id: "press-on",
@@ -71,6 +72,7 @@ describe("parsePricingSource", () => {
         durationMin: 105,
         fromPrice: true,
         showcaseOnly: false,
+        composedOf: null,
       },
       {
         id: "design-per-nail",
@@ -79,6 +81,7 @@ describe("parsePricingSource", () => {
         durationMin: null,
         fromPrice: false,
         showcaseOnly: false,
+        composedOf: null,
       },
     ]);
   });
@@ -198,7 +201,35 @@ describe("contra el archivo real de la landing", () => {
       durationMin: 150,
       fromPrice: false,
       showcaseOnly: false,
+      composedOf: null,
     });
+  });
+
+  it("lee la composición de los combos, que es cómo se llega a ellos", () => {
+    const combos = entradas.filter((e) => e.categoryId === "combos");
+
+    expect(combos.length).toBeGreaterThan(0);
+    // Sin composición un combo es inalcanzable: ninguna pantalla lo ofrece en
+    // una lista. El build de la landing ya lo impide; esto lo vuelve a exigir
+    // desde el lado que lo consume.
+    expect(combos.every((c) => c.composedOf !== null)).toBe(true);
+
+    const ids = new Set(entradas.map((e) => e.id));
+    for (const combo of combos) {
+      expect(ids.has(combo.composedOf!.hands)).toBe(true);
+      expect(ids.has(combo.composedOf!.feet)).toBe(true);
+    }
+
+    expect(entradas.find((e) => e.id === "semi-permanent-hands-feet")?.composedOf).toEqual({
+      hands: "semi-permanent-hands",
+      feet: "semi-permanent-feet",
+    });
+  });
+
+  it("no le inventa composición a lo que no es un combo", () => {
+    expect(
+      entradas.filter((e) => e.categoryId !== "combos").every((e) => e.composedOf === null),
+    ).toBe(true);
   });
 
   it("respeta el durationMin null de un adicional que no ocupa tiempo propio", () => {

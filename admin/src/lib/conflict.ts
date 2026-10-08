@@ -241,6 +241,51 @@ export type ConflictReport = {
   conflicts: readonly Conflict[];
 };
 
+/**
+ * Los motivos que significan "la profesional no trabaja a esa hora".
+ *
+ * Son los tres que produce `checkWorkingPlan()`, y son exactamente los que la
+ * casilla "Agendar fuera del horario" del formulario apaga.
+ *
+ * Deliberadamente **no** están acá `blocked-period` ni `provider-unavailable`.
+ * Los tres de arriba son la jornada *por defecto* de alguien —"Lina trabaja de
+ * 9 a 6"— y quedarse media hora más es una decisión normal de un martes. Los
+ * otros dos son marcas puntuales que alguien puso a mano sobre un día concreto:
+ * "el estudio cierra el 25" o "ese jueves no vengo". Taparlos con la misma
+ * casilla haría que una decisión que alguien tomó y escribió se ignorara sin
+ * que nadie la vuelva a leer. Para esos sigue estando "Guardar de todas
+ * formas", que sí lo dice todo en voz alta.
+ */
+const WORKING_PLAN_REASONS: ReadonlySet<ConflictReason> = new Set<ConflictReason>([
+  "outside-working-plan",
+  "plan-exception",
+  "during-break",
+]);
+
+/**
+ * El mismo reporte, sin los motivos de horario de la profesional.
+ *
+ * Es cómo se "fuerza el horario" **sin** forzar todo lo demás. El `force_save`
+ * de EA —y el "Guardar de todas formas" que lo espeja— es un martillo: dice que
+ * sí a la doble reserva y al puesto que no existe con el mismo clic con el que
+ * dice que sí a una cita a las 7 de la mañana. Y las dos cosas no son iguales:
+ * la jornada es política y se cambia decidiéndolo; que la silla ya esté ocupada
+ * es física.
+ *
+ * Así que la casilla del formulario pasa por acá, y un choque de verdad sigue
+ * frenando el guardado y pidiendo confirmación explícita.
+ */
+export function allowingOutsideHours(report: ConflictReport): ConflictReport {
+  const conflicts = report.conflicts.filter((c) => !WORKING_PLAN_REASONS.has(c.reason));
+  if (conflicts.length === report.conflicts.length) return report;
+
+  return {
+    ok: conflicts.length === 0,
+    hard: conflicts.some((c) => c.severity === "hard"),
+    conflicts,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Utilidades
 // ---------------------------------------------------------------------------

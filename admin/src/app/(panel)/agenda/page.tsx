@@ -77,6 +77,8 @@ export default async function AgendaPage({
                 blockedPeriods: [],
                 meta: {},
                 services: [],
+                combos: [],
+                combosReason: null,
                 capacities: [],
                 stations: result.stations,
                 fetchedAt: new Date().toISOString(),
