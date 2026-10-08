@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { getActiveScenario, getActiveScenarios } from "./promos";
+import { PROMOS_DATA as ES } from "./promos.es";
+import { PROMOS_DATA as EN } from "./promos.en";
+import { PROMO_PRICES, promoPriceRows } from "./promo-prices";
+import { getPriceCOP } from "./pricing";
 
 const original = process.env.NEXT_PUBLIC_ACTIVE_PROMO;
 
@@ -95,5 +99,61 @@ describe("getActiveScenario", () => {
   it("returns null when no promo is active", async () => {
     setPromo("off");
     expect(await getActiveScenario("es")).toBeNull();
+  });
+});
+
+describe("the current lineup", () => {
+  const LINEUP = "sabado-press,miercoles-pies,primera-visita";
+
+  it("resolves all three, in env order, in both languages", async () => {
+    setPromo(LINEUP);
+    for (const lang of ["es", "en"] as const) {
+      const result = await getActiveScenarios(lang);
+      expect(result.map((s) => s.slug)).toEqual(LINEUP.split(","));
+    }
+  });
+
+  it("shows the same flyer in both languages", async () => {
+    setPromo(LINEUP);
+    const es = await getActiveScenarios("es");
+    const en = await getActiveScenarios("en");
+    expect(en.map((s) => s.items[0]?.image_url)).toEqual(es.map((s) => s.items[0]?.image_url));
+  });
+});
+
+describe("portrait flyers", () => {
+  // A flyer carries its prices as pixels. Without a real alt, a screen reader
+  // hears the title and none of the numbers.
+  it("always carry an alt that is more than the title", () => {
+    for (const data of [ES, EN]) {
+      for (const scenario of Object.values(data)) {
+        for (const item of scenario.items) {
+          if (item.image_orientation !== "portrait") continue;
+          expect(item.image_url, `${scenario.slug}/${item.id}`).toBeTruthy();
+          expect(item.image_alt, `${scenario.slug}/${item.id}`).toBeTruthy();
+          expect(item.image_alt).not.toBe(item.title);
+        }
+      }
+    }
+  });
+});
+
+describe("promo prices", () => {
+  // A strikethrough that saves nothing is false advertising.
+  it("are below the regular price they are shown against", () => {
+    for (const [slug, rows] of Object.entries(PROMO_PRICES)) {
+      for (const row of rows) {
+        const regular = getPriceCOP(row.regularId);
+        expect(regular, `${slug}/${row.key}: ${row.regularId} not in pricing.ts`).not.toBeNull();
+        expect(row.promoCOP, `${slug}/${row.key}`).toBeLessThan(regular!);
+      }
+    }
+  });
+
+  it("render the same amounts in both languages, each in its own format", () => {
+    const es = promoPriceRows("sabado-press", "es", { "press-on": "Press On" });
+    const en = promoPriceRows("sabado-press", "en", { "press-on": "Press On" });
+    expect(es).toEqual([{ label: "Press On", price: "$80.000", was: "$100.000" }]);
+    expect(en).toEqual([{ label: "Press On", price: "$80,000 COP", was: "$100,000 COP" }]);
   });
 });

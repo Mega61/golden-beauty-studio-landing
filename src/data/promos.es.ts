@@ -1,4 +1,5 @@
 import type { PromosBySlug } from "./promos.types";
+import { promoPrice, promoPriceRows } from "./promo-prices";
 import { siteConfig } from "@/config/site";
 
 // Reservation URL lives in NEXT_PUBLIC_BOOKING_URL (siteConfig.bookingUrl). If
@@ -161,18 +162,98 @@ export const PROMOS_DATA: PromosBySlug = {
     ],
   },
 
+  // Promos de día de la semana. Recurrentes, sin starts_at/ends_at: corren
+  // mientras estén en NEXT_PUBLIC_ACTIVE_PROMO. Los montos viven en
+  // `promo-prices.ts`, compartidos con el inglés.
+  "sabado-press": {
+    slug: "sabado-press",
+    label: "Sábado de Press",
+    active: true,
+    strip: {
+      tag: "Sábado de Press",
+      message: `Sábados: Press On a ${promoPrice("sabado-press", "press-on", "es")}`,
+      cta: "Reservar",
+      href: BOOKING,
+      accent: "gold",
+    },
+    items: [
+      {
+        id: "sabado-press-on",
+        eyebrow: "Todos los sábados",
+        title: "Sábado de Press",
+        body:
+          "Press On a precio de sábado. El mismo montaje de siempre, con su largo y su diseño, por menos — solo los sábados.",
+        cta_label: "Reservar un sábado",
+        cta_href: BOOKING,
+        image_url: "/promos/sabado-press.webp",
+        image_orientation: "portrait",
+        image_alt: `Afiche Sábado de Press: Press On a ${promoPrice("sabado-press", "press-on", "es")}, todos los sábados en Golden Beauty Studio.`,
+        price_rows: promoPriceRows("sabado-press", "es", { "press-on": "Press On" }),
+        accent: "gold",
+        featured: true,
+        terms_label: "Condiciones",
+        terms: [
+          "El precio aplica a citas de Press On realizadas un sábado.",
+          "No es acumulable con otras promociones, incluido el 10% de primera visita.",
+          "La reserva en línea muestra el precio regular; el precio de sábado se aplica al pagar en el estudio.",
+          "Diseños adicionales por uña se cobran aparte, según la lista de precios.",
+        ],
+      },
+    ],
+  },
+
+  "miercoles-pies": {
+    slug: "miercoles-pies",
+    label: "Miércoles de pies",
+    active: true,
+    strip: {
+      tag: "Miércoles de pies",
+      message: `Miércoles: pies desde ${promoPrice("miercoles-pies", "traditional-feet", "es")}`,
+      cta: "Reservar",
+      href: BOOKING,
+      accent: "ink",
+    },
+    items: [
+      {
+        id: "miercoles-pies",
+        eyebrow: "Todos los miércoles",
+        title: "Miércoles de pies",
+        body:
+          "Tradicional o semipermanente en pies, a precio de miércoles. Una cita a mitad de semana para llegar al fin de semana lista.",
+        cta_label: "Reservar un miércoles",
+        cta_href: BOOKING,
+        image_url: "/promos/miercoles-pies.webp",
+        image_orientation: "portrait",
+        image_alt: `Afiche Miércoles de pies: tradicional ${promoPrice("miercoles-pies", "traditional-feet", "es")}, semipermanente ${promoPrice("miercoles-pies", "semi-permanent-feet", "es")}, todos los miércoles en Golden Beauty Studio.`,
+        price_rows: promoPriceRows("miercoles-pies", "es", {
+          "traditional-feet": "Tradicional",
+          "semi-permanent-feet": "Semipermanente",
+        }),
+        accent: "ink",
+        featured: true,
+        terms_label: "Condiciones",
+        terms: [
+          "El precio aplica a servicios de pies realizados un miércoles: tradicional o semipermanente.",
+          "No es acumulable con otras promociones, incluido el 10% de primera visita.",
+          "La reserva en línea muestra el precio regular; el precio de miércoles se aplica al pagar en el estudio.",
+          "Limpieza profunda y diseños se cobran aparte, según la lista de precios.",
+        ],
+      },
+    ],
+  },
+
   "primera-visita": {
     slug: "primera-visita",
     label: "Primera visita",
     active: true,
     // Evergreen: sin starts_at/ends_at — pensada para correr todo el año junto
-    // a la promo de temporada que esté activa.
+    // a las promos que estén activas.
     strip: {
       tag: "Primera visita",
-      message:
-        "10% de descuento en tu primera cita en el estudio — solo clientas nuevas.",
+      message: "10% en tu primera cita",
       cta: "Reservar",
       href: BOOKING,
+      until: "Solo clientas nuevas",
       accent: "ink",
     },
     items: [
@@ -181,13 +262,23 @@ export const PROMOS_DATA: PromosBySlug = {
         eyebrow: "Bienvenida",
         title: "10% en tu primera visita",
         body:
-          "Si es tu primera cita en Golden, recibe 10% sobre el servicio que elijas. Sin fecha límite — el beneficio es válido una sola vez, al reservar tu primera cita.",
+          "Si es tu primera cita en Golden, recibe 10% de descuento en el servicio que elijas — en todos nuestros servicios. Válido una sola vez.",
         cta_label: "Reservar mi primera cita",
         cta_href: BOOKING,
         ribbon: "Solo clientas nuevas",
-        image_url: "/primera-visita.jpg",
+        image_url: "/promos/primera-visita.webp",
+        image_orientation: "portrait",
+        image_alt:
+          "Afiche 10% de descuento en tu primera visita, en todos los servicios: Press On, Polygel, Builder Gel, Acrílico, Base Rubber, semipermanente en pies y en manos.",
         accent: "ink",
         featured: true,
+        terms_label: "Condiciones",
+        terms: [
+          "Aplica solo a clientas nuevas, sin citas previas en el estudio.",
+          "El 10% se descuenta del servicio de la primera cita; los adicionales se cobran a precio regular.",
+          "No es acumulable con otras promociones, incluidos Sábado de Press y Miércoles de pies.",
+          "La reserva en línea muestra el precio regular; el descuento se aplica al pagar en el estudio.",
+        ],
       },
     ],
   },
