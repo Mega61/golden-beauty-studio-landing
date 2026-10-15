@@ -233,6 +233,15 @@ export function isAllowedIdentity(
  * - `catalogo:publicar` — el diff `pricing.ts` ↔ EA en el sentido de escritura.
  * - `diagnostico:ver` — el tablero de estado del sistema.
  * - `ea:avanzado` — el link a la interfaz de EA.
+ * - `recordatorios:enviar` — ver la lista de recordatorios de hoy y mañana y
+ *   mandarlos a mano por `wa.me` (el paliativo de X7). Es trabajo de mostrador.
+ *   **No es de la técnica**, aunque sean sus clientas: el aviso tiene que salir
+ *   del WhatsApp del estudio, que es a donde la clienta va a responder "no
+ *   puedo, ¿me cambias?". Desde el celular personal de la técnica, esa
+ *   respuesta llega a un número que la recepción no ve, y la cita no se mueve.
+ * - `recordatorios:baja` — registrar que un número no quiere más recordatorios.
+ *   Corta todos los avisos futuros de esa persona, incluidos los automáticos,
+ *   así que es de quien atiende el WhatsApp del estudio y queda en bitácora.
  */
 export type Capability =
   | "cuenta:cerrar-propia"
@@ -251,7 +260,9 @@ export type Capability =
   | "clientes:fusionar"
   | "catalogo:publicar"
   | "diagnostico:ver"
-  | "ea:avanzado";
+  | "ea:avanzado"
+  | "recordatorios:enviar"
+  | "recordatorios:baja";
 
 /**
  * Contexto que hace variar una fila de la matriz.
@@ -294,6 +305,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "catalogo:publicar",
     "diagnostico:ver",
     "ea:avanzado",
+    "recordatorios:enviar",
+    "recordatorios:baja",
   ]),
 
   // Recepción. Opera el día completo y cierra la caja, pero no corrige después
@@ -308,6 +321,10 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "agenda:ver-todas",
     "clientes:editar",
     "diagnostico:ver",
+    // Recepción es quien atiende el WhatsApp del estudio: manda los avisos y
+    // registra a quien pide no recibir más.
+    "recordatorios:enviar",
+    "recordatorios:baja",
   ]),
 
   // La técnica. Su alcance es su propio día, sus propias cuentas y su propia

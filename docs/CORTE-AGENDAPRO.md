@@ -361,6 +361,28 @@ si esto no está, la clienta simplemente deja de recibirlos y la inasistencia su
 alarga, el paliativo es un botón que abre `wa.me` con el texto listo: trabajo humano diario, pero
 nadie se queda sin aviso.
 
+### Estado del paliativo: ✅ construido (2026-10-15)
+
+`/admin/recordatorios` (y un acceso con el conteo de pendientes en Hoy), para dueña y recepción
+(`recordatorios:enviar`, `recordatorios:baja`). La técnica no: el aviso tiene que salir del WhatsApp
+del estudio, que es a donde la clienta responde para reprogramar.
+
+- **Por día, no por ventana.** Lista lo que falta de hoy (tipo `recordatorio_2h`) y todo mañana
+  (`recordatorio_24h`), con estado: pendiente, ya recordada (por quién y a qué hora), sin teléfono,
+  baja, o estado que no aplica. Las reglas de estado son las de `jobs/reminders.ts`
+  (`isSendableStatus`); la selección y el texto, puros y testeados, en `lib/whatsapp/manual-reminder.ts`.
+- **La fila va antes del enlace.** "Enviar por WhatsApp" inserta en `wa_message` (`channel =
+  'manual'`, `sent_by_user_id`, plantilla `manual-wa-me-v1`, `enviado`) y recién después abre `wa.me`.
+  Un segundo toque choca contra la `UNIQUE` y solo reabre la conversación.
+- **El emisor automático va a ver esas filas y saltarlas**: comparte el `kind`, así que la `UNIQUE
+  (ea_appointment_id, kind)` cruza los dos canales. Cuando se construya, su `ya-existe` cubre el caso
+  sin código nuevo. Migración `021` (`channel`, `sent_by_user_id`).
+- **"No quiere recordatorios"** registra la baja del número en `wa_optout`, con bitácora. Deshacer una
+  baja no tiene botón todavía: se hace a mano en la base.
+- **Lo que no hace:** no sabe si la persona de verdad le dio "enviar" en WhatsApp — la fila dice que
+  se abrió con el texto listo. Y una fila `fallido`/`omitido` del futuro emisor bloquea el envío manual
+  de ese aviso (la `UNIQUE`); se muestra como "no salió" para que alguien lo vea.
+
 ## X8 — El corte
 
 1. **Ensayo de restauración del respaldo.** El servicio `db-backup` ya existe en el stack: `mysqldump`

@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
+import Link from "next/link";
+
 import { Icon, formatDateLong } from "@/components/ui";
 import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
 import { cerrarCuenta } from "./actions";
 import { loadToday } from "./data";
+import { loadReminders } from "../recordatorios/data";
 import { TodayList } from "./TodayList";
 
 /**
@@ -44,14 +47,28 @@ function shellRole(role: UserRole): Role {
 export default async function HoyPage() {
   const session = await requireSession();
 
-  const [verTodas, canCharge, canSeeTotals, canFixAfterClose] = await Promise.all([
+  const [verTodas, canCharge, canSeeTotals, canFixAfterClose, canRemind] = await Promise.all([
     sessionCan("agenda:ver-todas"),
     sessionCan("cuenta:cobrar"),
     sessionCan("caja:ver"),
     sessionCan("cuenta:corregir-tras-cierre"),
+    sessionCan("recordatorios:enviar"),
   ]);
 
-  const { date, appointments, catalog, problems } = await loadToday(session, { verTodas });
+  // El acceso a Recordatorios va acá con su conteo porque Hoy es la pantalla
+  // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
+  // que la pasada diaria no dependa de acordarse. Si la carga falla, el acceso
+  // sale sin número —nunca tumba Hoy por un dato accesorio.
+  const [{ date, appointments, catalog, problems }, pendingReminders] = await Promise.all([
+    loadToday(session, { verTodas }),
+    canRemind
+      ? loadReminders()
+          .then((r) =>
+            r.problems.length > 0 ? null : r.rows.filter((row) => row.state === "pendiente").length,
+          )
+          .catch(() => null)
+      : Promise.resolve(null),
+  ]);
 
   const eaCaido = problems.find((p) => p.source === "ea") ?? null;
   const dbCaida = problems.find((p) => p.source === "db") ?? null;
@@ -103,6 +120,23 @@ export default async function HoyPage() {
             </span>
           </div>
         )}
+
+        {canRemind ? (
+          // `Link` y no `ButtonLink`: un `<a>` crudo no lleva el `basePath`.
+          <Link
+            href="/recordatorios"
+            className={`ui-btn ui-btn--${pendingReminders ? "primary" : "secondary"} ui-btn--block`}
+          >
+            <Icon name="mensaje" size={18} />
+            {pendingReminders === null
+              ? "Recordatorios por WhatsApp"
+              : pendingReminders === 0
+                ? "Recordatorios: nada pendiente"
+                : pendingReminders === 1
+                  ? "Recordatorios: 1 pendiente"
+                  : `Recordatorios: ${pendingReminders} pendientes`}
+          </Link>
+        ) : null}
 
         <TodayList
           appointments={appointments}

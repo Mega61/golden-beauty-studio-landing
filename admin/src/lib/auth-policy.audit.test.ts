@@ -43,6 +43,8 @@ const TODAS: Capability[] = [
   "catalogo:publicar",
   "diagnostico:ver",
   "ea:avanzado",
+  "recordatorios:enviar",
+  "recordatorios:baja",
 ];
 
 /**
@@ -74,6 +76,10 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "catalogo:publicar": false,
     "diagnostico:ver": true,
     "ea:avanzado": false,
+    // Recordatorios por `wa.me` (X7): recepción atiende el WhatsApp del
+    // estudio, así que manda los avisos y registra las bajas.
+    "recordatorios:enviar": true,
+    "recordatorios:baja": true,
   },
   staff: {
     "cuenta:cerrar-propia": true,
@@ -93,11 +99,15 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "catalogo:publicar": false,
     "diagnostico:ver": false,
     "ea:avanzado": false,
+    // El aviso sale del WhatsApp del estudio, no del celular de la técnica: es
+    // a ese número a donde la clienta responde para reprogramar.
+    "recordatorios:enviar": false,
+    "recordatorios:baja": false,
   },
 };
 
 describe("AUDIT · la matriz completa, celda por celda, contra el plan", () => {
-  it("51 celdas × las dos posiciones de TICKET_STAFF_COBRA", () => {
+  it("57 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
     for (const role of ["owner", "admin", "staff"] as UserRole[]) {
       for (const capability of TODAS) {
         const esperado = DEL_PLAN[role][capability];

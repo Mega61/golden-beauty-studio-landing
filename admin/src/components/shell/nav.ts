@@ -74,6 +74,16 @@ export const DESTINATIONS: readonly Destination[] = [
     bottom: 4,
   },
   {
+    id: "recordatorios",
+    label: "Recordatorios",
+    href: "/recordatorios",
+    icon: "mensaje",
+    // Los avisos por `wa.me` salen del WhatsApp del estudio, que atiende la
+    // recepción. La técnica no los manda desde su celular: la clienta
+    // respondería a un número que nadie más ve.
+    roles: NO_STAFF,
+  },
+  {
     id: "comisiones",
     label: "Comisiones",
     href: "/comisiones",

@@ -44,6 +44,7 @@ describe("destinationsFor", () => {
     expect(ids).not.toContain("diagnostico");
     expect(ids).not.toContain("avanzado");
     expect(ids).toContain("caja");
+    expect(ids).toContain("recordatorios");
   });
 
   it("la técnica no ve caja, ni clientas, ni a las demás profesionales", () => {
@@ -61,6 +62,7 @@ describe("bottomBarFor", () => {
       "clientas",
     ]);
     expect(overflowFor("reception").map((d) => d.id)).toEqual([
+      "recordatorios",
       "comisiones",
       "servicios",
       "equipo",

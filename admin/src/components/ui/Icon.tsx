@@ -37,7 +37,8 @@ export type IconName =
   | "info"
   | "deshacer"
   | "candado"
-  | "reloj";
+  | "reloj"
+  | "mensaje";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Hoy: el sol sobre el mesón. La pantalla que abre la recepción.
@@ -157,6 +158,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.6" />
       <path d="M12 7.2V12l3.2 2" />
+    </>
+  ),
+  // Mensaje: el globo de conversación. Recordatorios por WhatsApp.
+  mensaje: (
+    <>
+      <path d="M4 5.5h16a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H9.5L5 20.5V17H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
+      <path d="M7.5 10h9M7.5 13h6" />
     </>
   ),
 };

@@ -171,6 +171,8 @@ describe("can — el alcance de una técnica", () => {
     "catalogo:publicar",
     "diagnostico:ver",
     "ea:avanzado",
+    "recordatorios:enviar",
+    "recordatorios:baja",
   ];
 
   it.each(PROHIBIDAS)("staff NO alcanza %s", (capability) => {
@@ -208,6 +210,11 @@ describe("can — recepción y dueña", () => {
     expect(can("admin", "liquidacion:ver-todas")).toBe(false);
   });
 
+  it("recepción manda los recordatorios por wa.me y registra las bajas", () => {
+    expect(can("admin", "recordatorios:enviar")).toBe(true);
+    expect(can("admin", "recordatorios:baja")).toBe(true);
+  });
+
   it("la dueña alcanza todo", () => {
     const TODAS: Capability[] = [
       "cuenta:cerrar-propia",
@@ -225,6 +232,8 @@ describe("can — recepción y dueña", () => {
       "catalogo:publicar",
       "diagnostico:ver",
       "ea:avanzado",
+      "recordatorios:enviar",
+      "recordatorios:baja",
     ];
     for (const capability of TODAS) {
       expect(can("owner", capability)).toBe(true);

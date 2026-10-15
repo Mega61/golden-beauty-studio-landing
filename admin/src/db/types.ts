@@ -637,6 +637,16 @@ export type WaMessageKind = "recordatorio_24h" | "recordatorio_2h" | "confirmaci
  * `enviado` y `entregado` es exactamente la pregunta que se hace alguien cuando
  * una clienta dice que no le avisaron.
  */
+/**
+ * Por dónde salió un mensaje.
+ *
+ * `manual` es una persona abriendo `wa.me` con el texto listo: el paliativo de
+ * X7 mientras Meta no apruebe las plantillas. Comparten la `UNIQUE (cita,
+ * tipo)` a propósito — un recordatorio manual es uno que el emisor automático
+ * ya no tiene que mandar.
+ */
+export type WaMessageChannel = "cloud_api" | "manual";
+
 export type WaMessageStatus =
   | "pendiente"
   | "enviado"
@@ -654,6 +664,10 @@ export interface WaMessageTable {
   id: Generated<number>;
   ea_appointment_id: number;
   kind: WaMessageKind;
+  /** Migración `021`. Por defecto `cloud_api`; el botón de `wa.me` escribe `manual`. */
+  channel: Generated<WaMessageChannel>;
+  /** Quién tocó el botón, en `manual`. Sin FK, como `audit_log.actor_user_id`. */
+  sent_by_user_id: AuthId | null;
   phone_e164: string;
   template_name: string;
   status: Generated<WaMessageStatus>;

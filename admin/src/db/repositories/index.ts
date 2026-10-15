@@ -22,6 +22,7 @@ import { legacyAppointmentRepository } from "./legacy-appointment";
 import { serviceMapRepository } from "./service-map";
 import { staffTotpRepository } from "./staff-totp";
 import { stationRepository } from "./station";
+import { waMessageRepository } from "./wa-message";
 import { webhookEventRepository } from "./webhook-event";
 import type { Db } from "./shared";
 
@@ -42,6 +43,7 @@ export function repositories(db: Db) {
     serviceMap: serviceMapRepository(db),
     staffTotp: staffTotpRepository(db),
     stations: stationRepository(db),
+    waMessages: waMessageRepository(db),
     webhookEvents: webhookEventRepository(db),
   };
 }
@@ -74,6 +76,8 @@ export { legacyAppointmentRepository } from "./legacy-appointment";
 export { serviceMapRepository } from "./service-map";
 export { staffTotpRepository } from "./staff-totp";
 export { stationRepository } from "./station";
+export { waMessageRepository } from "./wa-message";
+export type { ManualSendInput, WaMessageWithSender } from "./wa-message";
 export { webhookEventRepository } from "./webhook-event";
 export type { RecordedEvent } from "./webhook-event";
 export type { Db } from "./shared";
