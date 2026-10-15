@@ -485,6 +485,12 @@ columna que coincida.
 > liquidaría 40 % también sobre esas 35. Las tres salidas —Mariana es la dueña y no cobra
 > comisión; es una segunda técnica con su propia tasa; o el 40 % vale para las dos— son una
 > migración de dos sentencias, pero hay que elegir una. Es la fila que X4 estaba esperando.
+>
+> **Resuelto (2026-10-15):** Kati ya no trabaja en el estudio. Atiende **una sola técnica,
+> Mariana** —que no es la dueña: se llaman igual—, y el export de octubre lo confirma (64 de 64).
+> Con una sola persona la regla global de `018` da exactamente lo correcto, así que **no se toca**:
+> amarrarla ahora a Mariana podría dejar sin liquidar las últimas citas de Kati. X4 sigue con la
+> misma fecha de vencimiento: antes del primer día de una segunda técnica.
 
 **Dos cosas menores que el archivo también trae:** 20 de 173 apellidos son un guion bajo (se
 limpian; si no, quedan clientas llamadas "Julian \_" y ese nombre va en la confirmación), y 37
