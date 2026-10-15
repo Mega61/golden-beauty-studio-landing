@@ -227,7 +227,8 @@
       }
     },
     "footnote": "Garantía de una semana por desprendimiento de producto (no dijes o piedrería)",
-    "cta": "Reservar mi cita"
+    "cta": "Reservar mi cita",
+    "book": "Reservar"
   },
   "reservar": {
     "meta": {
@@ -236,42 +237,83 @@
     },
     "eyebrow": "Reservar",
     "title": "Agenda tu cita",
-    "intro": "Cuatro pasos y listo. Si prefieres escribirnos, también estamos por WhatsApp.",
+    "intro": "Tres pasos, menos de un minuto. Te confirmamos al instante.",
     "steps": {
-      "service": "¿Qué te vas a hacer?",
-      "provider": "¿Con quién?",
-      "slot": "¿Qué día y a qué hora?",
+      "service": "Servicio",
+      "slot": "Día y hora",
       "details": "Tus datos"
     },
-    "anyProvider": "Cualquiera",
-    "anyProviderHint": "La que tenga el espacio",
-    "duration": "{min} min",
-    "back": "Volver",
-    "next": "Continuar",
+    "headings": {
+      "service": "¿Qué te vas a hacer?",
+      "slot": "¿Cuándo te queda bien?",
+      "details": "¿A nombre de quién?"
+    },
+    "provider": {
+      "label": "¿Con quién?",
+      "any": "Cualquiera",
+      "anyHint": "La primera con espacio"
+    },
+    "summary": {
+      "title": "Tu cita",
+      "empty": "Elige un servicio para empezar.",
+      "with": "Con",
+      "anyone": "La primera disponible",
+      "total": "Total",
+      "pay": "Pagas en el estudio, en efectivo o por transferencia. Si aplica una promo, el descuento se hace al pagar."
+    },
+    "continue": "Continuar",
+    "back": "Atrás",
+    "change": "Cambiar",
     "confirm": "Confirmar cita",
     "sending": "Confirmando…",
     "labels": {
       "firstName": "Nombre",
       "lastName": "Apellido",
       "phone": "Celular",
-      "phoneHint": "Para confirmarte y avisarte si algo cambia.",
-      "notes": "¿Algo que debamos saber? (opcional)"
+      "phoneHint": "Aquí te confirmamos y te avisamos si algo cambia.",
+      "phoneInvalid": "Revisa el número: un celular tiene 10 dígitos y empieza por 3.",
+      "notes": "Nota para la técnica",
+      "notesPlaceholder": "Un diseño que viste, una alergia, si vienes con alguien…",
+      "addNote": "Agregar una nota",
+      "remember": "Recordar mis datos en este dispositivo"
     },
-    "noSlots": "No quedan horas libres ese día. Prueba con otro.",
+    "day": {
+      "today": "Hoy",
+      "tomorrow": "Mañana",
+      "closed": "Cerrado"
+    },
+    "parts": {
+      "morning": "Mañana",
+      "afternoon": "Tarde",
+      "evening": "Noche"
+    },
+    "noSlots": "Ese día ya no quedan horas.",
+    "nextOpen": "Ver el siguiente día",
     "loadingSlots": "Buscando horas…",
     "pickDate": "Elige un día",
     "combo": {
       "askFeet": "¿También pies?",
       "askHands": "¿También manos?",
       "none": "No, solo eso",
-      "hint": "Se agenda como un solo turno, con precio de combo.",
+      "hint": "En el mismo turno y con precio de combo.",
       "saving": "Ahorras {amount}"
     },
     "success": {
-      "title": "¡Lista tu cita!",
-      "body": "Te esperamos el {date} a las {time} con {provider}.",
-      "note": "Si necesitas cambiarla, escríbenos por WhatsApp.",
-      "again": "Reservar otra"
+      "eyebrow": "Cita confirmada",
+      "title": "¡Lista, {name}!",
+      "body": "Te esperamos el {date} a las {time}",
+      "with": "Con {provider}",
+      "calendar": "Guardar en el calendario",
+      "google": "Google Calendar",
+      "ics": "Apple · Outlook",
+      "whatsapp": "Recibir el resumen por WhatsApp",
+      "whatsappHint": "Te queda la confirmación en el chat del estudio, y por ahí mismo nos escribes si necesitas cambiarla.",
+      "whatsappText": "Hola Golden ✨ Acabo de reservar en la página:\n• {service}\n• {date} a las {time}\n• Con {provider}\nA nombre de {name}.",
+      "directions": "Cómo llegar",
+      "address": "Calle 69 Sur #43a - 41, Primer piso · Sabaneta",
+      "again": "Reservar otra cita",
+      "calendarTitle": "Golden Beauty Studio · {service}",
+      "calendarDetails": "Con {provider}. Si necesitas cambiar la cita, escríbenos por WhatsApp."
     },
     "errors": {
       "taken": "Justo tomaron esa hora. Elige otra y seguimos.",
@@ -280,7 +322,8 @@
       "rate_limited": "Demasiados intentos seguidos. Espera un momento.",
       "captcha": "No pudimos verificar que eres una persona. Intenta de nuevo.",
       "spam": "No pudimos procesar el formulario. Recarga la página e intenta otra vez.",
-      "unavailable": "No pudimos conectar con la agenda. Intenta en un momento o escríbenos por WhatsApp."
+      "unavailable": "No pudimos conectar con la agenda. Intenta en un momento o escríbenos por WhatsApp.",
+      "retry": "Reintentar"
     }
   },
   "faq": {
@@ -655,7 +698,7 @@
       "links": [
         "Instagram @goldenbeauty",
         "WhatsApp Business",
-        "AgendaPro · Reservas",
+        "Reserva en línea",
         "Google Maps"
       ]
     },

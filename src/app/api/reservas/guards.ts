@@ -21,6 +21,7 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 
 export type GuardReason =
   | "validation"
+  | "phone"
   | "rate_limited"
   | "captcha"
   | "spam"
@@ -45,11 +46,21 @@ export function fail(reason: GuardReason, status: number, extra?: Record<string,
  */
 const hits = new Map<string, number[]>();
 
-export function rateLimited(ip: string, max: number): boolean {
+/**
+ * One counter **per route**, not per IP. The three routes used to share one,
+ * each checking it against its own cap — so a client who loaded the catalog
+ * and looked at four days had spent the confirm route's five before pressing
+ * "Confirmar", and her booking came back 429. The bucket is what keeps reads
+ * from spending the write's allowance.
+ */
+export type RateBucket = "catalogo" | "disponibilidad" | "reservar";
+
+export function rateLimited(ip: string, max: number, bucket: RateBucket): boolean {
   const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+  const key = `${bucket}:${ip}`;
+  const recent = (hits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
   recent.push(now);
-  hits.set(ip, recent);
+  hits.set(key, recent);
 
   if (hits.size > 500) {
     for (const [key, times] of hits) {

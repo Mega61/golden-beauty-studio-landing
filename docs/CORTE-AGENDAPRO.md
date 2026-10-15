@@ -297,6 +297,29 @@ relativa recibe el prefijo del idioma. Los tres lugares con CTA —nav, servicio
 **Así que jubilar Agenda Pro del sitio público es cambiar una variable a `/reservar`**, y los dos
 idiomas siguen. No hay commit de por medio el día del corte.
 
+### Estado (2026-10-15): flujo rehecho, y un bug que habría tumbado el corte
+
+El flujo de `/reservar` se rehízo en tres pasos (servicio → día y hora → datos), uno por pantalla,
+con el resumen siempre a la vista y cada paso como entrada del historial (el gesto de "atrás" del
+celular retrocede un paso en vez de sacarla de la página). Lo que importa para el corte:
+
+- **El limitador por IP era uno solo para las tres rutas**, cada una midiéndolo contra su propio
+  tope. Una clienta que cargaba el catálogo y miraba cuatro o cinco días ya había gastado el cupo de
+  5 del POST: su reserva salía **429** al confirmar. Ahora hay un contador por ruta
+  (`rateLimited(ip, max, bucket)`) y un test que fija la regresión.
+- **Todos los CTA pasan por `bookingHref(lang)`.** Hero, Técnicas, Contacto, Footer y las promos
+  leían la variable cruda; con `/reservar` habrían mandado a cualquiera al flujo sin idioma y en
+  pestaña nueva. Cada renglón de la lista de precios enlaza a `/reservar?servicio=<id>` con el
+  servicio ya elegido (solo cuando la reserva es propia).
+- El catálogo público manda el **id de vitrina** (`slug`, de `service_map`) y **qué días trabaja**
+  cada técnica (`schedule`, `lib/public-schedule.ts`): la landing pone nombres y descripciones en el
+  idioma de quien reserva, y apaga los días cerrados antes de que alguien los toque.
+- **La confirmación es para la clienta, no solo para la pantalla:** botón de WhatsApp con el resumen
+  ya escrito (le queda la cita en el chat del estudio y el estudio se entera), y `.ics` / Google
+  Calendar con avisos el día antes y dos horas antes. No reemplaza a X7, pero tapa el hueco mientras
+  Meta no apruebe plantillas.
+- `/reservar` ya no se prerenderiza: leía "hoy" en el build y lo congelaba en la fecha del deploy.
+
 ## X7 — Recordatorios por WhatsApp
 
 **El trámite arranca ya, antes que el código.** Coexistence sobre el número actual exige verificación

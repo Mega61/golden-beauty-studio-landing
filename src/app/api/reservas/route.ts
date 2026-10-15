@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Per-IP burst.
-  if (rateLimited(ip, RATE_MAX)) return fail("rate_limited", 429);
+  if (rateLimited(ip, RATE_MAX, "reservar")) return fail("rate_limited", 429);
 
   // 4. Turnstile, if the studio ever turns it on.
   if (!(await turnstileOk(text(body["cf-turnstile-response"]) || null, ip))) {
@@ -96,7 +96,12 @@ export async function POST(req: NextRequest) {
     // mistake the client made, and the form has to say so without blaming her.
     if (res.status === 409) return fail("taken", 409);
 
-    if (res.status === 400) return fail("validation", 400);
+    // The panel names the field it refused. The phone is the one a person can
+    // fix on the spot, so it gets its own message; the rest stay generic.
+    if (res.status === 400) {
+      const refused = (await res.json().catch(() => null)) as { field?: string } | null;
+      return fail(refused?.field === "phone" ? "phone" : "validation", 400);
+    }
 
     console.error("[reservas] el panel rechazó la reserva", res.status);
     return fail("unavailable", res.status === 503 ? 503 : 502);

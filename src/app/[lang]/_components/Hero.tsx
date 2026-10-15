@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { EyebrowLabel, PrimaryCTA, SecondaryCTA } from "./atoms";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 import { getHeroImage } from "@/data/hero";
 
 type HeroDict = {
@@ -15,7 +15,7 @@ type HeroDict = {
   metaStatus: string;
 };
 
-export default async function Hero({ dict }: { dict: HeroDict }) {
+export default async function Hero({ dict, lang }: { dict: HeroDict; lang: string }) {
   const heroSrc = await getHeroImage();
   return (
     <section className="relative bg-carbon">
@@ -81,7 +81,7 @@ export default async function Hero({ dict }: { dict: HeroDict }) {
             {dict.body}
           </p>
           <div className="mt-7 flex flex-wrap gap-3.5 md:mt-10">
-            <PrimaryCTA href={siteConfig.bookingUrl} trackLocation="hero">
+            <PrimaryCTA href={bookingHref(lang)} trackLocation="hero">
               {dict.ctaPrimary}
             </PrimaryCTA>
             <SecondaryCTA onLight={false} trackLocation="hero">

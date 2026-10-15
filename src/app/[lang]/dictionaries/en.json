@@ -227,60 +227,103 @@
       }
     },
     "footnote": "One-week warranty on product lift (excluding charms or rhinestones).",
-    "cta": "Book my appointment"
+    "cta": "Book my appointment",
+    "book": "Book"
   },
   "reservar": {
     "meta": {
       "title": "Book an appointment — Golden Beauty Studio",
       "description": "Book your appointment at Golden Beauty Studio, Sabaneta. Pick the service, the technician and a time that works."
     },
-    "eyebrow": "Booking",
+    "eyebrow": "Book",
     "title": "Book your appointment",
-    "intro": "Four steps and you're done. If you'd rather write to us, we're on WhatsApp too.",
+    "intro": "Three steps, under a minute. Confirmed instantly.",
     "steps": {
-      "service": "What are you booking?",
-      "provider": "With whom?",
-      "slot": "Which day and time?",
-      "details": "Your details"
+      "service": "Service",
+      "slot": "Date & time",
+      "details": "Details"
     },
-    "anyProvider": "Anyone",
-    "anyProviderHint": "Whoever has the slot",
-    "duration": "{min} min",
+    "headings": {
+      "service": "What are we doing?",
+      "slot": "When works for you?",
+      "details": "Who's the booking for?"
+    },
+    "provider": {
+      "label": "With whom?",
+      "any": "Anyone",
+      "anyHint": "First one available"
+    },
+    "summary": {
+      "title": "Your appointment",
+      "empty": "Pick a service to get started.",
+      "with": "With",
+      "anyone": "First available",
+      "total": "Total",
+      "pay": "You pay at the studio, cash or bank transfer. Promo discounts are applied at checkout."
+    },
+    "continue": "Continue",
     "back": "Back",
-    "next": "Continue",
+    "change": "Change",
     "confirm": "Confirm appointment",
     "sending": "Confirming…",
     "labels": {
       "firstName": "First name",
       "lastName": "Last name",
       "phone": "Mobile",
-      "phoneHint": "So we can confirm and let you know if anything changes.",
-      "notes": "Anything we should know? (optional)"
+      "phoneHint": "We'll confirm here and let you know if anything changes.",
+      "phoneInvalid": "Check the number: a Colombian mobile has 10 digits starting with 3. Abroad? Start with +.",
+      "notes": "Note for your artist",
+      "notesPlaceholder": "A design you saw, an allergy, bringing a friend…",
+      "addNote": "Add a note",
+      "remember": "Remember my details on this device"
     },
-    "noSlots": "No times left that day. Try another one.",
-    "loadingSlots": "Looking for times…",
+    "day": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "closed": "Closed"
+    },
+    "parts": {
+      "morning": "Morning",
+      "afternoon": "Afternoon",
+      "evening": "Evening"
+    },
+    "noSlots": "No times left that day.",
+    "nextOpen": "See the next day",
+    "loadingSlots": "Finding times…",
     "pickDate": "Pick a day",
     "combo": {
-      "askFeet": "Feet as well?",
-      "askHands": "Hands as well?",
+      "askFeet": "Feet too?",
+      "askHands": "Hands too?",
       "none": "No, just that",
-      "hint": "Booked as a single appointment, at the combo price.",
+      "hint": "Same visit, combo price.",
       "saving": "You save {amount}"
     },
     "success": {
-      "title": "You're booked!",
-      "body": "See you on {date} at {time} with {provider}.",
-      "note": "Need to change it? Write to us on WhatsApp.",
-      "again": "Book another"
+      "eyebrow": "Appointment confirmed",
+      "title": "You're booked, {name}!",
+      "body": "See you on {date} at {time}",
+      "with": "With {provider}",
+      "calendar": "Save to calendar",
+      "google": "Google Calendar",
+      "ics": "Apple · Outlook",
+      "whatsapp": "Get the summary on WhatsApp",
+      "whatsappHint": "You'll have the confirmation in the studio's chat — and that's where to write if you need to change it.",
+      "whatsappText": "Hi Golden ✨ I just booked on the website:\n• {service}\n• {date} at {time}\n• With {provider}\nName: {name}.",
+      "directions": "Directions",
+      "address": "Calle 69 Sur #43a - 41, first floor · Sabaneta",
+      "again": "Book another",
+      "calendarTitle": "Golden Beauty Studio · {service}",
+      "calendarDetails": "With {provider}. Need to change it? Message us on WhatsApp."
     },
     "errors": {
-      "taken": "That time was just taken. Pick another and we'll carry on.",
-      "phone": "Check the mobile number: we need 10 digits.",
-      "validation": "Something's missing or mistyped. Please check and try again.",
+      "taken": "Someone just took that time. Pick another and we'll carry on.",
+      "phone": "Check your mobile number: we need 10 digits.",
+      "validation": "Something's missing or mistyped. Check and try again.",
       "rate_limited": "Too many attempts in a row. Give it a moment.",
       "captcha": "We couldn't verify you're a person. Please try again.",
       "spam": "We couldn't process the form. Reload the page and try again.",
-      "unavailable": "We couldn't reach the calendar. Try again shortly, or write to us on WhatsApp."
+      "unavailable": "We couldn't reach the calendar. Try again in a moment or message us on WhatsApp.",
+      "retry": "Try again"
     }
   },
   "faq": {
@@ -659,7 +702,7 @@
       "links": [
         "Instagram @goldenbeauty",
         "WhatsApp Business",
-        "AgendaPro · Bookings",
+        "Book online",
         "Google Maps"
       ]
     },

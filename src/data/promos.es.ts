@@ -1,10 +1,10 @@
 import type { PromosBySlug } from "./promos.types";
 import { promoPrice, promoPriceRows } from "./promo-prices";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 
-// Reservation URL lives in NEXT_PUBLIC_BOOKING_URL (siteConfig.bookingUrl). If
+// Reservation URL lives in NEXT_PUBLIC_BOOKING_URL, localised by bookingHref(). If
 // unset, hashes fall through to the local #contacto section.
-const BOOKING = siteConfig.bookingUrl ?? "#contacto";
+const BOOKING = bookingHref("es") ?? "#contacto";
 
 // Mock por idioma. Cuando se conecte Strapi, este archivo deja de usarse —
 // `getActiveScenario` (en promos.ts) consultará `?locale=es&populate=deep`.

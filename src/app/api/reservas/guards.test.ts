@@ -20,16 +20,26 @@ describe("límite por IP", () => {
 
     // `max` es el número de pedidos permitidos, así que el que sobra es el
     // siguiente: con 5, el sexto es el que se rechaza.
-    for (let i = 0; i < 5; i += 1) expect(rateLimited(ip, 5)).toBe(false);
-    expect(rateLimited(ip, 5)).toBe(true);
+    for (let i = 0; i < 5; i += 1) expect(rateLimited(ip, 5, "reservar")).toBe(false);
+    expect(rateLimited(ip, 5, "reservar")).toBe(true);
   });
 
   it("una IP no gasta el cupo de otra", () => {
     const [a, b] = [freshIp(), freshIp()];
 
-    for (let i = 0; i < 6; i += 1) rateLimited(a, 5);
+    for (let i = 0; i < 6; i += 1) rateLimited(a, 5, "reservar");
 
-    expect(rateLimited(b, 5)).toBe(false);
+    expect(rateLimited(b, 5, "reservar")).toBe(false);
+  });
+
+  it("mirar horarios no gasta el cupo de confirmar", () => {
+    // La regresión real: catálogo + diez días mirados dejaban a la clienta
+    // sin cupo para el POST, y su reserva salía 429.
+    const ip = freshIp();
+    rateLimited(ip, 20, "catalogo");
+    for (let i = 0; i < 10; i += 1) rateLimited(ip, 60, "disponibilidad");
+
+    expect(rateLimited(ip, 5, "reservar")).toBe(false);
   });
 });
 

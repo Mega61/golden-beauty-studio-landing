@@ -1,8 +1,8 @@
 import type { PromosBySlug } from "./promos.types";
 import { promoPrice, promoPriceRows } from "./promo-prices";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 
-const BOOKING = siteConfig.bookingUrl ?? "#contacto";
+const BOOKING = bookingHref("en") ?? "#contacto";
 
 // Same shape as promos.es.ts. Keeping the slug keys identical so the
 // language-agnostic selector can resolve either locale by the same slug.

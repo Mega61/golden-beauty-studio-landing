@@ -1,4 +1,4 @@
-import { siteConfig } from "@/config/site";
+import { bookingHref, siteConfig } from "@/config/site";
 import Logo from "./Logo";
 import TrackedBookingLink from "./TrackedBookingLink";
 import TrackedWhatsappLink from "./TrackedWhatsappLink";
@@ -30,13 +30,14 @@ function resolveFindLink(
   const l = label.toLowerCase();
   if (l.includes("instagram")) return urls.instagram;
   if (l.includes("whatsapp")) return urls.whatsapp;
-  if (l.includes("agendapro") || l.includes("fresha")) return urls.booking;
+  if (l.includes("reserva") || l.includes("book")) return urls.booking;
   if (l.includes("google") || l.includes("maps")) return urls.maps;
   return null;
 }
 
-export default function Footer({ dict }: { dict: FooterDict }) {
-  const { instagramUrl, whatsappUrl, bookingUrl, mapsPlaceId } = siteConfig;
+export default function Footer({ dict, lang }: { dict: FooterDict; lang: string }) {
+  const { instagramUrl, whatsappUrl, mapsPlaceId } = siteConfig;
+  const bookingUrl = bookingHref(lang);
   const addressQuery = encodeURIComponent(
     [dict.visit.address1, dict.visit.address2].join(", ")
   );

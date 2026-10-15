@@ -66,7 +66,7 @@ export default async function TrabajaPage({
         switchPath="/trabaja-con-nosotros"
       />
       <Trabaja dict={dict.trabaja} lang={typedLang} roles={roles} />
-      <Footer dict={dict.footer} />
+      <Footer dict={dict.footer} lang={typedLang} />
     </>
   );
 }

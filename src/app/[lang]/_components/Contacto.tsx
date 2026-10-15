@@ -1,4 +1,4 @@
-import { siteConfig } from "@/config/site";
+import { bookingHref, siteConfig } from "@/config/site";
 import TrackedBookingLink from "./TrackedBookingLink";
 import TrackedWhatsappLink from "./TrackedWhatsappLink";
 
@@ -28,9 +28,9 @@ type ContactoDict = {
   };
 };
 
-export default function Contacto({ dict }: { dict: ContactoDict }) {
+export default function Contacto({ dict, lang }: { dict: ContactoDict; lang: string }) {
+  const bookingUrl = bookingHref(lang);
   const {
-    bookingUrl,
     whatsappUrl,
     mapsEmbedUrl,
     mapsPlaceId,

@@ -83,7 +83,9 @@ export default function MobileMenu({
           }`}
           style={{
             backgroundColor: "#f8f4ee",
-            boxShadow: "-20px 0 60px -20px rgba(20, 15, 12, 0.35)",
+            // Only while open: translated off-canvas, the shadow still casts
+            // back over the page and greys the right edge of every screen.
+            boxShadow: open ? "-20px 0 60px -20px rgba(20, 15, 12, 0.35)" : "none",
           }}
         >
           <div

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { EyebrowLabel, PrimaryCTA } from "./atoms";
 import { bookingHref } from "@/config/site";
 import { getPricing } from "@/data/pricing";
@@ -23,6 +24,8 @@ type ServiciosDict = {
   categories: Record<string, CategoryCopy>;
   footnote: string;
   cta: string;
+  /** Hover label on each price-list row when it links into `/reservar`. */
+  book: string;
 };
 
 export default async function Servicios({
@@ -34,6 +37,16 @@ export default async function Servicios({
 }) {
   const { from: fromLabel, currencySuffix } = dict.labels;
   const pricing = await getPricing(lang, dict.categories);
+
+  // With our own `/reservar`, every line of the price list books that service
+  // directly. An external booking tool can't take the id, so then the rows
+  // stay plain text and the single CTA below does the job. `extras` are
+  // add-ons charged on the bill, not something you book on its own.
+  const booking = bookingHref(lang);
+  const rowHref = (catId: string, itemId: string) =>
+    booking?.startsWith("/") && catId !== "extras"
+      ? `${booking}?servicio=${encodeURIComponent(itemId)}`
+      : null;
 
   return (
     <section
@@ -86,14 +99,19 @@ export default async function Servicios({
                     it.fromPrice,
                   );
                   const dur = formatDuration(it.durationMin);
-                  return (
-                    <li
-                      key={it.id}
-                      className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 border-b border-dashed pb-3.5"
-                      style={{ borderColor: "var(--hair)" }}
-                    >
+                  const href = rowHref(cat.id, it.id);
+                  const row = (
+                    <>
                       <span className="font-sans text-[14px] font-medium text-ink md:text-[15px]">
                         {it.name}
+                        {href && (
+                          <span
+                            aria-hidden
+                            className="ml-2 inline-block font-sans text-[10px] font-semibold uppercase tracking-[0.2em] text-gold opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"
+                          >
+                            {dict.book} →
+                          </span>
+                        )}
                       </span>
                       <span className="whitespace-nowrap text-right font-display text-[15px] italic text-gold md:text-[17px]">
                         {price}
@@ -104,6 +122,23 @@ export default async function Servicios({
                       <span className="text-right font-sans text-[10px] uppercase tracking-[0.18em] text-ink-mute">
                         {dur}
                       </span>
+                    </>
+                  );
+                  const cls =
+                    "grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 border-b border-dashed pb-3.5";
+                  return (
+                    <li key={it.id} style={{ borderColor: "var(--hair)" }} className={href ? "" : cls}>
+                      {href ? (
+                        <Link
+                          href={href}
+                          className={`group ${cls} -mx-2 rounded-md px-2 pt-1 no-underline outline-none transition-colors hover:bg-gold-pale/40 focus-visible:bg-gold-pale/40`}
+                          style={{ borderColor: "var(--hair)" }}
+                        >
+                          {row}
+                        </Link>
+                      ) : (
+                        row
+                      )}
                     </li>
                   );
                 })}

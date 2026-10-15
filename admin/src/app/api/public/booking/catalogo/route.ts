@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { getDb } from "@/db/client";
+import { serviceMapRepository } from "@/db/repositories";
 import { loadComboCompositions } from "@/lib/combo-source";
 import { comboServiceIds } from "@/lib/combos";
 import { createEaClient } from "@/lib/ea/client";
+import { instantToEaDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
+import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
+import { publicSchedule } from "@/lib/public-schedule";
 
 /**
  * Lo que el formulario de reserva necesita para dibujarse: qué se puede
@@ -58,7 +63,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const client = createEaClient();
-    const [services, providers, categories, composition] = await Promise.all([
+    const [services, providers, categories, composition, serviceMap] = await Promise.all([
       client.services.list(),
       client.providers.list(),
       client.serviceCategories.list(),
@@ -66,7 +71,20 @@ export async function GET() {
       // composiciones la landing lista los combos como un servicio más, que es
       // exactamente como funcionaba antes.
       loadComboCompositions(),
+      // El id de vitrina de cada servicio. Con él la landing pone el nombre y
+      // la descripción en el idioma de quien reserva —EA solo los tiene en
+      // español— y un enlace desde la lista de precios llega con el servicio
+      // ya elegido. Sin mapa la reserva sigue funcionando con los nombres de EA.
+      serviceMapRepository(getDb())
+        .listAll()
+        .catch((error: unknown) => {
+          console.error("[public/booking/catalogo] sin service_map", error);
+          return [];
+        }),
     ]);
+
+    const slugOf = new Map(serviceMap.map((row) => [row.ea_service_id, row.pricing_id]));
+    const today = instantToEaDate(new Date());
 
     // El nombre de la categoría, para que la lista se agrupe como la vitrina en
     // vez de caer como veinticinco tarjetas seguidas. EA ya las tiene: son las
@@ -97,6 +115,7 @@ export async function GET() {
           durationMin: s.duration,
           // El precio de EA, no el de `pricing.ts`: es el que se va a cobrar.
           priceCOP: s.price,
+          slug: slugOf.get(s.id) ?? null,
           category:
             s.serviceCategoryId === null ? null : (categoryName.get(s.serviceCategoryId) ?? null),
           // La landing esconde de la lista lo que es un combo. Se manda la
@@ -117,6 +136,9 @@ export async function GET() {
             id: p.id,
             name: (p.firstName ?? "").trim() || `Profesional ${p.id}`,
             serviceIds: (p.services ?? []).filter((id) => bookableIds.has(id)),
+            // Solo qué días trabaja: ver `lib/public-schedule.ts`. Una excepción
+            // mal formada no tumba el catálogo; se pierde la pista y nada más.
+            schedule: scheduleOf(p, today),
           })),
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -129,5 +151,21 @@ export async function GET() {
       { error: "unavailable" },
       { status: transient ? 503 : 500, headers: { "Cache-Control": "no-store" } },
     );
+  }
+}
+
+function scheduleOf(
+  provider: Parameters<typeof providerWorkingPlanExceptions>[0],
+  today: string,
+) {
+  try {
+    return publicSchedule(
+      provider.settings?.workingPlan ?? null,
+      providerWorkingPlanExceptions(provider),
+      today,
+    );
+  } catch (error) {
+    console.error("[public/booking/catalogo] plan de trabajo ilegible", provider.id, error);
+    return { offWeekdays: [], closedDates: [], openDates: [] };
   }
 }

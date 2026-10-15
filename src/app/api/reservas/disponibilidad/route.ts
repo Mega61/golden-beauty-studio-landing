@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 const RATE_MAX = 60;
 
 export async function GET(req: NextRequest) {
-  if (rateLimited(clientIp(req), RATE_MAX)) return fail("rate_limited", 429);
+  if (rateLimited(clientIp(req), RATE_MAX, "disponibilidad")) return fail("rate_limited", 429);
 
   const origin = adminOrigin();
   if (!origin) return fail("unavailable", 503);

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { EyebrowLabel } from "./atoms";
 import TrackedBookingLink from "./TrackedBookingLink";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 
 type Member = { name: string; role: string; years: string; quote: string };
 type TecnicasDict = {
@@ -14,7 +14,8 @@ type TecnicasDict = {
 
 const portraits = ["/tecnica-01.jpg", "/tecnica-02.jpg"];
 
-export default function Tecnicas({ dict }: { dict: TecnicasDict }) {
+export default function Tecnicas({ dict, lang }: { dict: TecnicasDict; lang: string }) {
+  const bookingUrl = bookingHref(lang);
   return (
     <section
       id="tecnicas"
@@ -68,9 +69,9 @@ export default function Tecnicas({ dict }: { dict: TecnicasDict }) {
                 >
                   &ldquo;{m.quote}&rdquo;
                 </p>
-                {siteConfig.bookingUrl && (
+                {bookingUrl && (
                   <TrackedBookingLink
-                    href={siteConfig.bookingUrl}
+                    href={bookingUrl}
                     location="tecnicas"
                     extra={{ artist: m.name }}
                     className="border-b border-gold pb-1 font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-ink no-underline"

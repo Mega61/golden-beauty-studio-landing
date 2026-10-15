@@ -19,11 +19,13 @@ export default function TrackedBookingLink({
   style,
   children,
 }: Props) {
+  // Our own `/reservar` opens in place; only an external booking tool gets a
+  // new tab.
+  const external = /^https?:\/\//i.test(href);
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       onClick={() => trackBookingClick(location, extra)}
       className={className}
       style={style}
