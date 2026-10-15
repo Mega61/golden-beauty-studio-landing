@@ -30,6 +30,10 @@ export type BioPromo = {
   title: string; // editorial headline — Cormorant italic
   href: string;
   image?: string; // featured image — the banner's photographic background
+  // The image is a portrait flyer with its own text printed on it: the banner
+  // shows it whole as a poster beside the copy instead of as a dimmed,
+  // cropped background.
+  poster?: boolean;
   cta: string; // gold caps call-to-action on the banner
 };
 

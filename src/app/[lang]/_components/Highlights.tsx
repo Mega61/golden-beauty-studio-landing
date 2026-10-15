@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { EyebrowLabel } from "./atoms";
 import PromoTermsCTA from "./PromoTermsCTA";
-import type { PromoItem, PromoScenario } from "@/data/promos.types";
+import type { PromoItem, PromoPriceRow, PromoScenario } from "@/data/promos.types";
 
 // Auto-advance cadence for the section carousel (ms). Offset from the strip so
 // the two carousels don't flip in lockstep.
@@ -164,6 +164,8 @@ function ItemCTA({
         ruleColor={ruleColor}
         title={item.title}
         terms={item.terms}
+        href={item.terms_label ? item.cta_href : undefined}
+        termsLabel={item.terms_label}
         dict={{
           termsEyebrow: dict.termsEyebrow,
           termsClose: dict.termsClose,
@@ -182,7 +184,126 @@ function ItemCTA({
   );
 }
 
+// A promo's price list: label on the left, the regular price struck through
+// and the promo price on the right. Real text, so the numbers printed on a
+// flyer are also readable by search engines, screen readers and translators.
+function PriceRows({
+  rows,
+  isInk,
+}: {
+  rows: PromoPriceRow[];
+  isInk: boolean;
+}) {
+  const rule = isInk ? "rgba(231,170,81,0.22)" : "var(--hair)";
+  return (
+    <ul className="m-0 mt-6 list-none p-0" style={{ borderTop: `1px solid ${rule}` }}>
+      {rows.map((row) => (
+        <li
+          key={row.label}
+          className="flex items-center justify-between gap-4 py-3"
+          style={{ borderBottom: `1px solid ${rule}` }}
+        >
+          <span className="min-w-0 font-sans text-[11px] font-semibold uppercase tracking-[0.24em]">
+            {row.label}
+          </span>
+          {/* Stacked on phones: "$55,000 COP  $40,000 COP" side by side is
+              wider than a 390px card once the label takes its share. */}
+          <span className="flex shrink-0 flex-col items-end gap-1 whitespace-nowrap sm:flex-row sm:items-baseline sm:gap-3">
+            {row.was && (
+              <s
+                className={`font-sans text-[13px] ${isInk ? "text-gold-soft/60" : "text-ink-soft/70"}`}
+              >
+                {row.was}
+              </s>
+            )}
+            <span
+              className={`font-display text-[26px] leading-none md:text-[30px] ${isInk ? "text-gold-bright" : "text-gold-dark"}`}
+            >
+              {row.price}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The featured card for a portrait flyer (`image_orientation: "portrait"`).
+ *
+ * A flyer has its headline and prices printed on it, so the landscape card's
+ * treatment — 16:9 `object-cover` plus a dark wash — would crop the title off
+ * and dim the prices. Here the flyer is shown whole at 4:5 and never covered:
+ * stacked above the copy on narrow cards, beside it once the card itself is
+ * wide enough (a container query, not a viewport one — the same card can be
+ * the full row or share it with compact cards). The ribbon moves out of the
+ * image into the copy for the same reason.
+ */
+function PortraitFeaturedCard({ item, dict }: { item: PromoItem; dict: HighlightsDict }) {
+  const palette = ACCENT_CARD[item.accent] ?? ACCENT_CARD.gold;
+  const isInk = item.accent === "ink";
+  return (
+    <article
+      className={`@container h-full ${palette.text}`}
+      style={{
+        background: palette.background,
+        border: "1px solid var(--hair)",
+      }}
+    >
+      <div className="grid h-full grid-cols-1 @2xl:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+        <div className="relative aspect-[4/5] w-full">
+          <Image
+            src={item.image_url!}
+            alt={item.image_alt ?? item.title}
+            fill
+            sizes="(min-width: 768px) 440px, 100vw"
+            className="object-cover"
+            // Same reasoning as the landscape card: never compete with the hero.
+            loading="lazy"
+          />
+        </div>
+
+        <div className="flex flex-col p-5 md:p-9 @2xl:justify-center @2xl:p-12">
+          <div className="flex flex-1 flex-col @2xl:max-w-[520px] @2xl:flex-none">
+            <EyebrowLabel className={palette.eyebrowText}>{item.eyebrow}</EyebrowLabel>
+            <h3
+              className="m-0 mb-4 mt-3 font-display font-normal leading-[1.05] text-[30px] md:text-[44px]"
+              style={{ letterSpacing: "-0.01em" }}
+            >
+              {item.title}
+            </h3>
+            <p className={`m-0 font-sans text-[14px] leading-[1.6] md:text-[15px] ${palette.subtext}`}>
+              {item.body}
+            </p>
+            {item.price_rows && item.price_rows.length > 0 && (
+              <PriceRows rows={item.price_rows} isInk={isInk} />
+            )}
+            {item.ribbon && (
+              <p
+                className={`m-0 mt-5 font-sans text-[10px] font-semibold uppercase tracking-[0.28em] ${palette.eyebrowText}`}
+              >
+                {item.ribbon}
+              </p>
+            )}
+            <div className="mt-auto @2xl:mt-2">
+              <ItemCTA
+                item={item}
+                ctaText={palette.ctaText}
+                ruleColor={isInk ? "rgba(231,170,81,0.28)" : "var(--hair)"}
+                dict={dict}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function FeaturedCard({ item, dict }: { item: PromoItem; dict: HighlightsDict }) {
+  if (item.image_url && item.image_orientation === "portrait") {
+    return <PortraitFeaturedCard item={item} dict={dict} />;
+  }
   const palette = ACCENT_CARD[item.accent] ?? ACCENT_CARD.gold;
   const isInk = item.accent === "ink";
   const hasImage = Boolean(item.image_url);
