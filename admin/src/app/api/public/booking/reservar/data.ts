@@ -58,6 +58,12 @@ export type BookingResult =
       /** A quién le tocó. La confirmación la nombra. */
       providerId: number;
       providerName: string;
+      /**
+       * Solo el nombre de pila: lo que ve quien reservó. El catálogo público ya
+       * manda solo el nombre de pila; la confirmación tiene que decir lo mismo,
+       * y no el apellido —ni un apellido de relleno— de una persona del equipo.
+       */
+      providerFirstName: string;
       start: string;
       end: string;
     }
@@ -166,6 +172,7 @@ export async function createBooking(
     secondAppointmentId,
     providerId,
     providerName: fullName(provider.firstName, provider.lastName) ?? `Profesional ${providerId}`,
+    providerFirstName: (provider.firstName ?? "").trim() || `Profesional ${providerId}`,
     start: slot.start,
     end: slot.end,
   };
