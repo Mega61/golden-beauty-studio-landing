@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import type { UserRole } from "@/db/types";
-import { requireCapability } from "@/lib/dal";
+import { requireCapability, sessionCan } from "@/lib/dal";
 
 import { ClientesLista } from "./ClientesLista";
 import { searchClients } from "./data";
@@ -44,11 +44,14 @@ export default async function ClientesPage({
   const raw = params.q;
   const query = typeof raw === "string" ? raw : null;
 
-  const result = await searchClients(query);
+  const [result, canExport] = await Promise.all([
+    searchClients(query),
+    sessionCan("clientes:exportar"),
+  ]);
 
   return (
     <AppShell role={navRole(session.role)} title="Clientas">
-      <ClientesLista result={result} />
+      <ClientesLista canExport={canExport} result={result} />
     </AppShell>
   );
 }

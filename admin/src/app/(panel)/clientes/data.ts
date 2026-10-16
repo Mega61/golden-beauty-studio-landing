@@ -6,6 +6,8 @@ import type { LegacyAppointment } from "@/db/types";
 import { EaApiError, type Customer, type Provider, type Service } from "@/lib/ea";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
 
+import { splitName } from "@/jobs/import-agendapro";
+
 import { buildUnifiedHistory, type EaHistoryInput, type UnifiedHistory } from "./history";
 import {
   clientKeyToParam,
@@ -320,10 +322,15 @@ async function loadLegacyByPhone(phone: string | null): Promise<LegacyAppointmen
 /** La ficha de alguien que solo existe antes del corte. */
 function legacyOnlyClient(key: ClientKey, legacy: LegacyAppointment[]): ResolvedClient {
   const named = legacy.find((row) => (row.client_name ?? "").trim() !== "");
+  // Agenda Pro trae el nombre en una sola casilla: se parte con la misma regla
+  // del import, para que la ficha y la audiencia de Meta digan lo mismo.
+  const split = splitName(named?.client_name ?? undefined, undefined);
   return {
     key,
     phone: key.kind === "tel" ? key.phone : null,
     name: named?.client_name?.trim() ?? "Clienta sin nombre",
+    firstName: split.firstName,
+    lastName: split.lastName,
     email: null,
     suspiciousEmails: [],
     eaCustomerIds: [],

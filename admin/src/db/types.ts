@@ -706,6 +706,22 @@ export interface PushSubscriptionTable {
   updated_at: UpdatedAt;
 }
 
+/** Por dónde salió la plata de la pauta (migración `023`). */
+export type AdChannel = "meta" | "google" | "otro";
+
+/**
+ * La inversión en anuncios de un mes y un canal (migración `023`). `month` es
+ * `"YYYY-MM"` en texto: un mes es calendario, no un instante.
+ */
+export interface AdSpendTable {
+  month: string;
+  channel: Generated<AdChannel>;
+  amount_cop: Cop;
+  notes: string | null;
+  updated_by: AuthId | null;
+  updated_at: UpdatedAt;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -733,6 +749,7 @@ export interface Database {
   wa_message: WaMessageTable;
   wa_optout: WaOptoutTable;
   push_subscription: PushSubscriptionTable;
+  ad_spend: AdSpendTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -762,6 +779,8 @@ export type NewWaMessage = Insertable<WaMessageTable>;
 export type WaMessageUpdate = Updateable<WaMessageTable>;
 
 export type PushSubscriptionRow = Selectable<PushSubscriptionTable>;
+
+export type AdSpendRow = Selectable<AdSpendTable>;
 
 export type WaOptout = Selectable<WaOptoutTable>;
 export type NewWaOptout = Insertable<WaOptoutTable>;

@@ -7,6 +7,7 @@
  * enganchar las cuentas y anotar la bitácora) sea un solo acto o ninguno.
  */
 
+import { adSpendRepository } from "./ad-spend";
 import { allowedUserRepository } from "./allowed-user";
 import { appointmentFinanceRepository } from "./appointment-finance";
 import { appointmentFinanceItemRepository } from "./appointment-finance-item";
@@ -29,6 +30,7 @@ import type { Db } from "./shared";
 
 export function repositories(db: Db) {
   return {
+    adSpend: adSpendRepository(db),
     allowedUsers: allowedUserRepository(db),
     appointmentFinance: appointmentFinanceRepository(db),
     appointmentFinanceItems: appointmentFinanceItemRepository(db),
@@ -52,6 +54,8 @@ export function repositories(db: Db) {
 
 export type Repositories = ReturnType<typeof repositories>;
 
+export { adSpendRepository } from "./ad-spend";
+export type { AdSpendInput } from "./ad-spend";
 export { allowedUserRepository } from "./allowed-user";
 export { appointmentFinanceRepository } from "./appointment-finance";
 export type { EnsureResult } from "./appointment-finance";

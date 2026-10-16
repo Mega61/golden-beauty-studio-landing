@@ -24,7 +24,14 @@ import type { ResolvedClient } from "./identity";
  * Es presentacional a propósito —recibe el resultado ya resuelto— para poder
  * mirarla a 390 / 768 / 1440 sin base de datos ni agenda levantadas.
  */
-export function ClientesLista({ result }: { result: ClientListResult }) {
+export function ClientesLista({
+  result,
+  canExport = false,
+}: {
+  result: ClientListResult;
+  /** `clientes:exportar`: el enlace a la lista para Meta. Solo la dueña. */
+  canExport?: boolean;
+}) {
   const columns = clientColumns();
 
   return (
@@ -62,6 +69,16 @@ export function ClientesLista({ result }: { result: ClientListResult }) {
         fusionar.
       */}
       <NuevaClienta />
+
+      {canExport ? (
+        <Link
+          className="ui-btn ui-btn--secondary ui-btn--sm"
+          href="/clientes/exportar-meta"
+          style={{ justifySelf: "start" }}
+        >
+          Exportar para Meta
+        </Link>
+      ) : null}
 
       {result.query === null && !result.failure ? (
         <p style={meta}>

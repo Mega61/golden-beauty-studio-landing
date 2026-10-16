@@ -26,6 +26,8 @@
  * - Una cohorte de retención **con la ventana abierta**, para ver el
  *   "todavía no se puede medir" en vez de un 0 %.
  * - Un nombre de servicio largo, para ver el recorte de la etiqueta.
+ * - Para los reportes de pauta: sábados por la tarde llenos, martes flojos, y
+ *   una inversión en anuncios anotada para el mes (ver `demandRows()`).
  */
 
 import { parseEaLocalDate, parseEaLocalDateTime } from "@/lib/ea";
@@ -126,6 +128,82 @@ const MONTH: Row[] = [
   // Sin teléfono: sale de la cuenta de clientas y se dice cuántas fueron.
   { id: 122, provider: 8, day: "28", hour: "10:00", booked: 2, performed: 2, service: 95_000, charged: 95_000, method: "efectivo" },
 ];
+
+/**
+ * La demanda del mes, para los dos reportes de pauta.
+ *
+ * Armada para que la lectura sea obvia en la vista previa: **los sábados por
+ * la tarde se llenan** (las dos técnicas, de 12 m. a 3 p. m., los cinco
+ * sábados del mes) y **los martes se quedan flojos** — solo los cuatro
+ * renglones de `MONTH`, uno de ellos una inasistencia y otro una cancelada.
+ * Los viernes al final de la tarde tienen algo, para que el mapa tenga más de
+ * dos tonos.
+ *
+ * Una de cada tres clientas es nueva (un teléfono que no aparece en ninguna
+ * historia) y las demás vuelven, para que el costo por clienta nueva y el "ya
+ * recuperado" salgan con cifras creíbles contra la inversión de abajo.
+ * Ninguna técnica tiene dos citas encimadas: con dos puestos, más que eso
+ * dispararía el aviso de "físicamente imposible" de la ocupación.
+ */
+const SATURDAY_SLOTS: { provider: number; hour: string; service: number; price: number }[] = [
+  { provider: 7, hour: "10:00", service: 5, price: 55_000 },
+  { provider: 8, hour: "11:00", service: 3, price: 60_000 },
+  { provider: 7, hour: "12:00", service: 3, price: 60_000 },
+  { provider: 8, hour: "12:00", service: 5, price: 55_000 },
+  { provider: 7, hour: "13:00", service: 5, price: 55_000 },
+  { provider: 8, hour: "13:00", service: 3, price: 60_000 },
+  { provider: 7, hour: "14:00", service: 5, price: 55_000 },
+  { provider: 8, hour: "14:00", service: 5, price: 55_000 },
+];
+
+const RETURNING = ["+573001110001", "+573001110002", "+573001110005", "+573001110006"];
+
+function demandRows(): Row[] {
+  const rows: Row[] = [];
+  let id = 200;
+  let fresh = 0;
+
+  const push = (day: string, slot: (typeof SATURDAY_SLOTS)[number], index: number) => {
+    id += 1;
+    // Una de cada tres es nueva; las otras, alguien que ya venía.
+    const customer =
+      index % 3 === 0
+        ? `+5730022${String((fresh += 1)).padStart(5, "0")}`
+        : RETURNING[index % RETURNING.length];
+    rows.push({
+      id,
+      provider: slot.provider,
+      day,
+      hour: slot.hour,
+      booked: slot.service,
+      performed: slot.service,
+      service: slot.price,
+      charged: slot.price,
+      method: index % 3 === 0 ? "transferencia" : "efectivo",
+      customer,
+    });
+  };
+
+  for (const day of ["01", "08", "15", "22", "29"]) {
+    SATURDAY_SLOTS.forEach((slot, index) => push(day, slot, index));
+  }
+
+  // Jueves: una al final de la mañana, para que el más flojo sea el martes y no por
+  // un empate.
+  for (const [index, day] of ["06", "13", "27"].entries()) {
+    push(day, { provider: 8, hour: "11:00", service: 3, price: 60_000 }, index + 1);
+  }
+
+  // Viernes: una o dos al final de la tarde.
+  for (const [index, day] of ["07", "14", "21", "28"].entries()) {
+    push(day, { provider: 7, hour: "17:00", service: 3, price: 60_000 }, index);
+    if (index % 2 === 0) push(day, { provider: 8, hour: "16:00", service: 5, price: 55_000 }, index + 1);
+  }
+
+  return rows;
+}
+
+const ALL_ROWS: Row[] = [...MONTH, ...demandRows()];
 
 function itemsOf(row: Row): FinanceItemRow[] {
   const items: FinanceItemRow[] = [
@@ -261,7 +339,7 @@ export function previewData(cadence: Cadence, anchor: EaLocalDate): ReportData {
   const month = period.from.slice(0, 7);
   const days = eachDay(period.from, period.to);
 
-  const inPeriod = MONTH.filter((row) => {
+  const inPeriod = ALL_ROWS.filter((row) => {
     const date = `${month}-${row.day}`;
     return date >= period.from && date <= period.to;
   });
@@ -297,10 +375,17 @@ export function previewData(cadence: Cadence, anchor: EaLocalDate): ReportData {
       {
         customerKey: "+573001110006",
         at: at("2025-11-02 10:00:00"),
+        kind: "atendida",
         attended: true,
       },
     ],
     commissionEntries: COMMISSION,
+    // La pauta del mes: Meta casi toda, algo de Google. Con las nuevas del
+    // mes da un costo por clienta y un "ya recuperado" con cifras creíbles.
+    adSpend: [
+      { month, channel: "meta", amountCop: 1_150_000 },
+      { month, channel: "google", amountCop: 250_000 },
+    ],
     stations: 2,
     studioWindow: { open: studioOpen, breaks: studioBreaks },
     providerWindows,

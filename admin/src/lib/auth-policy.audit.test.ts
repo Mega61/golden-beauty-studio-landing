@@ -46,6 +46,8 @@ const TODAS: Capability[] = [
   "recordatorios:enviar",
   "recordatorios:baja",
   "avisos:reservas-web",
+  "pauta:registrar",
+  "clientes:exportar",
 ];
 
 /**
@@ -84,6 +86,12 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // Reservas de la página (push): recepción confirma y acomoda la agenda,
     // así que es quien tiene que enterarse en el momento.
     "avisos:reservas-web": true,
+    // Recepción **ve** el costo por clienta nueva (es un reporte), pero no
+    // escribe la inversión en anuncios: es plata y decisión de la dueña.
+    "pauta:registrar": false,
+    // La lista para Meta es una exportación masiva de datos personales hacia
+    // un tercero. Va cifrada, y aun así es de la dueña sola.
+    "clientes:exportar": false,
   },
   staff: {
     "cuenta:cerrar-propia": true,
@@ -110,11 +118,13 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // El aviso nombra clienta y técnica de cualquier columna: es agenda de
     // todo el equipo, que la técnica no ve.
     "avisos:reservas-web": false,
+    "pauta:registrar": false,
+    "clientes:exportar": false,
   },
 };
 
 describe("AUDIT · la matriz completa, celda por celda, contra el plan", () => {
-  it("60 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
+  it("66 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
     for (const role of ["owner", "admin", "staff"] as UserRole[]) {
       for (const capability of TODAS) {
         const esperado = DEL_PLAN[role][capability];

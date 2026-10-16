@@ -1,5 +1,5 @@
 /**
- * Los nueve reportes, ya armados. Server Components de presentación.
+ * Los nueve reportes del plan —y los dos de pauta, en `PautaReports.tsx`—, ya armados. Server Components de presentación.
  *
  * Viven aparte de `page.tsx` por dos razones, y las dos importan:
  *
@@ -48,6 +48,7 @@ import styles from "./charts.module.css";
 import { DataView } from "./DataView";
 import { loadReports } from "./data";
 import { occupancyByProvider, slotLabel, SLOTS, type SlotId } from "./occupancy";
+import { AcquisitionFrame, DemandFrame } from "./PautaReports";
 import { SERIES, statusColor } from "./palette";
 import { axisTicks, deltaAgainst, formatRate, NOT_MEASURABLE } from "./scale";
 
@@ -298,7 +299,14 @@ export function FortnightReports({ data }: { data: Data }) {
 
 // ── Cadencia mensual ────────────────────────────────────────────────────────
 
-export function MonthlyReports({ data }: { data: Data }) {
+export function MonthlyReports({
+  data,
+  canEditAdSpend = false,
+}: {
+  data: Data;
+  /** `pauta:registrar`: dibuja el formulario de inversión. La acción lo vuelve a preguntar. */
+  canEditAdSpend?: boolean;
+}) {
   const chair = chairHourReport(data.finance, data.services);
   const swaps = bookedVsPerformed(data.finance, data.services);
   const extras = extrasReport(data.finance, data.providers);
@@ -740,6 +748,10 @@ export function MonthlyReports({ data }: { data: Data }) {
           </p>
         ) : null}
       </ChartFrame>
+
+      {/* --- Pauta: demanda y costo por clienta nueva --------------------- */}
+      <DemandFrame data={data} />
+      <AcquisitionFrame canEdit={canEditAdSpend} data={data} visits={visits.visits} />
 
       {/* --- Inasistencia ------------------------------------------------- */}
       <ChartFrame

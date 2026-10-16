@@ -402,6 +402,21 @@
   color: var(--color-ink-soft);
 }
 
+/* Variante densa: siete columnas de una cifra corta (días de la semana × hora).
+   Con el ancho normal de 3.5rem la semana entera mide 450 px y a 390 obligaba
+   a scrollear de lado justo el mapa que hay que leer de un vistazo. Una o dos
+   cifras caben en 2.25rem; el texto va centrado porque sin columna de cifras
+   largas alinear a la derecha no compara nada. */
+.heat--dense .heatCell {
+  min-width: 2.25rem;
+  padding: 0.3125rem 0.25rem;
+  text-align: center;
+}
+
+.heat--dense thead th {
+  text-align: center;
+}
+
 .heatCell:focus-visible {
   outline: 2px solid var(--color-gold-dark);
   outline-offset: 1px;

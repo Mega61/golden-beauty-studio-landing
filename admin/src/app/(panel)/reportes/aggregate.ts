@@ -814,6 +814,32 @@ export function noShowReport(appointments: readonly AppointmentRow[]): NoShowRep
   };
 }
 
+// ── El estado de una fila de Agenda Pro ─────────────────────────────────────
+
+/** Lo que se puede saber de una cita heredada, a partir de su texto libre. */
+export type LegacyStatusKind = "atendida" | "no-asistio" | "cancelada";
+
+/**
+ * El estado de una fila de `legacy_appointment`, leído de su texto libre.
+ *
+ * El histórico de Agenda Pro guarda el estado como texto suyo, no el de EA, y
+ * el export no trae una lista cerrada. Por eso la lectura es por **exclusión**:
+ * es atendida la que no dice que se cayó. Descartar todo lo que no se
+ * reconozca borraría la clientela heredada de los reportes, que es exactamente
+ * lo que `legacy_appointment` existe para evitar.
+ *
+ * Vive acá, una sola vez, porque la usan tres lugares —la unión EA + legacy
+ * de "clienta nueva", la demanda por día y hora, y la exportación para Meta—
+ * y una segunda expresión regular en otro archivo es una segunda definición de
+ * "atendida" que tarde o temprano se separa de la primera.
+ */
+export function legacyStatusKind(status: string | null | undefined): LegacyStatusKind {
+  const text = status ?? "";
+  if (/cancel/i.test(text)) return "cancelada";
+  if (/no.?asis|no.?show/i.test(text)) return "no-asistio";
+  return "atendida";
+}
+
 // ── Visitas para el reporte de clientas ─────────────────────────────────────
 
 /**

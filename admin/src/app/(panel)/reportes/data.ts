@@ -37,12 +37,14 @@ import type {
 import { instantToEaLocal, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea";
 import type { Interval } from "@/lib/metrics";
 
-import type {
-  AppointmentRow,
-  CommissionEntryRow,
-  FinanceRow,
-  ProviderRow,
-  ServiceRow,
+import {
+  legacyStatusKind,
+  type AppointmentRow,
+  type CommissionEntryRow,
+  type FinanceRow,
+  type LegacyStatusKind,
+  type ProviderRow,
+  type ServiceRow,
 } from "./aggregate";
 import {
   loadAppointments,
@@ -54,6 +56,7 @@ import {
   type EaBlocks,
   type EaProvider,
 } from "./ea-sql";
+import { monthsInPeriod, type AdSpendEntry } from "./acquisition";
 import { addDays, eachDay, type Period } from "./period";
 import { dayWindow, windowOverRange, type DayWindow } from "./occupancy";
 import type { WorkingPlanException } from "@/lib/ea";
@@ -75,8 +78,20 @@ export type ReportData = {
   appointments: AppointmentRow[];
   /** Historia completa hasta el fin de la ventana de retención. */
   visitHistory: AppointmentRow[];
-  legacyVisits: { customerKey: string | null; at: EaLocalDateTime; attended: boolean }[];
+  legacyVisits: {
+    customerKey: string | null;
+    at: EaLocalDateTime;
+    /** Lo que dice la fila heredada. La demanda cuenta también las inasistencias. */
+    kind: LegacyStatusKind;
+    attended: boolean;
+  }[];
   commissionEntries: CommissionEntryRow[];
+  /**
+   * La inversión en anuncios de los meses que toca el periodo (`ad_spend`).
+   * `null` = no se pudo leer — la migración `023` no está aplicada o la base no
+   * respondió —, que **no** es lo mismo que "no hay inversión anotada" (`[]`).
+   */
+  adSpend: AdSpendEntry[] | null;
   stations: number;
   /** Jornada del estudio y de cada técnica, ya expandidas. */
   studioWindow: DayWindow;
@@ -296,12 +311,10 @@ export async function loadReports(
     legacyVisits = legacy.map((row) => ({
       customerKey: row.client_phone_e164,
       at: instantToEaLocal(row.started_at),
-      // El histórico de Agenda Pro guarda el estado como texto libre suyo, no
-      // el de EA. Se considera atendida la que **no** dice que se cayó: el
-      // export no trae una lista cerrada de estados, y descartar todo lo que no
-      // se reconozca borraría la clientela heredada del reporte, que es
-      // exactamente lo que `legacy_appointment` existe para evitar.
-      attended: !/cancel|no.?asis|no.?show/i.test(row.status ?? ""),
+      // Texto libre de Agenda Pro, leído por `legacyStatusKind()`: atendida es
+      // la que **no** dice que se cayó. La regla y su porqué viven allá.
+      kind: legacyStatusKind(row.status),
+      attended: legacyStatusKind(row.status) === "atendida",
     }));
   } catch (error) {
     db = null;
@@ -341,6 +354,25 @@ export async function loadReports(
     problems.push({ source: "ea", message: messageOf(error) });
   }
 
+  // --- Inversión en anuncios ---------------------------------------------
+  //
+  // Aparte del bloque de la plata: si la tabla no existe todavía (la `023` no
+  // se aplicó) el resto de los reportes sigue en pie, y el de costo por
+  // clienta dice que no pudo leerla en vez de suponer cero.
+  let adSpend: AdSpendEntry[] | null = null;
+  if (db !== null) {
+    try {
+      const rows = await repositories(db).adSpend.listByMonths(monthsInPeriod(period));
+      adSpend = rows.map((row) => ({
+        month: row.month,
+        channel: row.channel,
+        amountCop: row.amount_cop,
+      }));
+    } catch (error) {
+      console.error("[reportes] no se pudo leer ad_spend", error);
+    }
+  }
+
   // --- Comisiones ---------------------------------------------------------
   //
   // Depende de las dos: la lista de técnicas viene de EA y los renglones de
@@ -372,6 +404,7 @@ export async function loadReports(
     visitHistory,
     legacyVisits,
     commissionEntries,
+    adSpend,
     stations,
     studioWindow,
     providerWindows,

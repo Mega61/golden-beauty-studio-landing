@@ -69,6 +69,9 @@ const TODAS: Capability[] = [
   "catalogo:publicar",
   "diagnostico:ver",
   "ea:avanzado",
+  // Las dos exportaciones/escrituras de plata y datos que son solo de la dueña.
+  "pauta:registrar",
+  "clientes:exportar",
 ];
 
 /** Lo que una técnica NO puede alcanzar, ni con un formulario armado a mano. */
@@ -87,7 +90,7 @@ afterEach(() => {
 });
 
 describe("AUDIT · una técnica llamando el DAL directamente", () => {
-  it("las doce capacidades que no son suyas lanzan ForbiddenError", async () => {
+  it("las catorce capacidades que no son suyas lanzan ForbiddenError", async () => {
     entrarComo("lina@gmail.com");
 
     for (const capability of PROHIBIDO_A_STAFF) {
@@ -140,7 +143,7 @@ describe("AUDIT · una técnica llamando el DAL directamente", () => {
 });
 
 describe("AUDIT · recepción y dueña", () => {
-  it("recepción alcanza ocho capacidades y no las otras siete", async () => {
+  it("recepción alcanza ocho capacidades y no las otras nueve", async () => {
     entrarComo("recepcion@estudio.com");
 
     const permitidas: Capability[] = [
@@ -160,7 +163,7 @@ describe("AUDIT · recepción y dueña", () => {
     }
   });
 
-  it("la dueña alcanza las quince", async () => {
+  it("la dueña alcanza las diecisiete", async () => {
     entrarComo("duena@estudio.com");
 
     for (const capability of TODAS) {

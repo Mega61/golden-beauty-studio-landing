@@ -561,6 +561,7 @@ de indexar la agenda por rango y la liquidación por técnica sin un JOIN que no
 | `service_map` | `pricing_id` (el id de `src/data/pricing.ts`) ↔ `ea_service_id`. Sin esto la vitrina y el catálogo operativo son dos listas que se separan en silencio (ver "Catálogo y precios"). |
 | `legacy_appointment` | histórico de Agenda Pro, para continuidad de reportes sin ensuciar el calendario de EA |
 | `audit_log` | quién cambió qué desde el panel |
+| `ad_spend` | inversión en anuncios por mes (`"YYYY-MM"`) y canal, en pesos enteros — el denominador del costo por clienta nueva (migración `023`) |
 
 **Webhooks de EA → `POST /admin/api/webhooks/ea`** crean la fila `appointment_finance` y congelan el
 precio del servicio en el momento en que se agenda la cita — incluyendo reservas hechas desde la
@@ -793,6 +794,8 @@ diferencia sin acusar a nadie:
 | Hacer el cierre diario | ❌ | ✅ | ✅ |
 | Corregir después del cierre | ❌ | ❌ | ✅ |
 | Ver su propia liquidación y su propio ticket promedio | ✅ | — | ✅ |
+| Anotar la inversión en anuncios del mes (`pauta:registrar`) | ❌ | ❌ (ve el reporte) | ✅ |
+| Exportar la lista de clientas para Meta (`clientes:exportar`) | ❌ | ❌ | ✅ |
 
 `TICKET_STAFF_COBRA` existe porque la respuesta cambia con el día: en un estudio de dos personas la
 técnica cobra; con recepción de planta, no. Es una decisión de operación, no de código.
@@ -1061,6 +1064,8 @@ reporte en una decisión.
 | **Variación de precio por técnica, desglosada por motivo** | Dónde se escapa la plata | Quincenal |
 | **Clientas nuevas vs. que vuelven, y retención a 60 días** | Cuánto invertir en captación vs. en volver a traer | Mensual |
 | **Inasistencia por franja y por origen de reserva** | Si el recordatorio funciona, y si algún horario no vale la pena abrir | Mensual |
+| **Demanda por día y hora** — mapa de calor día de la semana × hora de inicio, ingreso por día, el día más lleno y el más flojo *por día abierto* | Cuándo pautar y qué día empujar con una promo | Mensual |
+| **Costo por clienta nueva** — inversión en anuncios ÷ clientas nuevas, y "ya recuperado" = lo que pagaron las nuevas ÷ inversión | Si la pauta se paga sola | Mensual |
 
 Definiciones que se fijan una vez y se usan igual en todos lados: **ocupación** = minutos de servicios
 realizados ÷ minutos disponibles (el plan de trabajo menos bloqueos; una inasistencia **no** cuenta como
@@ -1068,6 +1073,32 @@ ocupado); **clienta nueva** = sin ninguna cita previa en la unión EA + `legacy_
 **retención a 60 días** = % de clientas atendidas en el periodo que volvieron dentro de los 60 días
 siguientes. Todas viven en `lib/metrics.ts` como funciones puras, y ningún reporte las recalcula por su
 cuenta.
+
+**Los dos reportes de pauta** (`reportes/demand.ts`, `reportes/acquisition.ts`, dibujados por
+`PautaReports.tsx`) se agregaron después del set original, para la metodología de anuncios de la
+dueña. Decisiones fijadas, con su test:
+
+- **Demanda:** cuentan las citas atendidas y agendadas por su hora de inicio en hora de pared de
+  Bogotá. **Una inasistencia sí es demanda** (alguien pidió esa hora); una cancelada no; un estado
+  que el panel no traduce tampoco, y se cuenta aparte. Las filas de `legacy_appointment` del periodo
+  entran al conteo con `legacyStatusKind()` —la misma lectura del texto libre de Agenda Pro que usa
+  "clienta nueva"— pero **no** al ingreso: ningún reporte de plata lee el histórico. El día más lleno
+  y el más flojo se comparan por *citas por día abierto* (la jornada sale del plan de trabajo), no
+  por totales, para que un mes con cinco sábados no premie al sábado.
+- **Costo por clienta nueva:** "clienta nueva" es `splitCustomers()`, la misma del reporte de
+  clientas. La inversión vive en `ad_spend` (migración `023`, por mes y canal), la anota la dueña
+  desde el reporte (`pauta:registrar`, auditado). Un periodo que no es mes entero suma **los meses
+  completos** que toca y lo dice: la pauta no se prorratea porque no se gasta pareja. Sin inversión,
+  con inversión en cero o sin nuevas, el costo es `null` con el motivo, nunca `$ 0` ni `∞`.
+
+La tercera pieza de esa metodología no es un reporte: **`/clientes/exportar-meta`** baja la lista
+de clientas para una audiencia personalizada de Meta (`clientes:exportar`, solo la dueña), en el
+formato de lista de clientes de Meta y **cifrada con SHA-256** (`phone`, `fn`, `ln`, `ct` si hay
+ciudad, `country`). Segmentos: todas, atendidas en los últimos 180 días (exclusión de captación) e
+inactivas hace más de 60 días sin cita futura (volver a traer). Une EA y el histórico por teléfono
+E.164; las que no tienen teléfono se cuentan en pantalla. **`wa_optout` no filtra**: es una baja de
+mensajes, y esta lista no le escribe a nadie — sirve sobre todo para *no* mostrar anuncios. Cada
+descarga deja en `audit_log` el segmento y el número de filas, nunca los datos.
 
 ---
 
