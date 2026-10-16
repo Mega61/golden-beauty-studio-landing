@@ -9,14 +9,13 @@ import { repositories } from "@/db/repositories";
 import { REMINDER_RULES, scheduledFor } from "@/jobs/reminders";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { eaLocalToInstant, instantToEaDate } from "@/lib/ea";
-import { createEaClient } from "@/lib/ea/client";
+import { loadAppointmentForMessage } from "@/lib/whatsapp/load-appointment";
 import {
   MANUAL_TEMPLATE,
   planManualReminders,
   type ManualReminderAppointment,
 } from "@/lib/whatsapp/manual-reminder";
 
-import { normalizePhoneE164 } from "../clientes/identity";
 import { linkFor, nextEaDate, sentLabelOf } from "./data";
 
 /**
@@ -63,24 +62,7 @@ const STATE_MESSAGE = {
 } as const;
 
 /** La cita, reducida a lo que deciden las funciones puras. Leída de EA. */
-async function loadAppointment(eaAppointmentId: number): Promise<ManualReminderAppointment> {
-  const ea = createEaClient();
-  const appointment = await ea.appointments.get(eaAppointmentId);
-  const [customer, service] = await Promise.all([
-    appointment.customerId === null ? null : ea.customers.get(appointment.customerId),
-    appointment.serviceId === null ? null : ea.services.get(appointment.serviceId),
-  ]);
-  return {
-    eaAppointmentId: appointment.id,
-    start: appointment.start,
-    status: appointment.status,
-    phoneE164: normalizePhoneE164(customer?.phone ?? null),
-    customerFirstName: customer?.firstName ?? null,
-    customerName:
-      [customer?.firstName, customer?.lastName].filter(Boolean).join(" ").trim() || "Sin clienta",
-    serviceName: service?.name ?? null,
-  };
-}
+const loadAppointment = loadAppointmentForMessage;
 
 export async function enviarRecordatorio(input: {
   eaAppointmentId: number;

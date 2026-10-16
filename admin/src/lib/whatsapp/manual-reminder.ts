@@ -261,6 +261,33 @@ export function buildReminderText(input: {
   ].join("\n");
 }
 
+/**
+ * El mensaje de confirmación de una reserva recién hecha en la página.
+ *
+ * Lo manda la dueña o recepción con un toque desde el aviso del celular
+ * ("Escribirle por WhatsApp"): la clienta recibe la confirmación por el chat
+ * del estudio, que es por donde va a escribir si necesita cambiarla. Mismas
+ * reglas que el recordatorio: nombre presentable, hora hablada, sin precio.
+ */
+export function buildConfirmationText(input: {
+  customerFirstName: string | null;
+  serviceName: string | null;
+  start: EaLocalDateTime;
+}): string {
+  const name = presentableFirstName(input.customerFirstName);
+  const greeting = name === null ? "¡Hola!" : `¡Hola, ${name}!`;
+  const service = input.serviceName?.trim() ? ` de ${input.serviceName.trim()}` : "";
+  const first = `${greeting} ✨ Tu cita${service} quedó confirmada para el ${formatDateLong(input.start)} ${spokenTime(input.start)}`;
+
+  return [
+    first.endsWith(".") ? first : `${first}.`,
+    "",
+    `Te esperamos en Golden Beauty Studio: ${STUDIO_ADDRESS}.`,
+    "",
+    "Si necesitas cambiarla, respóndenos por aquí.",
+  ].join("\n");
+}
+
 // ── El enlace ───────────────────────────────────────────────────────────────
 
 /**

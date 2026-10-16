@@ -163,9 +163,11 @@ export async function sendTestPush(
 ): Promise<PushOutcome> {
   const vapid = vapidConfig();
   if (vapid === null) return { kind: "failed", statusCode: null };
+  // Con la misma cara que uno de verdad: probar el aviso es ver cómo se va a
+  // ver cuando entre una reserva, no leer que "funciona".
   const payload: PushPayload = {
-    title: "Avisos activos",
-    body: "Así te va a llegar cada reserva que entre por la página.",
+    title: "Así te llega una reserva ✨",
+    body: "Semipermanente manos\nLaura M. · mañana 10 a. m. · (esto es una prueba)",
     url: `${PANEL_BASE_PATH}/ajustes`,
     tag: "prueba",
   };

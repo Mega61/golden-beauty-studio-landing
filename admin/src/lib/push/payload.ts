@@ -40,6 +40,12 @@ export type PushPayload = {
   url: string;
   /** Una reserva, un aviso: si el mismo llega dos veces, el segundo reemplaza. */
   tag: string;
+  /**
+   * El botón "Escribirle por WhatsApp": la ruta del panel que resuelve el
+   * teléfono del lado del servidor (`/confirmar/:id`). Nunca un `wa.me`: el
+   * número no viaja en el aviso.
+   */
+  confirmUrl?: string;
 };
 
 /** Techo por campo. El cifrado de Web Push deja ~4 KB y la pantalla, menos. */
@@ -119,14 +125,19 @@ export function buildNewBookingPayload(
   const provider = clean(notice.providerName, 40);
 
   const parts = [who, when].filter(Boolean).join(" · ");
-  const body = provider ? `${parts} con ${provider}` : parts;
+  const detail = provider ? `${parts} con ${provider}` : parts;
 
-  const agenda = `${basePath.replace(/\/+$/, "")}/agenda`;
+  const base = basePath.replace(/\/+$/, "");
+  const agenda = `${base}/agenda`;
 
+  // Dos renglones: qué se va a hacer, y quién y cuándo. Android e iOS respetan
+  // el salto; `clean()` va por renglón porque se come los saltos de línea.
+  const what = service.charAt(0).toLocaleUpperCase("es-CO") + service.slice(1);
   return {
-    title: clean(`Nueva reserva · ${service}`, MAX_TITLE),
-    body: clean(body, MAX_BODY),
+    title: clean("Nueva reserva ✨", MAX_TITLE),
+    body: `${what}\n${clean(detail, MAX_BODY - what.length - 1)}`,
     url: date === null ? agenda : `${agenda}?dia=${date}`,
     tag: `reserva-${notice.appointmentId}`,
+    confirmUrl: `${base}/confirmar/${notice.appointmentId}`,
   };
 }

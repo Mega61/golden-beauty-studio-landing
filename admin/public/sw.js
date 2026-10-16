@@ -26,6 +26,10 @@
 
 const BASE = "/admin";
 const ICON = `${BASE}/icons/icon-192.png`;
+// La insignia de la barra de estado de Android: solo cuenta la silueta, así
+// que es un destello blanco sobre transparente. Sin ella, Android pinta un
+// cuadrado gris donde iba la marca.
+const BADGE = `${BASE}/icons/badge-96.png`;
 
 self.addEventListener("install", () => {
   // Una versión nueva toma el control sin esperar a que se cierren todas las
@@ -49,23 +53,47 @@ self.addEventListener("push", (event) => {
     data = { title: "Golden · Panel", body: event.data.text() };
   }
 
-  const url = typeof data.url === "string" && data.url.startsWith(`${BASE}/`) ? data.url : `${BASE}/agenda`;
+  const inPanel = (value) => typeof value === "string" && value.startsWith(`${BASE}/`);
+  const url = inPanel(data.url) ? data.url : `${BASE}/agenda`;
+  const confirmUrl = inPanel(data.confirmUrl) ? data.confirmUrl : null;
 
   event.waitUntil(
     self.registration.showNotification(data.title || "Golden · Panel", {
       body: data.body || "",
       icon: ICON,
+      badge: BADGE,
       tag: data.tag || undefined,
       // Si llega otra con la misma etiqueta, que vuelva a sonar.
       renotify: Boolean(data.tag),
-      data: { url },
+      // Corto y doble: se nota en el bolsillo sin parecer una llamada.
+      vibrate: [90, 60, 90],
+      timestamp: Date.now(),
+      // Android y escritorio muestran los botones; iOS los ignora y tocar el
+      // aviso sigue abriendo la agenda del día.
+      actions: confirmUrl
+        ? [
+            { action: "confirmar", title: "Escribirle por WhatsApp" },
+            { action: "agenda", title: "Ver en la agenda" },
+          ]
+        : [],
+      data: { url, confirmUrl },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || `${BASE}/agenda`, self.location.origin);
+  const data = event.notification.data || {};
+
+  // "Escribirle por WhatsApp": la ruta del panel resuelve el teléfono y
+  // redirige a wa.me. Va en ventana nueva —sale de la app hacia WhatsApp— en
+  // vez de reusar la del panel, que quedaría parada en una redirección.
+  if (event.action === "confirmar" && data.confirmUrl) {
+    event.waitUntil(self.clients.openWindow(new URL(data.confirmUrl, self.location.origin).href));
+    return;
+  }
+
+  const target = new URL(data.url || `${BASE}/agenda`, self.location.origin);
 
   event.waitUntil(
     (async () => {

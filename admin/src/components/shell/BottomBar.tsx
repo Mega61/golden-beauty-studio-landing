@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { salir } from "@/app/(auth)/entrar/actions";
 import { Icon } from "../ui/Icon";
 import { Panel } from "../ui/Panel";
 import { activeDestinationId, bottomBarFor, overflowFor, type Role } from "./nav";
@@ -48,19 +49,19 @@ export function BottomBar({ role }: { role: Role }) {
           </Link>
         ))}
 
-        {rest.length > 0 ? (
-          <button
-            type="button"
-            className="ui-bottombar__item"
-            aria-expanded={openMore}
-            aria-haspopup="dialog"
-            data-current={activeInRest ? "true" : undefined}
-            onClick={() => setOpenMore(true)}
-          >
-            <Icon name="mas" size={20} />
-            Más
-          </button>
-        ) : null}
+        {/* Siempre: aunque un rol no tenga más destinos, acá vive "Cerrar
+            sesión" — sin esto una técnica en el celular no tendría cómo salir. */}
+        <button
+          type="button"
+          className="ui-bottombar__item"
+          aria-expanded={openMore}
+          aria-haspopup="dialog"
+          data-current={activeInRest ? "true" : undefined}
+          onClick={() => setOpenMore(true)}
+        >
+          <Icon name="mas" size={20} />
+          Más
+        </button>
       </nav>
 
       <Panel open={openMore} onClose={() => setOpenMore(false)} title="Más">
@@ -100,6 +101,21 @@ export function BottomBar({ role }: { role: Role }) {
               )}
             </li>
           ))}
+          <li>
+            <form action={salir}>
+              <button
+                type="submit"
+                className="ui-list__row"
+                data-interactive="true"
+                style={{ width: "100%", border: 0, background: "none", font: "inherit", textAlign: "left", cursor: "pointer" }}
+              >
+                <Icon name="salir" size={20} style={{ flex: "none" }} />
+                <span className="ui-list__body">
+                  <span className="ui-list__primary">Cerrar sesión</span>
+                </span>
+              </button>
+            </form>
+          </li>
         </ul>
       </Panel>
     </>

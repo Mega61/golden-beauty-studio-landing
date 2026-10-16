@@ -20,19 +20,20 @@ describe("buildNewBookingPayload", () => {
   it("arma título, cuerpo y enlace a la agenda del día", () => {
     const p = buildNewBookingPayload(BASE, "2026-10-15", "/admin");
     expect(p).toEqual({
-      title: "Nueva reserva · Semipermanente manos",
-      body: "Laura M. · sáb 17 oct 3:30 p. m. con Lina",
+      title: "Nueva reserva ✨",
+      body: "Semipermanente manos\nLaura M. · sáb 17 oct 3:30 p. m. con Lina",
       url: "/admin/agenda?dia=2026-10-17",
       tag: "reserva-812",
+      confirmUrl: "/admin/confirmar/812",
     });
   });
 
   it("dice «hoy» y «mañana» cuando aplica", () => {
     expect(buildNewBookingPayload(BASE, "2026-10-17", "/admin").body).toBe(
-      "Laura M. · hoy 3:30 p. m. con Lina",
+      "Semipermanente manos\nLaura M. · hoy 3:30 p. m. con Lina",
     );
     expect(buildNewBookingPayload(BASE, "2026-10-16", "/admin").body).toBe(
-      "Laura M. · mañana 3:30 p. m. con Lina",
+      "Semipermanente manos\nLaura M. · mañana 3:30 p. m. con Lina",
     );
   });
 
@@ -47,7 +48,7 @@ describe("buildNewBookingPayload", () => {
 
   it("sin nombre de servicio sale igual, con «servicio»", () => {
     const p = buildNewBookingPayload({ ...BASE, serviceName: null }, "2026-10-15", "/admin");
-    expect(p.title).toBe("Nueva reserva · servicio");
+    expect(p.body.split("\n")[0]).toBe("Servicio");
   });
 
   it("limpia saltos de línea y recorta lo largo", () => {
@@ -61,9 +62,11 @@ describe("buildNewBookingPayload", () => {
       "2026-10-15",
       "/admin",
     );
-    expect(p.title.length).toBeLessThanOrEqual(80);
-    expect(p.title.endsWith("…")).toBe(true);
-    expect(p.body).not.toMatch(/[\n\t]/);
+    const [what, detail] = p.body.split("\n");
+    expect(p.body.split("\n")).toHaveLength(2);
+    expect(what.length).toBeLessThanOrEqual(60);
+    expect(what.endsWith("…")).toBe(true);
+    expect(detail).not.toMatch(/[\n\t]/);
     expect(p.body).toContain("Ana María M.");
     expect(p.body).toContain("con Lina Pérez");
   });
@@ -71,7 +74,7 @@ describe("buildNewBookingPayload", () => {
   it("con una fecha ilegible, el enlace va a la agenda sin día", () => {
     const p = buildNewBookingPayload({ ...BASE, start: "basura" }, "2026-10-15", "/admin");
     expect(p.url).toBe("/admin/agenda");
-    expect(p.body).toBe("Laura M. con Lina");
+    expect(p.body).toBe("Semipermanente manos\nLaura M. con Lina");
   });
 
   it("el basePath con barra final no duplica la barra", () => {
@@ -82,7 +85,7 @@ describe("buildNewBookingPayload", () => {
 
   it("la hora en punto no lleva «:00», como en el resto del panel", () => {
     const p = buildNewBookingPayload({ ...BASE, start: "2026-10-15 09:00:00" }, "2026-10-15", "/admin");
-    expect(p.body).toBe("Laura M. · hoy 9 a. m. con Lina");
+    expect(p.body).toBe("Semipermanente manos\nLaura M. · hoy 9 a. m. con Lina");
   });
 });
 

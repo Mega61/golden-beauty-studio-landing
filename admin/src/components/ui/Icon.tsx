@@ -39,7 +39,8 @@ export type IconName =
   | "candado"
   | "reloj"
   | "mensaje"
-  | "ajustes";
+  | "ajustes"
+  | "salir";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Hoy: el sol sobre el mesón. La pantalla que abre la recepción.
@@ -175,6 +176,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M4 8h9M17 8h3M4 16h3M11 16h9" />
       <circle cx="15" cy="8" r="2" />
       <circle cx="9" cy="16" r="2" />
+    </>
+  ),
+  // Cerrar sesión: una puerta y la flecha que sale por ella.
+  salir: (
+    <>
+      <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
+      <path d="m9 16-4-4 4-4M5 12h10" />
     </>
   ),
 };

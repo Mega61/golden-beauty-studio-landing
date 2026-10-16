@@ -1368,6 +1368,24 @@
       background-color var(--dur-1) var(--ease-out),
       color var(--dur-1) var(--ease-out);
   }
+  /* "Cerrar sesión" es un <button> dentro de un <form> (la acción revoca la
+     sesión en el servidor), con la cara de un destino más del nav. Va abajo
+     del todo: es lo último que se busca y lo único que no se quiere tocar
+     sin querer. */
+  .ui-side__logout {
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--hair);
+    width: 100%;
+  }
+  button.ui-nav__item {
+    width: 100%;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
   .ui-nav__item:hover {
     background: var(--color-ivory-deep);
     color: var(--color-ink);

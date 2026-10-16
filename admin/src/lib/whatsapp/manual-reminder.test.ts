@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseEaLocalDate, parseEaLocalDateTime } from "@/lib/ea";
 
 import {
+  buildConfirmationText,
   KIND_FOR_DAY,
   MANUAL_TEMPLATE,
   STUDIO_ADDRESS,
@@ -427,5 +428,31 @@ describe("MANUAL_TEMPLATE", () => {
   it("cabe en template_name y se distingue de una plantilla de Meta", () => {
     expect(MANUAL_TEMPLATE.length).toBeLessThanOrEqual(120);
     expect(MANUAL_TEMPLATE.startsWith("manual-")).toBe(true);
+  });
+});
+
+describe("buildConfirmationText", () => {
+  it("confirma con el nombre, el servicio, el día y la hora, sin precio", () => {
+    const text = buildConfirmationText({
+      customerFirstName: "LAURA",
+      serviceName: "Semipermanente manos",
+      start: "2026-10-16 10:00:00" as never,
+    });
+    expect(text.split("\n")[0]).toBe(
+      "¡Hola, Laura! ✨ Tu cita de Semipermanente manos quedó confirmada para el viernes 16 de octubre a las 10:00 a. m.",
+    );
+    expect(text).toContain("Calle 69 Sur #43a - 41");
+    expect(text).not.toMatch(/\$/);
+  });
+
+  it("sin nombre ni servicio sigue siendo una frase", () => {
+    const text = buildConfirmationText({
+      customerFirstName: null,
+      serviceName: null,
+      start: "2026-10-16 13:30:00" as never,
+    });
+    expect(text.split("\n")[0]).toBe(
+      "¡Hola! ✨ Tu cita quedó confirmada para el viernes 16 de octubre a la 1:30 p. m.",
+    );
   });
 });
