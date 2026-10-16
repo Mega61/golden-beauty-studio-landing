@@ -48,6 +48,10 @@ const tiktokUrl = process.env.NEXT_PUBLIC_TIKTOK_URL?.trim() || null;
 
 const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim() || null;
 
+// Meta Pixel (Events Manager → Data sources). Unset = no Pixel, and the
+// server-side Conversions API stays off too (it needs the same id).
+const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim() || null;
+
 const googleSiteVerification =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || null;
 
@@ -100,6 +104,7 @@ export const siteConfig = {
   instagramUrl,
   tiktokUrl,
   gaId,
+  metaPixelId,
   googleSiteVerification,
   mapsEmbedUrl,
   mapsPlaceId,

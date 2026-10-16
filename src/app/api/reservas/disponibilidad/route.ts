@@ -19,7 +19,10 @@ import { adminOrigin, bookingUrl, clientIp, fail, rateLimited } from "../guards"
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const RATE_MAX = 60;
+// Doubled from 60 when the flow started prefetching the next two days: one
+// person looking at ten days now makes ~30 calls. The panel caches the
+// expensive part, so this is about scripts, not about cost.
+const RATE_MAX = 120;
 
 export async function GET(req: NextRequest) {
   if (rateLimited(clientIp(req), RATE_MAX, "disponibilidad")) return fail("rate_limited", 429);

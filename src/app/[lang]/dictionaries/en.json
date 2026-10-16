@@ -324,6 +324,16 @@
       "spam": "We couldn't process the form. Reload the page and try again.",
       "unavailable": "We couldn't reach the calendar. Try again in a moment or message us on WhatsApp.",
       "retry": "Try again"
+    },
+    "trust": {
+      "reviews": "{rating} on Google · {count} reviews",
+      "instant": "Instant confirmation",
+      "pay": "Pay at the studio",
+      "ratingOnly": "{rating} ★ on Google"
+    },
+    "scarcity": {
+      "few": "Only {n} times left this day",
+      "last": "Just one time left this day"
     }
   },
   "faq": {

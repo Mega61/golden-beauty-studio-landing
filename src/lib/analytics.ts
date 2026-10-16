@@ -1,5 +1,6 @@
 declare global {
   interface Window {
+    fbq?: (command: "track" | "trackCustom" | "init", name: string, params?: Record<string, unknown>, options?: { eventID?: string }) => void;
     gtag?: (
       command: "event",
       name: string,
@@ -34,6 +35,9 @@ export function trackWhatsappClick(
   extra?: Record<string, unknown>,
 ): void {
   trackEvent("contact_whatsapp", { location, ...extra });
+  // WhatsApp is the second way people book. Meta optimises "messages"
+  // campaigns on this event.
+  trackMeta("Contact", { content_category: location });
 }
 
 /* ── Trabaja con nosotros (job applications) ──────────────────────────────── */
@@ -116,4 +120,20 @@ export function trackBioClick(params: {
       link_url: href,
     });
   }
+}
+
+/* ── Meta Pixel ──────────────────────────────────────────────────────────── */
+
+/**
+ * A standard Meta event from the browser. `eventId` is what lets Meta merge it
+ * with the server copy of the same event (see `lib/meta-events.ts`) — pass it
+ * for any event the server also sends.
+ */
+export function trackMeta(
+  name: "ViewContent" | "InitiateCheckout" | "Schedule" | "Contact",
+  params?: Record<string, unknown>,
+  eventId?: string,
+): void {
+  if (typeof window === "undefined" || typeof window.fbq !== "function") return;
+  window.fbq("track", name, params, eventId ? { eventID: eventId } : undefined);
 }

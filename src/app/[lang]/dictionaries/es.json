@@ -324,6 +324,16 @@
       "spam": "No pudimos procesar el formulario. Recarga la página e intenta otra vez.",
       "unavailable": "No pudimos conectar con la agenda. Intenta en un momento o escríbenos por WhatsApp.",
       "retry": "Reintentar"
+    },
+    "trust": {
+      "reviews": "{rating} en Google · {count} reseñas",
+      "instant": "Confirmación al instante",
+      "pay": "Pagas en el estudio",
+      "ratingOnly": "{rating} ★ en Google"
+    },
+    "scarcity": {
+      "few": "Quedan {n} horas este día",
+      "last": "Queda una sola hora este día"
     }
   },
   "faq": {

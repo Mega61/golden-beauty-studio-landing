@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from "motion/react";
 import type { Locale } from "../dictionaries";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackMeta } from "@/lib/analytics";
+import { newEventId } from "@/lib/meta-events";
 import {
   addMinutes,
   buildDays,
@@ -73,6 +75,8 @@ type Slot = { time: string; start: string; end: string; providerIds: number[] };
  */
 type Combo = { serviceId: number; handsServiceId: number; feetServiceId: number };
 
+export type Catalog = { services: Service[]; providers: Provider[]; combos: Combo[] };
+
 export type ServiceCopy = { name: string; desc: string; category: string; categoryId: string };
 
 type Step = "service" | "slot" | "details";
@@ -106,6 +110,8 @@ type Dict = {
   loadingSlots: string;
   pickDate: string;
   combo: { askFeet: string; askHands: string; none: string; hint: string; saving: string };
+  trust: { reviews: string; ratingOnly: string; instant: string; pay: string };
+  scarcity: { few: string; last: string };
   success: {
     eyebrow: string;
     title: string;
@@ -129,6 +135,21 @@ type Dict = {
 /** How far ahead the day strip runs. The panel refuses anything past 120. */
 const DAYS_AHEAD = 45;
 
+/**
+ * How long a day's times are shown from memory before only the live answer
+ * counts. Short on purpose — see the availability block in the component.
+ */
+const SLOT_TTL_MS = 45_000;
+
+/** Fewer Google reviews than this and the trust line shows the rating alone. */
+const MIN_REVIEWS_TO_COUNT = 20;
+
+/** Younger than this, a cached day isn't refetched on display. */
+const FRESH_MS = 10_000;
+
+/** At or below this many free times, the day says so. Real scarcity only. */
+const FEW_SLOTS = 3;
+
 /** Where "remember my details" keeps them. Name and phone only, never notes. */
 const REMEMBER_KEY = "gbs-reserva-datos";
 
@@ -139,6 +160,8 @@ export default function ReservaFlow({
   lang,
   today,
   initialSlug,
+  initialCatalog,
+  rating,
   copy,
   whatsappNumber,
   mapsUrl,
@@ -149,15 +172,15 @@ export default function ReservaFlow({
   today: string;
   /** `?servicio=<price-list id>` — arrive with the service already chosen. */
   initialSlug: string | null;
+  /** Rendered with the page; null when the server couldn't reach the panel. */
+  initialCatalog: Catalog | null;
+  /** Google rating, for the trust line. Null hides it. */
+  rating: { value: number; count: number } | null;
   copy: Record<string, ServiceCopy>;
   whatsappNumber: string | null;
   mapsUrl: string;
 }) {
-  const [catalog, setCatalog] = useState<{
-    services: Service[];
-    providers: Provider[];
-    combos: Combo[];
-  } | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(initialCatalog);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadNonce, setLoadNonce] = useState(0);
 
@@ -189,6 +212,18 @@ export default function ReservaFlow({
   } | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
+  /** Set below, once the service is known: reports funnel steps to Meta. */
+  const onStepTracked = useRef<((s: Step) => void) | null>(null);
+
+  // Forward slides left, back slides right — the same spatial logic as the
+  // progress bar, so going back feels like going back. Adjusted during render
+  // (React's pattern for state derived from a change), not in an effect.
+  const [prevStep, setPrevStep] = useState<Step>(step);
+  const [direction, setDirection] = useState(1);
+  if (prevStep !== step) {
+    setDirection(STEPS.indexOf(step) > STEPS.indexOf(prevStep) ? 1 : -1);
+    setPrevStep(step);
+  }
   const dayStripRef = useRef<HTMLDivElement>(null);
   const advanceTimer = useRef<number | null>(null);
   /** How many times the default day has rolled forward. 0 = she chose it. */
@@ -239,6 +274,7 @@ export default function ReservaFlow({
       setStep(next);
       window.history.pushState({ gbsStep: next }, "");
       trackEvent("booking_step", { step: STEPS.indexOf(next) + 1 });
+      onStepTracked.current?.(next);
       scrollToTop();
     },
     [scrollToTop],
@@ -262,6 +298,9 @@ export default function ReservaFlow({
   /* ── Catalog ─────────────────────────────────────────────────────────── */
 
   useEffect(() => {
+    // Already rendered with the page: nothing to wait for. A retry after a
+    // failure bumps `loadNonce` and comes through here with `catalog` null.
+    if (catalog) return;
     let alive = true;
     void (async () => {
       try {
@@ -285,6 +324,7 @@ export default function ReservaFlow({
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a retry refetches
   }, [loadNonce]);
 
   const nameOf = useCallback(
@@ -398,6 +438,7 @@ export default function ReservaFlow({
     resetSlot();
     setError(null);
     if (partnersOf(s.id).length === 0) {
+      prefetchFirstDay(s);
       advanceTimer.current = window.setTimeout(() => go("slot"), 260);
     }
   };
@@ -413,6 +454,7 @@ export default function ReservaFlow({
     setService(next);
     setProviderId(null);
     resetSlot();
+    if (next) prefetchFirstDay(next);
     advanceTimer.current = window.setTimeout(() => go("slot"), 260);
   };
 
@@ -502,32 +544,138 @@ export default function ReservaFlow({
     }
   }, [step, date]);
 
-  // Times are refetched on every change of day, service or technician — and
-  // never cached, because a cached availability is a chair sold twice.
+  /* ── Availability: fetched ahead, kept briefly, always rechecked ─────── */
+  //
+  // A tap on a day should show times now, not after a round trip. So the
+  // first open day is fetched while she's still deciding on a service, and
+  // the next two open days while she reads the times of this one.
+  //
+  // Holding them for a short while is safe for one reason: the panel
+  // re-verifies the slot against fresh data before it writes anything, and a
+  // lost race comes back as `taken`, which drops the cache and reloads. A day
+  // shown from the cache is refetched underneath anyway, so a time that went
+  // meanwhile disappears on its own.
+
+  const slotCache = useRef(new Map<string, { at: number; slots: Slot[] }>());
+  const inflight = useRef(new Map<string, Promise<Slot[] | null>>());
+  /** Free-time count per day already seen — state, because the strip renders it. */
+  const [knownLoads, setKnownLoads] = useState<Record<string, number>>({});
+
+  const keyOf = (serviceId: number, day: string, provider: number | null) =>
+    `${serviceId}|${day}|${provider ?? "any"}`;
+
+  const fetchSlots = useCallback(
+    (serviceId: number, day: string, provider: number | null): Promise<Slot[] | null> => {
+      const key = keyOf(serviceId, day, provider);
+      const running = inflight.current.get(key);
+      if (running) return running;
+      const query = new URLSearchParams({ serviceId: String(serviceId), date: day });
+      if (provider !== null) query.set("providerId", String(provider));
+      const p = fetch(`/api/reservas/disponibilidad?${query}`)
+        .then(async (res) => {
+          if (!res.ok) throw new Error(String(res.status));
+          const body = (await res.json()) as { slots: Slot[] };
+          slotCache.current.set(key, { at: Date.now(), slots: body.slots });
+          setKnownLoads((prev) => (prev[key] === body.slots.length ? prev : { ...prev, [key]: body.slots.length }));
+          return body.slots;
+        })
+        .catch(() => null)
+        .finally(() => inflight.current.delete(key));
+      inflight.current.set(key, p);
+      return p;
+    },
+    [],
+  );
+
+  const cachedSlots = (serviceId: number, day: string, provider: number | null) => {
+    const hit = slotCache.current.get(keyOf(serviceId, day, provider));
+    return hit && Date.now() - hit.at < SLOT_TTL_MS ? hit.slots : null;
+  };
+
+  // The visible day: cached times at once if we have them, then the live answer.
   useEffect(() => {
     if (!service || !date || step === "service") return;
     let alive = true;
-    void (async () => {
-      const query = new URLSearchParams({ serviceId: String(service.id), date });
-      if (providerId !== null) query.set("providerId", String(providerId));
-      try {
-        const res = await fetch(`/api/reservas/disponibilidad?${query}`);
-        if (!res.ok) throw new Error(String(res.status));
-        const body = (await res.json()) as { slots: Slot[] };
-        if (alive) setSlots(body.slots);
-      } catch {
-        if (alive) {
-          setSlots([]);
-          setError(dict.errors.unavailable);
-        }
+    const key = keyOf(service.id, date, providerId);
+    const hit = cachedSlots(service.id, date, providerId);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- show what we already know
+    setSlots(hit);
+    // Just fetched (the prefetch a moment ago): no second trip for the same answer.
+    const age = Date.now() - (slotCache.current.get(key)?.at ?? 0);
+    if (hit && age < FRESH_MS) return;
+    void fetchSlots(service.id, date, providerId).then((fresh) => {
+      if (!alive) return;
+      if (fresh) setSlots(fresh);
+      else if (!hit) {
+        setSlots([]);
+        setError(dict.errors.unavailable);
       }
-    })();
+    });
     return () => {
       alive = false;
     };
     // `step` only gates the first fetch; leaving step 2 must not refetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [service, date, providerId, dict.errors.unavailable, step === "service"]);
+  }, [service, date, providerId, dict.errors.unavailable, fetchSlots, step === "service"]);
+
+  // Ahead of time: the next two open days, once this one has answered.
+  useEffect(() => {
+    if (step !== "slot" || !service || !date || slots === null) return;
+    const ahead = days.filter((d) => d > date && openDays.has(d)).slice(0, 2);
+    const run = () => {
+      for (const d of ahead) {
+        if (!cachedSlots(service.id, d, providerId)) void fetchSlots(service.id, d, providerId);
+      }
+    };
+    const idle = window.requestIdleCallback?.(run, { timeout: 1500 }) ?? window.setTimeout(run, 400);
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, service, date, providerId, slots, days, openDays, fetchSlots]);
+
+  /**
+   * The first day anyone could do `svc`, fetched now — during the beat between
+   * the tap and step 2 — so the times are usually there when it slides in.
+   */
+  const prefetchFirstDay = (svc: Service) => {
+    if (!catalog) return;
+    const who = catalog.providers.filter((p) => p.serviceIds.includes(svc.id)).map((p) => p.schedule);
+    const first = days.find((d) => isDayOpen(d, who));
+    if (first && !cachedSlots(svc.id, first, null)) void fetchSlots(svc.id, first, null);
+  };
+
+  /** What the strip knows about a day it has already seen: full, nearly full, or nothing yet. */
+  const dayLoad = (d: string): "full" | "few" | null => {
+    if (!service) return null;
+    const known = knownLoads[keyOf(service.id, d, providerId)];
+    if (known === undefined) return null;
+    if (known === 0) return "full";
+    return known <= FEW_SLOTS ? "few" : null;
+  };
+
+  /* ── Meta funnel ───────────────────────────────────────────────────── */
+  //
+  // ViewContent = a service chosen, InitiateCheckout = a time chosen, Schedule
+  // = booked (sent from the browser *and* the server with one event id). This
+  // is what lets the ads optimise for bookings instead of for clicks.
+  const metaParams = () =>
+    service
+      ? {
+          content_ids: [service.slug ?? String(service.id)],
+          content_name: nameOf(service),
+          content_type: "product",
+          value: service.priceCOP,
+          currency: "COP",
+        }
+      : {};
+  useEffect(() => {
+    onStepTracked.current = (next) => {
+      if (next === "slot") trackMeta("ViewContent", metaParams());
+      if (next === "details") trackMeta("InitiateCheckout", metaParams());
+    };
+  });
 
   /* ── Submit ──────────────────────────────────────────────────────────── */
 
@@ -543,6 +691,7 @@ export default function ReservaFlow({
     }
     setSending(true);
     setError(null);
+    const eventId = newEventId("schedule");
 
     try {
       const res = await fetch("/api/reservas", {
@@ -559,6 +708,10 @@ export default function ReservaFlow({
           notes: form.notes,
           startedAt: startedAt.current,
           empresa: honeypotRef.current?.value ?? "",
+          // For the server's copy of the Meta event, so both count as one.
+          eventId,
+          value: service.priceCOP,
+          serviceSlug: service.slug ?? null,
         }),
       });
 
@@ -586,6 +739,7 @@ export default function ReservaFlow({
           // Storage blocked: nothing to remember, nothing lost.
         }
         trackEvent("booking_confirmed", { service: service.slug ?? service.id, value: service.priceCOP, currency: "COP" });
+        trackMeta("Schedule", metaParams(), eventId);
         setBooked({
           name: form.firstName.trim(),
           service: nameOf(service),
@@ -603,8 +757,12 @@ export default function ReservaFlow({
       // Someone else took it. Back to the times, freshly loaded, so she picks
       // from what's real now instead of re-submitting into the same wall.
       if (body.reason === "taken") {
+        slotCache.current.delete(keyOf(service.id, date, providerId));
         setSlot(null);
         setSlots(null);
+        // The times effect keys on service/day/technician, none of which
+        // changed — so the reload is explicit, or step 2 would spin forever.
+        void fetchSlots(service.id, date, providerId).then((fresh) => setSlots(fresh ?? []));
         setStep("slot");
         window.history.replaceState({ gbsStep: "slot" }, "");
         setError(dict.errors.taken);
@@ -666,8 +824,14 @@ export default function ReservaFlow({
   );
 
   return (
+    <LazyMotion features={domAnimation} strict>
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.24, ease: [0.25, 1, 0.5, 1] }}>
     <div ref={topRef} className="mx-auto max-w-[1120px] px-5 pb-40 md:px-8 lg:pb-24">
       <Progress dict={dict} step={step} reachable={(s) => STEPS.indexOf(s) < stepIndex} onGo={go} />
+
+      {step === "service" && (
+        <TrustLine dict={dict} rating={rating} lang={lang} />
+      )}
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-14">
         <div className="min-w-0">
@@ -681,9 +845,10 @@ export default function ReservaFlow({
             </p>
           )}
 
+          <AnimatePresence mode="wait" initial={false} custom={direction}>
           {/* ── 1 · Service ───────────────────────────────────────────── */}
           {step === "service" && (
-            <section key="service" className="gbs-step" aria-labelledby="h-service">
+            <m.section key="service" {...stepMotion} custom={direction} aria-labelledby="h-service">
               <StepHeading id="h-service" n={1} title={dict.headings.service} />
 
               {loadFailed ? (
@@ -763,8 +928,16 @@ export default function ReservaFlow({
                           {/* The other half. Only when this forms a combo, and only
                               offering pairs that are one — a pair with no combo has
                               no price to show. */}
-                          {selected && partners.length > 0 && (
-                            <div className="gbs-step mt-2.5 rounded-2xl border border-gold/35 bg-gradient-to-br from-gold-pale/80 to-paper p-4 md:p-5">
+                          <AnimatePresence initial={false}>
+                          {expanded && (
+                            <m.div
+                              key="combo"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                            <div className="mt-2.5 rounded-2xl border border-gold/35 bg-gradient-to-br from-gold-pale/80 to-paper p-4 md:p-5">
                               <p className="font-display text-[22px] leading-tight text-ink">
                                 {baseIsFeet ? dict.combo.askHands : dict.combo.askFeet}
                               </p>
@@ -806,19 +979,21 @@ export default function ReservaFlow({
                                 </p>
                               )}
                             </div>
+                            </m.div>
                           )}
+                          </AnimatePresence>
                         </li>
                       );
                     })}
                   </ul>
                 </>
               )}
-            </section>
+            </m.section>
           )}
 
           {/* ── 2 · Day and time ──────────────────────────────────────── */}
           {step === "slot" && service && (
-            <section key="slot" className="gbs-step" aria-labelledby="h-slot">
+            <m.section key="slot" {...stepMotion} custom={direction} aria-labelledby="h-slot">
               <StepHeading id="h-slot" n={2} title={dict.headings.slot} onBack={back} backLabel={dict.back} />
 
               {providers.length > 1 && (
@@ -864,6 +1039,7 @@ export default function ReservaFlow({
               >
                 {days.map((d, i) => {
                   const open = openDays.has(d);
+                  const load = open ? dayLoad(d) : null;
                   const selected = date === d;
                   const label =
                     i === 0 ? dict.day.today : i === 1 ? dict.day.tomorrow : weekdayShort(d, lang);
@@ -896,7 +1072,7 @@ export default function ReservaFlow({
                       >
                         {label}
                       </span>
-                      <span className={`mt-0.5 text-[22px] leading-none ${open ? "" : "line-through"}`}>
+                      <span className={`mt-0.5 text-[22px] leading-none ${!open || load === "full" ? "line-through opacity-50" : ""}`}>
                         {Number(d.slice(8, 10))}
                       </span>
                       {d.endsWith("-01") && i !== 0 ? (
@@ -904,7 +1080,16 @@ export default function ReservaFlow({
                           {monthShort(d, lang)}
                         </span>
                       ) : (
-                        <span aria-hidden className={`mt-1.5 h-1 w-1 rounded-full ${open ? (selected ? "bg-gold-soft" : "bg-gold/60") : "bg-transparent"}`} />
+                        <span
+                          aria-hidden
+                          className={`mt-1.5 h-1 rounded-full transition-all ${
+                            !open || load === "full"
+                              ? "w-1 bg-transparent"
+                              : load === "few"
+                                ? "w-3 bg-gold-bright"
+                                : `w-1 ${selected ? "bg-gold-soft" : "bg-gold/60"}`
+                          }`}
+                        />
                       )}
                     </button>
                   );
@@ -935,6 +1120,14 @@ export default function ReservaFlow({
                     </div>
                   ) : (
                     <div className="gbs-step grid gap-6">
+                      {slots.length <= FEW_SLOTS && (
+                        <p className="-mb-2 flex items-center gap-2 font-sans text-[13px] font-medium text-gold-deep">
+                          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold-bright" />
+                          {slots.length === 1
+                            ? dict.scarcity.last
+                            : fill(dict.scarcity.few, { n: String(slots.length) })}
+                        </p>
+                      )}
                       {groupByDayPart(slots).map(({ part, slots: group }) => (
                         <div key={part}>
                           <p className="mb-2.5 flex items-center gap-2 font-sans text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-mute">
@@ -972,12 +1165,12 @@ export default function ReservaFlow({
                     </div>
                   ))}
               </div>
-            </section>
+            </m.section>
           )}
 
           {/* ── 3 · Details ───────────────────────────────────────────── */}
           {step === "details" && service && slot && date && (
-            <section key="details" className="gbs-step" aria-labelledby="h-details">
+            <m.section key="details" {...stepMotion} custom={direction} aria-labelledby="h-details">
               <StepHeading id="h-details" n={3} title={dict.headings.details} onBack={back} backLabel={dict.back} />
 
               <div className="mb-6 lg:hidden">{summary}</div>
@@ -1108,8 +1301,9 @@ export default function ReservaFlow({
                 </button>
                 <p className="text-center font-sans text-[12px] leading-relaxed text-ink-mute">{dict.summary.pay}</p>
               </form>
-            </section>
+            </m.section>
           )}
+          </AnimatePresence>
         </div>
 
         {/* Desktop: what's been chosen, always beside the steps. */}
@@ -1120,8 +1314,14 @@ export default function ReservaFlow({
 
       {/* Phone: the same, as a bar under the thumb. Hidden on step 3, where
           the summary sits above the form and the submit is the action. */}
+      <AnimatePresence>
       {step !== "details" && service && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 px-5 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 shadow-[0_-12px_30px_-18px_rgba(28,23,20,0.35)] backdrop-blur lg:hidden">
+        <m.div
+          key="bar"
+          initial={{ y: "110%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "110%" }}
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 px-5 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 shadow-[0_-12px_30px_-18px_rgba(28,23,20,0.35)] backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-[640px] items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-[18px] leading-tight text-ink">{nameOf(service)}</p>
@@ -1142,13 +1342,74 @@ export default function ReservaFlow({
               {dict.continue}
             </button>
           </div>
-        </div>
+        </m.div>
       )}
+      </AnimatePresence>
     </div>
+    </MotionConfig>
+    </LazyMotion>
   );
 }
 
+/**
+ * Step transition. Direction comes in as `custom`, so the exiting step leaves
+ * the way the new one arrives from. Small distances on purpose: this moves
+ * content a thumb is about to touch, it isn't a slideshow.
+ */
+const stepMotion = {
+  variants: {
+    enter: (dir: number) => ({ opacity: 0, x: dir * 28 }),
+    center: { opacity: 1, x: 0 },
+    exit: (dir: number) => ({ opacity: 0, x: dir * -28 }),
+  },
+  initial: "enter",
+  animate: "center",
+  exit: "exit",
+} as const;
+
 /* ── Pieces ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Three reasons to keep going, right where the doubt starts: under the
+ * progress bar on the first step. The rating is Google's, live — no number on
+ * this page is written by hand.
+ */
+function TrustLine({
+  dict,
+  rating,
+  lang,
+}: {
+  dict: Dict;
+  rating: { value: number; count: number } | null;
+  lang: Locale;
+}) {
+  const items = [
+    // Below a handful of reviews the count argues against us; the rating alone
+    // is just as true and reads better. Raise or drop as the count grows.
+    rating && rating.count < MIN_REVIEWS_TO_COUNT
+      ? fill(dict.trust.ratingOnly, {
+          rating: rating.value.toLocaleString(lang === "es" ? "es-CO" : "en-US", { maximumFractionDigits: 1 }),
+        })
+      : rating
+      ? fill(dict.trust.reviews, {
+          rating: rating.value.toLocaleString(lang === "es" ? "es-CO" : "en-US", { maximumFractionDigits: 1 }),
+          count: String(rating.count),
+        })
+      : null,
+    dict.trust.instant,
+    dict.trust.pay,
+  ].filter((x): x is string => x !== null);
+  return (
+    <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 font-sans text-[12px] text-ink-soft">
+      {items.map((t, i) => (
+        <li key={t} className="flex items-center gap-1.5">
+          <span aria-hidden className="text-gold">{i === 0 && rating ? "★" : "✓"}</span>
+          {t}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function Progress({
   dict,

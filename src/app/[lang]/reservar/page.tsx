@@ -5,7 +5,9 @@ import { siteConfig } from "@/config/site";
 import { EyebrowLabel } from "../_components/atoms";
 import Nav from "../_components/Nav";
 import Footer from "../_components/Footer";
-import ReservaFlow, { type ServiceCopy } from "./ReservaFlow";
+import ReservaFlow, { type Catalog, type ServiceCopy } from "./ReservaFlow";
+import { adminOrigin, bookingUrl } from "@/app/api/reservas/guards";
+import { getReviews } from "@/data/reviews";
 
 /**
  * `/[lang]/reservar` — the booking flow.
@@ -86,6 +88,35 @@ function serviceCopy(categories: Record<string, {
   return out;
 }
 
+/**
+ * The catalog, rendered with the page instead of fetched after it.
+ *
+ * Services and technicians change a few times a year; making a phone on 4G
+ * wait for a second round trip — and stare at a skeleton — before it can pick
+ * anything was the slowest part of the flow. Cached for a minute in Next's data
+ * cache, so a burst of ad traffic costs the panel one request a minute, not one
+ * per visitor. Availability is never cached here: that stays a live call.
+ *
+ * Bounded at 2.5 s and allowed to fail: the client fetches it itself when this
+ * comes back null, which is exactly how the page worked before.
+ */
+async function loadCatalog(): Promise<Catalog | null> {
+  const origin = adminOrigin();
+  if (!origin) return null;
+  try {
+    const res = await fetch(bookingUrl(origin, "catalogo"), {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 60, tags: ["booking-catalog"] },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as Catalog;
+    return { ...body, combos: body.combos ?? [] };
+  } catch {
+    return null;
+  }
+}
+
 export default async function ReservarPage({
   params,
   searchParams,
@@ -102,7 +133,11 @@ export default async function ReservarPage({
   const query = await searchParams;
   const initialSlug = typeof query.servicio === "string" ? query.servicio : null;
 
-  const dict = await getDictionary(typedLang);
+  const [dict, catalog, reviews] = await Promise.all([
+    getDictionary(typedLang),
+    loadCatalog(),
+    getReviews(typedLang).catch(() => null),
+  ]);
   const t = dict.reservar;
 
   return (
@@ -129,6 +164,12 @@ export default async function ReservarPage({
           lang={typedLang}
           today={todayInStudio()}
           initialSlug={initialSlug}
+          initialCatalog={catalog}
+          rating={
+            reviews?.rating && reviews.count
+              ? { value: reviews.rating, count: reviews.count }
+              : null
+          }
           copy={serviceCopy(dict.servicios.categories)}
           whatsappNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() || null}
           mapsUrl={

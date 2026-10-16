@@ -1,4 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
+
+import { capiConfigured, sendCapiEvent } from "@/lib/meta-capi";
+import { fbcFrom } from "@/lib/meta-events";
 
 import {
   MIN_FILL_SECONDS,
@@ -86,6 +89,41 @@ export async function POST(req: NextRequest) {
 
     if (res.status === 201) {
       const created: unknown = await res.json();
+      // The booking, reported to Meta from the server — after the response, so
+      // the client never waits on Facebook. Same `eventId` as the browser's
+      // Pixel event, so Meta counts one booking, not two.
+      if (capiConfigured()) {
+        const eventId = text(body.eventId) || `schedule-${Date.now()}`;
+        const referer = req.headers.get("referer") ?? `${req.nextUrl.origin}/es/reservar`;
+        const fbclid = (() => {
+          try {
+            return new URL(referer).searchParams.get("fbclid");
+          } catch {
+            return null;
+          }
+        })();
+        const value = Number(body.value);
+        after(() =>
+          sendCapiEvent({
+            eventName: "Schedule",
+            eventId,
+            eventTime: new Date(),
+            sourceUrl: referer,
+            ip,
+            userAgent: req.headers.get("user-agent"),
+            fbc: fbcFrom(req.cookies.get("_fbc")?.value, fbclid),
+            fbp: req.cookies.get("_fbp")?.value ?? null,
+            phone: payload.phone,
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            customData: {
+              currency: "COP",
+              ...(Number.isFinite(value) && value > 0 ? { value } : {}),
+              ...(text(body.serviceSlug) ? { content_ids: [text(body.serviceSlug)], content_type: "product" } : {}),
+            },
+          }),
+        );
+      }
       return NextResponse.json(
         { ok: true, booking: created },
         { status: 201, headers: { "Cache-Control": "no-store" } },
