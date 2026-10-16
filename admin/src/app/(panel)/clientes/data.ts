@@ -289,6 +289,41 @@ export async function loadHistoryByPhone(
   }
 }
 
+/**
+ * El historial de una ficha de EA, para cuando lo que se tiene es el id y no el
+ * teléfono: el formulario de cita elige clientas de la búsqueda de EA, y al
+ * editar una cita solo trae `customerId`.
+ *
+ * Con teléfono válido se va por `loadHistoryByPhone()`, que junta todas las
+ * fichas de la misma persona y el historial de Agenda Pro. Sin él, solo queda
+ * la mitad de EA de esa ficha: es lo que hay, y no se marca como parcial
+ * porque no faltó nada que se pudiera traer.
+ */
+export async function loadHistoryForCustomer(
+  eaCustomerId: number,
+  ea: EaClient = createEaClient(),
+): Promise<{ history: UnifiedHistory; partial: boolean }> {
+  let customer: Customer;
+  try {
+    customer = await ea.customers.get(eaCustomerId);
+  } catch (error) {
+    if (!(error instanceof EaApiError && error.kind === "not_found")) {
+      console.error("[clientes] no se pudo leer la ficha para el historial", error);
+    }
+    return { history: buildUnifiedHistory([], []), partial: true };
+  }
+
+  const phone = normalizePhoneE164(customer.phone);
+  if (phone !== null) return loadHistoryByPhone(phone, ea);
+
+  try {
+    return { history: buildUnifiedHistory(await loadEaHistory(ea, [customer.id]), []), partial: false };
+  } catch (error) {
+    console.error("[clientes] historial por ficha incompleto", error);
+    return { history: buildUnifiedHistory([], []), partial: true };
+  }
+}
+
 /** ¿Alguna de estas fichas es cortesía por defecto? Sin base, no. */
 async function loadHouseCourtesy(eaCustomerIds: readonly number[]): Promise<boolean> {
   if (eaCustomerIds.length === 0) return false;
@@ -354,31 +389,38 @@ async function loadEaHistory(
   const appointments = perCustomer.flat();
 
   const finance = appointmentFinanceRepository(getDb());
-  const amounts = await Promise.all(
+  const tickets = await Promise.all(
     appointments.map(async (appointment) => {
       try {
         const row = await finance.findByEaAppointmentId(appointment.id);
-        return row?.amount_charged ?? null;
+        return {
+          amountCharged: row?.amount_charged ?? null,
+          performedServiceId: row?.performed_service_id ?? null,
+        };
       } catch {
         // La plata que no se pudo leer se muestra como desconocida, no como
         // cero: `history.ts` marca el total como parcial y la ficha lo dice.
-        return null;
+        return { amountCharged: null, performedServiceId: null };
       }
     }),
   );
 
-  return appointments.map((appointment, index) => ({
-    appointment,
-    serviceName:
-      appointment.serviceId === null
-        ? null
-        : (serviceName.get(appointment.serviceId) ?? null),
-    providerName:
-      appointment.providerId === null
-        ? null
-        : (providerName.get(appointment.providerId) ?? null),
-    amountCharged: amounts[index],
-  }));
+  return appointments.map((appointment, index) => {
+    // Lo realizado manda sobre lo agendado: se reservó press-on y se hizo un
+    // forrado, y la próxima vez lo que toca es el retoque del forrado.
+    const performed = tickets[index].performedServiceId;
+    const shownServiceId = performed ?? appointment.serviceId;
+    return {
+      appointment,
+      serviceName: shownServiceId === null ? null : (serviceName.get(shownServiceId) ?? null),
+      performedServiceId: performed,
+      providerName:
+        appointment.providerId === null
+          ? null
+          : (providerName.get(appointment.providerId) ?? null),
+      amountCharged: tickets[index].amountCharged,
+    };
+  });
 }
 
 /**

@@ -48,8 +48,20 @@ export type HistoryEntry = {
   source: HistorySource;
   /** Hora de pared. La única forma comparable entre las dos mitades. */
   start: EaLocalDateTime;
-  /** Lo que se prestó, con el nombre que tenga en cada mitad. */
+  /**
+   * Lo que se prestó, con el nombre que tenga en cada mitad. En EA es el
+   * servicio **realizado** cuando la cuenta se cerró, y el agendado si no: lo
+   * agendado no es lo realizado, y "¿qué se hizo la última vez?" pregunta por
+   * lo segundo.
+   */
   serviceName: string;
+  /**
+   * El id de EA de ese mismo servicio (realizado, o agendado sin cuenta).
+   * `null` en el historial de Agenda Pro, que solo trae el nombre en texto.
+   * Lo usa la sugerencia del formulario de cita para no tener que adivinar por
+   * nombre lo que EA ya sabe.
+   */
+  serviceId: number | null;
   providerName: string | null;
   /** El `status` tal cual lo guarda su origen. Se muestra sin traducir. */
   rawStatus: string | null;
@@ -120,7 +132,13 @@ export type UnifiedHistory = {
  */
 export type EaHistoryInput = {
   appointment: Appointment;
+  /** El nombre del servicio realizado si lo hay; si no, el del agendado. */
   serviceName: string | null;
+  /**
+   * `appointment_finance.performed_service_id`: lo que se hizo de verdad al
+   * cerrar la cuenta. Ausente o `null` = no hay cuenta, vale lo agendado.
+   */
+  performedServiceId?: number | null;
   providerName: string | null;
   /** `appointment_finance.amount_charged`, o `null` si la cuenta no se cerró. */
   amountCharged: number | null;
@@ -210,6 +228,7 @@ export function buildUnifiedHistory(
       source: "ea",
       start: row.appointment.start,
       serviceName: row.serviceName?.trim() || "Servicio sin nombre",
+      serviceId: row.performedServiceId ?? row.appointment.serviceId ?? null,
       providerName: row.providerName?.trim() || null,
       rawStatus,
       outcome: eaOutcome(rawStatus),
@@ -226,6 +245,7 @@ export function buildUnifiedHistory(
       source: "legacy",
       start: legacyStartToWallClock(row.started_at),
       serviceName: row.service_name.trim() || "Servicio sin nombre",
+      serviceId: null,
       providerName: row.provider_name?.trim() || null,
       rawStatus: row.status,
       outcome: legacyOutcome(row.status),
@@ -299,10 +319,18 @@ function summarize(entries: readonly HistoryEntry[]): HistorySummary {
  * hacia la cuenta, que es lo que protege `legacy-history.money-paths.test.ts`.
  */
 export function hasVisitedBefore(entries: readonly HistoryEntry[], asOf: EaLocalDateTime): boolean {
-  return entries.some(
-    (entry) =>
-      entry.start < asOf &&
-      (entry.outcome === "atendida" ||
-        (entry.source === "ea" && entry.amountCharged !== null && entry.outcome === "desconocido")),
+  return entries.some((entry) => entry.start < asOf && countsAsVisit(entry));
+}
+
+/**
+ * ¿Este renglón es una vez que la clienta se sentó en la silla? El criterio de
+ * `hasVisitedBefore()`, suelto para que "su última visita" del formulario de
+ * cita cuente igual que el 10% de primera visita: si uno dice "nueva" y el otro
+ * muestra una visita, alguien deja de creerle a los dos.
+ */
+export function countsAsVisit(entry: HistoryEntry): boolean {
+  return (
+    entry.outcome === "atendida" ||
+    (entry.source === "ea" && entry.amountCharged !== null && entry.outcome === "desconocido")
   );
 }

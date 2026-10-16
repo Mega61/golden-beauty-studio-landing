@@ -25,6 +25,8 @@ import { addDays, fetchWindow } from "@/components/calendar/range";
 import type { EaLocalDate, EaLocalDateTime } from "@/lib/ea/datetime";
 import { eaDatePart, parseEaLocalDateTime } from "@/lib/ea/datetime";
 import { planBlock, type BlockForm } from "./block-resource";
+import type { ClientContext } from "./client-context";
+import { loadClientContext } from "./client-context-data";
 import { searchCustomers } from "./data";
 import { isWritableAgendaTarget, LEGACY_READ_ONLY } from "./legacy";
 
@@ -442,4 +444,42 @@ function failure(error: unknown, fallback: string): WriteResult {
   }
 
   return { status: "error", message: fallback };
+}
+
+// ---------------------------------------------------------------------------
+// Contexto de la clienta (la tarjeta "Última visita")
+// ---------------------------------------------------------------------------
+
+/**
+ * Qué se hizo la clienta las últimas veces, si es nueva, si suele faltar, y qué
+ * agendarle. Lo pide el formulario de cita en cuanto se elige una clienta (o se
+ * abre una cita ya hecha).
+ *
+ * Mismo portero que `findCustomers()`: sesión. Una técnica que agenda en su
+ * columna también necesita saber de qué es el retoque, y esto no lleva plata
+ * ni datos de contacto — solo fechas, servicios y quién atendió. Es una
+ * lectura: no escribe nada y lee EA con caché (ver `client-context-data.ts`).
+ *
+ * Se acepta el id de EA o, si no hay, el teléfono. Al editar se manda la cita
+ * para que no cuente como historia de sí misma.
+ */
+export async function clientContext(input: {
+  customerId?: number | null;
+  phone?: string | null;
+  excludeAppointmentId?: number | null;
+}): Promise<ClientContext | null> {
+  await requireSession();
+
+  const positive = (value: unknown): number | null =>
+    typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+
+  const customerId = positive(input.customerId);
+  const phone = typeof input.phone === "string" && input.phone.trim() !== "" ? input.phone : null;
+  if (customerId === null && phone === null) return null;
+
+  return loadClientContext({
+    customerId,
+    phone,
+    excludeAppointmentId: positive(input.excludeAppointmentId),
+  });
 }
