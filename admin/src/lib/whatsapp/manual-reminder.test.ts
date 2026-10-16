@@ -164,22 +164,47 @@ describe("planManualReminders", () => {
     }
   });
 
-  it("una fila que dice que NO salió se muestra como tal, sin botón", () => {
-    for (const status of ["omitido", "fallido"] as const) {
-      const [row] = plan([cita()], {
-        existing: [
-          {
-            eaAppointmentId: 1,
-            kind: "recordatorio_24h",
-            status,
-            channel: "cloud_api",
-            sentAt: null,
-            sentByName: null,
-          },
-        ],
-      });
-      expect(row.state, status).toBe("no-enviada");
-    }
+  it("una fila omitida se muestra como tal, sin botón", () => {
+    const [row] = plan([cita()], {
+      existing: [
+        {
+          eaAppointmentId: 1,
+          kind: "recordatorio_24h",
+          status: "omitido",
+          channel: "cloud_api",
+          sentAt: null,
+          sentByName: null,
+        },
+      ],
+    });
+    expect(row.state).toBe("no-enviada");
+  });
+
+  it("un fallo del envío automático se puede mandar a mano", () => {
+    const fallo = {
+      eaAppointmentId: 1,
+      kind: "recordatorio_24h" as const,
+      status: "fallido" as const,
+      channel: "cloud_api" as const,
+      sentAt: null,
+      sentByName: null,
+    };
+    const [row] = plan([cita()], { existing: [fallo] });
+    expect(row.state).toBe("fallo-automatico");
+    expect(row.existing).toEqual(fallo);
+  });
+
+  it("pero un fallo del automático sigue respetando la baja y el teléfono", () => {
+    const fallo = {
+      eaAppointmentId: 1,
+      kind: "recordatorio_24h" as const,
+      status: "fallido" as const,
+      channel: "cloud_api" as const,
+      sentAt: null,
+      sentByName: null,
+    };
+    expect(plan([cita()], { existing: [fallo], optedOut: ["+573001234567"] })[0].state).toBe("opt-out");
+    expect(plan([cita({ phoneE164: null })], { existing: [fallo] })[0].state).toBe("sin-telefono");
   });
 
   it("lo ya mandado gana sobre la baja, el teléfono y el estado", () => {

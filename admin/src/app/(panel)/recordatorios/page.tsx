@@ -51,8 +51,9 @@ export default async function RecordatoriosPage() {
     <AppShell role={navRole(session.role)} title="Recordatorios">
       <div style={{ display: "grid", gap: "1rem" }}>
         <p style={{ margin: 0, color: "var(--color-ink-soft)", maxWidth: "40rem" }}>
-          Cada botón abre WhatsApp con el mensaje listo. Revisa que salga desde el WhatsApp del
-          estudio y dale enviar allá.
+          {data.automatic
+            ? "Los recordatorios salen solos por WhatsApp 24 horas y 2 horas antes de cada cita. Acá ves si llegaron. El botón sirve para los que el envío automático no pudo mandar; si lo usas antes, el automático ya no lo repite."
+            : "Cada botón abre WhatsApp con el mensaje listo. Revisa que salga desde el WhatsApp del estudio y dale enviar allá."}
         </p>
 
         {eaCaido === null && dbCaida === null ? null : (

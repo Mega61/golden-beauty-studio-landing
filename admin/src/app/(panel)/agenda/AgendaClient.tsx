@@ -71,6 +71,8 @@ export type AgendaClientProps = {
   /** La técnica solo puede bloquearse a sí misma. `null` en dueña y recepción. */
   ownProviderId: number | null;
   canWrite: boolean;
+  /** ¿Está prendida la confirmación por WhatsApp (Cloud API)? */
+  whatsappConfirmation: boolean;
 };
 
 /** Cada cuánto se vuelve a pedir el rango visible. */
@@ -93,6 +95,7 @@ export function AgendaClient({
   eaFailure,
   ownProviderId,
   canWrite,
+  whatsappConfirmation,
 }: AgendaClientProps) {
   const { toast } = useToast();
 
@@ -382,6 +385,7 @@ export function AgendaClient({
           // Arranca apagado siempre: forzar el horario es una decisión de ese
           // turno, no una preferencia que se quede pegada al formulario.
           allowOutsideHours: false,
+          sendWhatsappConfirmation: true,
         },
       });
     },
@@ -401,6 +405,8 @@ export function AgendaClient({
         notes: draft.notes,
         status: draft.status,
         allowOutsideHours: draft.allowOutsideHours,
+        sendWhatsappConfirmation:
+          whatsappConfirmation && draft.id === undefined && draft.sendWhatsappConfirmation,
         force,
       });
 
@@ -507,6 +513,7 @@ export function AgendaClient({
         report={report}
         error={formError}
         saving={saving}
+        canConfirmByWhatsapp={whatsappConfirmation}
         onSubmit={submitAppointment}
         onCancel={() => setPanel({ kind: "none" })}
       />
@@ -871,5 +878,6 @@ function draftFrom(appointment: Appointment, meta: AgendaData["meta"]): Appointm
     notes: appointment.notes ?? "",
     status: appointment.status,
     allowOutsideHours: false,
+    sendWhatsappConfirmation: false,
   };
 }

@@ -17,6 +17,8 @@ import type { Db } from "./shared";
 /** Los nombres de trabajo, en un solo lugar. */
 export const JOB_RECONCILE = "reconcile";
 export const JOB_DAY_CLOSE_PUSH = "day-close-push";
+/** El emisor automático de recordatorios por WhatsApp (`jobs/reminders-run.ts`). */
+export const JOB_WHATSAPP_REMINDERS = "whatsapp-recordatorios";
 
 /**
  * `summary` es `VARCHAR(500)`.

@@ -74,6 +74,7 @@ export { dayCloseRepository } from "./day-close";
 export {
   JOB_DAY_CLOSE_PUSH,
   JOB_RECONCILE,
+  JOB_WHATSAPP_REMINDERS,
   jobRunRepository,
   jobRunValues,
 } from "./job-run";
@@ -85,7 +86,7 @@ export { serviceMapRepository } from "./service-map";
 export { staffTotpRepository } from "./staff-totp";
 export { stationRepository } from "./station";
 export { waMessageRepository } from "./wa-message";
-export type { ManualSendInput, WaMessageWithSender } from "./wa-message";
+export type { ManualSendInput, PendingInput, WaMessageWithSender } from "./wa-message";
 export { webhookEventRepository } from "./webhook-event";
 export type { RecordedEvent } from "./webhook-event";
 export type { Db } from "./shared";

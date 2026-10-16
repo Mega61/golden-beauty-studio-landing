@@ -5,6 +5,8 @@ import { createEaClient } from "@/lib/ea/client";
 import { isEaLocalDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
 import { notifyNewWebBooking } from "@/lib/push/send";
+import { whatsappConfirmationFor } from "@/lib/whatsapp/booking-confirmation";
+import { sendAppointmentConfirmation } from "@/lib/whatsapp/confirmation";
 import { createBooking } from "./data";
 
 /**
@@ -89,6 +91,14 @@ export async function POST(req: NextRequest) {
               (await createEaClient().services.get(serviceId)).name ?? null,
           }),
         );
+        // La confirmación por WhatsApp, por el mismo camino: después del 201,
+        // y sin poder tumbarlo. `whatsappConfirmation` le dice a la landing si
+        // va a intentarse, para que la pantalla de éxito no prometa un mensaje
+        // que no va a salir (sin Meta configurado, o número dado de baja).
+        const whatsappConfirmation = await whatsappConfirmationFor(phone);
+        if (whatsappConfirmation === "sending") {
+          after(() => sendAppointmentConfirmation(result.appointmentId).then(() => undefined));
+        }
         return NextResponse.json(
           {
             appointmentId: result.appointmentId,
@@ -97,6 +107,7 @@ export async function POST(req: NextRequest) {
             provider: { id: result.providerId, name: result.providerName },
             start: result.start,
             end: result.end,
+            whatsappConfirmation,
           },
           { status: 201, headers: NO_STORE },
         );

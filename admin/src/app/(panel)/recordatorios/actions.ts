@@ -137,7 +137,7 @@ export async function enviarRecordatorio(input: {
       return { ok: true, url, already: true, sentLabel: sentLabelOf(row.existing, today) };
     }
 
-    if (row.state !== "pendiente") {
+    if (row.state !== "pendiente" && row.state !== "fallo-automatico") {
       return { ok: false, message: STATE_MESSAGE[row.state] };
     }
 
@@ -164,17 +164,34 @@ export async function enviarRecordatorio(input: {
           );
 
     const phoneE164 = appointment.phoneE164;
+    // El automático lo intentó y Meta no lo mandó: la fila ya existe y la
+    // `UNIQUE` no admite otra, así que se **retoma** esa (pasa a `manual`).
+    // El UPDATE es condicional sobre `fallido`: si en el medio el job lo
+    // reintentó y salió, no se toca nada y se informa como ya recordada.
+    const takeOverId = row.state === "fallo-automatico" ? (sent?.id ?? null) : null;
+    if (row.state === "fallo-automatico" && takeOverId === null) {
+      return { ok: false, message: "No se encontró el registro del envío automático. Recarga la lista." };
+    }
     const inserted = await db.transaction().execute(async (trx) => {
       const tx = repositories(trx);
-      const fresh = await tx.waMessages.insertManualSent({
-        eaAppointmentId,
-        kind: row.kind,
-        phoneE164,
-        templateName: MANUAL_TEMPLATE,
-        scheduledFor: target,
-        sentAt: now,
-        sentByUserId: session.userId,
-      });
+      const fresh =
+        takeOverId !== null
+          ? await tx.waMessages.takeOverForManual({
+              id: takeOverId,
+              phoneE164,
+              templateName: MANUAL_TEMPLATE,
+              sentAt: now,
+              sentByUserId: session.userId,
+            })
+          : await tx.waMessages.insertManualSent({
+              eaAppointmentId,
+              kind: row.kind,
+              phoneE164,
+              templateName: MANUAL_TEMPLATE,
+              scheduledFor: target,
+              sentAt: now,
+              sentByUserId: session.userId,
+            });
       // Solo se anota lo que se escribió. El teléfono y el texto no van a la
       // bitácora: la fila ya dice a quién, y el texto lleva datos de la
       // clienta que un log sin retención no tiene por qué guardar.
@@ -184,7 +201,12 @@ export async function enviarRecordatorio(input: {
           action: "recordatorio.manual",
           entity: "ea_appointment",
           entityId: eaAppointmentId,
-          after: { kind: row.kind, channel: "manual", template: MANUAL_TEMPLATE },
+          after: {
+            kind: row.kind,
+            channel: "manual",
+            template: MANUAL_TEMPLATE,
+            ...(takeOverId !== null ? { retomaFalloAutomatico: true } : {}),
+          },
           at: now,
         });
       }

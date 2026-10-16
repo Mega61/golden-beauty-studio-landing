@@ -75,6 +75,13 @@ export type AppointmentDraft = {
    * que el segundo intento volviera a quejarse de lo que ya se decidió.
    */
   allowOutsideHours: boolean;
+  /**
+   * Mandarle a la clienta la confirmación por WhatsApp al crear la cita. Solo
+   * aplica al crear: reagendar no reenvía la confirmación (la `UNIQUE (cita,
+   * tipo)` tampoco lo dejaría). Viaja en el borrador por lo mismo que
+   * `allowOutsideHours`: sobrevive al ida y vuelta del reporte de choques.
+   */
+  sendWhatsappConfirmation: boolean;
 };
 
 export type AppointmentFormProps = {
@@ -90,6 +97,8 @@ export type AppointmentFormProps = {
   report: ConflictReport | null;
   error: string | null;
   saving: boolean;
+  /** ¿Está configurada la Cloud API? Sin ella la casilla no aparece. */
+  canConfirmByWhatsapp: boolean;
   onSubmit: (draft: AppointmentDraft, force: boolean) => void;
   onCancel: () => void;
 };
@@ -104,6 +113,7 @@ export function AppointmentForm({
   report,
   error,
   saving,
+  canConfirmByWhatsapp,
   onSubmit,
   onCancel,
 }: AppointmentFormProps) {
@@ -442,6 +452,19 @@ export function AppointmentForm({
         label="Agendar fuera del horario de la profesional"
         hint="Ignora el plan de trabajo, los descansos y los días libres. Los choques con otra cita o con los puestos siguen avisando."
       />
+
+      {/* Solo al crear y solo con la Cloud API configurada: sin ella la casilla
+          prometería un mensaje que no va a salir. Marcada por defecto porque
+          es lo que Agenda Pro hacía con cada cita nueva; se desmarca para una
+          cita que la clienta ya tiene confirmada por chat. */}
+      {draft.id === undefined && canConfirmByWhatsapp ? (
+        <Checkbox
+          checked={draft.sendWhatsappConfirmation}
+          onChange={(e) => set("sendWhatsappConfirmation", e.target.checked)}
+          label="Enviar confirmación por WhatsApp"
+          hint="Le llega a la clienta un mensaje con el servicio, el día, la hora y la profesional. Sin precio."
+        />
+      ) : null}
 
       <Field
         label="Notas"

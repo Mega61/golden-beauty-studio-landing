@@ -30,3 +30,38 @@ export async function loadAppointmentForMessage(
     serviceName: service?.name ?? null,
   };
 }
+
+/** Lo que necesitan las plantillas de la Cloud API, además de lo del recordatorio manual. */
+export type TemplateAppointmentData = ManualReminderAppointment & {
+  providerFirstName: string | null;
+};
+
+/**
+ * La cita con la técnica, para las plantillas de Meta (`{{4}}` la nombra).
+ *
+ * Lee **fresco** (`createEaClient()` no usa la caché): la confirmación sale
+ * segundos después de crear la cita, y una lectura de caché de antes de
+ * crearla diría que no existe.
+ */
+export async function loadAppointmentForTemplate(
+  eaAppointmentId: number,
+): Promise<TemplateAppointmentData> {
+  const ea = createEaClient();
+  const appointment = await ea.appointments.get(eaAppointmentId);
+  const [customer, service, provider] = await Promise.all([
+    appointment.customerId === null ? null : ea.customers.get(appointment.customerId),
+    appointment.serviceId === null ? null : ea.services.get(appointment.serviceId),
+    appointment.providerId === null ? null : ea.providers.get(appointment.providerId),
+  ]);
+  return {
+    eaAppointmentId: appointment.id,
+    start: appointment.start,
+    status: appointment.status,
+    phoneE164: normalizePhoneE164(customer?.phone ?? null),
+    customerFirstName: customer?.firstName ?? null,
+    customerName:
+      [customer?.firstName, customer?.lastName].filter(Boolean).join(" ").trim() || "Sin clienta",
+    serviceName: service?.name ?? null,
+    providerFirstName: provider?.firstName ?? null,
+  };
+}

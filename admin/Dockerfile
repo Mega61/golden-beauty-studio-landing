@@ -84,6 +84,12 @@ RUN npm run build:estados
 # como clientas nuevas el primer mes.
 RUN npm run build:importar
 
+# El emisor de recordatorios por WhatsApp. `scripts/recordatorios.js`, que el
+# servicio `admin-recordatorios` corre cada 30 minutos. Sin las variables
+# `WHATSAPP_*` del stack no manda nada: el canal manual de /admin/recordatorios
+# sigue siendo el que funciona.
+RUN npm run build:recordatorios
+
 # `public/` puede no existir todavía (hoy no existe). Crearlo acá hace que el
 # `COPY` de abajo funcione igual, en vez de romper el build el día que alguien
 # borre el último archivo estático — o el día que agregue el primero.

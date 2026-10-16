@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { getDb } from "@/db/client";
 import { stationRepository } from "@/db/repositories";
@@ -17,6 +18,8 @@ import {
 import { requireOwnProvider, requireSession } from "@/lib/dal";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
+import { whatsappConfigured } from "@/lib/whatsapp/config";
+import { sendAppointmentConfirmation } from "@/lib/whatsapp/confirmation";
 import { EaApiError } from "@/lib/ea/errors";
 import { addDays, fetchWindow } from "@/components/calendar/range";
 import type { EaLocalDate, EaLocalDateTime } from "@/lib/ea/datetime";
@@ -77,6 +80,11 @@ export type AppointmentWrite = {
    * y "siéntala encima de la clienta de las 8". Ver `allowingOutsideHours()`.
    */
   allowOutsideHours?: boolean;
+  /**
+   * Al crear: mandar la confirmación por WhatsApp (Cloud API). Se ignora al
+   * editar o mover, y sin configuración de Meta.
+   */
+  sendWhatsappConfirmation?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -92,7 +100,7 @@ export type AppointmentWrite = {
  */
 export async function saveAppointment(input: AppointmentWrite): Promise<WriteResult> {
   // Una técnica solo toca su columna. `owner` y `reception` pasan siempre.
-  await requireOwnProvider(input.providerId);
+  const session = await requireOwnProvider(input.providerId);
 
   const start = safeLocal(input.start);
   const end = safeLocal(input.end);
@@ -132,6 +140,18 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
       input.id === undefined
         ? await client.appointments.create(body)
         : await client.appointments.update(input.id, body);
+
+    // La confirmación sale después de responder, como en la reserva pública:
+    // Meta lento o caído no puede demorar ni tumbar una cita que ya existe en
+    // EA. Queda en la bitácora a nombre de quien creó la cita.
+    if (input.id === undefined && input.sendWhatsappConfirmation === true && whatsappConfigured()) {
+      const appointmentId = saved.id;
+      after(() =>
+        sendAppointmentConfirmation(appointmentId, { actorUserId: session.userId }).then(
+          () => undefined,
+        ),
+      );
+    }
 
     revalidatePath("/agenda");
     return { status: "ok", appointmentId: saved.id };

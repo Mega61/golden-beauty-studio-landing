@@ -342,6 +342,9 @@ En la misma pantalla, **Environment variables**. Ninguna de estas entra al repo;
 | `INGEST_URL` / `INGEST_SHARED_SECRET` | los del Strapi del CRM |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` (dentro de `admin/`), **una vez** — opcionales, ver abajo |
 | `VAPID_SUBJECT` | `mailto:` de un buzón del estudio que alguien lea |
+| `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | token permanente del *System User* y el *Phone number ID* — opcionales, ver abajo |
+| `WHATSAPP_APP_SECRET` / `WHATSAPP_VERIFY_TOKEN` | secreto de la app de Meta y la frase del webhook — opcionales |
+| `WHATSAPP_TEMPLATE_LANG` / `WHATSAPP_TPL_CONFIRMACION` / `WHATSAPP_TPL_RECORDATORIO` / `WHATSAPP_GRAPH_VERSION` | opcionales: `es`, `confirmacion_cita`, `recordatorio_cita`, `v23.0` |
 | `MYSQL_HOST` / `MYSQL_PORT` | `mysql-transversal` / `3306` (respaldo) |
 | `BACKUP_GBS_USER` / `BACKUP_GBS_PASSWORD` | `gbs_admin` y su contraseña |
 | `BACKUP_EA_USER` / `BACKUP_EA_PASSWORD` | `gbs_ea_ro` y su contraseña |
@@ -372,6 +375,25 @@ dispositivos de la dueña y de recepción que la hayan prendido en
 - **El service worker no cachea nada.** `admin/public/sw.js` solo muestra el
   aviso y abre la agenda al tocarlo; no tiene manejador de `fetch`, así que el
   panel instalado nunca muestra una agenda vieja. Ver su cabecera.
+
+**Las `WHATSAPP_*` prenden la confirmación y los recordatorios automáticos por
+la Cloud API de Meta, y son opcionales.** Sin `WHATSAPP_TOKEN` y
+`WHATSAPP_PHONE_NUMBER_ID` nada intenta mandar: la reserva responde
+`whatsappConfirmation: "disabled"`, la agenda no muestra la casilla de
+confirmación, el servicio `admin-recordatorios` escribe una línea y se queda
+dormido, y `/admin/recordatorios` sigue siendo el canal manual. El paso a paso
+de Meta (verificación, Coexistence, token, plantillas, webhook) está en
+**`docs/WHATSAPP.md`**. Dos cosas de infraestructura:
+
+- **El webhook de Meta es público a propósito**:
+  `https://www.goldenbeautystudio.com.co/admin/api/public/whatsapp/webhook`.
+  Vive bajo `/admin/api/public/`, que Caddy deja pasar; el bloque `@webhook` de
+  abajo solo cierra `/admin/api/webhooks/*` (el de EA, que no se firma). El de
+  Meta se verifica con `X-Hub-Signature-256` contra `WHATSAPP_APP_SECRET`, y sin
+  esa variable responde 503 a todo.
+- **`admin-recordatorios` duerme exactamente 1800 s entre corridas.** Las
+  ventanas de `jobs/reminders.ts` tienen ±35 min de tolerancia porque asumen ese
+  intervalo, y `jobs/reminders-run.test.ts` lee el compose y falla si cambia.
 
 ### Lo primero que hay que mirar en el primer despliegue
 

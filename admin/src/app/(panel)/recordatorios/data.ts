@@ -24,6 +24,9 @@ import {
   type ManualReminderState,
 } from "@/lib/whatsapp/manual-reminder";
 
+import { readableSendError } from "@/lib/whatsapp/cloud-api";
+import { whatsappConfigured } from "@/lib/whatsapp/config";
+
 import { normalizePhoneE164 } from "../clientes/identity";
 
 /**
@@ -56,6 +59,10 @@ export type ReminderView = {
   link: string | null;
   /** "Recordada por Recepción a las 9:12 a. m." */
   sentLabel: string | null;
+  /** Solo en envíos automáticos: "Entregado", "Leído"… según el webhook de Meta. */
+  delivery: string | null;
+  /** Por qué no lo mandó el automático, en `fallo-automatico`. */
+  autoError: string | null;
 };
 
 export type RemindersData = {
@@ -63,6 +70,8 @@ export type RemindersData = {
   tomorrow: EaLocalDate;
   rows: ReminderView[];
   problems: ReminderProblem[];
+  /** ¿Está prendido el envío automático por la Cloud API? */
+  automatic: boolean;
 };
 
 function messageOf(error: unknown): string {
@@ -92,6 +101,31 @@ export function sentLabelOf(
   return `Recordada ${who} ${when}`;
 }
 
+/**
+ * Lo que dijo Meta de un envío automático. `null` en los manuales: de un
+ * `wa.me` no vuelve ningún estado, y decir "enviado" ahí sería afirmar algo
+ * que nadie verificó.
+ */
+export function deliveryLabelOf(
+  existing: Pick<ExistingReminder, "channel" | "status">,
+): string | null {
+  if (existing.channel !== "cloud_api") return null;
+  switch (existing.status) {
+    case "pendiente":
+      return "Saliendo";
+    case "enviado":
+      return "Enviado, sin confirmación de entrega todavía";
+    case "entregado":
+      return "Entregado";
+    case "leido":
+      return "Leído";
+    case "fallido":
+      return "No salió";
+    default:
+      return null;
+  }
+}
+
 function existingOf(row: WaMessageWithSender): ExistingReminder {
   return {
     eaAppointmentId: row.eaAppointmentId,
@@ -113,7 +147,9 @@ export function linkFor(
   row: ManualReminderRow,
   sentToPhone: string | null,
 ): string | null {
-  if (row.state !== "pendiente" && row.state !== "recordada") return null;
+  if (row.state !== "pendiente" && row.state !== "recordada" && row.state !== "fallo-automatico") {
+    return null;
+  }
   const phone = row.state === "recordada" ? sentToPhone : row.appointment.phoneE164;
   if (phone === null) return null;
   return waMeLink(
@@ -154,7 +190,7 @@ export async function loadReminders(now: Date = new Date()): Promise<RemindersDa
     }));
   } catch (error) {
     problems.push({ source: "ea", message: messageOf(error) });
-    return { today, tomorrow, rows: [], problems };
+    return { today, tomorrow, rows: [], problems, automatic: whatsappConfigured() };
   }
 
   let sent: WaMessageWithSender[] = [];
@@ -194,9 +230,14 @@ export async function loadReminders(now: Date = new Date()): Promise<RemindersDa
       serviceName: row.appointment.serviceName ?? "Sin servicio",
       status: row.appointment.status,
       link: linkFor(row, stored?.phoneE164 ?? null),
-      sentLabel: row.existing === null ? null : sentLabelOf(row.existing, today),
+      sentLabel:
+        row.existing === null || row.state !== "recordada"
+          ? null
+          : sentLabelOf(row.existing, today),
+      delivery: row.existing === null ? null : deliveryLabelOf(row.existing),
+      autoError: row.state === "fallo-automatico" ? readableSendError(stored?.error) : null,
     };
   });
 
-  return { today, tomorrow, rows, problems };
+  return { today, tomorrow, rows, problems, automatic: whatsappConfigured() };
 }

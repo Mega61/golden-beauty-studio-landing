@@ -103,7 +103,9 @@ export function RecordatoriosLista({
   }
 
   const section = (title: string, subtitle: string, list: readonly ReminderView[]) => {
-    const pendientes = list.filter((r) => r.state === "pendiente").length;
+    const pendientes = list.filter(
+      (r) => r.state === "pendiente" || r.state === "fallo-automatico",
+    ).length;
     return (
       <section style={{ display: "grid", gap: "0.625rem" }}>
         <header style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -152,6 +154,7 @@ export function RecordatoriosLista({
 
 /** Lo que dice cada estado que no es "pendiente". */
 const STATE_NOTE: Record<Exclude<ReminderView["state"], "pendiente" | "recordada">, string> = {
+  "fallo-automatico": "El envío automático no salió. Mándalo a mano.",
   "sin-telefono": "Sin teléfono válido. Corrígelo en Clientas para poder avisarle.",
   "opt-out": "Pidió no recibir recordatorios.",
   "estado-no-aplica": "Por su estado en la agenda, esta cita no lleva recordatorio.",
@@ -182,7 +185,8 @@ function ReminderCard({
   onOptOut: () => void;
 }) {
   const done = row.state === "recordada";
-  const pending = row.state === "pendiente";
+  // Un fallo del automático se manda a mano igual que uno pendiente.
+  const pending = row.state === "pendiente" || row.state === "fallo-automatico";
 
   return (
     <article className="ui-card" style={{ display: "grid", gap: "0.625rem", padding: "0.875rem" }}>
@@ -224,6 +228,9 @@ function ReminderCard({
           }}
         >
           <Icon name="check" size={14} /> {row.sentLabel}
+          {row.delivery === null ? null : (
+            <span style={{ fontWeight: 400, color: "var(--color-ink-soft)" }}>· {row.delivery}</span>
+          )}
         </p>
       ) : row.state === "pendiente" ? null : (
         <p
@@ -237,6 +244,7 @@ function ReminderCard({
           }}
         >
           <Icon name="info" size={14} style={{ flex: "none" }} /> {STATE_NOTE[row.state]}
+          {row.autoError === null ? null : ` (${row.autoError})`}
         </p>
       )}
 
@@ -249,7 +257,7 @@ function ReminderCard({
           disabled={readOnly || disabled || row.link === null}
           onClick={onSend}
         >
-          Enviar por WhatsApp
+          {row.state === "fallo-automatico" ? "Enviar a mano por WhatsApp" : "Enviar por WhatsApp"}
         </Button>
       ) : null}
 

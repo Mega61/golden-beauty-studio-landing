@@ -352,9 +352,31 @@ Hecho: la migración `020` (`wa_message` con `UNIQUE (ea_appointment_id, kind)` 
   retención no es lugar para eso.
 - La baja es del **número**, no de la ficha: sobrevive a que alguien borre y recree la clienta.
 
-Falta —y depende de Meta, no de nosotros— el alta de Coexistence, **las plantillas `utility`
-aprobadas**, el cliente de `lib/whatsapp/` contra la Cloud API, el webhook de estado y el cron. El
-trámite es lo que hay que empezar ya: el código sin plantilla aprobada no manda nada.
+### Estado (2026-10-15): ✅ código completo, apagado hasta que Meta esté listo
+
+Construido y detrás de variables de entorno (`WHATSAPP_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID`):
+
+- **`lib/whatsapp/cloud-api.ts`**: cliente mínimo de plantillas, con los códigos de error de Meta
+  mapeados. Un timeout **no** se reintenta (pudo haber salido); solo lo que Meta rechazó por límite
+  de tasa o caída declarada.
+- **Confirmación** al reservar en la página (en `after()`, nunca tumba la reserva; el 201 dice
+  `whatsappConfirmation: "sending" | "disabled"` para que la landing no prometa un mensaje que no
+  sale) y al crear una cita en la agenda con la casilla marcada (con bitácora a nombre de quien la
+  creó).
+- **`jobs/reminders-run.ts`** + servicio `admin-recordatorios` cada 30 min: fila antes de Meta,
+  reintento solo de fallos reintentables y solo dentro de la ventana, corrida en `job_run`. Las
+  omisiones **no** se escriben como filas `omitido`: la `UNIQUE` congelaría un motivo pasajero (un
+  teléfono corregido diez minutos después ya no recibiría su aviso).
+- **Webhook** público y firmado (`/admin/api/public/whatsapp/webhook`): estados solo hacia
+  adelante, y "BAJA"/"STOP"/"NO" como mensaje completo dan de baja el número.
+- **`/recordatorios`** muestra si el aviso automático salió y si llegó; un fallo del automático se
+  manda a mano **sobre la misma fila**. **Diagnóstico** tiene su renglón.
+- Las plantillas tienen **cuatro** variables, no cinco: día y hora viajan juntos porque Meta no
+  acepta dos variables pegadas y "a las 1:00 p. m." delataría a la máquina.
+
+Falta lo de Meta, que es de la dueña: verificación del negocio, alta de Coexistence, token del
+System User, las dos plantillas `utility` aprobadas y el webhook registrado. Paso a paso en
+**`docs/WHATSAPP.md`**.
 
 **Es la regresión más visible del corte.** Agenda Pro manda recordatorios hoy; el día que se cancele,
 si esto no está, la clienta simplemente deja de recibirlos y la inasistencia sube. Si el trámite se
@@ -413,7 +435,7 @@ LO QUE FALTA PARA CANCELAR AGENDA PRO
   ✅ X3 clientas RW          construido, sin desplegar
   ✅ X5 estados y combos     construidos · el pin de EA es operación en Portainer
   ⚙️  X6 reserva pública      commitear + una variable de entorno
-  ⏳ X7 WhatsApp             lógica lista · falta Meta (trámite + plantillas)
+  ⏳ X7 WhatsApp             código listo y apagado · falta Meta (docs/WHATSAPP.md)
   ⬜ X8 corte                operación: respaldo, ensayo, ciclo en paralelo
 
 FUERA DEL CAMINO DEL CORTE

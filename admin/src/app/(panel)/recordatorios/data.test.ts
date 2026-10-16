@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseEaLocalDate, parseEaLocalDateTime } from "@/lib/ea";
 import type { ManualReminderRow } from "@/lib/whatsapp/manual-reminder";
 
-import { linkFor, nextEaDate, sentLabelOf } from "./data";
+import { deliveryLabelOf, linkFor, nextEaDate, sentLabelOf } from "./data";
 
 const TODAY = parseEaLocalDate("2026-10-15");
 
@@ -91,5 +91,21 @@ describe("linkFor", () => {
 
   it("sin número no hay enlace", () => {
     expect(linkFor(row({ state: "recordada" }), null)).toBeNull();
+  });
+});
+
+describe("fallo del envío automático", () => {
+  it("tiene enlace de wa.me al número de la ficha, para mandarlo a mano", () => {
+    const link = linkFor(row({ state: "fallo-automatico" }), null) as string;
+    expect(new URL(link).pathname).toBe("/573001234567");
+  });
+});
+
+describe("deliveryLabelOf", () => {
+  it("dice lo que contó Meta, solo en envíos automáticos", () => {
+    expect(deliveryLabelOf({ channel: "cloud_api", status: "entregado" })).toBe("Entregado");
+    expect(deliveryLabelOf({ channel: "cloud_api", status: "leido" })).toBe("Leído");
+    expect(deliveryLabelOf({ channel: "cloud_api", status: "enviado" })).toMatch(/sin confirmación/);
+    expect(deliveryLabelOf({ channel: "manual", status: "enviado" })).toBeNull();
   });
 });

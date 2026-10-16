@@ -36,6 +36,10 @@
 #   TOTP_ENC_KEY
 #   INGEST_URL                INGEST_SHARED_SECRET
 #   VAPID_PUBLIC_KEY          VAPID_PRIVATE_KEY      VAPID_SUBJECT   (opcionales: avisos push)
+#   WHATSAPP_TOKEN            WHATSAPP_PHONE_NUMBER_ID                (opcionales: WhatsApp automático)
+#   WHATSAPP_APP_SECRET       WHATSAPP_VERIFY_TOKEN                   (webhook de estado de Meta)
+#   WHATSAPP_GRAPH_VERSION    WHATSAPP_TEMPLATE_LANG                  (opcionales, con valor por defecto)
+#   WHATSAPP_TPL_CONFIRMACION WHATSAPP_TPL_RECORDATORIO               (opcionales, con valor por defecto)
 #   MYSQL_HOST                MYSQL_PORT             (respaldo)
 #   BACKUP_GBS_USER           BACKUP_GBS_PASSWORD    (respaldo, RW sobre gbs_admin)
 #   BACKUP_EA_USER            BACKUP_EA_PASSWORD     (respaldo, RO sobre easyappointments)
@@ -156,6 +160,19 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+
+      # WhatsApp por la Cloud API de Meta (confirmación de reservas y webhook
+      # de estado). Opcionales igual que las VAPID: sin token y sin id de
+      # número, nada intenta mandar y /admin/recordatorios sigue siendo el
+      # canal manual. Paso a paso en `docs/WHATSAPP.md`.
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-}
+      WHATSAPP_TEMPLATE_LANG: ${WHATSAPP_TEMPLATE_LANG:-}
+      WHATSAPP_TPL_CONFIRMACION: ${WHATSAPP_TPL_CONFIRMACION:-}
+      WHATSAPP_TPL_RECORDATORIO: ${WHATSAPP_TPL_RECORDATORIO:-}
 
       # Dónde buscar `last-run.txt` y `last-status.txt`, que escribe
       # `db-backup`. Sin esta variable Diagnóstico muestra el respaldo como
@@ -420,4 +437,65 @@ services:
             sleep 60
           fi
           sleep 20
+        done
+
+  # ── Recordatorios por WhatsApp ──────────────────────────────────────────────
+  #
+  # El emisor automático de los avisos de 24 h y 2 h (`jobs/reminders-run.ts`),
+  # por la Cloud API de Meta. Mismo patrón que el reconcile: la misma imagen,
+  # un bundle de esbuild (`scripts/recordatorios.js`) y el bucle acá adentro.
+  #
+  # **Cada 30 minutos, y no es un número cualquiera.** Las ventanas de
+  # `REMINDER_RULES` tienen ±35 min de tolerancia porque asumen este intervalo:
+  # una cita cuyo momento exacto cae entre dos corridas tiene que quedar
+  # adentro de alguna. Si se sube el `sleep`, hay que subir la tolerancia —
+  # `jobs/reminders-run.test.ts` lee este archivo y falla si no alcanza.
+  #
+  # **Inerte sin configuración.** Sin `WHATSAPP_TOKEN` y
+  # `WHATSAPP_PHONE_NUMBER_ID` escribe una línea y se queda dormido: cambiar
+  # variables en Portainer recrea el contenedor, así que no hace falta volver a
+  # preguntar cada media hora. Mientras tanto, los recordatorios se mandan a
+  # mano desde /admin/recordatorios, y comparten con este job la llave
+  # `UNIQUE (cita, tipo)`: lo que salió por un canal no sale por el otro.
+  admin-recordatorios:
+    image: ${ADMIN_IMAGE}
+    container_name: gbs-admin-recordatorios
+    restart: unless-stopped
+    networks: [data, web]
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+    environment:
+      TZ: America/Bogota
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      EA_API_URL: ${EA_API_URL}
+      EA_API_TOKEN: ${EA_API_TOKEN}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-}
+      WHATSAPP_TEMPLATE_LANG: ${WHATSAPP_TEMPLATE_LANG:-}
+      WHATSAPP_TPL_RECORDATORIO: ${WHATSAPP_TPL_RECORDATORIO:-}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging: *logging
+    # Igual que el reconcile: la sonda horneada consulta un servidor HTTP que
+    # este contenedor no levanta.
+    healthcheck:
+      disable: true
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -u
+        if [ -z "$${WHATSAPP_TOKEN}" ] || [ -z "$${WHATSAPP_PHONE_NUMBER_ID}" ]; then
+          echo "recordatorios: WhatsApp no está configurado. No se manda nada; se usan los recordatorios manuales del panel."
+          while true; do sleep 86400; done
+        fi
+        echo "recordatorios: en pie. Corre cada 30 minutos."
+        while true; do
+          node scripts/recordatorios.js
+          sleep 1800
         done

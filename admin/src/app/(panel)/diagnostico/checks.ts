@@ -579,6 +579,98 @@ export function reconcileCheck(input: {
 }
 
 /**
+ * Los recordatorios automáticos por WhatsApp.
+ *
+ * Es la regresión más visible del corte: Agenda Pro los mandaba, y si el job
+ * deja de correr la clienta simplemente deja de recibirlos — sin error en
+ * ningún lado. Por eso el renglón mira tres cosas: si hay configuración, si el
+ * job corrió hace poco, y cuántos mensajes no salieron en 24 h.
+ *
+ * **Sin configuración es amarillo, no gris.** No es "no se puede saber": se
+ * sabe exactamente — los recordatorios dependen de que alguien los mande a mano
+ * desde Recordatorios. Es un estado conocido y aceptado mientras Meta aprueba
+ * las plantillas, pero no es verde.
+ */
+export function whatsappCheck(input: {
+  configured: boolean;
+  /** La última corrida del job. `null` = nunca corrió. */
+  lastRun: JobRunFact | null;
+  /** Envíos automáticos `fallido` en las últimas 24 h. */
+  failed24h: number;
+  /** Minutos tras los que se considera que no corrió. El job corre cada 30. */
+  staleMinutes?: number;
+  now: Date;
+}): Check {
+  const title = "Los recordatorios por WhatsApp salen solos";
+  const staleMinutes = input.staleMinutes ?? 90;
+
+  if (!input.configured) {
+    return {
+      id: "whatsapp",
+      title,
+      level: "warn",
+      detail:
+        "El envío automático está apagado: faltan WHATSAPP_TOKEN y WHATSAPP_PHONE_NUMBER_ID en el stack. Mientras tanto, los recordatorios se mandan a mano desde Recordatorios. El paso a paso para prenderlo está en docs/WHATSAPP.md.",
+      lastSeen: input.lastRun === null ? undefined : relativeAge(input.lastRun.startedAt, input.now),
+    };
+  }
+
+  if (input.lastRun === null) {
+    return {
+      id: "whatsapp",
+      title,
+      level: "down",
+      detail:
+        "Está configurado pero el job nunca corrió. Revisar el servicio admin-recordatorios en Portainer: sin él no sale ningún recordatorio.",
+      lastSeen: "nunca",
+    };
+  }
+
+  const when = relativeAge(input.lastRun.startedAt, input.now);
+  const age = hoursSince(input.lastRun.startedAt, input.now);
+  const summary = input.lastRun.summary ?? "sin resumen";
+
+  if (!input.lastRun.ok) {
+    return {
+      id: "whatsapp",
+      title,
+      level: "down",
+      detail: `La última corrida (${when}) terminó mal: ${summary}. Mientras siga así no sale ningún recordatorio: mandarlos a mano desde Recordatorios y revisar los logs de admin-recordatorios.`,
+      lastSeen: when,
+    };
+  }
+
+  if (age === null || age * 60 > staleMinutes) {
+    return {
+      id: "whatsapp",
+      title,
+      level: "down",
+      detail: `La última corrida fue ${when} y el job corre cada 30 minutos. Revisar el servicio admin-recordatorios; mientras tanto, mandarlos a mano desde Recordatorios.`,
+      lastSeen: when,
+    };
+  }
+
+  if (input.failed24h > 0) {
+    return {
+      id: "whatsapp",
+      title,
+      level: "warn",
+      detail: `El job corre, pero ${input.failed24h} mensaje${input.failed24h === 1 ? "" : "s"} no ${input.failed24h === 1 ? "salió" : "salieron"} en las últimas 24 horas. Recordatorios muestra cuáles y deja mandarlos a mano. Si son muchos, el motivo suele ser el token o una plantilla pausada.`,
+      figure: String(input.failed24h),
+      lastSeen: when,
+    };
+  }
+
+  return {
+    id: "whatsapp",
+    title,
+    level: "ok",
+    detail: `Corrió ${when}: ${summary}. Ningún envío automático falló en 24 horas.`,
+    lastSeen: when,
+  };
+}
+
+/**
  * El último push a ingest.
  *
  * Éste **no** es un proxy: `day_close.pushed_to_ingest_at` se escribe cuando el

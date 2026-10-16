@@ -67,16 +67,19 @@ export type ExistingReminder = {
 /**
  * En qué está el recordatorio de una cita.
  *
- * - `pendiente` — hay que mandarlo; es la única con botón de envío.
+ * - `pendiente` — hay que mandarlo; tiene botón de envío.
+ * - `fallo-automatico` — el emisor automático lo intentó y Meta no lo mandó
+ *   (`fallido`). También tiene botón: recepción lo manda a mano **sobre la
+ *   misma fila** (la `UNIQUE` no admite otra), que pasa a `manual`.
  * - `recordada` — ya hay una fila que dice que salió (a mano o por la API).
- * - `no-enviada` — hay fila, pero dice que **no** salió (`omitido`/`fallido`,
- *   que solo puede escribir el emisor automático). La `UNIQUE` impide una
- *   segunda fila, así que se muestra en vez de esconderse.
+ * - `no-enviada` — hay fila, pero dice que **no** salió y no es un fallo que
+ *   se pueda retomar (`omitido`). Se muestra en vez de esconderse.
  * - `sin-telefono`, `opt-out`, `estado-no-aplica` — los mismos motivos de
  *   `jobs/reminders.ts`.
  */
 export type ManualReminderState =
   | "pendiente"
+  | "fallo-automatico"
   | "recordada"
   | "no-enviada"
   | "sin-telefono"
@@ -158,8 +161,14 @@ export function planManualReminders(input: {
     const kind = KIND_FOR_DAY[day];
     const existing = byKey.get(`${appointment.eaAppointmentId}:${kind}`) ?? null;
 
+    // Un fallo del automático no es un hecho consumado como un envío: la
+    // clienta no recibió nada. Pasa por las mismas preguntas que una cita sin
+    // fila, y si todas dan, se ofrece mandarlo a mano.
+    const autoFailed =
+      existing !== null && existing.channel === "cloud_api" && existing.status === "fallido";
+
     let state: ManualReminderState;
-    if (existing !== null) {
+    if (existing !== null && !autoFailed) {
       state = SENT_STATUSES.has(existing.status) ? "recordada" : "no-enviada";
     } else if (!isSendableStatus(appointment.status)) {
       state = "estado-no-aplica";
@@ -168,7 +177,7 @@ export function planManualReminders(input: {
     } else if (input.optedOut.has(appointment.phoneE164)) {
       state = "opt-out";
     } else {
-      state = "pendiente";
+      state = autoFailed ? "fallo-automatico" : "pendiente";
     }
 
     rows.push({ appointment, day, kind, state, existing });
