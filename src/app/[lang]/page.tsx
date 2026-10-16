@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale } from "./dictionaries";
-import { siteConfig } from "@/config/site";
+import { bookingHref, siteConfig } from "@/config/site";
 import { getActiveScenarios } from "@/data/promos";
 import { getReviews } from "@/data/reviews";
 import { getJobRoles } from "@/data/careers";
@@ -76,7 +76,7 @@ export default async function Page({
       {sections.reviews && <Reviews dict={dict.reviews} data={reviews} />}
       {sections.contacto && <Contacto dict={dict.contacto} lang={lang} />}
       <Footer dict={dict.footer} lang={lang} />
-      <FloatingActions dict={dict.floating} />
+      <FloatingActions dict={dict.floating} bookingHref={bookingHref(lang)} />
       <BackToTop label={dict.floating.backToTop} />
     </>
   );

@@ -37,6 +37,11 @@ export default function MobileMenu({
   ctaShort,
   bookingUrl,
 }: Props) {
+  // Our own `/reservar` opens in place; only an external tool gets a new tab.
+  const bookingTarget =
+    bookingUrl && /^https?:\/\//i.test(bookingUrl)
+      ? { target: "_blank", rel: "noopener noreferrer" }
+      : {};
   const [open, setOpen] = useState(false);
   const mounted = useIsClient();
 
@@ -62,7 +67,7 @@ export default function MobileMenu({
         role="dialog"
         aria-modal="true"
         aria-hidden={!open}
-        className={`fixed inset-0 z-[60] lg:hidden ${
+        className={`fixed inset-0 z-[60] xl:hidden ${
           open ? "pointer-events-auto" : "pointer-events-none"
         }`}
       >
@@ -149,8 +154,7 @@ export default function MobileMenu({
             {bookingUrl && (
               <Link
                 href={bookingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                {...bookingTarget}
                 onClick={() => {
                   trackBookingClick("mobile_menu_drawer");
                   close();
@@ -168,12 +172,11 @@ export default function MobileMenu({
 
   return (
     <>
-      <div className="flex items-center gap-3 lg:hidden">
+      <div className="flex items-center gap-3 xl:hidden">
         {bookingUrl && (
           <Link
             href={bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            {...bookingTarget}
             onClick={() => trackBookingClick("mobile_menu_header")}
             className="bg-gold-grad-dark px-3.5 py-2 font-sans text-[10px] font-semibold uppercase tracking-[0.22em] text-white no-underline"
           >

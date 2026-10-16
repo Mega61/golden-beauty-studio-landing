@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from "motion/react";
 import type { Locale } from "../dictionaries";
 import { trackEvent, trackMeta } from "@/lib/analytics";
@@ -83,6 +84,7 @@ type Step = "service" | "slot" | "details";
 const STEPS: Step[] = ["service", "slot", "details"];
 
 type Dict = {
+  eyebrow: string;
   steps: Record<Step, string>;
   headings: Record<Step, string>;
   provider: { label: string; any: string; anyHint: string };
@@ -110,25 +112,27 @@ type Dict = {
   loadingSlots: string;
   pickDate: string;
   combo: { askFeet: string; askHands: string; none: string; hint: string; saving: string };
-  trust: { reviews: string; ratingOnly: string; instant: string; pay: string };
+  trust: { reviews: string; ratingOnly: string; instant: string; pay: string; change: string };
+  studio: { name: string; area: string; hours: string; address: string; directions: string; photoAlt: string };
   scarcity: { few: string; last: string };
   success: {
     eyebrow: string;
     title: string;
     body: string;
     with: string;
-    calendar: string;
     google: string;
     ics: string;
-    whatsapp: string;
-    whatsappHint: string;
-    whatsappText: string;
+    whatsappSent: string;
+    changeHint: string;
+    changeCta: string;
+    changeText: string;
     directions: string;
     address: string;
     again: string;
     calendarTitle: string;
     calendarDetails: string;
   };
+
   errors: Record<string, string>;
 };
 
@@ -140,6 +144,17 @@ const DAYS_AHEAD = 45;
  * counts. Short on purpose — see the availability block in the component.
  */
 const SLOT_TTL_MS = 45_000;
+
+/** The studio's own wall — gold marble and the lit logo. The booking surface's face. */
+const STUDIO_PHOTO = "/space-02.jpg";
+
+/**
+ * The booking card. On a phone it slides up over the studio photo like an app
+ * sheet; on a desktop it's an elevated card beside the studio. Either way the
+ * flow lives *inside* something — a form floating on the page read as a toy.
+ */
+const CARD =
+  "relative z-10 -mt-7 min-w-0 rounded-t-[28px] bg-paper px-5 pb-10 pt-6 shadow-[0_-18px_40px_-28px_rgba(28,23,20,0.45)] md:rounded-[28px] md:px-8 md:pb-10 md:shadow-[0_40px_90px_-50px_rgba(28,23,20,0.45)] lg:mt-0 lg:rounded-[28px] lg:border lg:border-ink/8 lg:px-10 lg:pb-10 lg:pt-8 lg:shadow-[0_40px_90px_-50px_rgba(28,23,20,0.45)]";
 
 /** Fewer Google reviews than this and the trust line shows the rating alone. */
 const MIN_REVIEWS_TO_COUNT = 20;
@@ -209,6 +224,10 @@ export default function ReservaFlow({
     durationMin: number;
     provider: string;
     appointmentId: string;
+    /** The panel will send the WhatsApp confirmation (Cloud API configured). */
+    whatsappSent: boolean;
+    /** Last four digits, to say where it went without printing the number. */
+    phoneTail: string;
   } | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
@@ -718,7 +737,13 @@ export default function ReservaFlow({
       const body = (await res.json()) as {
         ok?: boolean;
         reason?: string;
-        booking?: { appointmentId?: number; provider: { name: string }; start: string };
+        booking?: {
+          appointmentId?: number;
+          provider: { name: string };
+          start: string;
+          /** Sent by panels with the WhatsApp Cloud API; older ones omit it. */
+          whatsappConfirmation?: "sending" | "disabled";
+        };
       };
 
       if (res.status === 201 && body.booking) {
@@ -748,6 +773,8 @@ export default function ReservaFlow({
           durationMin: service.durationMin,
           provider: body.booking.provider.name,
           appointmentId: String(body.booking.appointmentId ?? `${date}-${slot.time}`),
+          whatsappSent: body.booking.whatsappConfirmation === "sending",
+          phoneTail: form.phone.replace(/\D/g, "").slice(-4),
         });
         window.history.replaceState({ gbsStep: "details" }, "");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -782,6 +809,13 @@ export default function ReservaFlow({
 
   if (booked) {
     return (
+      <div className="mx-auto max-w-[1180px] pb-24 md:max-w-[720px] md:px-6 md:pt-8 lg:max-w-[1180px] lg:px-8 lg:pt-10">
+        <StudioBanner dict={dict} rating={rating} lang={lang} />
+        <div className="lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-8">
+          <aside className="hidden lg:sticky lg:top-28 lg:block">
+            <StudioCard dict={dict} rating={rating} lang={lang} mapsUrl={mapsUrl} />
+          </aside>
+          <section className={CARD}>
       <Success
         dict={dict}
         lang={lang}
@@ -802,6 +836,9 @@ export default function ReservaFlow({
           window.history.replaceState({ gbsStep: "service" }, "");
         }}
       />
+          </section>
+        </div>
+      </div>
     );
   }
 
@@ -826,15 +863,27 @@ export default function ReservaFlow({
   return (
     <LazyMotion features={domAnimation} strict>
     <MotionConfig reducedMotion="user" transition={{ duration: 0.24, ease: [0.25, 1, 0.5, 1] }}>
-    <div ref={topRef} className="mx-auto max-w-[1120px] px-5 pb-40 md:px-8 lg:pb-24">
-      <Progress dict={dict} step={step} reachable={(s) => STEPS.indexOf(s) < stepIndex} onGo={go} />
+    <div ref={topRef} className="mx-auto max-w-[1180px] pb-40 md:max-w-[720px] md:px-6 md:pt-8 lg:max-w-[1180px] lg:px-8 lg:pb-20 lg:pt-10">
+      <StudioBanner dict={dict} rating={rating} lang={lang} />
 
-      {step === "service" && (
-        <TrustLine dict={dict} rating={rating} lang={lang} />
-      )}
+      <div className="lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {/* Desktop: the studio, and what's been chosen, beside the steps. */}
+        <aside className="hidden lg:sticky lg:top-28 lg:block">
+          <StudioCard dict={dict} rating={rating} lang={lang} mapsUrl={mapsUrl} />
+          <div className="mt-4">{summary}</div>
+        </aside>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-14">
-        <div className="min-w-0">
+        <section className={CARD}>
+          <Progress dict={dict} step={step} reachable={(s) => STEPS.indexOf(s) < stepIndex} onGo={go} />
+
+          {step === "service" && (
+            <div className="lg:hidden">
+              {/* The rating is already on the photo header above. */}
+              <TrustLine dict={dict} rating={null} lang={lang} />
+            </div>
+          )}
+
+        <div className="mt-7 min-w-0">
           {error && (
             <p
               role="alert"
@@ -1305,11 +1354,7 @@ export default function ReservaFlow({
           )}
           </AnimatePresence>
         </div>
-
-        {/* Desktop: what's been chosen, always beside the steps. */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-28">{summary}</div>
-        </aside>
+        </section>
       </div>
 
       {/* Phone: the same, as a bar under the thumb. Hidden on step 3, where
@@ -1369,6 +1414,111 @@ const stepMotion = {
 
 /* ── Pieces ─────────────────────────────────────────────────────────────── */
 
+/** Google rating in words, honouring the minimum count rule. Null when there's no rating. */
+function ratingText(dict: Dict, rating: { value: number; count: number } | null, lang: Locale) {
+  if (!rating) return null;
+  const value = rating.value.toLocaleString(lang === "es" ? "es-CO" : "en-US", { maximumFractionDigits: 1 });
+  return rating.count < MIN_REVIEWS_TO_COUNT
+    ? fill(dict.trust.ratingOnly, { rating: value })
+    : fill(dict.trust.reviews, { rating: value, count: String(rating.count) });
+}
+
+/** Phone only: the studio as a photo header; the booking card slides up over it. */
+function StudioBanner({
+  dict,
+  rating,
+  lang,
+}: {
+  dict: Dict;
+  rating: { value: number; count: number } | null;
+  lang: Locale;
+}) {
+  const r = ratingText(dict, rating, lang);
+  return (
+    <div className="relative h-[188px] overflow-hidden md:h-[230px] md:rounded-t-[28px] lg:hidden">
+      <Image
+        src={STUDIO_PHOTO}
+        alt={dict.studio.photoAlt}
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-center"
+      />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-carbon/90 via-carbon/40 to-carbon/5" />
+      <div className="absolute inset-x-5 bottom-12 text-cream">
+        <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.32em] text-gold-soft">
+          {dict.eyebrow}
+        </p>
+        <p className="mt-1.5 font-display text-[32px] leading-none">{dict.studio.name}</p>
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 font-sans text-[12px] text-cream/85">
+          {r && (
+            <>
+              <span className="text-gold-soft">{r}</span>
+              <span aria-hidden className="text-cream/40">·</span>
+            </>
+          )}
+          {dict.studio.area}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Desktop: who you're booking with — photo, rating, where, when, and the promises. */
+function StudioCard({
+  dict,
+  rating,
+  lang,
+  mapsUrl,
+}: {
+  dict: Dict;
+  rating: { value: number; count: number } | null;
+  lang: Locale;
+  mapsUrl: string;
+}) {
+  const r = ratingText(dict, rating, lang);
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-ink/8 bg-paper">
+      <div className="relative aspect-[16/10]">
+        <Image src={STUDIO_PHOTO} alt={dict.studio.photoAlt} fill priority sizes="360px" className="object-cover" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-carbon/85 via-carbon/20 to-transparent" />
+        <div className="absolute inset-x-6 bottom-5 text-cream">
+          <p className="font-display text-[28px] leading-none">{dict.studio.name}</p>
+          {r && <p className="mt-1.5 font-sans text-[12px] text-gold-soft">{r}</p>}
+        </div>
+      </div>
+      <div className="grid gap-3.5 px-6 py-5 font-sans text-[13px] text-ink-soft">
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group flex items-start gap-3 no-underline"
+        >
+          <span className="mt-0.5 text-gold-dark"><PinIcon /></span>
+          <span className="flex-1">
+            {dict.studio.address}
+            <span className="mt-0.5 block text-[12px] text-gold-dark group-hover:underline">
+              {dict.studio.directions} →
+            </span>
+          </span>
+        </a>
+        <p className="flex items-start gap-3">
+          <span className="mt-0.5 text-gold-dark"><ClockIcon /></span>
+          {dict.studio.hours}
+        </p>
+        <ul className="mt-1 grid gap-2 border-t border-ink/8 pt-4">
+          {[dict.trust.instant, dict.trust.pay, dict.trust.change].map((t) => (
+            <li key={t} className="flex items-center gap-2.5">
+              <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-gold/15 text-[10px] text-gold-dark">✓</span>
+              {t}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Three reasons to keep going, right where the doubt starts: under the
  * progress bar on the first step. The rating is Google's, live — no number on
@@ -1383,22 +1533,11 @@ function TrustLine({
   rating: { value: number; count: number } | null;
   lang: Locale;
 }) {
-  const items = [
-    // Below a handful of reviews the count argues against us; the rating alone
-    // is just as true and reads better. Raise or drop as the count grows.
-    rating && rating.count < MIN_REVIEWS_TO_COUNT
-      ? fill(dict.trust.ratingOnly, {
-          rating: rating.value.toLocaleString(lang === "es" ? "es-CO" : "en-US", { maximumFractionDigits: 1 }),
-        })
-      : rating
-      ? fill(dict.trust.reviews, {
-          rating: rating.value.toLocaleString(lang === "es" ? "es-CO" : "en-US", { maximumFractionDigits: 1 }),
-          count: String(rating.count),
-        })
-      : null,
-    dict.trust.instant,
-    dict.trust.pay,
-  ].filter((x): x is string => x !== null);
+  // Below a handful of reviews the count argues against us; `ratingText`
+  // shows the rating alone until there are enough.
+  const items = [ratingText(dict, rating, lang), dict.trust.instant, dict.trust.pay].filter(
+    (x): x is string => x !== null,
+  );
   return (
     <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 font-sans text-[12px] text-ink-soft">
       {items.map((t, i) => (
@@ -1612,6 +1751,8 @@ function Success({
     durationMin: number;
     provider: string;
     appointmentId: string;
+    whatsappSent: boolean;
+    phoneTail: string;
   };
   whatsappNumber: string | null;
   mapsUrl: string;
@@ -1650,7 +1791,7 @@ function Success({
   };
 
   return (
-    <div className="mx-auto max-w-[620px] px-5 pb-24 pt-6 md:pt-10">
+    <div className="mx-auto max-w-[560px] pt-2 lg:pt-4">
       <div className="gbs-step flex flex-col items-center text-center">
         <SuccessMark />
         <p className="mt-6 font-sans text-[11px] font-semibold uppercase tracking-[0.32em] text-gold-dark">{t.eyebrow}</p>
@@ -1689,43 +1830,53 @@ function Success({
         </a>
       </div>
 
-      {whatsappNumber && (
-        <div className="gbs-step mt-4 [animation-delay:200ms]">
-          <a
-            href={whatsappLink(whatsappNumber, fill(t.whatsappText, values))}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackEvent("booking_whatsapp_summary")}
-            className="flex w-full items-center justify-center gap-3 rounded-full bg-whatsapp px-6 py-4 font-sans text-[14px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(37,211,102,0.8)]"
-          >
-            <WaIcon /> {t.whatsapp}
-          </a>
-          <p className="mt-2 px-4 text-center font-sans text-[12px] leading-relaxed text-ink-mute">{t.whatsappHint}</p>
-        </div>
-      )}
+      {/* Saving it is the one thing left for her to do, so it's the main
+          action here. Google is the calendar most phones in Colombia use; the
+          .ics covers iPhone and Outlook. */}
+      <div className="gbs-step mt-6 grid gap-2 [animation-delay:200ms] sm:grid-cols-2">
+        <a
+          href={googleCalendarUrl(event)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => trackEvent("booking_add_calendar", { kind: "google" })}
+          className="flex items-center justify-center gap-2.5 rounded-full bg-carbon px-5 py-4 text-center font-sans text-[13px] font-semibold text-gold-soft"
+        >
+          <CalendarIcon /> {t.google}
+        </a>
+        <button
+          type="button"
+          onClick={downloadIcs}
+          className="flex items-center justify-center gap-2.5 rounded-full border border-ink/15 bg-paper px-5 py-4 text-center font-sans text-[13px] text-ink transition-colors hover:border-gold"
+        >
+          <CalendarIcon /> {t.ics}
+        </button>
+      </div>
 
-      <div className="gbs-step mt-6 [animation-delay:260ms]">
-        <p className="mb-2 text-center font-sans text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-mute">
-          {t.calendar}
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <a
-            href={googleCalendarUrl(event)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackEvent("booking_add_calendar", { kind: "google" })}
-            className="rounded-full border border-ink/15 bg-paper px-4 py-3 text-center font-sans text-[13px] text-ink transition-colors hover:border-gold"
-          >
-            {t.google}
-          </a>
-          <button
-            type="button"
-            onClick={downloadIcs}
-            className="rounded-full border border-ink/15 bg-paper px-4 py-3 text-center font-sans text-[13px] text-ink transition-colors hover:border-gold"
-          >
-            {t.ics}
-          </button>
-        </div>
+      {/* WhatsApp: the confirmation goes out by itself when the studio's
+          WhatsApp API is set up — and then we say so. Otherwise, the only
+          WhatsApp here is the way to change the appointment. Asking her to
+          send us her own summary was work for the client. */}
+      <div className="gbs-step mt-6 rounded-2xl bg-ivory px-5 py-4 text-center font-sans text-[13px] leading-relaxed text-ink-soft [animation-delay:260ms]">
+        {booked.whatsappSent ? (
+          <p className="flex items-center justify-center gap-2">
+            <span className="text-whatsapp"><WaIcon /></span>
+            {fill(t.whatsappSent, { tail: booked.phoneTail })}
+          </p>
+        ) : null}
+        {whatsappNumber ? (
+          <p className={booked.whatsappSent ? "mt-1.5" : ""}>
+            {t.changeHint}{" "}
+            <a
+              href={whatsappLink(whatsappNumber, fill(t.changeText, values))}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackEvent("booking_change_whatsapp")}
+              className="font-semibold text-gold-dark underline decoration-gold/40 underline-offset-4"
+            >
+              {t.changeCta}
+            </a>
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-10 text-center">

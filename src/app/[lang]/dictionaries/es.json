@@ -300,20 +300,20 @@
     },
     "success": {
       "eyebrow": "Cita confirmada",
-      "title": "¡Lista, {name}!",
+      "title": "¡Todo listo, {name}!",
       "body": "Te esperamos el {date} a las {time}",
       "with": "Con {provider}",
-      "calendar": "Guardar en el calendario",
-      "google": "Google Calendar",
-      "ics": "Apple · Outlook",
-      "whatsapp": "Recibir el resumen por WhatsApp",
-      "whatsappHint": "Te queda la confirmación en el chat del estudio, y por ahí mismo nos escribes si necesitas cambiarla.",
-      "whatsappText": "Hola Golden ✨ Acabo de reservar en la página:\n• {service}\n• {date} a las {time}\n• Con {provider}\nA nombre de {name}.",
+      "google": "Agregar a Google Calendar",
+      "ics": "Apple · Outlook (.ics)",
       "directions": "Cómo llegar",
       "address": "Calle 69 Sur #43a - 41, Primer piso · Sabaneta",
       "again": "Reservar otra cita",
       "calendarTitle": "Golden Beauty Studio · {service}",
-      "calendarDetails": "Con {provider}. Si necesitas cambiar la cita, escríbenos por WhatsApp."
+      "calendarDetails": "Con {provider}. Si necesitas cambiar la cita, escríbenos por WhatsApp.",
+      "whatsappSent": "Te enviamos la confirmación por WhatsApp al ···{tail}.",
+      "changeHint": "¿Necesitas cambiarla?",
+      "changeCta": "Escríbenos por WhatsApp",
+      "changeText": "Hola Golden, necesito cambiar mi cita de {service} del {date} a las {time}. A nombre de {name}."
     },
     "errors": {
       "taken": "Justo tomaron esa hora. Elige otra y seguimos.",
@@ -329,11 +329,20 @@
       "reviews": "{rating} en Google · {count} reseñas",
       "instant": "Confirmación al instante",
       "pay": "Pagas en el estudio",
-      "ratingOnly": "{rating} ★ en Google"
+      "ratingOnly": "{rating} ★ en Google",
+      "change": "Cambios por WhatsApp"
     },
     "scarcity": {
       "few": "Quedan {n} horas este día",
       "last": "Queda una sola hora este día"
+    },
+    "studio": {
+      "name": "Golden Beauty Studio",
+      "area": "Sabaneta, Antioquia",
+      "hours": "Lun–sáb 9 a. m. – 7 p. m. · Dom 10 a. m. – 3 p. m.",
+      "address": "Calle 69 Sur #43a - 41, primer piso · Sabaneta",
+      "directions": "Cómo llegar",
+      "photoAlt": "El estudio: pared de mármol dorado con el logo de Golden iluminado"
     }
   },
   "faq": {
@@ -440,8 +449,8 @@
   "estudio": {
     "eyebrow": "05 · El estudio",
     "title1": "Un espacio pensado para",
-    "title2_em": "mujeres que aman el lujo en los detalles.",
-    "leadItalic": "Golden nace de la idea de transformar el cuidado personal en una experiencia de comodidad y exclusividad. Hacer que cada mujer se sienta segura, femenina y auténtica.",
+    "title2_em": "quienes aman el lujo en los detalles.",
+    "leadItalic": "Golden nace de la idea de transformar el cuidado personal en una experiencia de comodidad y exclusividad. Que cada persona que nos visita se vaya con más confianza y con su estilo intacto.",
     "body1": "Nuestras nail artists manejan a la perfección cada técnica que ofrecemos: puedes elegir tu favorita con la certeza de que el resultado siempre será deslumbrante.",
     "body2": "Estamos ubicadas en Sabaneta, en un local moderno, elegante y acogedor, diseñado para brindar una experiencia sofisticada y exclusiva.",
     "spaceAlts": [
@@ -493,7 +502,7 @@
         ],
         [
           "Productos sellados",
-          "Todo el material se abre frente a la clienta."
+          "Todo el material se abre frente a ti."
         ],
         [
           "Mesa desinfectada",
@@ -513,7 +522,7 @@
   "reviews": {
     "eyebrow": "06 · Reseñas",
     "title1": "Lo que dicen",
-    "title2_em": "nuestras clientas.",
+    "title2_em": "quienes nos visitan.",
     "body": "Reseñas verificadas de Google de quienes ya pasaron por nuestra silla.",
     "ratingLabel": "{rating} de 5",
     "verifiedLabel": "Google",
@@ -570,7 +579,7 @@
     "eyebrow": "Vacantes abiertas · Sabaneta",
     "title1": "Trabaja con",
     "title2_em": "nosotras.",
-    "body": "Buscamos manos con criterio y ganas de aprender. Si te apasiona el detalle y quieres crecer en un estudio que cuida su técnica tanto como a sus clientas, cuéntanos de ti y adjunta tu hoja de vida.",
+    "body": "Buscamos manos con criterio y ganas de aprender. Si te apasiona el detalle y quieres crecer en un estudio que cuida su técnica tanto como a quienes nos visitan, cuéntanos de ti y adjunta tu hoja de vida.",
     "perks": [
       "Formación continua en técnicas y tendencias.",
       "Materiales premium y esterilización a la vista.",
@@ -716,7 +725,7 @@
   },
   "floating": {
     "whatsapp": "WhatsApp",
-    "cta": "Agendar →",
+    "cta": "Agendar",
     "backToTop": "Volver arriba"
   }
 }

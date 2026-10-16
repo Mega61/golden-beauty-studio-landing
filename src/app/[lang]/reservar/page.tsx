@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale, type Locale } from "../dictionaries";
 import { siteConfig } from "@/config/site";
-import { EyebrowLabel } from "../_components/atoms";
 import Nav from "../_components/Nav";
 import Footer from "../_components/Footer";
 import ReservaFlow, { type Catalog, type ServiceCopy } from "./ReservaFlow";
@@ -148,17 +147,14 @@ export default async function ReservarPage({
         sections={siteConfig.sections}
         onLanding={false}
         switchPath={`/${PATH}`}
+        showCta={false}
       />
 
-      <main className="bg-ivory pt-8 md:pt-14">
-        <header className="mx-auto max-w-[1120px] px-5 pb-2 md:px-8">
-          <EyebrowLabel className="text-gold-dark">{t.eyebrow}</EyebrowLabel>
-          <h1 className="mt-2 font-display text-[40px] leading-none text-ink md:text-6xl">
-            {t.title}
-          </h1>
-          <p className="mt-3 font-sans text-sm text-ink-soft">{t.intro}</p>
-        </header>
-
+      {/* No page heading: the studio header inside the flow is the heading —
+          photo, name, rating — the way a booking app presents a business.
+          The deeper background is what the booking card sits on. */}
+      <main className="bg-ivory-deep/50">
+        <h1 className="sr-only">{t.title}</h1>
         <ReservaFlow
           dict={t}
           lang={typedLang}

@@ -300,20 +300,20 @@
     },
     "success": {
       "eyebrow": "Appointment confirmed",
-      "title": "You're booked, {name}!",
+      "title": "You're all set, {name}!",
       "body": "See you on {date} at {time}",
       "with": "With {provider}",
-      "calendar": "Save to calendar",
-      "google": "Google Calendar",
-      "ics": "Apple · Outlook",
-      "whatsapp": "Get the summary on WhatsApp",
-      "whatsappHint": "You'll have the confirmation in the studio's chat — and that's where to write if you need to change it.",
-      "whatsappText": "Hi Golden ✨ I just booked on the website:\n• {service}\n• {date} at {time}\n• With {provider}\nName: {name}.",
+      "google": "Add to Google Calendar",
+      "ics": "Apple · Outlook (.ics)",
       "directions": "Directions",
       "address": "Calle 69 Sur #43a - 41, first floor · Sabaneta",
       "again": "Book another",
       "calendarTitle": "Golden Beauty Studio · {service}",
-      "calendarDetails": "With {provider}. Need to change it? Message us on WhatsApp."
+      "calendarDetails": "With {provider}. Need to change it? Message us on WhatsApp.",
+      "whatsappSent": "We sent your confirmation on WhatsApp to ···{tail}.",
+      "changeHint": "Need to change it?",
+      "changeCta": "Message us on WhatsApp",
+      "changeText": "Hi Golden, I need to change my {service} appointment on {date} at {time}. Name: {name}."
     },
     "errors": {
       "taken": "Someone just took that time. Pick another and we'll carry on.",
@@ -329,11 +329,20 @@
       "reviews": "{rating} on Google · {count} reviews",
       "instant": "Instant confirmation",
       "pay": "Pay at the studio",
-      "ratingOnly": "{rating} ★ on Google"
+      "ratingOnly": "{rating} ★ on Google",
+      "change": "Changes via WhatsApp"
     },
     "scarcity": {
       "few": "Only {n} times left this day",
       "last": "Just one time left this day"
+    },
+    "studio": {
+      "name": "Golden Beauty Studio",
+      "area": "Sabaneta, Antioquia",
+      "hours": "Mon–Sat 9 AM – 7 PM · Sun 10 AM – 3 PM",
+      "address": "Calle 69 Sur #43a - 41, first floor · Sabaneta",
+      "directions": "Directions",
+      "photoAlt": "The studio: gold marble wall with the Golden logo lit up"
     }
   },
   "faq": {
@@ -440,8 +449,8 @@
   "estudio": {
     "eyebrow": "05 · The studio",
     "title1": "A space designed for",
-    "title2_em": "women who love luxury in the details.",
-    "leadItalic": "Golden was born from the idea of turning personal care into an experience of comfort and exclusivity — making every woman feel confident, feminine and authentic.",
+    "title2_em": "those who love luxury in the details.",
+    "leadItalic": "Golden was born from the idea of turning personal care into an experience of comfort and exclusivity — so everyone who visits leaves more confident and true to their own style.",
     "body1": "Our nail artists have mastered every technique we offer: choose your favorite knowing the result will always be stunning.",
     "body2": "We're based in Sabaneta, in a modern, elegant and welcoming space designed for a sophisticated and exclusive experience.",
     "spaceAlts": [
@@ -493,7 +502,7 @@
         ],
         [
           "Sealed products",
-          "Every material is opened in front of the client."
+          "Every material is opened in front of you."
         ],
         [
           "Disinfected table",
@@ -720,7 +729,7 @@
   },
   "floating": {
     "whatsapp": "WhatsApp",
-    "cta": "Book →",
+    "cta": "Book",
     "backToTop": "Back to top"
   }
 }
