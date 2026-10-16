@@ -171,6 +171,7 @@ describe("summarizeDayTotals", () => {
       tips: 0,
       count: 0,
       ingreso: 0,
+      cortesias: 0,
     });
   });
 });

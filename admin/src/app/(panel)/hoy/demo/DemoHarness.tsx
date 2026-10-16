@@ -107,7 +107,12 @@ export function DemoHarness() {
     }
 
     const cita = CITAS_DEMO.find((c) => c.eaAppointmentId === input.eaAppointmentId);
-    const draft: TicketDraft = { ...input, version: DRAFT_VERSION, updatedAt: Date.now() };
+    const draft: TicketDraft = {
+      ...input,
+      houseCourtesy: input.houseCourtesy === true,
+      version: DRAFT_VERSION,
+      updatedAt: Date.now(),
+    };
     const r = priceDraft(draft, CATALOGO_DEMO, {
       bookedServiceId: cita?.bookedServiceId ?? null,
       bookedSnapshot: cita?.finance.snapshot ?? null,
@@ -174,6 +179,7 @@ export function DemoHarness() {
         catalog={CATALOGO_DEMO}
         scope="demo"
         canCharge
+        canGiveCourtesy
         canSeeTotals
         canFixAfterClose={false}
         readOnly={false}

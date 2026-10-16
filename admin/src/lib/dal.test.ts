@@ -152,6 +152,9 @@ describe("requireCapability — una técnica no alcanza lo que no es suyo", () =
     "cuenta:corregir-tras-cierre",
     "comisiones:administrar",
     "equipo:administrar",
+    // Cortesía de la casa: la técnica no regala servicios — llamando la
+    // función directo tampoco.
+    "cortesia:otorgar",
   ] as const;
 
   it.each(PROHIBIDAS)("staff → %s lanza ForbiddenError", async (capability) => {
@@ -172,6 +175,13 @@ describe("requireCapability — una técnica no alcanza lo que no es suyo", () =
     await expect(
       requireCapability("cuenta:corregir-tras-cierre"),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("solo la dueña otorga una cortesía de la casa", async () => {
+    entrarComo("recepcion@estudio.com");
+    await expect(requireCapability("cortesia:otorgar")).rejects.toBeInstanceOf(ForbiddenError);
+    entrarComo("dueña@estudio.com");
+    expect((await requireCapability("cortesia:otorgar")).role).toBe("owner");
   });
 
   it("sin sesión, redirige antes de evaluar el permiso", async () => {

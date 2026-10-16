@@ -258,6 +258,7 @@ function financeOf(row: Row, month: string): FinanceRow {
         : [{ method: row.method, amount: row.charged }]),
     varianceReasonCode: row.reason ?? null,
     closed: row.charged !== null,
+    houseCourtesy: false,
     items: itemsOf(row),
   };
 }
@@ -435,6 +436,7 @@ export function previewData(cadence: Cadence, anchor: EaLocalDate): ReportData {
       PROVIDERS,
     ),
     commissionEntries: COMMISSION,
+    courtesyCommissions: [],
     // La pauta del mes: Meta casi toda, algo de Google. Con las nuevas del
     // mes da un costo por clienta y un "ya recuperado" con cifras creíbles.
     adSpend: [

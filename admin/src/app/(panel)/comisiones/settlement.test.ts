@@ -57,6 +57,7 @@ function entrada(over: Partial<CommissionEntryDetail> = {}): CommissionEntryDeta
     eaAppointmentId: 5001,
     // 2 p. m. del 8 de septiembre en la zona del proceso.
     appointmentStartAt: new Date(2026, 8, 8, 14, 0, 0),
+    houseCourtesy: false,
     ...over,
   };
 }

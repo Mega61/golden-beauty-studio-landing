@@ -24,6 +24,7 @@ import {
 } from "@/lib/commission";
 import { FULL_BASIS_POINTS } from "@/lib/combo-allocation";
 import {
+  commissionBasesOf,
   computeTicketTotals,
   TicketError,
   type TicketItemInput,
@@ -56,6 +57,13 @@ import {
  * La tasa se aplica sobre `netTotal` —el total del renglón con el descuento del
  * ticket ya prorrateado—, no sobre el precio de lista. Quien da el descuento se
  * baja su comisión y el incentivo se alinea solo.
+ *
+ * **La excepción es la cortesía de la casa** (`is_house_courtesy`, migración
+ * `026`): la clienta no pagó, la dueña decidió regalar el servicio, y la técnica
+ * cobra sobre el **precio de lista** de cada renglón — el mismo precio congelado
+ * que la cuenta guardó, nunca uno de hoy. La regla vive en `commissionBasesOf()`
+ * de `lib/ticket.ts`; acá solo se le pregunta. Tasa, vigencia y reparto a cuatro
+ * manos son los de siempre.
  *
  * La propina va aparte y **jamás** entra a la base. Ya es 100 % de la técnica y
  * se entrega el mismo día; sumarla a la base sería pagarle 40 % encima de plata
@@ -203,6 +211,11 @@ export type CommissionAccount = {
   discount: Cop;
   amountCharged: Cop | null;
   tip: Cop;
+  /**
+   * Cortesía de la casa: la base es el precio de lista, no lo cobrado (que es
+   * cero). Ver `commissionBasesOf()`.
+   */
+  houseCourtesy: boolean;
   items: CommissionAccountItem[];
 };
 
@@ -226,6 +239,7 @@ export function toCommissionAccount(
     discount: row.discount,
     amountCharged: row.amount_charged,
     tip: row.tip,
+    houseCourtesy: row.is_house_courtesy === 1,
     items: items.map((item) => ({
       itemId: item.id,
       kind: item.kind,
@@ -442,7 +456,22 @@ function reconstructLines(
     };
   }
 
-  return { ok: true, netTotals: totals.lines.map((line) => line.netTotal) };
+  if (account.houseCourtesy && totals.amountCharged !== 0) {
+    // Una cortesía que cobró algo no es una cortesía, y pagar sobre la lista
+    // **y** sobre lo cobrado sería pagar dos veces el mismo trabajo. El CHECK
+    // `ck_af_house_courtesy` lo impide en la base; esto es para la fila que
+    // llegue por otro lado, y no se liquida hasta que alguien la mire.
+    return {
+      ok: false,
+      skipped: skip(
+        account,
+        "cuenta-ilegible",
+        `La cuenta está marcada como cortesía de la casa y cobró ${totals.amountCharged}.`,
+      ),
+    };
+  }
+
+  return { ok: true, netTotals: commissionBasesOf(totals, account.houseCourtesy) };
 }
 
 /**

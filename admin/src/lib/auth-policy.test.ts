@@ -177,6 +177,8 @@ describe("can — el alcance de una técnica", () => {
     "avisos:reservas-web",
     "pauta:registrar",
     "clientes:exportar",
+    // Regalar un servicio: la cortesía le paga comisión sobre lo que nadie cobró.
+    "cortesia:otorgar",
   ];
 
   it.each(PROHIBIDAS)("staff NO alcanza %s", (capability) => {
@@ -222,6 +224,14 @@ describe("can — recepción y dueña", () => {
     expect(can("owner", "clientes:exportar")).toBe(true);
   });
 
+  it("solo la dueña marca una cortesía de la casa", () => {
+    expect(can("owner", "cortesia:otorgar")).toBe(true);
+    expect(can("admin", "cortesia:otorgar")).toBe(false);
+    expect(can("staff", "cortesia:otorgar")).toBe(false);
+    // `TICKET_STAFF_COBRA` deja a la técnica registrar el cobro, no regalarlo.
+    expect(can("staff", "cortesia:otorgar", { staffCobra: true })).toBe(false);
+  });
+
   it("recepción manda los recordatorios por wa.me y registra las bajas", () => {
     expect(can("admin", "recordatorios:enviar")).toBe(true);
     expect(can("admin", "recordatorios:baja")).toBe(true);
@@ -260,6 +270,7 @@ describe("can — recepción y dueña", () => {
       "avisos:reservas-web",
       "pauta:registrar",
       "clientes:exportar",
+      "cortesia:otorgar",
     ];
     for (const capability of TODAS) {
       expect(can("owner", capability)).toBe(true);

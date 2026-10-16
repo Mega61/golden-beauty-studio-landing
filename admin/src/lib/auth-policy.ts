@@ -261,6 +261,13 @@ export function isAllowedIdentity(
  *   tercero, así que es de la dueña sola, como `clientes:fusionar`: recepción
  *   corrige una ficha con la clienta enfrente; sacar a toda la clientela en un
  *   archivo no es trabajo de mostrador. Cada descarga queda en la bitácora.
+ * - `cortesia:otorgar` — cerrar una cuenta como **cortesía de la casa** (la
+ *   clienta no paga, la profesional cobra su comisión sobre el precio de lista)
+ *   y marcar a una clienta como cortesía por defecto. Es regalar un servicio, y
+ *   regalar es de la dueña: ni recepción ni la técnica. En la técnica además
+ *   sería un conflicto directo —la cortesía le paga comisión sobre un trabajo
+ *   que nadie cobró— y por eso no alcanza ni a mantener una cortesía que ya
+ *   existe: tocarla, en cualquier sentido, es de la dueña.
  */
 export type Capability =
   | "cuenta:cerrar-propia"
@@ -284,7 +291,8 @@ export type Capability =
   | "recordatorios:baja"
   | "avisos:reservas-web"
   | "pauta:registrar"
-  | "clientes:exportar";
+  | "clientes:exportar"
+  | "cortesia:otorgar";
 
 /**
  * Contexto que hace variar una fila de la matriz.
@@ -332,6 +340,7 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "avisos:reservas-web",
     "pauta:registrar",
     "clientes:exportar",
+    "cortesia:otorgar",
   ]),
 
   // Recepción. Opera el día completo y cierra la caja, pero no corrige después

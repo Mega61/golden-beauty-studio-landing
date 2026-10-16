@@ -48,7 +48,7 @@ import { eaDatePart, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea";
 import type { DateRange, Interval } from "@/lib/metrics";
 import type { Cop } from "@/db/types";
 
-import type { FinanceRow, LegacyStatusKind } from "./aggregate";
+import { isPaidTicket, type FinanceRow, type LegacyStatusKind } from "./aggregate";
 import { weekdayKey, type WeekdayKey } from "./period";
 
 /** La semana como la piensa el estudio: de lunes a domingo. */
@@ -257,7 +257,8 @@ export function demandReport(input: DemandInput): DemandReport {
   // cuenta sin cerrar no cobró cero, no cobró. El precio es el congelado.
   const revenue = new Map<WeekdayKey, { amount: Cop; tickets: number }>();
   for (const row of input.finance) {
-    if (!row.closed || row.amountCharged === null || row.startAt === null) continue;
+    // Una cortesía de la casa no es venta: no cuenta como ticket del día.
+    if (!isPaidTicket(row) || row.amountCharged === null || row.startAt === null) continue;
     const day = eaDatePart(row.startAt);
     if (!within(day, period)) continue;
     const weekday = weekdayKey(day);

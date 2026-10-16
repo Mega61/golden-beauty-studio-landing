@@ -32,6 +32,17 @@
  * que es el que la técnica cerró — y nunca `booked_service_id`. La única
  * excepción es el reporte que compara los dos justamente para medir la
  * diferencia.
+ *
+ * ## Las cortesías de la casa no son ventas
+ *
+ * Una cortesía (`houseCourtesy`, migración `026`) es una cuenta cerrada con
+ * cobro cero. Contarla como venta no mueve el ingreso, pero sí todo lo que se
+ * divide por cuentas —el ticket promedio, el enganche de adicionales, la hora
+ * de silla— y aparece como "sin método" en el reparto por método. Por eso los
+ * reportes de plata leen `isPaidTicket()` y no `closed` a secas, y las
+ * cortesías tienen su propia línea, `courtesyReport()`: cuántas, cuánto valían
+ * a precio de lista y cuánto se pagó de comisión por ellas — que es plata que
+ * sí salió del estudio.
  */
 
 import { mapEaStatus } from "@/components/calendar";
@@ -121,6 +132,8 @@ export type FinanceRow = {
   payments: readonly { method: PaymentMethod; amount: Cop }[];
   varianceReasonCode: VarianceReasonCode | null;
   closed: boolean;
+  /** Cortesía de la casa: cerrada, sin cobro, y fuera de todo reporte de ventas. */
+  houseCourtesy: boolean;
   items: FinanceItemRow[];
 };
 
@@ -169,6 +182,18 @@ function chargedOf(row: FinanceRow): Cop | null {
   return row.amountCharged;
 }
 
+/**
+ * ¿Esta cuenta es una **venta**? Cerrada, con monto, y no una cortesía de la
+ * casa.
+ *
+ * Es el filtro de todo reporte de plata: ingreso, ticket promedio, reparto por
+ * método, adicionales, hora de silla, demanda y adquisición. Una cortesía queda
+ * afuera de todos y entra solo a `courtesyReport()`.
+ */
+export function isPaidTicket(row: FinanceRow): boolean {
+  return row.closed && row.amountCharged !== null && !row.houseCourtesy;
+}
+
 // ── 1 · Cierre del día ──────────────────────────────────────────────────────
 //
 // La decisión: ¿cuadra la caja? ¿puedo cerrar?
@@ -210,7 +235,7 @@ export function dailyClose(
   appointments: readonly AppointmentRow[],
   providers: readonly ProviderRow[],
 ): DailyClose {
-  const closed = finance.filter((row) => row.closed && row.amountCharged !== null);
+  const closed = finance.filter(isPaidTicket);
 
   // "Pendiente" es una cita **atendida** sin cuenta cerrada. Una cancelada o
   // una inasistencia no son pendientes: no hay nada que cobrar, y contarlas
@@ -379,7 +404,7 @@ export function chairHourReport(
   finance: readonly FinanceRow[],
   services: readonly ServiceRow[],
 ): ChairHourReport {
-  const closed = finance.filter((row) => row.closed && row.amountCharged !== null);
+  const closed = finance.filter(isPaidTicket);
 
   const durationOf = (id: number | null): number =>
     id === null ? 0 : (services.find((service) => service.id === id)?.durationMin ?? 0);
@@ -445,8 +470,15 @@ export function bookedVsPerformed(
   // Una cuenta sin servicio realizado no dice nada sobre el cambio de
   // servicio: dice que la cuenta no se cerró. Fuera del denominador, igual que
   // las cohortes pendientes salen del de la retención.
+  // Sin cortesías de la casa: su "diferencia de ingreso" sería el precio de
+  // lista entero en negativo, y el reporte lo leería como un cambio de
+  // servicio que hizo perder plata.
   const comparable = finance.filter(
-    (row) => row.closed && row.bookedServiceId !== null && row.performedServiceId !== null,
+    (row) =>
+      row.closed &&
+      !row.houseCourtesy &&
+      row.bookedServiceId !== null &&
+      row.performedServiceId !== null,
   );
 
   const changed = comparable.filter(
@@ -507,7 +539,7 @@ export function extrasReport(
   finance: readonly FinanceRow[],
   providers: readonly ProviderRow[],
 ): { rows: ExtrasRow[]; total: Cop; attachRate: number | null } {
-  const closed = finance.filter((row) => row.closed && row.amountCharged !== null);
+  const closed = finance.filter(isPaidTicket);
   const ids = [...new Set(closed.map((row) => row.eaProviderId))];
 
   const rows = ids
@@ -588,7 +620,11 @@ export function varianceReport(
   finance: readonly FinanceRow[],
   providers: readonly ProviderRow[],
 ): VarianceReport {
-  const closed = finance.filter((row) => row.closed && row.amountCharged !== null);
+  // Sin las cortesías de la casa: valen el 100 % de la lista y ahogarían la
+  // pregunta del reporte —dónde se escapa la plata sin que nadie lo haya
+  // decidido—. Una cortesía la decidió la dueña, y su costo sale en su propia
+  // línea (`courtesyReport()`).
+  const closed = finance.filter(isPaidTicket);
 
   const cells = new Map<string, VarianceCell>();
   let withoutReason = 0;
@@ -895,7 +931,7 @@ export function dailySeries(
   const byDay = new Map<string, number>();
 
   for (const row of finance) {
-    if (!row.closed || row.startAt === null || row.amountCharged === null) continue;
+    if (!isPaidTicket(row) || row.startAt === null || row.amountCharged === null) continue;
     const day = eaDatePart(row.startAt);
     byDay.set(day, (byDay.get(day) ?? 0) + row.amountCharged);
   }
@@ -911,5 +947,57 @@ export function snapshotHealth(finance: readonly FinanceRow[]): {
   return {
     fallback: finance.filter((row) => row.snapshotSource === "fallback").length,
     withoutSnapshot: finance.filter((row) => row.snapshot === null).length,
+  };
+}
+
+// ── Cortesías de la casa ────────────────────────────────────────────────────
+//
+// La decisión: cuánto le cuestan a la dueña las cortesías. No entra plata, pero
+// la comisión de la profesional sí sale, y es un gasto real.
+
+export type CourtesyReport = {
+  /** Cortesías de la casa cerradas en el periodo. */
+  count: number;
+  /** Lo que habrían valido a precio de lista: la suma de sus renglones. */
+  listPrice: Cop;
+  /** La comisión que ya quedó calculada por ellas en `commission_entry`. */
+  commission: Cop;
+  /**
+   * Cortesías sin ninguna comisión calculada todavía: la quincena no se ha
+   * liquidado. Se cuentan aparte para que `commission` no se lea como el total
+   * definitivo cuando todavía falta.
+   */
+  unsettled: number;
+};
+
+/**
+ * Las cortesías del periodo, con su costo.
+ *
+ * El precio de lista es la suma de los renglones tal como se congelaron al
+ * cerrar —el mismo número sobre el que la liquidación calcula la comisión—, no
+ * un precio de hoy. La comisión **no se calcula acá**: se suma lo que el motor
+ * dejó en `commission_entry`, que es lo que se le paga a la técnica.
+ */
+export function courtesyReport(
+  finance: readonly FinanceRow[],
+  commissions: readonly { eaAppointmentId: number; amount: Cop }[],
+): CourtesyReport {
+  const courtesies = finance.filter((row) => row.closed && row.houseCourtesy);
+  const ids = new Set(courtesies.map((row) => row.eaAppointmentId));
+
+  const byAppointment = new Map<number, Cop>();
+  for (const entry of commissions) {
+    if (!ids.has(entry.eaAppointmentId)) continue;
+    byAppointment.set(
+      entry.eaAppointmentId,
+      (byAppointment.get(entry.eaAppointmentId) ?? 0) + entry.amount,
+    );
+  }
+
+  return {
+    count: courtesies.length,
+    listPrice: courtesies.reduce((total, row) => total + sumLines(row.items), 0),
+    commission: [...byAppointment.values()].reduce((total, amount) => total + amount, 0),
+    unsettled: courtesies.filter((row) => !byAppointment.has(row.eaAppointmentId)).length,
   };
 }

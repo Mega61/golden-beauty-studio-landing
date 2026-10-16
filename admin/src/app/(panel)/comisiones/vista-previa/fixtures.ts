@@ -79,6 +79,7 @@ function entrada(
     note: null,
     financeId: 600 + seq,
     appointmentStartAt: new Date(year, month - 1, day, 10, 0, 0),
+    houseCourtesy: false,
     ...over,
   };
 }

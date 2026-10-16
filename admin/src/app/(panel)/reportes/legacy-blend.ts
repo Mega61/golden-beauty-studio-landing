@@ -39,7 +39,13 @@ import {
 } from "@/lib/legacy-history";
 
 import { mapEaStatus } from "@/components/calendar";
-import type { AppointmentRow, FinanceRow, ProviderRow, ServiceRow } from "./aggregate";
+import {
+  isPaidTicket,
+  type AppointmentRow,
+  type FinanceRow,
+  type ProviderRow,
+  type ServiceRow,
+} from "./aggregate";
 
 /** Una fila heredada, en la forma estrecha que los reportes necesitan. */
 export type LegacyReportRow = {
@@ -204,7 +210,7 @@ export function salesReport(
   const byService = new Map<string, SalesGroup>();
   const byProvider = new Map<string, SalesGroup>();
 
-  const closed = finance.filter((row) => row.closed && row.amountCharged !== null);
+  const closed = finance.filter(isPaidTicket);
   let panelTotal = 0;
 
   for (const row of closed) {
@@ -282,7 +288,7 @@ export function salesTotal(
   legacy: readonly LegacyReportRow[],
 ): Cop {
   const panel = finance
-    .filter((row) => row.closed && row.amountCharged !== null)
+    .filter(isPaidTicket)
     .reduce((total, row) => total + (row.amountCharged ?? 0), 0);
   return legacy.reduce((total, row) => total + (legacySale(row) ?? 0), panel);
 }
@@ -295,7 +301,7 @@ export function salesSeries(
 ): number[] {
   const byDay = new Map<string, number>();
   for (const row of finance) {
-    if (!row.closed || row.startAt === null || row.amountCharged === null) continue;
+    if (!isPaidTicket(row) || row.startAt === null || row.amountCharged === null) continue;
     const day = eaDatePart(row.startAt);
     byDay.set(day, (byDay.get(day) ?? 0) + row.amountCharged);
   }

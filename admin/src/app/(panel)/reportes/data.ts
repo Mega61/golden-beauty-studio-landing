@@ -33,6 +33,7 @@ import type {
   AppointmentFinance,
   AppointmentFinanceItem,
   AppointmentPayment,
+  Cop,
 } from "@/db/types";
 import { instantToEaLocal, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea";
 import type { Interval } from "@/lib/metrics";
@@ -97,6 +98,12 @@ export type ReportData = {
   previousLegacy: LegacyReportRow[];
   commissionEntries: CommissionEntryRow[];
   /**
+   * La comisión ya calculada de las **cortesías de la casa** del periodo, por
+   * cita. Alimenta `courtesyReport()`: la clienta no pagó, pero esta plata sí
+   * salió del estudio. Vacío si no hay cortesías o si no se pudo leer.
+   */
+  courtesyCommissions: { eaAppointmentId: number; amount: Cop }[];
+  /**
    * La inversión en anuncios de los meses que toca el periodo (`ad_spend`).
    * `null` = no se pudo leer — la migración `023` no está aplicada o la base no
    * respondió —, que **no** es lo mismo que "no hay inversión anotada" (`[]`).
@@ -143,6 +150,7 @@ function toFinanceRow(
     // —un retoque de garantía— y usarlo como señal de cierre haría desaparecer
     // esas cuentas de la ocupación y de la ficha de la clienta.
     closed: row.closed_at !== null,
+    houseCourtesy: row.is_house_courtesy === 1,
     items: items.map((item) => ({
       kind: item.kind,
       eaServiceId: item.ea_service_id,
@@ -414,6 +422,24 @@ export async function loadReports(
     }
   }
 
+  // --- Lo que costaron las cortesías -------------------------------------
+  //
+  // Por cita y no por quincena: el periodo del reporte puede ser un día o un
+  // mes, y la comisión que importa es la de **estas** cortesías. Un fallo acá
+  // no tumba nada: la línea sale diciendo que falta liquidar.
+  let courtesyCommissions: { eaAppointmentId: number; amount: Cop }[] = [];
+  const courtesyIds = finance
+    .filter((row) => row.closed && row.houseCourtesy)
+    .map((row) => row.eaAppointmentId);
+  if (db !== null && courtesyIds.length > 0) {
+    try {
+      courtesyCommissions =
+        await repositories(db).commissionEntries.listAmountsByEaAppointmentIds(courtesyIds);
+    } catch (error) {
+      console.error("[reportes] no se pudo leer la comisión de las cortesías", error);
+    }
+  }
+
   const { studioWindow, providerWindows } = windowsFor(providers, days, exceptions);
 
   // El historial se recorta y se deduplica contra **toda** la historia de EA
@@ -449,6 +475,7 @@ export async function loadReports(
     legacy: legacyRows,
     previousLegacy: previousLegacyRows,
     commissionEntries,
+    courtesyCommissions,
     adSpend,
     stations,
     studioWindow,

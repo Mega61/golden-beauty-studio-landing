@@ -47,13 +47,15 @@ function shellRole(role: UserRole): Role {
 export default async function HoyPage() {
   const session = await requireSession();
 
-  const [verTodas, canCharge, canSeeTotals, canFixAfterClose, canRemind] = await Promise.all([
-    sessionCan("agenda:ver-todas"),
-    sessionCan("cuenta:cobrar"),
-    sessionCan("caja:ver"),
-    sessionCan("cuenta:corregir-tras-cierre"),
-    sessionCan("recordatorios:enviar"),
-  ]);
+  const [verTodas, canCharge, canSeeTotals, canFixAfterClose, canRemind, canGiveCourtesy] =
+    await Promise.all([
+      sessionCan("agenda:ver-todas"),
+      sessionCan("cuenta:cobrar"),
+      sessionCan("caja:ver"),
+      sessionCan("cuenta:corregir-tras-cierre"),
+      sessionCan("recordatorios:enviar"),
+      sessionCan("cortesia:otorgar"),
+    ]);
 
   // El acceso a Recordatorios va acá con su conteo porque Hoy es la pantalla
   // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
@@ -143,6 +145,7 @@ export default async function HoyPage() {
           catalog={catalog}
           scope={session.userId}
           canCharge={canCharge}
+          canGiveCourtesy={canGiveCourtesy}
           canSeeTotals={canSeeTotals}
           canFixAfterClose={canFixAfterClose}
           readOnly={eaCaido !== null}

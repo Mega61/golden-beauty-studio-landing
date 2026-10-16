@@ -4,6 +4,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 
 import {
   Button,
+  Checkbox,
   Field,
   FormErrorSummary,
   Icon,
@@ -53,8 +54,8 @@ import type { TodayAppointment } from "./types";
  * falta un cálculo que no existe, el lugar de agregarlo es `lib/`, no un
  * `useMemo`.
  *
- * **No decide permisos.** `canCharge` y `readOnly` llegan resueltos desde el
- * servidor, y volver a comprobarlos en la Server Action no es redundancia sino
+ * **No decide permisos.** `canCharge`, `canGiveCourtesy` y `readOnly` llegan
+ * resueltos desde el servidor, y volver a comprobarlos en la Server Action no es redundancia sino
  * el diseño: esconder el paso 5 es cortesía con la usuaria, y la compuerta está
  * en el DAL.
  *
@@ -77,6 +78,8 @@ export function TicketSheet({
   draft,
   pricing,
   canCharge,
+  canGiveCourtesy = false,
+  courtesyFromDefault = false,
   readOnly = false,
   saving = false,
   dirty,
@@ -93,6 +96,14 @@ export function TicketSheet({
   pricing: TicketPricing;
   /** `TICKET_STAFF_COBRA` ya resuelto contra el rol. Ver `lib/auth-policy.ts`. */
   canCharge: boolean;
+  /** `cortesia:otorgar` ya resuelto contra el rol: solo la dueña. */
+  canGiveCourtesy?: boolean;
+  /**
+   * La casilla de cortesía llegó marcada **por la ficha de la clienta**, no por
+   * alguien que la tocó. Se dice en pantalla para que quien cierra sepa que
+   * puede desmarcarla: a veces esas mismas personas pagan.
+   */
+  courtesyFromDefault?: boolean;
   readOnly?: boolean;
   saving?: boolean;
   dirty: boolean;
@@ -121,7 +132,12 @@ export function TicketSheet({
     appointment.bookedServiceId !== null &&
     draft.performedServiceId !== appointment.bookedServiceId;
 
-  const bloqueado = readOnly || saving;
+  const cortesia = draft.houseCourtesy;
+  // Una cortesía que ya existe, abierta por quien no puede otorgarla: se mira,
+  // no se toca. El servidor igual rechazaría guardarla (`cortesia:otorgar`), y
+  // descubrirlo al tocar "Guardar" es tarde.
+  const cortesiaAjena = cortesia && !canGiveCourtesy;
+  const bloqueado = readOnly || saving || cortesiaAjena;
   const puedeGuardar = !bloqueado && pricingResult.errors.length === 0;
 
   function patch(next: Partial<TicketDraft>): void {
@@ -147,7 +163,11 @@ export function TicketSheet({
             disabled={!puedeGuardar}
             onClick={onSave}
           >
-            {amountCharged === null ? "Guardar" : `Guardar · ${formatCOP(amountCharged)}`}
+            {cortesia
+              ? "Guardar · cortesía"
+              : amountCharged === null
+                ? "Guardar"
+                : `Guardar · ${formatCOP(amountCharged)}`}
           </Button>
         </>
       }
@@ -167,6 +187,19 @@ export function TicketSheet({
         {readOnly ? (
           <Aviso tono="warn">
             La cuenta ya entró al cierre del día. Corregirla exige un ajuste y lo hace administración.
+          </Aviso>
+        ) : null}
+
+        {cortesiaAjena ? (
+          <Aviso tono="info">
+            Esta cuenta es una <strong>cortesía de la casa</strong>: no se cobró y la profesional
+            cobra su comisión sobre el precio de lista. Solo la dueña la puede cambiar.
+          </Aviso>
+        ) : !canGiveCourtesy && appointment.houseCourtesyDefault ? (
+          <Aviso tono="info">
+            {appointment.customerName} es <strong>cortesía de la casa</strong> en su ficha. Si hoy no
+            paga, la cuenta la cierra la dueña como cortesía, para que tu comisión se calcule
+            sobre el precio de lista.
           </Aviso>
         ) : null}
 
@@ -236,36 +269,69 @@ export function TicketSheet({
         </Paso>
 
         <Paso n={3} titulo="Total">
-          <TotalBlock
-            subtotal={subtotal}
-            amountCharged={amountCharged}
-            descuento={descuento}
-            editando={editandoTotal}
-            disabled={bloqueado}
-            onEditar={() => {
-              setShowTotalEditor(true);
-              if (draft.totalOverride === null && amountCharged !== null) {
-                patch({ totalOverride: amountCharged });
-              }
-            }}
-            onValor={(pesos) => patch({ totalOverride: pesos })}
-            onVolverAlCalculado={() => {
-              setShowTotalEditor(false);
-              patch({ totalOverride: null, varianceReasonCode: null, varianceReason: "" });
-            }}
-            valor={draft.totalOverride}
-          />
-
-          {editandoTotal ? (
-            <MotivoBlock
-              code={draft.varianceReasonCode}
-              text={draft.varianceReason}
-              exigido={descuento > 0}
+          {canGiveCourtesy ? (
+            <CortesiaBlock
+              checked={cortesia}
+              fromDefault={courtesyFromDefault && cortesia}
+              customerName={appointment.customerName}
               disabled={bloqueado}
-              onCode={(varianceReasonCode) => patch({ varianceReasonCode })}
-              onText={(varianceReason) => patch({ varianceReason })}
+              onChange={(on) => {
+                setShowTotalEditor(false);
+                patch(
+                  on
+                    ? {
+                        houseCourtesy: true,
+                        // Lo que una cortesía no puede traer se limpia al marcarla,
+                        // no al guardar: el servidor lo rechazaría, y es mejor que
+                        // la pantalla muestre de una vez la cuenta que se va a guardar.
+                        totalOverride: null,
+                        varianceReasonCode: null,
+                        varianceReason: "",
+                        payments: [],
+                        tip: 0,
+                      }
+                    : { houseCourtesy: false },
+                );
+              }}
             />
           ) : null}
+
+          {cortesia ? (
+            <CortesiaTotal subtotal={subtotal} />
+          ) : (
+            <>
+              <TotalBlock
+                subtotal={subtotal}
+                amountCharged={amountCharged}
+                descuento={descuento}
+                editando={editandoTotal}
+                disabled={bloqueado}
+                onEditar={() => {
+                  setShowTotalEditor(true);
+                  if (draft.totalOverride === null && amountCharged !== null) {
+                    patch({ totalOverride: amountCharged });
+                  }
+                }}
+                onValor={(pesos) => patch({ totalOverride: pesos })}
+                onVolverAlCalculado={() => {
+                  setShowTotalEditor(false);
+                  patch({ totalOverride: null, varianceReasonCode: null, varianceReason: "" });
+                }}
+                valor={draft.totalOverride}
+              />
+
+              {editandoTotal ? (
+                <MotivoBlock
+                  code={draft.varianceReasonCode}
+                  text={draft.varianceReason}
+                  exigido={descuento > 0}
+                  disabled={bloqueado}
+                  onCode={(varianceReasonCode) => patch({ varianceReasonCode })}
+                  onText={(varianceReason) => patch({ varianceReason })}
+                />
+              ) : null}
+            </>
+          )}
 
           {pricingResult.flags.length > 0 ? (
             <Aviso tono="warn">
@@ -327,27 +393,36 @@ export function TicketSheet({
         </Paso>
 
         <Paso n={5} titulo="Cobro">
-          {canCharge ? (
-            <MetodoPago
-              payments={draft.payments}
-              amountCharged={amountCharged ?? 0}
-              disabled={bloqueado}
-              onChange={(payments) => patch({ payments })}
-            />
-          ) : (
+          {cortesia ? (
             <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
-              El método de pago lo registra recepción. Guarda la cuenta y listo.
+              Cortesía de la casa: no se registra método de pago ni propina, y la cuenta no entra a
+              la caja del día.
             </p>
-          )}
+          ) : (
+            <>
+              {canCharge ? (
+                <MetodoPago
+                  payments={draft.payments}
+                  amountCharged={amountCharged ?? 0}
+                  disabled={bloqueado}
+                  onChange={(payments) => patch({ payments })}
+                />
+              ) : (
+                <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
+                  El método de pago lo registra recepción. Guarda la cuenta y listo.
+                </p>
+              )}
 
-          <MoneyInput
-            label="Propina"
-            value={draft.tip === 0 ? null : draft.tip}
-            disabled={bloqueado}
-            max={9_999_999}
-            hint="Va aparte: no es ingreso del estudio ni entra a la base de comisión."
-            onValueChange={(pesos) => patch({ tip: pesos ?? 0 })}
-          />
+              <MoneyInput
+                label="Propina"
+                value={draft.tip === 0 ? null : draft.tip}
+                disabled={bloqueado}
+                max={9_999_999}
+                hint="Va aparte: no es ingreso del estudio ni entra a la base de comisión."
+                onValueChange={(pesos) => patch({ tip: pesos ?? 0 })}
+              />
+            </>
+          )}
         </Paso>
       </div>
     </Panel>
@@ -545,6 +620,93 @@ function TotalBlock({
         Toca para cambiarlo
       </span>
     </button>
+  );
+}
+
+/**
+ * La casilla de **cortesía de la casa**. Solo se dibuja para quien la puede
+ * otorgar (la dueña).
+ *
+ * Cuando llegó marcada por la ficha de la clienta se dice con todas las letras,
+ * con el nombre adentro: la casilla pre-marcada es la forma más fácil de regalar
+ * un servicio sin querer, y las mismas personas a veces pagan.
+ */
+function CortesiaBlock({
+  checked,
+  fromDefault,
+  customerName,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  fromDefault: boolean;
+  customerName: string;
+  disabled: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: "0.375rem",
+        padding: "0.625rem 0.75rem",
+        borderRadius: "var(--radius-md)",
+        border: `1px solid ${checked ? "var(--color-info-line)" : "var(--hair-strong)"}`,
+        background: checked ? "var(--color-info-tint)" : "var(--color-paper)",
+      }}
+    >
+      <Checkbox
+        label={
+          <>
+            <strong>Cortesía de la casa</strong> — no se cobra, la profesional sí cobra su comisión
+          </>
+        }
+        hint="Cobro en cero, fuera de la caja del día. La comisión se calcula sobre el precio de lista."
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {fromDefault ? (
+        <p
+          role="status"
+          style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-info-ink)" }}
+        >
+          <strong>Marcada por defecto</strong>: {customerName} es cortesía de la casa en su ficha.
+          Si esta vez paga, desmárcala.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** El total de una cortesía: cero, con el precio de lista que paga la comisión debajo. */
+function CortesiaTotal({ subtotal }: { subtotal: number | null }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        gap: "0.75rem",
+        minHeight: "var(--hit)",
+        padding: "0.625rem 0.875rem",
+        background: "var(--color-cream)",
+        border: "1px solid var(--hair-strong)",
+        borderRadius: "var(--radius-md)",
+      }}
+    >
+      <span
+        className="ui-num"
+        style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--color-carbon)" }}
+      >
+        {formatCOP(0)}
+      </span>
+      <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)", textAlign: "right" }}>
+        {subtotal === null
+          ? "Cortesía de la casa"
+          : `Precio de lista ${formatCOP(subtotal)} · base de la comisión`}
+      </span>
+    </div>
   );
 }
 

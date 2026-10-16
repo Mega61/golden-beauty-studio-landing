@@ -47,6 +47,7 @@ function finance(id: number, start: string, charged: number | null): FinanceRow 
     payments: [],
     varianceReasonCode: null,
     closed: charged !== null,
+    houseCourtesy: false,
     items: [],
   };
 }

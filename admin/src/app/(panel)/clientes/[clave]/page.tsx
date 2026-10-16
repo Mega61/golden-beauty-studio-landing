@@ -5,7 +5,7 @@ import { EmptyState, ReadOnlyBand } from "@/components/ui";
 import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import type { UserRole } from "@/db/types";
-import { requireCapability } from "@/lib/dal";
+import { requireCapability, sessionCan } from "@/lib/dal";
 
 import { loadClientProfile } from "../data";
 import { FichaClienta } from "../FichaClienta";
@@ -42,7 +42,10 @@ export default async function ClientaPage({
   const key = parseClientKeyParam(clave);
   if (key === null) notFound();
 
-  const result = await loadClientProfile(key);
+  const [result, canGiveCourtesy] = await Promise.all([
+    loadClientProfile(key),
+    sessionCan("cortesia:otorgar"),
+  ]);
 
   if (!result.found) {
     // Un 404 acá mentiría: "no se pudo preguntar" y "no existe" son cosas
@@ -70,7 +73,7 @@ export default async function ClientaPage({
 
   return (
     <AppShell role={navRole(session.role)} title="Clientes">
-      <FichaClienta profile={result.profile} />
+      <FichaClienta profile={result.profile} canGiveCourtesy={canGiveCourtesy} />
     </AppShell>
   );
 }

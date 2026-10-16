@@ -224,6 +224,15 @@ export interface AppointmentFinanceTable {
   tip: Generated<Cop>;
 
   /**
+   * Migración `026`. **Cortesía de la casa**: la clienta no paga (`amount_charged
+   * = 0`, sin pagos, sin propina) y la profesional cobra su comisión sobre el
+   * precio de lista de los renglones, no sobre lo cobrado. No entra a Caja, al
+   * cierre diario ni al push a Strapi/Actual. `1`/`0`, como todo `TINYINT`.
+   * Ver `lib/ticket.ts` (`houseCourtesyTicket`, `commissionBasesOf`).
+   */
+  is_house_courtesy: Generated<number>;
+
+  /**
    * ⚠ **Ya no se lee. La fuente del método de pago es `appointment_payment`.**
    *
    * Sobrevive porque el set de migraciones es forward-only y porque el rollback
@@ -724,6 +733,20 @@ export interface AdSpendTable {
   updated_at: UpdatedAt;
 }
 
+/**
+ * Ajustes del panel por ficha de clienta de EA (migración `026`).
+ *
+ * Vive en `gbs_admin` y no en EA a propósito: "a esta clienta no se le cobra"
+ * no es un dato de la agenda. Sin llave foránea: la ficha vive en otro esquema.
+ */
+export interface CustomerSettingTable {
+  ea_customer_id: number;
+  /** "Cortesía de la casa por defecto": la hoja de la cuenta la trae marcada. */
+  house_courtesy_default: Generated<number>;
+  updated_by: AuthId | null;
+  updated_at: UpdatedAt;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -752,6 +775,7 @@ export interface Database {
   wa_optout: WaOptoutTable;
   push_subscription: PushSubscriptionTable;
   ad_spend: AdSpendTable;
+  customer_setting: CustomerSettingTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -783,6 +807,8 @@ export type WaMessageUpdate = Updateable<WaMessageTable>;
 export type PushSubscriptionRow = Selectable<PushSubscriptionTable>;
 
 export type AdSpendRow = Selectable<AdSpendTable>;
+
+export type CustomerSetting = Selectable<CustomerSettingTable>;
 
 export type WaOptout = Selectable<WaOptoutTable>;
 export type NewWaOptout = Insertable<WaOptoutTable>;

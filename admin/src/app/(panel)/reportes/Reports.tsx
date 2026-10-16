@@ -25,6 +25,7 @@ import { stationHourOccupancy } from "@/lib/metrics";
 import {
   bookedVsPerformed,
   chairHourReport,
+  courtesyReport,
   customersReport,
   dailyClose,
   extrasReport,
@@ -95,6 +96,35 @@ function legacyIncluded(data: Data): ReactNode {
 function legacyExcluded(data: Data, why: string): ReactNode {
   if (data.legacy.length === 0) return undefined;
   return <>El historial de Agenda Pro ({data.legacy.length} citas) no entra acá: {why}</>;
+}
+
+// ── Cortesías de la casa ────────────────────────────────────────────────────
+
+/**
+ * "Cortesías: 3 · $ 420.000 a precio de lista · comisión $ 168.000."
+ *
+ * Va debajo de las ventas porque responde la pregunta que las ventas dejan
+ * abierta: las cortesías no están en esa cifra —no se cobraron—, pero la
+ * comisión de la profesional sí se pagó, y eso es un gasto real del estudio.
+ * Si alguna todavía no se liquidó se dice, para que la comisión no se lea como
+ * el total definitivo.
+ */
+function CourtesyLine({ data }: { data: Data }) {
+  const report = courtesyReport(data.finance, data.courtesyCommissions);
+  if (report.count === 0) return null;
+
+  return (
+    <p className={`${styles.note} ${styles["note--info"]}`} role="note">
+      <span>
+        <strong>Cortesías: {report.count}</strong> · {formatCOP(report.listPrice)} a precio de lista
+        · comisión {formatCOP(report.commission)}
+        {report.unsettled > 0
+          ? ` (${report.unsettled} sin liquidar todavía)`
+          : ""}
+        . No entran a las ventas ni a la caja; la comisión sí es plata que salió.
+      </span>
+    </p>
+  );
 }
 
 // ── Ventas y citas (las dos fuentes) ────────────────────────────────────────
@@ -197,6 +227,7 @@ export function SalesFrames({ data }: { data: Data }) {
             />
           ) : null}
         </TileRow>
+        <CourtesyLine data={data} />
 
         {sales.byService.length === 0 ? (
           <EmptyState

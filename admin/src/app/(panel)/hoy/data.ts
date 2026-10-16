@@ -89,6 +89,7 @@ function financeViewOf(
       serviceNotes: "",
       varianceReasonCode: null,
       varianceReason: "",
+      houseCourtesy: false,
       closedAt: null,
       frozenByDayClose: false,
       snapshot: null,
@@ -117,6 +118,7 @@ function financeViewOf(
     serviceNotes: row.service_notes ?? "",
     varianceReasonCode: row.variance_reason_code,
     varianceReason: row.variance_reason ?? "",
+    houseCourtesy: row.is_house_courtesy === 1,
     closedAt: row.closed_at === null ? null : instantToEaLocal(row.closed_at),
     frozenByDayClose: row.day_close_id !== null,
     snapshot: row.service_price_snapshot,
@@ -222,6 +224,22 @@ export async function loadToday(
   }
 
   if (citas !== null) {
+    // Qué clientas del día son cortesía de la casa por defecto. Una consulta para
+    // todas. Si falla, la casilla simplemente no llega pre-marcada: es una
+    // comodidad, y la dueña la marca a mano igual. Nunca tumba Hoy.
+    let courtesyIds = new Set<number>();
+    if (db !== null) {
+      try {
+        courtesyIds = await repositories(db).customerSettings.listHouseCourtesyIds(
+          citas.map(({ appointment }) => appointment.customerId).filter(
+            (id): id is number => id !== null,
+          ),
+        );
+      } catch (error) {
+        console.error("[hoy] no se pudo leer la cortesía por defecto", error);
+      }
+    }
+
     const appointments = citas
       .map(({ appointment, service, provider, customer }): TodayAppointment => {
         const finance = financeByEaId.get(appointment.id);
@@ -232,6 +250,9 @@ export async function loadToday(
           status: appointment.status,
           customerName: personName(customer, "Sin cliente"),
           customerPhone: customer?.phone ?? null,
+          eaCustomerId: appointment.customerId,
+          houseCourtesyDefault:
+            appointment.customerId !== null && courtesyIds.has(appointment.customerId),
           eaProviderId: appointment.providerId,
           providerName: personName(provider, "Sin asignar"),
           bookedServiceId: appointment.serviceId,
@@ -264,6 +285,8 @@ export async function loadToday(
         status: "",
         customerName: `Cita #${row.ea_appointment_id}`,
         customerPhone: null,
+        eaCustomerId: null,
+        houseCourtesyDefault: false,
         eaProviderId: row.ea_provider_id,
         providerName: "—",
         bookedServiceId: row.booked_service_id,

@@ -17,6 +17,7 @@ import { comboRepository } from "./combo";
 import { commissionEntryRepository } from "./commission-entry";
 import { commissionRuleRepository } from "./commission-rule";
 import { commissionRunRepository } from "./commission-run";
+import { customerSettingRepository } from "./customer-setting";
 import { dayCloseRepository } from "./day-close";
 import { jobRunRepository } from "./job-run";
 import { legacyAppointmentRepository } from "./legacy-appointment";
@@ -40,6 +41,7 @@ export function repositories(db: Db) {
     commissionEntries: commissionEntryRepository(db),
     commissionRules: commissionRuleRepository(db),
     commissionRuns: commissionRunRepository(db),
+    customerSettings: customerSettingRepository(db),
     dayCloses: dayCloseRepository(db),
     jobRuns: jobRunRepository(db),
     legacyAppointments: legacyAppointmentRepository(db),
@@ -70,6 +72,7 @@ export {
   commissionRunRepository,
   PaidCommissionRunError,
 } from "./commission-run";
+export { customerSettingRepository } from "./customer-setting";
 export { dayCloseRepository } from "./day-close";
 export {
   JOB_DAY_CLOSE_PUSH,
