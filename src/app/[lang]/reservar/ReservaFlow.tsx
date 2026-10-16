@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from "motion/react";
+import { AnimatePresence, LazyMotion, MotionConfig, animate, domAnimation, m } from "motion/react";
 import type { Locale } from "../dictionaries";
 import { trackEvent, trackMeta } from "@/lib/analytics";
 import { newEventId } from "@/lib/meta-events";
@@ -128,6 +128,9 @@ type Dict = {
     hint: string;
     saving: string;
     pairHint: string;
+    comboHint: string;
+    discount: string;
+    total: string;
     badge: string;
   };
   trust: { reviews: string; ratingOnly: string; instant: string; pay: string; change: string };
@@ -274,7 +277,6 @@ export default function ReservaFlow({
     setPrevStep(step);
   }
   const dayStripRef = useRef<HTMLDivElement>(null);
-  const advanceTimer = useRef<number | null>(null);
   /** How many times the default day has rolled forward. 0 = she chose it. */
   const autoHops = useRef(0);
 
@@ -318,7 +320,6 @@ export default function ReservaFlow({
 
   const go = useCallback(
     (next: Step) => {
-      if (advanceTimer.current) window.clearTimeout(advanceTimer.current);
       setError(null);
       setStep(next);
       window.history.pushState({ gbsStep: next }, "");
@@ -525,7 +526,11 @@ export default function ReservaFlow({
     setSlots(null);
   };
 
-  /** Pick in step 1. Undoes any combo. Moves on by itself when there's nothing to add. */
+  /**
+   * Pick in step 1. Undoes any combo, and stays put: the person moves on with
+   * "Continuar" when they're ready. Jumping ahead on tap hid exactly what this
+   * step should show — the add-on question and what the combo saves.
+   */
   const chooseService = (s: Service) => {
     setService(s);
     setAddOn(null);
@@ -533,10 +538,8 @@ export default function ReservaFlow({
     setProviderId(null);
     resetSlot();
     setError(null);
-    if (partnersOf(s.id).length === 0) {
-      prefetchFirstDay(s);
-      advanceTimer.current = window.setTimeout(() => go("slot"), 260);
-    }
+    // The times are fetched now anyway, so step 2 opens with them.
+    prefetchFirstDay(s);
   };
 
   /**
@@ -555,7 +558,6 @@ export default function ReservaFlow({
     setProviderId(null);
     resetSlot();
     if (next) prefetchFirstDay(next, partner !== null && combo === null ? partner : null);
-    advanceTimer.current = window.setTimeout(() => go("slot"), 260);
   };
 
   // Arriving from the price list with `?servicio=`. A combo id lands as the
@@ -632,6 +634,22 @@ export default function ReservaFlow({
     setDate(next);
     setSlots(null);
   }, [step, slots, date, days, openDays]);
+
+  // The add-on box opens under the chosen card; bring it into view if it
+  // opened below the fold, so the question doesn't happen off-screen.
+  useEffect(() => {
+    if (step !== "service" || partners.length === 0) return;
+    const t = window.setTimeout(() => {
+      const box = document.querySelector<HTMLElement>("[data-addon]");
+      if (!box) return;
+      const r = box.getBoundingClientRect();
+      const bottomBar = 96;
+      if (r.top > window.innerHeight - bottomBar - 80) {
+        window.scrollBy({ top: r.top - window.innerHeight * 0.35, behavior: "smooth" });
+      }
+    }, 320);
+    return () => window.clearTimeout(t);
+  }, [step, baseId, partners.length]);
 
   // Keep the chosen day in view in the strip.
   useEffect(() => {
@@ -902,7 +920,12 @@ export default function ReservaFlow({
   /* ── Render ──────────────────────────────────────────────────────────── */
 
   if (booked) {
+    // Same motion provider as the flow: outside it, the `m.*` elements of the
+    // confirmation never get their animation features and stay at their
+    // initial state — invisible.
     return (
+      <LazyMotion features={domAnimation} strict>
+      <MotionConfig reducedMotion="user">
       <div className="mx-auto max-w-[1180px] pb-24 md:max-w-[720px] md:px-6 md:pt-8 lg:max-w-[1180px] lg:px-8 lg:pt-10">
         <StudioBanner dict={dict} rating={rating} lang={lang} />
         <div className="lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-8">
@@ -934,6 +957,8 @@ export default function ReservaFlow({
           </section>
         </div>
       </div>
+      </MotionConfig>
+      </LazyMotion>
     );
   }
 
@@ -1040,8 +1065,9 @@ export default function ReservaFlow({
                       const expanded = selected && partners.length > 0;
                       return (
                         <li key={s.id} className={expanded ? "sm:col-span-2" : ""}>
-                          <button
+                          <m.button
                             type="button"
+                            whileTap={{ scale: 0.985 }}
                             onClick={() => chooseService(s)}
                             aria-pressed={selected}
                             className={`group relative flex w-full flex-col items-start rounded-2xl ${expanded ? "" : "h-full"} border px-4 py-4 text-left transition-all duration-200 ${
@@ -1067,7 +1093,7 @@ export default function ReservaFlow({
                               <span aria-hidden className="text-ink/25">·</span>
                               <span className="font-semibold text-ink">{formatCOP(s.priceCOP, lang)}</span>
                             </span>
-                          </button>
+                          </m.button>
 
                           {/* The other half. Only when this forms a combo, and only
                               offering pairs that are one — a pair with no combo has
@@ -1081,7 +1107,7 @@ export default function ReservaFlow({
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                            <div className="mt-2.5 rounded-2xl border border-gold/35 bg-gradient-to-br from-gold-pale/80 to-paper p-4 md:p-5">
+                            <div data-addon className="mt-2.5 rounded-2xl border border-gold/35 bg-gradient-to-br from-gold-pale/80 to-paper p-4 md:p-5">
                               <p className="font-display text-[22px] leading-tight text-ink">
                                 {baseIsFeet ? dict.combo.askHands : dict.combo.askFeet}
                               </p>
@@ -1105,21 +1131,25 @@ export default function ReservaFlow({
                                   <ul className="grid gap-2 sm:grid-cols-2">
                                     {group.map((p) => {
                                       const combo = comboWith(p);
+                                      const saves = combo && base ? base.priceCOP + p.priceCOP - combo.priceCOP : 0;
                                       return (
                                         <li key={p.id}>
                                           <PillChoice selected={partnerId === p.id} onClick={() => choosePartner(p)}>
-                                            <span className="flex min-w-0 items-center gap-2">
-                                              <span className="truncate">{nameOf(p)}</span>
-                                              {combo && (
-                                                <span className="shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-gold-deep">
-                                                  {dict.combo.badge}
+                                            {/* The badge goes under the name, not beside it:
+                                                side by side on a phone, both got truncated. */}
+                                            <span className="flex min-w-0 flex-col items-start gap-1">
+                                              <span className="leading-snug">{nameOf(p)}</span>
+                                              {combo && saves > 0 && (
+                                                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-semibold tracking-wide text-gold-deep">
+                                                  {fill(dict.combo.badge, { amount: formatCOP(saves, lang) })}
                                                 </span>
                                               )}
                                             </span>
-                                            {/* The total the visit becomes: the combo's own
-                                                price, or the plain sum when there's no combo. */}
+                                            {/* Its own price, so it reads like the price list.
+                                                What the visit comes to — with the combo
+                                                discount, if any — is in the breakdown below. */}
                                             <span className="whitespace-nowrap text-[13px] text-ink-mute">
-                                              {formatCOP(combo?.priceCOP ?? (base?.priceCOP ?? 0) + p.priceCOP, lang)}
+                                              + {formatCOP(p.priceCOP, lang)}
                                             </span>
                                           </PillChoice>
                                         </li>
@@ -1128,29 +1158,33 @@ export default function ReservaFlow({
                                   </ul>
                                 </div>
                               ))}
-                              {addOn && visit && (
-                                <p className="mt-4 font-sans text-sm">
-                                  <span className="font-semibold text-ink">
-                                    {formatCOP(visit.priceCOP, lang)} · {formatDuration(visit.durationMin, lang)}
-                                  </span>
-                                  <span className="mt-0.5 block text-[12.5px] text-ink-mute">{dict.combo.pairHint}</span>
-                                </p>
-                              )}
-                              {composed && service && (
-                                <p className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-sans text-sm">
-                                  {partsSum && (
-                                    <span className="text-ink-mute line-through">{formatCOP(partsSum.price, lang)}</span>
-                                  )}
-                                  <span className="font-semibold text-ink">
-                                    {formatCOP(service.priceCOP, lang)} · {formatDuration(service.durationMin, lang)}
-                                  </span>
-                                  {partsSum && (
-                                    <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-[12px] font-semibold text-gold-deep">
-                                      {fill(dict.combo.saving, { amount: formatCOP(partsSum.saving, lang) })}
-                                    </span>
-                                  )}
-                                </p>
-                              )}
+                              <AnimatePresence initial={false}>
+                                {partnerId !== null && base && service && (
+                                  <m.div
+                                    key="breakdown"
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="overflow-hidden"
+                                  >
+                                    <VisitBreakdown
+                                      dict={dict}
+                                      lang={lang}
+                                      lines={[
+                                        { name: nameOf(base), price: base.priceCOP },
+                                        ...(() => {
+                                          const other = catalog?.services.find((x) => x.id === partnerId);
+                                          return other ? [{ name: nameOf(other), price: other.priceCOP }] : [];
+                                        })(),
+                                      ]}
+                                      discount={partsSum?.saving ?? 0}
+                                      total={visit?.priceCOP ?? service.priceCOP}
+                                      durationMin={visit?.durationMin ?? service.durationMin}
+                                      note={addOn ? dict.combo.pairHint : dict.combo.comboHint}
+                                    />
+                                  </m.div>
+                                )}
+                              </AnimatePresence>
                             </div>
                             </m.div>
                           )}
@@ -1311,13 +1345,11 @@ export default function ReservaFlow({
                             {group.map((s) => {
                               const selected = slot?.time === s.time;
                               return (
-                                <button
+                                <m.button
                                   key={s.time}
                                   type="button"
-                                  onClick={() => {
-                                    setSlot(s);
-                                    advanceTimer.current = window.setTimeout(() => go("details"), 240);
-                                  }}
+                                  whileTap={{ scale: 0.94 }}
+                                  onClick={() => setSlot(s)}
                                   aria-pressed={selected}
                                   className={`rounded-xl border py-3 font-sans text-[14px] tabular-nums transition-all ${
                                     selected
@@ -1329,7 +1361,7 @@ export default function ReservaFlow({
                                       afternoon; the suffix on every button is noise. */}
                                   <span aria-hidden>{formatTime(s.time, lang).replace(/\s?(a\. m\.|p\. m\.|AM|PM)$/, "")}</span>
                                   <span className="sr-only">{formatTime(s.time, lang)}</span>
-                                </button>
+                                </m.button>
                               );
                             })}
                           </div>
@@ -1346,7 +1378,18 @@ export default function ReservaFlow({
             <m.section key="details" {...stepMotion} custom={direction} aria-labelledby="h-details">
               <StepHeading id="h-details" n={3} title={dict.headings.details} onBack={back} backLabel={dict.back} />
 
-              <div className="mb-6 lg:hidden">{summary}</div>
+              {/* Phone: one compact line instead of the full summary card, so
+                  the form starts right away instead of a screen further down. */}
+              <div className="mb-6 flex items-center gap-3 rounded-2xl bg-carbon px-4 py-3 text-cream lg:hidden">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-display text-[18px] leading-tight">{visitName}</p>
+                  <p className="mt-0.5 truncate font-sans text-[12px] text-gold-soft">
+                    {weekdayShort(date, lang)} {Number(date.slice(8))} · {formatTime(slot.time, lang)}
+                    {chosenProvider ? ` · ${chosenProvider.name}` : ""}
+                  </p>
+                </div>
+                <AnimatedCOP value={visit?.priceCOP ?? service.priceCOP} lang={lang} className="shrink-0 font-display text-[20px]" />
+              </div>
 
               <form
                 onSubmit={(e) => {
@@ -1478,6 +1521,33 @@ export default function ReservaFlow({
           )}
           </AnimatePresence>
         </div>
+
+          {/* Desktop: the way forward, pinned to the bottom of the card. The
+              steps no longer move on by themselves, so the next step is always
+              a button — with what's chosen and what it costs right beside it. */}
+          {step !== "details" && service && (
+            <div className="sticky bottom-0 z-20 -mx-10 -mb-10 mt-8 hidden items-center gap-5 rounded-b-[28px] border-t border-ink/8 bg-paper/95 px-10 py-4 backdrop-blur lg:flex">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-display text-[20px] leading-tight text-ink">{visitName}</p>
+                <p className="mt-0.5 font-sans text-[12.5px] text-ink-mute">
+                  {step === "slot" && date && slot
+                    ? `${longDate(date, lang)} · ${formatTime(slot.time, lang)}`
+                    : formatDuration(visit?.durationMin ?? service.durationMin, lang)}
+                  {" · "}
+                  <AnimatedCOP value={visit?.priceCOP ?? service.priceCOP} lang={lang} className="font-semibold text-ink" />
+                </p>
+              </div>
+              <m.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                disabled={!canContinue}
+                onClick={() => go(step === "service" ? "slot" : "details")}
+                className="shrink-0 rounded-full bg-carbon px-8 py-3.5 font-sans text-[12px] font-semibold uppercase tracking-[0.2em] text-gold-soft transition-opacity disabled:opacity-35"
+              >
+                {dict.continue} →
+              </m.button>
+            </div>
+          )}
         </section>
       </div>
 
@@ -1499,7 +1569,7 @@ export default function ReservaFlow({
                   ? `${weekdayShort(date, lang)} ${Number(date.slice(8))} · ${formatTime(slot.time, lang)}`
                   : formatDuration(visit?.durationMin ?? service.durationMin, lang)}
                 {" · "}
-                <span className="font-semibold text-ink">{formatCOP(visit?.priceCOP ?? service.priceCOP, lang)}</span>
+                <AnimatedCOP value={visit?.priceCOP ?? service.priceCOP} lang={lang} className="font-semibold text-ink" />
               </p>
             </div>
             <button
@@ -1537,6 +1607,97 @@ const stepMotion = {
 } as const;
 
 /* ── Pieces ─────────────────────────────────────────────────────────────── */
+
+/**
+ * A money figure that counts to its new value instead of swapping. When adding
+ * feet takes the total from $95.000 to $135.000, the change is something you
+ * see happen — and a discount reads as a discount. Respects reduced motion
+ * (the MotionConfig above sets the transition to instant).
+ */
+function AnimatedCOP({ value, lang, className }: { value: number; lang: Locale; className?: string }) {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || from.current === value) {
+      from.current = value;
+      setShown(value);
+      return;
+    }
+    const controls = animate(from.current, value, {
+      duration: 0.55,
+      ease: [0.25, 1, 0.5, 1],
+      onUpdate: (v) => setShown(Math.round(v / 100) * 100),
+    });
+    from.current = value;
+    return () => controls.stop();
+  }, [value]);
+  return <span className={`tabular-nums ${className ?? ""}`}>{formatCOP(shown, lang)}</span>;
+}
+
+/**
+ * What the visit comes to, line by line: each service at its own price, the
+ * combo discount as its own line, and the total. Shown under the add-on
+ * question once one is picked — and it stays, because the person moves on
+ * when they choose to, not when the screen decides.
+ */
+function VisitBreakdown({
+  dict,
+  lang,
+  lines,
+  discount,
+  total,
+  durationMin,
+  note,
+}: {
+  dict: Dict;
+  lang: Locale;
+  lines: { name: string; price: number }[];
+  discount: number;
+  total: number;
+  durationMin: number;
+  note: string;
+}) {
+  return (
+    <div className="mt-4 rounded-2xl border border-gold/25 bg-paper px-4 py-3.5 font-sans text-[13.5px]">
+      {lines.map((line, i) => (
+        <p key={line.name} className="flex items-baseline justify-between gap-3 py-0.5 text-ink-soft">
+          <span className="min-w-0 truncate">
+            {i > 0 && <span className="text-gold-dark">+ </span>}
+            {line.name}
+          </span>
+          <span className="tabular-nums">{formatCOP(line.price, lang)}</span>
+        </p>
+      ))}
+      <AnimatePresence initial={false}>
+        {discount > 0 && (
+          <m.p
+            key="discount"
+            initial={{ opacity: 0, scale: 0.92, height: 0 }}
+            animate={{ opacity: 1, scale: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: "spring", stiffness: 420, damping: 26 }}
+            className="flex items-baseline justify-between gap-3 py-0.5 font-semibold text-gold-deep"
+          >
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden>✦</span>
+              {dict.combo.discount}
+            </span>
+            <span className="tabular-nums">− {formatCOP(discount, lang)}</span>
+          </m.p>
+        )}
+      </AnimatePresence>
+      <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-ink/10 pt-2.5">
+        <span className="text-ink">
+          {dict.combo.total}
+          <span className="ml-1.5 text-[12px] text-ink-mute">· {formatDuration(durationMin, lang)}</span>
+        </span>
+        <AnimatedCOP value={total} lang={lang} className="font-display text-[24px] leading-none text-ink" />
+      </div>
+      <p className="mt-1.5 text-[12px] leading-snug text-ink-mute">{note}</p>
+    </div>
+  );
+}
 
 /** Google rating in words, honouring the minimum count rule. Null when there's no rating. */
 function ratingText(dict: Dict, rating: { value: number; count: number } | null, lang: Locale) {
@@ -1916,14 +2077,41 @@ function Success({
 
   return (
     <div className="mx-auto max-w-[560px] pt-2 lg:pt-4">
-      <div className="gbs-step flex flex-col items-center text-center">
-        <SuccessMark />
-        <p className="mt-6 font-sans text-[11px] font-semibold uppercase tracking-[0.32em] text-gold-dark">{t.eyebrow}</p>
-        <h2 className="mt-2 font-display text-[44px] leading-none text-ink md:text-[56px]">{fill(t.title, values)}</h2>
-        <p className="mt-4 font-sans text-[15px] text-ink-soft">{fill(t.body, values)}</p>
+      <div className="flex flex-col items-center text-center">
+        <m.div
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 16 }}
+        >
+          <SuccessMark />
+        </m.div>
+        <m.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55, duration: 0.4 }}
+          className="relative mt-6 font-sans text-[11px] font-semibold uppercase tracking-[0.32em] text-gold-dark"
+        >
+          {t.eyebrow}
+        </m.p>
+        <m.h2
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, type: "spring", stiffness: 200, damping: 20 }}
+          className="relative mt-2 font-display text-[44px] leading-none text-ink md:text-[56px]"
+        >
+          {fill(t.title, values)}
+        </m.h2>
+        <m.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9, duration: 0.4 }}
+          className="relative mt-4 font-sans text-[15px] text-ink-soft"
+        >
+          {fill(t.body, values)}
+        </m.p>
       </div>
 
-      <div className="gbs-step mt-8 overflow-hidden rounded-3xl border border-ink/10 bg-paper [animation-delay:120ms]">
+      <div className="gbs-step mt-8 overflow-hidden rounded-3xl border border-ink/10 bg-paper [animation-delay:1000ms]">
         <div className="bg-carbon px-6 py-5">
           <p className="font-display text-[26px] leading-tight text-cream">{booked.service}</p>
           <p className="mt-1 font-sans text-[13px] text-gold-soft">{fill(t.with, values)}</p>
@@ -1957,7 +2145,7 @@ function Success({
       {/* Saving it is the one thing left for her to do, so it's the main
           action here. Google is the calendar most phones in Colombia use; the
           .ics covers iPhone and Outlook. */}
-      <div className="gbs-step mt-6 grid gap-2 [animation-delay:200ms] sm:grid-cols-2">
+      <div className="gbs-step mt-6 grid gap-2 [animation-delay:1120ms] sm:grid-cols-2">
         <a
           href={googleCalendarUrl(event)}
           target="_blank"
@@ -1980,7 +2168,7 @@ function Success({
           WhatsApp API is set up — and then we say so. Otherwise, the only
           WhatsApp here is the way to change the appointment. Asking her to
           send us her own summary was work for the client. */}
-      <div className="gbs-step mt-6 rounded-2xl bg-ivory px-5 py-4 text-center font-sans text-[13px] leading-relaxed text-ink-soft [animation-delay:260ms]">
+      <div className="gbs-step mt-6 rounded-2xl bg-ivory px-5 py-4 text-center font-sans text-[13px] leading-relaxed text-ink-soft [animation-delay:1220ms]">
         {booked.whatsappSent ? (
           <p className="flex items-center justify-center gap-2">
             <span className="text-whatsapp"><WaIcon /></span>
@@ -2062,7 +2250,8 @@ function PillChoice({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <m.button
+      whileTap={{ scale: 0.98 }}
       type="button"
       onClick={onClick}
       aria-pressed={selected}
@@ -2070,9 +2259,9 @@ function PillChoice({
         selected ? "border-gold bg-paper" : "border-ink/12 bg-paper/50 hover:border-gold/50"
       }`}
     >
-      <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">{children}</span>
+      <span className="flex min-w-0 flex-1 items-center justify-between gap-3">{children}</span>
       <Check on={selected} small />
-    </button>
+    </m.button>
   );
 }
 
@@ -2173,9 +2362,92 @@ function Check({ on, small = false }: { on: boolean; small?: boolean }) {
   );
 }
 
+/**
+ * Gold confetti from behind the check mark — the moment the booking is real.
+ *
+ * Pieces come from a fixed-seed sequence, not `Math.random()`: the same burst
+ * on every phone, and nothing impure in render. Fifty-odd pieces fly out on a
+ * curve and fall with a little gravity and spin, then they're gone; nothing
+ * stays on screen to compete with the details. Skipped entirely for reduced
+ * motion.
+ */
+function GoldBurst() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- decided once, after mount
+    if (!reduce) setOn(true);
+  }, []);
+  if (!on) return null;
+  return (
+    <span aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-0 w-0">
+      {BURST.map((p, i) => (
+        <m.span
+          key={i}
+          className="absolute block"
+          style={{
+            width: p.w,
+            height: p.h,
+            marginLeft: -p.w / 2,
+            marginTop: -p.h / 2,
+            background: p.color,
+            borderRadius: p.round ? "9999px" : "2px",
+          }}
+          initial={{ x: 0, y: 0, opacity: 0, scale: 0.4, rotate: 0 }}
+          animate={{
+            x: [0, p.dx * 0.75, p.dx],
+            y: [0, p.dy * 0.75, p.dy + p.fall],
+            opacity: [0, 1, 1, 0],
+            scale: [0.4, 1, 1, 0.8],
+            rotate: p.spin,
+          }}
+          transition={{ duration: p.duration, delay: 0.35 + p.delay, ease: [0.2, 0.7, 0.3, 1], times: [0, 0.35, 1] }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** The burst's pieces, from a tiny seeded PRNG — deterministic and pure. */
+const BURST = (() => {
+  let seed = 7;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+  const colors = ["#e7aa51", "#ac8231", "#ffd49f", "#8b6a1f", "#fff1d6", "#5b2b08"];
+  return Array.from({ length: 56 }, (_, i) => {
+    const angle = (i / 56) * Math.PI * 2 + rand() * 0.5;
+    const dist = 90 + rand() * 150;
+    const round = rand() > 0.6;
+    return {
+      dx: Math.cos(angle) * dist,
+      dy: Math.sin(angle) * dist * 0.8 - 40,
+      fall: 60 + rand() * 90,
+      spin: (rand() - 0.5) * 720,
+      w: round ? 7 : 5 + rand() * 4,
+      h: round ? 7 : 9 + rand() * 6,
+      round,
+      color: colors[Math.floor(rand() * colors.length)],
+      delay: rand() * 0.12,
+      duration: 1.3 + rand() * 0.7,
+    };
+  });
+})();
+
 function SuccessMark() {
   return (
     <span className="relative flex h-24 w-24 items-center justify-center">
+      {/* A warm glow that blooms once behind the mark. */}
+      <m.span
+        aria-hidden
+        className="absolute -inset-8 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(231,170,81,0.35) 0%, rgba(231,170,81,0) 65%)" }}
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: [0, 1, 0.55], scale: [0.5, 1.15, 1] }}
+        transition={{ duration: 1.2, ease: "easeOut" }}
+      />
+      <GoldBurst />
       <span aria-hidden className="absolute inset-0 rounded-full bg-gold/15 motion-safe:animate-[ping_1.6s_ease-out_1]" />
       <svg viewBox="0 0 96 96" width="96" height="96" aria-hidden>
         <defs>

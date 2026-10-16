@@ -298,7 +298,10 @@
       "hint": "Se agenda en la misma visita.",
       "saving": "Ahorras {amount}",
       "pairHint": "Dos servicios seguidos en la misma cita, sin esperas entre uno y otro.",
-      "badge": "Combo"
+      "badge": "Combo · ahorras {amount}",
+      "discount": "Descuento combo",
+      "total": "Total de la visita",
+      "comboHint": "Precio de combo: los dos en un solo turno."
     },
     "success": {
       "eyebrow": "Cita confirmada",
