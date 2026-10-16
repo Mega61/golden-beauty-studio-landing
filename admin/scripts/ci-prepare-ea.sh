@@ -81,6 +81,14 @@ dc exec -T mysql mysql -uroot -psecret easyappointments -e \
      SET us.working_plan = '${PLAN}'
    WHERE r.slug = 'provider';"
 
+echo "▸ poniéndole precio a los servicios sembrados…"
+# El seed de EA deja su "Service" en $0, y en el estudio no existe un servicio
+# sin precio. Con $0 la cuenta de `caja.spec.ts` no se puede cerrar —un pago en
+# efectivo de cero no es un pago y el panel lo rechaza, con razón— y el test
+# daba rojo hablando de una cuenta "en cero" cuando lo que faltaba era el dato.
+dc exec -T mysql mysql -uroot -psecret easyappointments -e \
+  "UPDATE ea_services SET price = 50000 WHERE price IS NULL OR price = 0;"
+
 echo "▸ comprobando que la API responde…"
 PUERTO="${CI_EA_PORT:-18080}"
 for _ in $(seq 1 30); do
