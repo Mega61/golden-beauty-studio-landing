@@ -35,7 +35,7 @@ import { confirmationParams } from "./template-params";
 export type ConfirmationResult =
   | DeliveryOutcome
   | { status: "apagado" }
-  | { status: "omitido"; reason: "sin-telefono" | "opt-out" | "estado-no-aplica" }
+  | { status: "omitido"; reason: "sin-telefono" | "opt-out" | "estado-no-aplica" | "misma-visita" }
   | { status: "error"; message: string };
 
 export async function sendAppointmentConfirmation(
@@ -48,6 +48,9 @@ export async function sendAppointmentConfirmation(
   try {
     const appointment = await loadAppointmentForTemplate(eaAppointmentId);
     if (!isSendableStatus(appointment.status)) return { status: "omitido", reason: "estado-no-aplica" };
+    // La segunda mitad de una visita no confirma por su cuenta: la primera ya
+    // nombró los dos servicios. Ver `lib/visits.ts`.
+    if (appointment.continuation) return { status: "omitido", reason: "misma-visita" };
     const phone = appointment.phoneE164;
     if (phone === null) return { status: "omitido", reason: "sin-telefono" };
 

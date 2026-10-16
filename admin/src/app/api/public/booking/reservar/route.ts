@@ -7,6 +7,7 @@ import { EaApiError } from "@/lib/ea/errors";
 import { notifyNewWebBooking } from "@/lib/push/send";
 import { whatsappConfirmationFor } from "@/lib/whatsapp/booking-confirmation";
 import { sendAppointmentConfirmation } from "@/lib/whatsapp/confirmation";
+import { visitServiceName } from "@/lib/visits";
 import { createBooking } from "./data";
 
 /**
@@ -39,6 +40,10 @@ export async function POST(req: NextRequest) {
   const raw = body as Record<string, unknown>;
 
   const serviceId = Number(raw.serviceId);
+  const thenServiceId =
+    raw.thenServiceId === null || raw.thenServiceId === undefined || raw.thenServiceId === ""
+      ? null
+      : Number(raw.thenServiceId);
   const date = raw.date;
   const time = str(raw.time);
   const firstName = str(raw.firstName);
@@ -51,6 +56,12 @@ export async function POST(req: NextRequest) {
       : Number(raw.providerId);
 
   if (!Number.isInteger(serviceId) || serviceId <= 0) return bad("serviceId");
+  if (
+    thenServiceId !== null &&
+    (!Number.isInteger(thenServiceId) || thenServiceId <= 0 || thenServiceId === serviceId)
+  ) {
+    return bad("thenServiceId");
+  }
   if (!isEaLocalDate(date)) return bad("date");
   if (!isWallTime(time)) return bad("time");
   if (providerId !== null && (!Number.isInteger(providerId) || providerId <= 0)) {
@@ -64,6 +75,7 @@ export async function POST(req: NextRequest) {
   try {
     const result = await createBooking({
       serviceId,
+      thenServiceId,
       date,
       time,
       providerId,
@@ -87,8 +99,14 @@ export async function POST(req: NextRequest) {
             customerLastName: lastName,
             start: result.start,
             providerName: result.providerName,
-            resolveServiceName: async () =>
-              (await createEaClient().services.get(serviceId)).name ?? null,
+            // Un par se anuncia como una sola reserva: "Semipermanente manos y
+            // Semipermanente pies".
+            resolveServiceName: async () => {
+              const ea = createEaClient();
+              const ids = thenServiceId ? [serviceId, thenServiceId] : [serviceId];
+              const services = await Promise.all(ids.map((id) => ea.services.get(id)));
+              return visitServiceName(services.map((s) => s.name ?? null));
+            },
           }),
         );
         // La confirmación por WhatsApp, por el mismo camino: después del 201,

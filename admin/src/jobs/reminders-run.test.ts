@@ -45,6 +45,18 @@ function row(over: {
 }
 
 describe("toRunnerAppointments", () => {
+  it("manos + pies seguidas son un solo recordatorio, que nombra los dos servicios", () => {
+    const manos = row({ id: 1 });
+    const pies = row({ id: 2, start: "2026-10-16 11:00:00" });
+    (pies.appointment as { end: string }).end = "2026-10-16 12:15:00";
+    (pies as { service: { name: string } }).service = { name: "Semipermanente pies" };
+
+    const map = toRunnerAppointments([manos, pies]);
+    expect([...map.keys()]).toEqual([1]);
+    expect(map.get(1)?.template.serviceName).toBe("Semipermanente manos y Semipermanente pies");
+  });
+
+
   it("convierte la hora de pared al instante y normaliza el teléfono", () => {
     const map = toRunnerAppointments([row({})]);
     const a = map.get(1);

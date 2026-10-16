@@ -83,6 +83,11 @@ export type PublicSlot = {
   start: EaLocalDateTime;
   end: EaLocalDateTime;
   /**
+   * Solo en un par sin combo (manos + pies): dónde termina la primera cita y
+   * empieza la segunda. Lo usa `createBooking` para partir el tramo en dos.
+   */
+  splitAt?: EaLocalDateTime;
+  /**
    * Quiénes pueden tomarla. Nunca vacío.
    *
    * Viaja al navegador para que "cualquiera" no tenga que volver a preguntar,
@@ -223,4 +228,29 @@ function normalizeForLoad(raw: string | null | undefined): string {
 function minutesOf(appointment: Appointment): number {
   const minutes = minutesBetween(appointment.start, appointment.end);
   return minutes > 0 ? minutes : 0;
+}
+
+/**
+ * Horas para un par sin combo: dos servicios seguidos con **la misma**
+ * profesional.
+ *
+ * Una hora sirve si la primera mitad cabe ahí y la segunda cabe justo cuando
+ * termina la primera, y queda alguien que pueda hacer las dos. Cada lista ya
+ * pasó por `publicSlots` contra la agenda y los puestos; como las dos mitades
+ * no se pisan entre sí, comprobarlas por separado es comprobar el par.
+ */
+export function chainSlots(
+  first: readonly PublicSlot[],
+  second: readonly PublicSlot[],
+): PublicSlot[] {
+  const byStart = new Map(second.map((slot) => [slot.start as string, slot]));
+  const out: PublicSlot[] = [];
+  for (const a of first) {
+    const b = byStart.get(a.end as string);
+    if (!b) continue;
+    const providerIds = a.providerIds.filter((id) => b.providerIds.includes(id));
+    if (providerIds.length === 0) continue;
+    out.push({ time: a.time, start: a.start, end: b.end, splitAt: a.end, providerIds });
+  }
+  return out;
 }

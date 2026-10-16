@@ -126,6 +126,9 @@ export async function GET() {
           // categoría: "Combos" es texto que alguien puede renombrar en EA.
           isCombo: isCombo.has(s.id),
         })),
+        // Este panel sabe agendar un par sin combo como dos citas seguidas
+        // (`thenServiceId`). La landing solo ofrece esos pares si lo dice.
+        chained: true,
         combos: combos.map((c) => ({
           serviceId: c.eaServiceId,
           handsServiceId: c.handsEaServiceId,

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { normalizePhoneE164 } from "@/app/(panel)/clientes/identity";
+import { groupVisits, visitServiceName, type VisitPart } from "@/lib/visits";
 import {
   createDb,
   createPool,
@@ -101,7 +102,29 @@ export function toRunnerAppointments(
   rows: readonly AppointmentWithRelations[],
 ): Map<number, RunnerAppointment> {
   const out = new Map<number, RunnerAppointment>();
+
+  // Manos + pies sin combo son dos citas y una visita: recordatorio uno solo,
+  // en la primera, nombrando los dos servicios. Ver `lib/visits.ts`.
+  const visits = groupVisits(
+    rows.map(({ appointment, service }) => ({
+      id: appointment.id,
+      customerId: appointment.customerId,
+      providerId: appointment.providerId,
+      start: String(appointment.start),
+      end: String(appointment.end),
+      serviceName: service?.name ?? null,
+    })),
+  );
+  const visitOf = new Map<number, VisitPart[]>();
+  for (const chain of visits.values()) for (const part of chain) visitOf.set(part.id, chain);
+
   for (const { appointment, service, provider, customer } of rows) {
+    const chain = visitOf.get(appointment.id);
+    if (chain && chain[0].id !== appointment.id) continue;
+    const serviceName =
+      chain && chain.length > 1
+        ? visitServiceName(chain.map((part) => part.serviceName))
+        : (service?.name ?? null);
     out.set(appointment.id, {
       planning: {
         eaAppointmentId: appointment.id,
@@ -112,7 +135,7 @@ export function toRunnerAppointments(
       template: {
         start: appointment.start as EaLocalDateTime,
         customerFirstName: customer?.firstName ?? null,
-        serviceName: service?.name ?? null,
+        serviceName,
         providerFirstName: provider?.firstName ?? null,
       },
     });

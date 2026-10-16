@@ -37,11 +37,19 @@ export async function GET(req: NextRequest) {
   const date = params.get("date");
   const rawProvider = params.get("providerId");
   const providerId = rawProvider === null || rawProvider === "" ? null : Number(rawProvider);
+  const rawThen = params.get("thenServiceId");
+  const thenServiceId = rawThen === null || rawThen === "" ? null : Number(rawThen);
 
   if (!Number.isInteger(serviceId) || serviceId <= 0) return bad("serviceId");
   if (!isEaLocalDate(date)) return bad("date");
   if (providerId !== null && (!Number.isInteger(providerId) || providerId <= 0)) {
     return bad("providerId");
+  }
+  if (
+    thenServiceId !== null &&
+    (!Number.isInteger(thenServiceId) || thenServiceId <= 0 || thenServiceId === serviceId)
+  ) {
+    return bad("thenServiceId");
   }
 
   // Una fecha pasada, o a dos años vista, es una consulta que ninguna clienta
@@ -50,7 +58,7 @@ export async function GET(req: NextRequest) {
   if (outOfRange(date)) return NextResponse.json({ slots: [] }, { headers: NO_STORE });
 
   try {
-    const result = await loadPublicAvailability({ serviceId, date, providerId });
+    const result = await loadPublicAvailability({ serviceId, date, providerId, thenServiceId });
 
     // Los tres "no hay nada" responden igual a propósito: ver el encabezado.
     if (result.status !== "ok") {

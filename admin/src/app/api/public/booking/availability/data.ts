@@ -10,7 +10,12 @@ import {
 import { createCachedEaClient, createEaClient, type EaClient } from "@/lib/ea/client";
 import { eaDatePart, type EaLocalDate } from "@/lib/ea/datetime";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
-import { publicSlots, type ProviderOffer, type PublicSlot } from "@/lib/public-availability";
+import {
+  chainSlots,
+  publicSlots,
+  type ProviderOffer,
+  type PublicSlot,
+} from "@/lib/public-availability";
 
 /**
  * El abanico de disponibilidad pública: la parte con E/S.
@@ -28,6 +33,11 @@ export type AvailabilityQuery = {
   date: EaLocalDate;
   /** Si la clienta eligió técnica. Sin esto, es "cualquiera". */
   providerId?: number | null;
+  /**
+   * La segunda mitad de un par sin combo (manos + pies): se agenda justo
+   * después de `serviceId`, con la misma persona. Ver `chainSlots`.
+   */
+  thenServiceId?: number | null;
 };
 
 export type AvailabilityResult =
@@ -53,10 +63,39 @@ export type AvailabilityResult =
  * por webhook— vence estas entradas al instante.
  */
 export function loadPublicAvailability(query: AvailabilityQuery): Promise<AvailabilityResult> {
+  if (query.thenServiceId) {
+    // Cada mitad sale de la caché por su cuenta; el cruce es puro y barato.
+    const { thenServiceId, ...first } = query;
+    return Promise.all([
+      loadPublicAvailability(first),
+      loadPublicAvailability({ ...first, serviceId: thenServiceId }),
+    ]).then(([a, b]) => combinePair(a, b));
+  }
   const key = `${PUBLIC_AVAILABILITY_TAG}:${query.serviceId}:${query.date}:${query.providerId ?? "*"}`;
   return sharedEaCache().read(key, [PUBLIC_AVAILABILITY_TAG], PUBLIC_AVAILABILITY_POLICY, () =>
     loadAvailability(query, createCachedEaClient()),
   );
+}
+
+/**
+ * Lo mismo que `loadAvailability`, para un par: las dos mitades y su cruce.
+ * Lo usa `createBooking` con un cliente fresco, sin caché.
+ */
+export async function loadPairAvailability(
+  query: AvailabilityQuery & { thenServiceId: number },
+  client: EaClient,
+): Promise<AvailabilityResult> {
+  const { thenServiceId, ...first } = query;
+  // Secuencial: cada una abanica llamadas a EA, que corta a 100 cada 120 s.
+  const a = await loadAvailability(first, client);
+  const b = await loadAvailability({ ...first, serviceId: thenServiceId }, client);
+  return combinePair(a, b);
+}
+
+function combinePair(a: AvailabilityResult, b: AvailabilityResult): AvailabilityResult {
+  if (a.status !== "ok") return a;
+  if (b.status !== "ok") return b.status === "no-providers" ? b : { status: "unknown-service" };
+  return { status: "ok", slots: chainSlots(a.slots, b.slots) };
 }
 
 /**
