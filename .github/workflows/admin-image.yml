@@ -35,7 +35,7 @@ on:
       # alguien toque `admin/`.
       - "src/data/pricing.ts"
       - "scripts/build-combo-map.mjs"
-      - "src/app/[[]lang]/dictionaries/es.json"
+      - "src/app/*/dictionaries/es.json"
       - ".github/workflows/admin-image.yml"
   # Para reconstruir sin cambios de código (por ejemplo, tras un cambio de base
   # en `node:22-alpine`).
