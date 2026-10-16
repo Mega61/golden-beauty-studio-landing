@@ -90,6 +90,12 @@ RUN npm run build:importar
 # sigue siendo el que funciona.
 RUN npm run build:recordatorios
 
+# El armador del catálogo de EA. `scripts/catalogo.js`, a mano, una vez, en la
+# puesta en marcha: crea y vincula los servicios de la vitrina que la agenda no
+# tiene (con los nombres horneados desde la landing) y se los asigna a las
+# técnicas. En seco por defecto, como `estados.js` e `importar.js`.
+RUN npm run build:catalogo
+
 # `public/` puede no existir todavía (hoy no existe). Crearlo acá hace que el
 # `COPY` de abajo funcione igual, en vez de romper el build el día que alguien
 # borre el último archivo estático — o el día que agregue el primero.

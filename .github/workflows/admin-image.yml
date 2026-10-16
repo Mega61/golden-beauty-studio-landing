@@ -35,6 +35,7 @@ on:
       # alguien toque `admin/`.
       - "src/data/pricing.ts"
       - "scripts/build-combo-map.mjs"
+      - "src/app/[[]lang]/dictionaries/es.json"
       - ".github/workflows/admin-image.yml"
   # Para reconstruir sin cambios de código (por ejemplo, tras un cambio de base
   # en `node:22-alpine`).
@@ -84,7 +85,10 @@ jobs:
       # landing. Un archivo generado que quedó viejo es peor que no tenerlo:
       # parece al día, y el panel ofrecería combinaciones que ya no existen.
       # `--check` no escribe; compara y falla.
-      - name: La composición de los combos está al día
+      # También los nombres (`service-names.ts`, desde `es.json`) y la copia de
+      # la vitrina (`showcase-pricing.ts`), con los que `scripts/catalogo.js`
+      # crea los servicios y la pantalla de Servicios lee la vitrina.
+      - name: Lo horneado desde la landing está al día
         run: node ../scripts/build-combo-map.mjs --check
 
       - name: Lint
