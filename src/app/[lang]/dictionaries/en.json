@@ -40,7 +40,7 @@
     "body": "Luxury in every detail. We specialize in nails with flawless finishes and a premium experience that blends beauty, elegance and care into every appointment. -More than nails, we craft details that elevate your essence-",
     "ctaPrimary": "Book a visit",
     "ctaSecondary": "Pricing",
-    "metaHours": "MON – SUN",
+    "metaHours": "MON – SAT",
     "metaArea": "Sabaneta",
     "metaStatus": "Bookings open"
   },
@@ -344,7 +344,7 @@
     "studio": {
       "name": "Golden Beauty Studio",
       "area": "Sabaneta, Antioquia",
-      "hours": "Mon–Sat 9 AM – 7 PM · Sun 10 AM – 3 PM",
+      "hours": "Mon–Sat 1 PM – 7 PM · Closed Sundays and public holidays",
       "address": "Calle 69 Sur #43a - 41, first floor · Sabaneta",
       "directions": "Directions",
       "photoAlt": "The studio: gold marble wall with the Golden logo lit up"
@@ -370,7 +370,7 @@
       },
       {
         "q": "Do I need an appointment?",
-        "a": "Yes. We work by appointment only so each service gets its full time — a full set takes around two and a half hours. You can book over WhatsApp. We are open Monday to Saturday from 9:00 to 19:00, and Sundays from 10:00 to 15:00."
+        "a": "Yes. We work by appointment only so each service gets its full time — a full set takes around two and a half hours. You can book over WhatsApp. We are open Monday to Saturday from 13:00 to 19:00; closed on Sundays and public holidays."
       },
       {
         "q": "Where is the studio located?",
@@ -549,14 +549,10 @@
       "rows": [
         [
           "Mon — Sat",
-          "09:00 — 19:00"
+          "13:00 — 19:00"
         ],
         [
-          "Sunday",
-          "10:00 — 15:00"
-        ],
-        [
-          "Holidays",
+          "Sunday & holidays",
           "Closed"
         ]
       ],
@@ -719,7 +715,7 @@
       "title": "Visit us",
       "address1": "Calle 69 Sur #43a - 41, First Floor",
       "address2": "Sabaneta, Antioquia",
-      "hours": "Mon – Sun"
+      "hours": "Mon – Sat · 1 – 7 PM"
     },
     "find": {
       "title": "Find us",
