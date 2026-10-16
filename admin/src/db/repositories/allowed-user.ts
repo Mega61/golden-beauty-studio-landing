@@ -4,6 +4,8 @@ import type {
   NewAllowedUser,
   UserRole,
 } from "../types";
+import { testAccountsAllowed } from "@/lib/test-accounts";
+
 import { toId, type Db } from "./shared";
 
 /**
@@ -22,11 +24,12 @@ export function allowedUserRepository(db: Db) {
      * fila) es JavaScript, y ahí `A@x.com !== a@x.com`.
      */
     async findByEmail(email: string): Promise<AllowedUser | undefined> {
-      return db
+      let q = db
         .selectFrom("allowed_user")
         .selectAll()
-        .where("email", "=", email.trim().toLowerCase())
-        .executeTakeFirst();
+        .where("email", "=", email.trim().toLowerCase());
+      if (!testAccountsAllowed()) q = q.where("is_test_account", "=", 0);
+      return q.executeTakeFirst();
     },
 
     async findByEaProviderId(
@@ -39,10 +42,17 @@ export function allowedUserRepository(db: Db) {
         .executeTakeFirst();
     },
 
-    /** Para la pantalla de Equipo. Orden estable por rol y luego por correo. */
+    /**
+     * La allowlist que vale para entrar. Orden estable por rol y luego por correo.
+     *
+     * En producción no trae cuentas de prueba (ver `lib/test-accounts.ts`), y
+     * por eso no hace falta repetir la regla en cada lugar que autentica: el
+     * login, la grilla de entrada y la sesión leen todos de acá.
+     */
     async list(role?: UserRole): Promise<AllowedUser[]> {
       let q = db.selectFrom("allowed_user").selectAll();
       if (role) q = q.where("role", "=", role);
+      if (!testAccountsAllowed()) q = q.where("is_test_account", "=", 0);
       return q.orderBy("role").orderBy("email").execute();
     },
 

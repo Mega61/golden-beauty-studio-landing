@@ -48,7 +48,7 @@ export default async function DiagnosticoPage() {
       <AppShell role="staff" title="Diagnóstico">
         <EmptyState
           icon="candado"
-          title="Diagnóstico es de la dueña"
+          title="Diagnóstico es solo de administración"
           body="Este tablero muestra el estado interno del sistema y no forma parte de tu trabajo del día."
         />
       </AppShell>

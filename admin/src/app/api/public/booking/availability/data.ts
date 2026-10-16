@@ -2,10 +2,20 @@ import "server-only";
 
 import { getDb } from "@/db/client";
 import { stationRepository } from "@/db/repositories";
-import { createEaClient, type EaClient } from "@/lib/ea/client";
+import {
+  PUBLIC_AVAILABILITY_POLICY,
+  PUBLIC_AVAILABILITY_TAG,
+  sharedEaCache,
+} from "@/lib/ea/cache";
+import { createCachedEaClient, createEaClient, type EaClient } from "@/lib/ea/client";
 import { eaDatePart, type EaLocalDate } from "@/lib/ea/datetime";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
-import { publicSlots, type ProviderOffer, type PublicSlot } from "@/lib/public-availability";
+import {
+  chainSlots,
+  publicSlots,
+  type ProviderOffer,
+  type PublicSlot,
+} from "@/lib/public-availability";
 
 /**
  * El abanico de disponibilidad pública: la parte con E/S.
@@ -23,6 +33,11 @@ export type AvailabilityQuery = {
   date: EaLocalDate;
   /** Si la clienta eligió técnica. Sin esto, es "cualquiera". */
   providerId?: number | null;
+  /**
+   * La segunda mitad de un par sin combo (manos + pies): se agenda justo
+   * después de `serviceId`, con la misma persona. Ver `chainSlots`.
+   */
+  thenServiceId?: number | null;
 };
 
 export type AvailabilityResult =
@@ -32,6 +47,61 @@ export type AvailabilityResult =
   | { status: "unbookable-service" }
   | { status: "no-providers" };
 
+/**
+ * La disponibilidad que ve la landing: el mismo cálculo, guardado 15 s.
+ *
+ * Una clienta que pasa por tres días y vuelve al primero, o diez que miran el
+ * mismo sábado a la vez, piden lo mismo. Sin esto cada consulta eran ~7
+ * llamadas a EA (ver `lib/ea/cache.ts`); con esto, diez consultas simultáneas
+ * del mismo día son un solo cálculo, y adentro las lecturas de referencia
+ * salen de la caché de 60 s.
+ *
+ * **Solo para mostrar.** Quien confirma (`reservar/data.ts`) llama a
+ * `loadAvailability` con un cliente fresco: un hueco servido de memoria puede
+ * estar ocupado, y eso se descubre ahí antes de escribir. Cualquier escritura
+ * de citas, bloqueos, técnicas o servicios —del panel, de la reserva pública o
+ * por webhook— vence estas entradas al instante.
+ */
+export function loadPublicAvailability(query: AvailabilityQuery): Promise<AvailabilityResult> {
+  if (query.thenServiceId) {
+    // Cada mitad sale de la caché por su cuenta; el cruce es puro y barato.
+    const { thenServiceId, ...first } = query;
+    return Promise.all([
+      loadPublicAvailability(first),
+      loadPublicAvailability({ ...first, serviceId: thenServiceId }),
+    ]).then(([a, b]) => combinePair(a, b));
+  }
+  const key = `${PUBLIC_AVAILABILITY_TAG}:${query.serviceId}:${query.date}:${query.providerId ?? "*"}`;
+  return sharedEaCache().read(key, [PUBLIC_AVAILABILITY_TAG], PUBLIC_AVAILABILITY_POLICY, () =>
+    loadAvailability(query, createCachedEaClient()),
+  );
+}
+
+/**
+ * Lo mismo que `loadAvailability`, para un par: las dos mitades y su cruce.
+ * Lo usa `createBooking` con un cliente fresco, sin caché.
+ */
+export async function loadPairAvailability(
+  query: AvailabilityQuery & { thenServiceId: number },
+  client: EaClient,
+): Promise<AvailabilityResult> {
+  const { thenServiceId, ...first } = query;
+  // Secuencial: cada una abanica llamadas a EA, que corta a 100 cada 120 s.
+  const a = await loadAvailability(first, client);
+  const b = await loadAvailability({ ...first, serviceId: thenServiceId }, client);
+  return combinePair(a, b);
+}
+
+function combinePair(a: AvailabilityResult, b: AvailabilityResult): AvailabilityResult {
+  if (a.status !== "ok") return a;
+  if (b.status !== "ok") return b.status === "no-providers" ? b : { status: "unknown-service" };
+  return { status: "ok", slots: chainSlots(a.slots, b.slots) };
+}
+
+/**
+ * El cálculo, contra el cliente que se le pase. Por defecto, uno **fresco**:
+ * es lo que usa la re-verificación de la reserva.
+ */
 export async function loadAvailability(
   query: AvailabilityQuery,
   client: EaClient = createEaClient(),

@@ -209,6 +209,20 @@
   inset: 0;
   padding: 0;
   position: absolute;
+
+  /* El blanco no puede ser más chico que un dedo, aunque la fila sí lo sea.
+     La pista mide lo que mida la barra, y con pocas series eso puede quedar en
+     38 px — por debajo del mínimo táctil del panel, que se usa sobre todo desde
+     el teléfono. Se crece hacia los dos lados desde el centro, así que el
+     blanco se agranda sin mover ni un píxel de lo que se ve.
+
+     Lo encontró la suite E2E de ergonomía, y solo cuando hubo datos de verdad
+     en los reportes: con la base vacía no hay barras que medir y el defecto no
+     existía para nadie. */
+  min-height: var(--hit);
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
 }
 
 .barHit:focus-visible {
@@ -386,6 +400,21 @@
      `ink-mute` mide 3.91:1. Lo que hace recesiva la celda es la ausencia de
      relleno y el filete punteado, no un texto que no se alcanza a leer. */
   color: var(--color-ink-soft);
+}
+
+/* Variante densa: siete columnas de una cifra corta (días de la semana × hora).
+   Con el ancho normal de 3.5rem la semana entera mide 450 px y a 390 obligaba
+   a scrollear de lado justo el mapa que hay que leer de un vistazo. Una o dos
+   cifras caben en 2.25rem; el texto va centrado porque sin columna de cifras
+   largas alinear a la derecha no compara nada. */
+.heat--dense .heatCell {
+  min-width: 2.25rem;
+  padding: 0.3125rem 0.25rem;
+  text-align: center;
+}
+
+.heat--dense thead th {
+  text-align: center;
 }
 
 .heatCell:focus-visible {

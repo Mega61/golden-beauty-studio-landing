@@ -6,6 +6,8 @@ import type { LegacyAppointment } from "@/db/types";
 import { EaApiError, type Customer, type Provider, type Service } from "@/lib/ea";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
 
+import { splitName } from "@/jobs/import-agendapro";
+
 import { buildUnifiedHistory, type EaHistoryInput, type UnifiedHistory } from "./history";
 import {
   clientKeyToParam,
@@ -34,7 +36,12 @@ import {
  */
 
 /** Cuántas clientas trae la vista sin búsqueda. Las más recientes. */
-const RECENT_PAGE_LENGTH = 100;
+/**
+ * Una página de la lista. Antes eran 100 filas de un tirón: la búsqueda y las
+ * acciones quedaban dos pantallas arriba y la lista no terminaba nunca en el
+ * celular. Veinticinco es lo que cabe en dos o tres pasadas del pulgar.
+ */
+export const PAGE_LENGTH = 25;
 
 export type EaFailure = {
   /** Para la banda: `true` cuando EA está caído y no mal configurado. */
@@ -73,6 +80,14 @@ export type ClientListResult = {
   /** `true` si la lista se recortó: hay más clientas de las que se muestran. */
   truncated: boolean;
   failure: EaFailure | null;
+  /** Página actual, desde 1. */
+  page: number;
+  /** Cuántas filas trae una página. */
+  pageLength: number;
+  /** Hay página siguiente. */
+  hasNext: boolean;
+  /** Solo con búsqueda, donde se conoce el total; EA no lo da al listar. */
+  total: number | null;
 };
 
 /**
@@ -84,37 +99,57 @@ export type ClientListResult = {
  * rechaza la combinación antes de salir a la red, así que ni siquiera se puede
  * cometer el error por accidente.
  */
-export async function searchClients(query: string | null): Promise<ClientListResult> {
+export async function searchClients(
+  query: string | null,
+  page: number = 1,
+): Promise<ClientListResult> {
+  const base = { page, pageLength: PAGE_LENGTH, hasNext: false, total: null };
   const ea = eaClientOrNull();
   if ("failure" in ea) {
-    return { clients: [], query, truncated: false, failure: ea.failure };
+    return { ...base, clients: [], query, truncated: false, failure: ea.failure };
   }
 
   const term = query?.trim() ?? "";
 
   try {
     if (term === "") {
-      const page = await ea.client.customers.listPage({
-        length: RECENT_PAGE_LENGTH,
+      // Paginada en EA: sin total (su API no lo da), con "hay más".
+      const result = await ea.client.customers.listPage({
+        page,
+        length: PAGE_LENGTH,
         sort: ["-id"],
       });
       return {
-        clients: mergeCustomers(page.items),
+        ...base,
+        clients: mergeCustomers(result.items),
         query: null,
-        truncated: page.hasMore,
+        truncated: result.hasMore,
+        hasNext: result.hasMore,
         failure: null,
       };
     }
 
-    const found = await ea.client.customers.list({ q: term });
+    // La búsqueda trae todo lo que coincide —pocas filas— y se pagina acá,
+    // después de unificar por teléfono, para que el total sea de personas.
+    const all = mergeCustomers(await ea.client.customers.list({ q: term }));
+    const start = (page - 1) * PAGE_LENGTH;
     return {
-      clients: mergeCustomers(found),
+      ...base,
+      clients: all.slice(start, start + PAGE_LENGTH),
       query: term,
       truncated: false,
+      hasNext: start + PAGE_LENGTH < all.length,
+      total: all.length,
       failure: null,
     };
   } catch (error) {
-    return { clients: [], query: term || null, truncated: false, failure: describeEaFailure(error) };
+    return {
+      ...base,
+      clients: [],
+      query: term || null,
+      truncated: false,
+      failure: describeEaFailure(error),
+    };
   }
 }
 
@@ -320,10 +355,15 @@ async function loadLegacyByPhone(phone: string | null): Promise<LegacyAppointmen
 /** La ficha de alguien que solo existe antes del corte. */
 function legacyOnlyClient(key: ClientKey, legacy: LegacyAppointment[]): ResolvedClient {
   const named = legacy.find((row) => (row.client_name ?? "").trim() !== "");
+  // Agenda Pro trae el nombre en una sola casilla: se parte con la misma regla
+  // del import, para que la ficha y la audiencia de Meta digan lo mismo.
+  const split = splitName(named?.client_name ?? undefined, undefined);
   return {
     key,
     phone: key.kind === "tel" ? key.phone : null,
-    name: named?.client_name?.trim() ?? "Clienta sin nombre",
+    name: named?.client_name?.trim() ?? "Sin nombre",
+    firstName: split.firstName,
+    lastName: split.lastName,
     email: null,
     suspiciousEmails: [],
     eaCustomerIds: [],

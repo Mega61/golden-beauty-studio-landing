@@ -83,6 +83,17 @@ function statusKey(value: string): string {
     .replace(/[^a-z0-9]+/g, "");
 }
 
+/**
+ * ¿Con este estado de EA se manda recordatorio?
+ *
+ * Exportada para el paliativo manual (`lib/whatsapp/manual-reminder.ts`): el
+ * botón de `wa.me` y el emisor automático tienen que estar de acuerdo en a
+ * quién se le recuerda, y eso solo es cierto si la lista vive en un solo lugar.
+ */
+export function isSendableStatus(status: string): boolean {
+  return SENDABLE.has(statusKey(status));
+}
+
 export type ReminderDecision =
   | { action: "enviar"; appointment: ReminderAppointment; rule: ReminderRule }
   | {
@@ -151,7 +162,7 @@ export function planReminders(input: {
         continue;
       }
 
-      if (!SENDABLE.has(statusKey(appointment.status))) {
+      if (!isSendableStatus(appointment.status)) {
         decisions.push({ action: "omitir", appointment, rule, reason: "estado-no-aplica" });
         continue;
       }

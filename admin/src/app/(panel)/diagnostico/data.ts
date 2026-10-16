@@ -28,11 +28,12 @@ import "server-only";
 import { sql } from "kysely";
 
 import { getDb } from "@/db/client";
-import { JOB_RECONCILE, repositories } from "@/db/repositories";
+import { JOB_RECONCILE, JOB_WHATSAPP_REMINDERS, repositories } from "@/db/repositories";
 import type { JobRunRow } from "@/db/types";
 import { createEaClient, eaConfigFromEnv } from "@/lib/ea/client";
 import { instantToEaDate, type EaLocalDate } from "@/lib/ea";
 import { mapEaStatus, unmappedStatuses } from "@/components/calendar";
+import { whatsappConfigured } from "@/lib/whatsapp/config";
 
 import { addDays } from "../reportes/period";
 import {
@@ -56,6 +57,7 @@ import {
   statusOptionsCheck,
   webhookCheck,
   webhookTrafficCheck,
+  whatsappCheck,
   worstLevel,
   type Check,
   type CheckLevel,
@@ -267,6 +269,16 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
     };
   });
 
+  // --- WhatsApp ------------------------------------------------------------
+  const whatsapp = await probe(async () => {
+    const repos = repositories(getDb());
+    const [lastRun, failed24h] = await Promise.all([
+      repos.jobRuns.lastRun(JOB_WHATSAPP_REMINDERS),
+      repos.waMessages.countAutomaticFailedSince(new Date(now.getTime() - 86_400_000)),
+    ]);
+    return { lastRun: toJobRunFact(lastRun), failed24h };
+  });
+
   // --- Respaldo -----------------------------------------------------------
   const dir = backupDir();
   const [stampRaw, statusFile] = await Promise.all([
@@ -335,6 +347,12 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
       pending: jobs.ok ? jobs.value.pending : 0,
       now,
     }),
+    whatsappCheck({
+      configured: whatsappConfigured(),
+      lastRun: whatsapp.ok ? whatsapp.value.lastRun : null,
+      failed24h: whatsapp.ok ? whatsapp.value.failed24h : 0,
+      now,
+    }),
     backupCheck({
       lastRun: parseBackupStamp(stampRaw),
       status: parseBackupStatus(statusFile),
@@ -370,6 +388,13 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
   // deje de servir.
   if (!jobs.ok) {
     degrade(["reconcile"], jobs.error);
+  }
+
+  // Igual con WhatsApp: "nunca corrió" en rojo solo si se pudo preguntar. Sin
+  // configuración, el amarillo de "apagado" es cierto aunque la base no
+  // conteste, así que se deja.
+  if (!whatsapp.ok && whatsappConfigured()) {
+    degrade(["whatsapp"], whatsapp.error);
   }
 
   return {

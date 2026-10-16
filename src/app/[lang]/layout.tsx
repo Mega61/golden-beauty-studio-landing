@@ -7,6 +7,7 @@ import { siteConfig, ogLocales } from "@/config/site";
 import { resolveDescription } from "@/lib/seo";
 import { getDictionary, hasLocale, locales, type Locale } from "./dictionaries";
 import Preconnect from "./_components/Preconnect";
+import MetaPixel from "./_components/MetaPixel";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -138,6 +139,7 @@ export default async function LangLayout({
         {children}
       </body>
       {siteConfig.gaId ? <GoogleAnalytics gaId={siteConfig.gaId} /> : null}
+      {siteConfig.metaPixelId ? <MetaPixel pixelId={siteConfig.metaPixelId} /> : null}
     </html>
   );
 }

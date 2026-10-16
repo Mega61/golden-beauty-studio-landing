@@ -5,12 +5,12 @@ import {
   phoneSearchVariants,
   type E164,
 } from "@/app/(panel)/clientes/identity";
-import { createEaClient, type EaClient } from "@/lib/ea/client";
+import { createEaClient, eaConfigFromEnv, type EaClient } from "@/lib/ea/client";
 import type { EaLocalDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
 import { pickProvider } from "@/lib/public-availability";
 import type { Customer } from "@/lib/ea/types";
-import { loadAvailability } from "../availability/data";
+import { loadAvailability, loadPairAvailability } from "../availability/data";
 
 /**
  * Confirmar una reserva pública.
@@ -33,6 +33,11 @@ import { loadAvailability } from "../availability/data";
 
 export type BookingRequest = {
   serviceId: number;
+  /**
+   * La segunda mitad de un par sin combo: otra cita, justo después de la
+   * primera y con la misma persona. Ver `lib/visits.ts`.
+   */
+  thenServiceId?: number | null;
   date: EaLocalDate;
   /** `"HH:MM"`, tal como vino del listado de horarios. */
   time: string;
@@ -48,6 +53,8 @@ export type BookingResult =
   | {
       status: "ok";
       appointmentId: number;
+      /** La segunda cita de un par; `null` si fue un solo servicio. */
+      secondAppointmentId: number | null;
       /** A quién le tocó. La confirmación la nombra. */
       providerId: number;
       providerName: string;
@@ -59,9 +66,21 @@ export type BookingResult =
   | { status: "invalid-phone" }
   | { status: "unknown-service" };
 
+/**
+ * El cliente de este camino lee **siempre fresco**, y se dice explícito en vez
+ * de confiar en el default: la disponibilidad pública se sirve de una caché de
+ * 15 s (`availability/data.ts`), y lo único que hace segura esa caché es que
+ * acá se vuelve a mirar EA antes de escribir. Si esta verificación leyera de
+ * memoria, un hueco ocupado hace diez segundos se vendería otra vez. La
+ * escritura, eso sí, invalida la caché compartida como cualquier otra.
+ */
+function freshClient(): EaClient {
+  return createEaClient({ ...eaConfigFromEnv(), cachedReads: false });
+}
+
 export async function createBooking(
   input: BookingRequest,
-  client: EaClient = createEaClient(),
+  client: EaClient = freshClient(),
 ): Promise<BookingResult> {
   const phone = normalizePhoneE164(input.phone);
   // Un número a medias deduplica mal, que es peor que no deduplicar.
@@ -70,10 +89,12 @@ export async function createBooking(
   // Se pide sin filtrar por técnica aunque la clienta haya elegido una: hace
   // falta la lista completa de quiénes pueden tomar el hueco para resolver
   // "cualquiera", y el filtro se aplica después.
-  const availability = await loadAvailability(
-    { serviceId: input.serviceId, date: input.date },
-    client,
-  );
+  const availability = input.thenServiceId
+    ? await loadPairAvailability(
+        { serviceId: input.serviceId, thenServiceId: input.thenServiceId, date: input.date },
+        client,
+      )
+    : await loadAvailability({ serviceId: input.serviceId, date: input.date }, client);
 
   if (availability.status === "unknown-service" || availability.status === "unbookable-service") {
     return { status: "unknown-service" };
@@ -103,7 +124,7 @@ export async function createBooking(
 
   const appointment = await client.appointments.create({
     start: slot.start,
-    end: slot.end,
+    end: slot.splitAt ?? slot.end,
     customerId: customer.id,
     providerId,
     serviceId: input.serviceId,
@@ -111,11 +132,38 @@ export async function createBooking(
     notes: input.notes?.trim() || null,
   });
 
+  // La segunda mitad del par. Si no se puede crear, la primera se borra: una
+  // persona que pidió manos + pies y quedó solo con manos se entera en el
+  // estudio, que es el peor lugar para enterarse. Mejor un "esa hora se acaba
+  // de ocupar" y que elija otra.
+  let secondAppointmentId: number | null = null;
+  if (input.thenServiceId && slot.splitAt) {
+    try {
+      const second = await client.appointments.create({
+        start: slot.splitAt,
+        end: slot.end,
+        customerId: customer.id,
+        providerId,
+        serviceId: input.thenServiceId,
+        status: "Reservada",
+        notes: "Sigue de la cita anterior (misma visita).",
+      });
+      secondAppointmentId = second.id;
+    } catch (error) {
+      await client.appointments.remove(appointment.id).catch((cleanup: unknown) => {
+        console.error("[reservar] no se pudo deshacer la primera mitad del par", appointment.id, cleanup);
+      });
+      if (error instanceof EaApiError && !error.isTransient) return { status: "taken" };
+      throw error;
+    }
+  }
+
   const provider = await client.providers.get(providerId);
 
   return {
     status: "ok",
     appointmentId: appointment.id,
+    secondAppointmentId,
     providerId,
     providerName: fullName(provider.firstName, provider.lastName) ?? `Profesional ${providerId}`,
     start: slot.start,

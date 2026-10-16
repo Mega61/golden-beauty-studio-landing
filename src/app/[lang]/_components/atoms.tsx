@@ -58,7 +58,7 @@ export function PrimaryCTA({
     ? { target: "_blank" as const, rel: "noopener noreferrer" }
     : {};
   const base =
-    "inline-flex items-center gap-3 px-6 py-3.5 md:px-8 md:py-[17px] font-sans text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.24em] no-underline cursor-pointer";
+    "inline-flex items-center gap-3 whitespace-nowrap px-6 py-3.5 md:px-8 md:py-[17px] font-sans text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.24em] no-underline cursor-pointer";
   return (
     <Link
       href={href}

@@ -1,10 +1,10 @@
 import type { PromosBySlug } from "./promos.types";
 import { promoPrice, promoPriceRows } from "./promo-prices";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 
-// Reservation URL lives in NEXT_PUBLIC_BOOKING_URL (siteConfig.bookingUrl). If
+// Reservation URL lives in NEXT_PUBLIC_BOOKING_URL, localised by bookingHref(). If
 // unset, hashes fall through to the local #contacto section.
-const BOOKING = siteConfig.bookingUrl ?? "#contacto";
+const BOOKING = bookingHref("es") ?? "#contacto";
 
 // Mock por idioma. Cuando se conecte Strapi, este archivo deja de usarse —
 // `getActiveScenario` (en promos.ts) consultará `?locale=es&populate=deep`.
@@ -20,7 +20,7 @@ export const PROMOS_DATA: PromosBySlug = {
     strip: {
       tag: "Kit de apertura",
       message:
-        "Las primeras 100 clientas reciben el kit de bienvenida Golden con su primera cita.",
+        "Las primeras 100 personas que nos visiten reciben el kit de bienvenida Golden con su primera cita.",
       cta: "Quiero mi kit",
       href: "#promos",
       accent: "gold",
@@ -42,19 +42,19 @@ export const PROMOS_DATA: PromosBySlug = {
       {
         id: "opening-referral",
         eyebrow: "Referidas",
-        title: "Trae a una amiga, ganan las dos",
+        title: "Trae a alguien, ganan los dos",
         body:
-          "Por cada referida que agenda su primera cita, ambas reciben 10% en el retoque siguiente.",
+          "Por cada persona referida que agenda su primera cita, las dos reciben 10% en el retoque siguiente.",
         cta_label: "Ver detalles",
         cta_href: "#contacto",
         accent: "mocha",
         featured: false,
         terms: [
-          "Aplica solo cuando la referida es una clienta nueva, sin citas previas en el estudio.",
+          "Aplica solo cuando la persona referida no tiene citas previas en el estudio.",
           "El descuento del 10% se aplica al primer retoque posterior de cada una — no acumulable con otras promociones ni canjeable por efectivo.",
-          "La referida debe mencionar el nombre de quien la refiere al momento de agendar; no se aplica retroactivamente.",
-          "El beneficio se libera cuando la referida completa (no solo agenda) su primera cita.",
-          "Una referida solo cuenta para una clienta — no aplica para múltiples referidoras del mismo nombre.",
+          "La persona referida debe mencionar el nombre de quien la refiere al momento de agendar; no se aplica retroactivamente.",
+          "El beneficio se libera cuando la persona referida completa (no solo agenda) su primera cita.",
+          "Cada persona referida cuenta una sola vez, aunque la refieran varias personas.",
           "Vigente mientras esté activa la edición de apertura; el estudio puede ajustar o cerrar la mecánica con previo aviso.",
         ],
       },
@@ -151,7 +151,7 @@ export const PROMOS_DATA: PromosBySlug = {
         eyebrow: "Aniversario",
         title: "Fin de año — bono de retoque",
         body:
-          "Las clientas que asistieron a 3 o más citas en 2026 reciben su primer retoque de enero sin costo.",
+          "Quienes asistieron a 3 o más citas en 2026 reciben su primer retoque de enero sin costo.",
         cta_label: "Confirmar elegibilidad",
         cta_href: "#contacto",
         accent: "ink",
@@ -253,7 +253,7 @@ export const PROMOS_DATA: PromosBySlug = {
       message: "10% en tu primera cita",
       cta: "Reservar",
       href: BOOKING,
-      until: "Solo clientas nuevas",
+      until: "Solo primera visita",
       accent: "ink",
     },
     items: [
@@ -265,7 +265,7 @@ export const PROMOS_DATA: PromosBySlug = {
           "Si es tu primera cita en Golden, recibe 10% de descuento en el servicio que elijas — en todos nuestros servicios. Válido una sola vez.",
         cta_label: "Reservar mi primera cita",
         cta_href: BOOKING,
-        ribbon: "Solo clientas nuevas",
+        ribbon: "Solo primera visita",
         image_url: "/promos/primera-visita.webp",
         image_orientation: "portrait",
         image_alt:
@@ -274,7 +274,7 @@ export const PROMOS_DATA: PromosBySlug = {
         featured: true,
         terms_label: "Condiciones",
         terms: [
-          "Aplica solo a clientas nuevas, sin citas previas en el estudio.",
+          "Aplica solo en tu primera visita, sin citas previas en el estudio.",
           "El 10% se descuenta del servicio de la primera cita; los adicionales se cobran a precio regular.",
           "No es acumulable con otras promociones, incluidos Sábado de Press y Miércoles de pies.",
           "La reserva en línea muestra el precio regular; el descuento se aplica al pagar en el estudio.",

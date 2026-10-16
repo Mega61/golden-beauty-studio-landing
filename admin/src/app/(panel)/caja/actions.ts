@@ -129,7 +129,7 @@ export async function cerrarDia(fecha: string): Promise<CerrarDiaResult> {
     return {
       ok: false,
       kind: "config",
-      message: "El panel no está bien configurado para cerrar el día. Avísale a la dueña.",
+      message: "El panel no está bien configurado para cerrar el día. Avísale a administración.",
     };
   }
 
@@ -241,7 +241,7 @@ export async function registrarAjuste(input: {
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof ForbiddenError) {
-      return { ok: false, message: "Solo la dueña puede corregir una cuenta después del cierre." };
+      return { ok: false, message: "Solo administración puede corregir una cuenta después del cierre." };
     }
     console.error("[caja] no se pudo verificar la sesión", error);
     return { ok: false, message: "No se pudo verificar la sesión." };
@@ -291,7 +291,7 @@ export async function reintentarAjuste(eaAppointmentId: number): Promise<PushRes
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof ForbiddenError) {
-      return { ok: false, message: "Solo la dueña puede empujar un ajuste." };
+      return { ok: false, message: "Solo administración puede empujar un ajuste." };
     }
     console.error("[caja] no se pudo verificar la sesión", error);
     return { ok: false, message: "No se pudo verificar la sesión." };

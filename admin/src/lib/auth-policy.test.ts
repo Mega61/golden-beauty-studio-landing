@@ -171,6 +171,12 @@ describe("can — el alcance de una técnica", () => {
     "catalogo:publicar",
     "diagnostico:ver",
     "ea:avanzado",
+    "recordatorios:enviar",
+    "recordatorios:baja",
+    // El aviso de reserva web nombra clienta y técnica de cualquier columna.
+    "avisos:reservas-web",
+    "pauta:registrar",
+    "clientes:exportar",
   ];
 
   it.each(PROHIBIDAS)("staff NO alcanza %s", (capability) => {
@@ -208,6 +214,30 @@ describe("can — recepción y dueña", () => {
     expect(can("admin", "liquidacion:ver-todas")).toBe(false);
   });
 
+  it("recepción ve el costo por clienta nueva pero no escribe la inversión ni exporta clientas", () => {
+    expect(can("admin", "reportes:ver")).toBe(true);
+    expect(can("admin", "pauta:registrar")).toBe(false);
+    expect(can("admin", "clientes:exportar")).toBe(false);
+    expect(can("owner", "pauta:registrar")).toBe(true);
+    expect(can("owner", "clientes:exportar")).toBe(true);
+  });
+
+  it("recepción manda los recordatorios por wa.me y registra las bajas", () => {
+    expect(can("admin", "recordatorios:enviar")).toBe(true);
+    expect(can("admin", "recordatorios:baja")).toBe(true);
+  });
+
+  it("recepción y dueña reciben el aviso de reserva web; la técnica no", () => {
+    expect(can("owner", "avisos:reservas-web")).toBe(true);
+    expect(can("admin", "avisos:reservas-web")).toBe(true);
+    expect(can("staff", "avisos:reservas-web")).toBe(false);
+    // Va de la mano de ver la agenda completa: quien no la ve no recibe un
+    // pedazo de ella en la pantalla de bloqueo.
+    for (const role of ["owner", "admin", "staff"] as const) {
+      expect(can(role, "avisos:reservas-web")).toBe(can(role, "agenda:ver-todas"));
+    }
+  });
+
   it("la dueña alcanza todo", () => {
     const TODAS: Capability[] = [
       "cuenta:cerrar-propia",
@@ -225,6 +255,11 @@ describe("can — recepción y dueña", () => {
       "catalogo:publicar",
       "diagnostico:ver",
       "ea:avanzado",
+      "recordatorios:enviar",
+      "recordatorios:baja",
+      "avisos:reservas-web",
+      "pauta:registrar",
+      "clientes:exportar",
     ];
     for (const capability of TODAS) {
       expect(can("owner", capability)).toBe(true);

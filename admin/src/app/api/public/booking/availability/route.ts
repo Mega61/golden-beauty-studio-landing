@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { instantToEaDate, isEaLocalDate, type EaLocalDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
-import { loadAvailability } from "./data";
+import { loadPublicAvailability } from "./data";
 
 /**
  * Horarios libres para la landing. **Es la única ruta pública del panel.**
@@ -21,8 +21,10 @@ import { loadAvailability } from "./data";
  * - **No propaga el error de EA.** Un `EaApiError` lleva ruta y cuerpo de EA;
  *   afuera solo sale `unavailable`. El detalle va al log del contenedor.
  *
- * `force-dynamic` + `no-store`: una disponibilidad cacheada es una silla
- * vendida dos veces.
+ * `force-dynamic` + `no-store`: ni Next ni el navegador guardan esta respuesta.
+ * La única caché es la del proceso (`loadPublicAvailability`, 15 s), que sí
+ * se invalida con cada escritura; y aun servida de memoria no vende una silla
+ * dos veces, porque la reserva re-verifica en fresco antes de escribir.
  */
 export const dynamic = "force-dynamic";
 
@@ -35,11 +37,19 @@ export async function GET(req: NextRequest) {
   const date = params.get("date");
   const rawProvider = params.get("providerId");
   const providerId = rawProvider === null || rawProvider === "" ? null : Number(rawProvider);
+  const rawThen = params.get("thenServiceId");
+  const thenServiceId = rawThen === null || rawThen === "" ? null : Number(rawThen);
 
   if (!Number.isInteger(serviceId) || serviceId <= 0) return bad("serviceId");
   if (!isEaLocalDate(date)) return bad("date");
   if (providerId !== null && (!Number.isInteger(providerId) || providerId <= 0)) {
     return bad("providerId");
+  }
+  if (
+    thenServiceId !== null &&
+    (!Number.isInteger(thenServiceId) || thenServiceId <= 0 || thenServiceId === serviceId)
+  ) {
+    return bad("thenServiceId");
   }
 
   // Una fecha pasada, o a dos años vista, es una consulta que ninguna clienta
@@ -48,7 +58,7 @@ export async function GET(req: NextRequest) {
   if (outOfRange(date)) return NextResponse.json({ slots: [] }, { headers: NO_STORE });
 
   try {
-    const result = await loadAvailability({ serviceId, date, providerId });
+    const result = await loadPublicAvailability({ serviceId, date, providerId, thenServiceId });
 
     // Los tres "no hay nada" responden igual a propósito: ver el encabezado.
     if (result.status !== "ok") {

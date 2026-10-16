@@ -561,6 +561,7 @@ de indexar la agenda por rango y la liquidación por técnica sin un JOIN que no
 | `service_map` | `pricing_id` (el id de `src/data/pricing.ts`) ↔ `ea_service_id`. Sin esto la vitrina y el catálogo operativo son dos listas que se separan en silencio (ver "Catálogo y precios"). |
 | `legacy_appointment` | histórico de Agenda Pro, para continuidad de reportes sin ensuciar el calendario de EA |
 | `audit_log` | quién cambió qué desde el panel |
+| `ad_spend` | inversión en anuncios por mes (`"YYYY-MM"`) y canal, en pesos enteros — el denominador del costo por clienta nueva (migración `023`) |
 
 **Webhooks de EA → `POST /admin/api/webhooks/ea`** crean la fila `appointment_finance` y congelan el
 precio del servicio en el momento en que se agenda la cita — incluyendo reservas hechas desde la
@@ -793,6 +794,8 @@ diferencia sin acusar a nadie:
 | Hacer el cierre diario | ❌ | ✅ | ✅ |
 | Corregir después del cierre | ❌ | ❌ | ✅ |
 | Ver su propia liquidación y su propio ticket promedio | ✅ | — | ✅ |
+| Anotar la inversión en anuncios del mes (`pauta:registrar`) | ❌ | ❌ (ve el reporte) | ✅ |
+| Exportar la lista de clientas para Meta (`clientes:exportar`) | ❌ | ❌ | ✅ |
 
 `TICKET_STAFF_COBRA` existe porque la respuesta cambia con el día: en un estudio de dos personas la
 técnica cobra; con recepción de planta, no. Es una decisión de operación, no de código.
@@ -987,6 +990,27 @@ clienta nunca se entere de que "cualquiera" era en realidad una decisión nuestr
 al backend). Dos formularios de reserva vivos es una forma elegante de darle dos disponibilidades
 distintas a la misma clienta.
 
+### El cupo de EA y la caché de lecturas
+
+EA limita a **100 peticiones por IP cada 120 s** (`rate_limit_helper.php`, activado fijo en el código),
+y el panel entero sale por una IP. Sin caché, el catálogo costaba 3 llamadas y cada consulta de horarios
+~7 (servicios, técnicas, citas del día, bloqueos, periodos bloqueados y una `availabilities` por
+técnica): cuatro clientas mirando tres días agotaban el cupo y EA le devolvía 429 también a la agenda.
+
+`admin/src/lib/ea/cache.ts` lo resuelve con una caché en memoria del proceso (TTL, un solo vuelo por
+clave, servir lo viejo ante 429/5xx con tope de edad, tope de 500 entradas). Las políticas, los tiempos
+y la tabla de qué escritura invalida qué viven en ese archivo. Tres reglas de diseño:
+
+- **Leer de caché es opt-in** (`createCachedEaClient()`); escribir invalida siempre, desde cualquier
+  cliente, y los webhooks de EA invalidan el recurso de su acción (después de verificar el secreto: un
+  POST sin secreto no puede vaciar la caché y empujar al panel contra el cupo).
+- **El camino que decide una escritura lee fresco.** `reservar/data.ts` re-verifica el hueco con un
+  cliente sin caché; por eso la disponibilidad pública sí puede servir un resultado de 15 s (o uno de
+  hasta 2 min si EA está caído): lo peor de un hueco viejo es un "ese horario se ocupó", no una silla
+  vendida dos veces.
+- **Es por proceso.** El panel es un contenedor con un `next start`; con dos réplicas cada una
+  invalidaría solo lo suyo.
+
 ---
 
 ## Reportes — cambiar el productor, no construir un pipeline
@@ -1040,6 +1064,8 @@ reporte en una decisión.
 | **Variación de precio por técnica, desglosada por motivo** | Dónde se escapa la plata | Quincenal |
 | **Clientas nuevas vs. que vuelven, y retención a 60 días** | Cuánto invertir en captación vs. en volver a traer | Mensual |
 | **Inasistencia por franja y por origen de reserva** | Si el recordatorio funciona, y si algún horario no vale la pena abrir | Mensual |
+| **Demanda por día y hora** — mapa de calor día de la semana × hora de inicio, ingreso por día, el día más lleno y el más flojo *por día abierto* | Cuándo pautar y qué día empujar con una promo | Mensual |
+| **Costo por clienta nueva** — inversión en anuncios ÷ clientas nuevas, y "ya recuperado" = lo que pagaron las nuevas ÷ inversión | Si la pauta se paga sola | Mensual |
 
 Definiciones que se fijan una vez y se usan igual en todos lados: **ocupación** = minutos de servicios
 realizados ÷ minutos disponibles (el plan de trabajo menos bloqueos; una inasistencia **no** cuenta como
@@ -1047,6 +1073,32 @@ ocupado); **clienta nueva** = sin ninguna cita previa en la unión EA + `legacy_
 **retención a 60 días** = % de clientas atendidas en el periodo que volvieron dentro de los 60 días
 siguientes. Todas viven en `lib/metrics.ts` como funciones puras, y ningún reporte las recalcula por su
 cuenta.
+
+**Los dos reportes de pauta** (`reportes/demand.ts`, `reportes/acquisition.ts`, dibujados por
+`PautaReports.tsx`) se agregaron después del set original, para la metodología de anuncios de la
+dueña. Decisiones fijadas, con su test:
+
+- **Demanda:** cuentan las citas atendidas y agendadas por su hora de inicio en hora de pared de
+  Bogotá. **Una inasistencia sí es demanda** (alguien pidió esa hora); una cancelada no; un estado
+  que el panel no traduce tampoco, y se cuenta aparte. Las filas de `legacy_appointment` del periodo
+  entran al conteo con `legacyStatusKind()` —la misma lectura del texto libre de Agenda Pro que usa
+  "clienta nueva"— pero **no** al ingreso: ningún reporte de plata lee el histórico. El día más lleno
+  y el más flojo se comparan por *citas por día abierto* (la jornada sale del plan de trabajo), no
+  por totales, para que un mes con cinco sábados no premie al sábado.
+- **Costo por clienta nueva:** "clienta nueva" es `splitCustomers()`, la misma del reporte de
+  clientas. La inversión vive en `ad_spend` (migración `023`, por mes y canal), la anota la dueña
+  desde el reporte (`pauta:registrar`, auditado). Un periodo que no es mes entero suma **los meses
+  completos** que toca y lo dice: la pauta no se prorratea porque no se gasta pareja. Sin inversión,
+  con inversión en cero o sin nuevas, el costo es `null` con el motivo, nunca `$ 0` ni `∞`.
+
+La tercera pieza de esa metodología no es un reporte: **`/clientes/exportar-meta`** baja la lista
+de clientas para una audiencia personalizada de Meta (`clientes:exportar`, solo la dueña), en el
+formato de lista de clientes de Meta y **cifrada con SHA-256** (`phone`, `fn`, `ln`, `ct` si hay
+ciudad, `country`). Segmentos: todas, atendidas en los últimos 180 días (exclusión de captación) e
+inactivas hace más de 60 días sin cita futura (volver a traer). Une EA y el histórico por teléfono
+E.164; las que no tienen teléfono se cuentan en pantalla. **`wa_optout` no filtra**: es una baja de
+mensajes, y esta lista no le escribe a nadie — sirve sobre todo para *no* mostrar anuncios. Cada
+descarga deja en `audit_log` el segmento y el número de filas, nunca los datos.
 
 ---
 
@@ -1396,14 +1448,33 @@ concreta del riesgo "actualizaciones de EA" listado abajo, y se corre después d
 
 ### Capa 4 — E2E (Playwright)
 
-Lo que Vitest no puede: los Server Components `async`. Playwright ya se usa en el CRM
-(`automation/agendapro-pull`), así que no es herramienta nueva.
+Lo que Vitest no puede: los Server Components `async`, y sobre todo **el pegamento**. Los tres
+defectos que llegaron a producción —pantallas sin navegación, un destino del menú apuntando a una
+ruta inexistente, el alta de clienta fallando contra EA por un campo obligatorio— pasaron con la
+suite unitaria en verde, porque ninguno de esos tests abre el panel.
 
-- Login: redirige sin sesión, entra con cuenta de Workspace.
-- La agenda renderiza el día y permite crear una cita.
+Corre contra un stack efímero de verdad (`deploy/compose/ci-stack.yml`): MySQL y Easy!Appointments
+en contenedores, **sin dobles**. Un doble de EA habría aceptado feliz el payload que EA rechaza,
+que es justo el bug que se escapó — y volvió a pasar: `POST /services` exige `attendants_number`,
+que el panel no mandaba, así que crear un servicio desde el panel no funcionó nunca hasta que este
+E2E lo encontró.
+
+- Login: redirige sin sesión, entra con cuenta de Workspace. · `navegacion.spec.ts`
+- La agenda renderiza el día y permite crear una cita, incluida la clienta nueva desde el mismo
+  formulario, con nombre y apellido separados. · `agenda.spec.ts`
 - Mover una cita encima de otra ofrece "Guardar de todas formas" en vez de guardar callado.
-- Reserva pública de punta a punta, y Turnstile rechazando un envío sin token.
-- Cerrar una cita en caja.
+- Agendar **fuera del horario** de la técnica con la casilla, y que esa casilla **no** tape una
+  doble reserva; correr la jornada visible sin depender de que haya una cita escondida. ·
+  `horario.spec.ts`
+- Componer un combo eligiendo sus dos mitades: que el combo no esté en la lista, que la suma salga
+  tachada contra su precio, y que se guarde **una** cita con el servicio del combo. · `combos.spec.ts`
+- Reserva pública de punta a punta (catálogo → horarios → confirmar), con la forma **exacta** de lo
+  que sale a internet y el 409 de la carrera perdida. · `reserva-publica.spec.ts`
+  (Turnstile se prueba en la landing, `src/app/api/reservas/guards.test.ts`: es su proxy quien lo
+  verifica, y el panel no lo ve.)
+- Cerrar una cita en caja, hasta la fila de `appointment_finance` con su método de pago y la
+  invariante comprobada en SQL. · `caja.spec.ts`
+- Ergonomía táctil: ningún objetivo por debajo de 44 px en las nueve pantallas. · `movil.spec.ts`
 
 ### El test que reemplaza la conciliación manual
 
@@ -1421,6 +1492,10 @@ como el fixture esperado.
 - **CI en cada PR**: `npm run lint && npm test` en la landing y en `admin/`. En `admin/` los tests son
   **compuerta del build de la imagen**: si fallan, no hay imagen y no hay despliegue. En la landing no
   corren en `prebuild` — un test lento o inestable no debe poder bloquear un deploy de la landing.
+- **Los umbrales se evalúan en CI**, con `npm run test:coverage` y no `npm test`. Un umbral que ningún
+  pipeline mira no es un umbral, es un comentario: así fue como una rama de `ingest-id.ts` —la que
+  rechaza un método de pago mal escrito, que produce llaves duplicadas en Actual Budget— se quedó sin
+  test sin que nadie se enterara.
 - **Lo que NO se testea:** EA en sí, Strapi en sí, Actual Budget en sí. Se testean nuestras
   suposiciones sobre ellos (capa 3) y nuestros mapeos hacia ellos (capa 1).
 

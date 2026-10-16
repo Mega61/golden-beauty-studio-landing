@@ -10,7 +10,7 @@ import { DailyReports, FortnightReports, MonthlyReports } from "../Reports";
 import { previewData } from "./fixtures";
 
 /**
- * `/admin/reportes/vista-previa` — los nueve reportes con un mes inventado.
+ * `/admin/reportes/vista-previa` — los once reportes con un mes inventado.
  *
  * **Por qué existe:** la Definition of Done de D4 pide revisar la pantalla en
  * navegador a 390 / 768 / 1440, y no hay forma de hacerlo sin datos. Lo que hay
@@ -63,7 +63,12 @@ export default async function VistaPreviaReportes({
       <div className={styles.grid}>
         {cadence === "dia" ? <DailyReports data={data} /> : null}
         {cadence === "quincena" ? <FortnightReports data={data} /> : null}
-        {cadence === "mes" ? <MonthlyReports data={data} /> : null}
+        {cadence === "mes" ? (
+          // El formulario de inversión se dibuja para la dueña, igual que en
+          // `/reportes`. Guardar desde acá escribe en la base de verdad: la
+          // acción no sabe que la llamó una vista previa, y pide sesión.
+          <MonthlyReports canEditAdSpend={role === "owner"} data={data} />
+        ) : null}
       </div>
     </AppShell>
   );

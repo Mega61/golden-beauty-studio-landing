@@ -1,3 +1,5 @@
+import { readdirSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import {
   activeDestinationId,
@@ -7,9 +9,33 @@ import {
   overflowFor,
 } from "./nav";
 
+/** La interfaz de EA como la ve un navegador. En local, el puerto de `EA_PORT`. */
+const EA = "http://localhost:8081";
+
 describe("destinationsFor", () => {
-  it("la dueña ve todo", () => {
-    expect(destinationsFor("owner")).toHaveLength(DESTINATIONS.length);
+  it("la dueña ve todo, con la URL de EA configurada", () => {
+    expect(destinationsFor("owner", EA)).toHaveLength(DESTINATIONS.length);
+  });
+
+  it("sin la URL de EA, «Avanzado» no se dibuja", () => {
+    // Un enlace que no lleva a ningún lado es peor que no tener el enlace:
+    // cuesta un clic descubrirlo y deja la sensación de que el panel está roto.
+    // Estuvo apuntando a `/avanzado`, una ruta que nunca existió.
+    const ids = destinationsFor("owner").map((d) => d.id);
+    expect(ids).not.toContain("avanzado");
+    expect(ids).toHaveLength(DESTINATIONS.length - 1);
+  });
+
+  it("con la URL, «Avanzado» apunta a ella y no a una ruta del panel", () => {
+    const avanzado = destinationsFor("owner", EA).find((d) => d.id === "avanzado");
+    expect(avanzado?.href).toBe(EA);
+    expect(avanzado?.external).toBe(true);
+  });
+
+  it("la URL de EA no se filtra a los demás destinos", () => {
+    for (const d of destinationsFor("owner", EA)) {
+      if (d.id !== "avanzado") expect(d.href.startsWith("/"), d.id).toBe(true);
+    }
   });
 
   it("la recepción no ve reportes, diagnóstico ni el link a EA", () => {
@@ -18,11 +44,14 @@ describe("destinationsFor", () => {
     expect(ids).not.toContain("diagnostico");
     expect(ids).not.toContain("avanzado");
     expect(ids).toContain("caja");
+    expect(ids).toContain("recordatorios");
   });
 
   it("la técnica no ve caja, ni clientas, ni a las demás profesionales", () => {
     const ids = destinationsFor("staff").map((d) => d.id);
-    expect(ids).toEqual(["hoy", "agenda", "comisiones"]);
+    // Ajustes sí: instalar el panel en el celular le sirve a cualquiera. Lo
+    // que hay adentro lo recorta la pantalla por rol.
+    expect(ids).toEqual(["hoy", "agenda", "comisiones", "ajustes"]);
   });
 });
 
@@ -35,9 +64,11 @@ describe("bottomBarFor", () => {
       "clientas",
     ]);
     expect(overflowFor("reception").map((d) => d.id)).toEqual([
+      "recordatorios",
       "comisiones",
       "servicios",
       "equipo",
+      "ajustes",
     ]);
   });
 
@@ -51,7 +82,7 @@ describe("bottomBarFor", () => {
     // Rellenar cinco casillas con un destino que el rol no puede abrir es una
     // simetría bonita que termina en una pantalla de "no autorizado".
     expect(bottomBarFor("staff").map((d) => d.id)).toEqual(["hoy", "agenda"]);
-    expect(overflowFor("staff").map((d) => d.id)).toEqual(["comisiones"]);
+    expect(overflowFor("staff").map((d) => d.id)).toEqual(["comisiones", "ajustes"]);
   });
 
   it("los cuatro respetan el orden declarado", () => {
@@ -114,8 +145,27 @@ describe("catálogo", () => {
 
   it("las rutas van sin el basePath: Next lo agrega solo", () => {
     for (const d of DESTINATIONS) {
-      expect(d.href.startsWith("/admin")).toBe(false);
-      expect(d.href.startsWith("/")).toBe(true);
+      // `avanzado` es el único que no es una ruta del panel: su `href` lo pone
+      // `destinationsFor()` desde la configuración del despliegue.
+      if (d.id === "avanzado") continue;
+      expect(d.href.startsWith("/admin"), d.id).toBe(false);
+      expect(d.href.startsWith("/"), d.id).toBe(true);
+    }
+  });
+
+  it("toda ruta del catálogo existe como pantalla", () => {
+    // El bug que este test habría atrapado: «Avanzado (EA)» apuntaba a
+    // `/avanzado`, un directorio que nunca se creó. Compilaba, pasaba el lint y
+    // abría una pestaña nueva en un 404.
+    const pantallas = readdirSync(new URL("../../app/(panel)", import.meta.url), {
+      withFileTypes: true,
+    })
+      .filter((e) => e.isDirectory())
+      .map((e) => `/${e.name}`);
+
+    for (const d of DESTINATIONS) {
+      if (d.external) continue;
+      expect(pantallas, `${d.id} → ${d.href}`).toContain(d.href);
     }
   });
 });

@@ -406,6 +406,7 @@ export function Heatmap({
   cells,
   scaleLabel,
   rowHeader = "",
+  dense = false,
 }: {
   columns: readonly { id: string; label: string }[];
   rows: readonly { id: string; label: string }[];
@@ -414,6 +415,8 @@ export function Heatmap({
   /** Cómo se rotulan los dos extremos de la escala. */
   scaleLabel: { min: string; max: string };
   rowHeader?: string;
+  /** Celdas angostas y centradas, para matrices de cifras cortas (la semana). */
+  dense?: boolean;
 }) {
   const tip = useTip();
 
@@ -428,7 +431,7 @@ export function Heatmap({
   return (
     <>
       <div className={styles.heatScroll} tabIndex={0}>
-        <table className={styles.heat}>
+        <table className={dense ? `${styles.heat} ${styles["heat--dense"]}` : styles.heat}>
           <thead>
             <tr>
               <th scope="col">{rowHeader}</th>

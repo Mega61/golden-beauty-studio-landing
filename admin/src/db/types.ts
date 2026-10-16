@@ -170,6 +170,8 @@ export interface AllowedUserTable {
   email: string;
   role: UserRole;
   ea_provider_id: number | null;
+  /** Migración 024. `dev:seed`, la suite E2E y la entrada de desarrollo. Ver `lib/test-accounts.ts`. */
+  is_test_account: Generated<number>;
   created_at: CreatedAt;
   updated_at: UpdatedAt;
 }
@@ -637,6 +639,16 @@ export type WaMessageKind = "recordatorio_24h" | "recordatorio_2h" | "confirmaci
  * `enviado` y `entregado` es exactamente la pregunta que se hace alguien cuando
  * una clienta dice que no le avisaron.
  */
+/**
+ * Por dónde salió un mensaje.
+ *
+ * `manual` es una persona abriendo `wa.me` con el texto listo: el paliativo de
+ * X7 mientras Meta no apruebe las plantillas. Comparten la `UNIQUE (cita,
+ * tipo)` a propósito — un recordatorio manual es uno que el emisor automático
+ * ya no tiene que mandar.
+ */
+export type WaMessageChannel = "cloud_api" | "manual";
+
 export type WaMessageStatus =
   | "pendiente"
   | "enviado"
@@ -654,6 +666,10 @@ export interface WaMessageTable {
   id: Generated<number>;
   ea_appointment_id: number;
   kind: WaMessageKind;
+  /** Migración `021`. Por defecto `cloud_api`; el botón de `wa.me` escribe `manual`. */
+  channel: Generated<WaMessageChannel>;
+  /** Quién tocó el botón, en `manual`. Sin FK, como `audit_log.actor_user_id`. */
+  sent_by_user_id: AuthId | null;
   phone_e164: string;
   template_name: string;
   status: Generated<WaMessageStatus>;
@@ -671,6 +687,41 @@ export interface WaOptoutTable {
   phone_e164: string;
   reason: string | null;
   created_at: CreatedAt;
+}
+
+/**
+ * Un navegador suscrito a Web Push (migración `022`). Una fila por
+ * dispositivo, no por persona. El `endpoint` es una capacidad —quien lo tiene
+ * y la llave VAPID le puede escribir a ese celular— y no sale nunca a un log.
+ */
+export interface PushSubscriptionTable {
+  id: Generated<number>;
+  user_id: AuthId;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  last_success_at: SqlDateTime | null;
+  failure_count: Generated<number>;
+  last_failure_at: SqlDateTime | null;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
+/** Por dónde salió la plata de la pauta (migración `023`). */
+export type AdChannel = "meta" | "google" | "otro";
+
+/**
+ * La inversión en anuncios de un mes y un canal (migración `023`). `month` es
+ * `"YYYY-MM"` en texto: un mes es calendario, no un instante.
+ */
+export interface AdSpendTable {
+  month: string;
+  channel: Generated<AdChannel>;
+  amount_cop: Cop;
+  notes: string | null;
+  updated_by: AuthId | null;
+  updated_at: UpdatedAt;
 }
 
 export interface Database {
@@ -699,6 +750,8 @@ export interface Database {
   job_run: JobRunTable;
   wa_message: WaMessageTable;
   wa_optout: WaOptoutTable;
+  push_subscription: PushSubscriptionTable;
+  ad_spend: AdSpendTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -726,6 +779,10 @@ export type NewAppointmentPayment = Insertable<AppointmentPaymentTable>;
 export type WaMessage = Selectable<WaMessageTable>;
 export type NewWaMessage = Insertable<WaMessageTable>;
 export type WaMessageUpdate = Updateable<WaMessageTable>;
+
+export type PushSubscriptionRow = Selectable<PushSubscriptionTable>;
+
+export type AdSpendRow = Selectable<AdSpendTable>;
 
 export type WaOptout = Selectable<WaOptoutTable>;
 export type NewWaOptout = Insertable<WaOptoutTable>;

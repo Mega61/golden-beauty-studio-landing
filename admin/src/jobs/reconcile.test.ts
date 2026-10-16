@@ -25,6 +25,7 @@ const report = (over: Partial<ReconcileReport> = {}): ReconcileReport => ({
   repaired: 0,
   frozen: 0,
   fallback: 0,
+  combos: { written: 5, removed: 0, skipped: [] },
   startedAt: new Date("2026-09-03T03:15:00Z"),
   finishedAt: new Date("2026-09-03T03:15:42Z"),
   ...over,
@@ -56,6 +57,33 @@ describe("summarizeReconcile", () => {
     expect(summary).toContain("4 espejadas");
     expect(summary).toContain("5 ya cerradas");
     expect(summary).toContain("2 en fallback");
+  });
+
+  it("dice cómo quedó la composición de los combos", () => {
+    // La sincronización de `combo` viaja en este job porque es el único trabajo
+    // nocturno que hay. Si no se dijera en el resumen, una tabla que dejó de
+    // llenarse sería indistinguible de una noche normal — y lo que se pierde es
+    // el reparto de comisión de los combos a cuatro manos.
+    expect(summarizeReconcile(report())).toContain("5 combos sincronizados");
+  });
+
+  it("un combo que todavía no se publicó sale nombrado, no contado", () => {
+    const summary = summarizeReconcile(
+      report({ combos: { written: 4, removed: 0, skipped: ["semi-permanent-hands-feet"] } }),
+    );
+
+    // "se saltó 1" deja a alguien comparando listas a mano contra la vitrina.
+    expect(summary).toContain("sin publicar: semi-permanent-hands-feet");
+  });
+
+  it("que la sincronización falle se grita, no se omite", () => {
+    // `null` es "no se pudo", que no es lo mismo que "no había ninguno". La
+    // diferencia es si hay que ir a mirar algo.
+    const summary = summarizeReconcile(report({ combos: null }));
+
+    expect(summary).toContain("NO se pudieron sincronizar");
+    // Y el barrido sigue contando: un fallo de combos no tumba la noche.
+    expect(summary).toContain("41 citas revisadas");
   });
 
   it("cabe en la columna: `summary` es VARCHAR(500)", () => {

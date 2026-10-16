@@ -12,6 +12,8 @@ import {
   type Db,
 } from "@/db";
 
+import { syncComboTable, type ComboSyncResult } from "@/lib/combo-source";
+
 import {
   createServicePriceCache,
   upsertAppointmentFinance,
@@ -112,6 +114,15 @@ export type ReconcileReport = {
   frozen: number;
   /** Filas que quedaron marcadas `fallback` en esta corrida. Es la alarma. */
   fallback: number;
+  /**
+   * Cómo quedó `gbs_admin.combo`. `null` = la sincronización falló y se siguió.
+   *
+   * No tiene nada que ver con congelar precios, y viaja acá igual por una razón
+   * práctica: es el único trabajo nocturno que hay, y darle un cron propio a una
+   * escritura idempotente de cinco filas sería un servicio más que puede morirse
+   * en silencio. Ver `syncCombos()` abajo.
+   */
+  combos: ComboSyncResult | null;
   startedAt: Date;
   finishedAt: Date;
 };
@@ -128,8 +139,39 @@ export function summarizeReconcile(report: ReconcileReport): string {
     `${report.created} creadas · ${report.repaired} reparadas · ` +
     `${report.repriced} recongeladas · ${report.mirrored} espejadas · ` +
     `${report.untouched} intactas · ${report.frozen} ya cerradas · ` +
-    `${report.fallback} en fallback`
+    `${report.fallback} en fallback` +
+    (report.combos === null
+      ? " · combos: NO se pudieron sincronizar"
+      : ` · ${report.combos.written} combos sincronizados`) +
+    (report.combos && report.combos.skipped.length > 0
+      ? ` (sin publicar: ${report.combos.skipped.join(", ")})`
+      : "")
   );
+}
+
+/**
+ * Rehacer `gbs_admin.combo` — y no tumbar la noche si falla.
+ *
+ * Esa tabla es de donde las comisiones sacan el reparto de un combo trabajado a
+ * cuatro manos. Se rehace todas las noches desde la composición horneada en la
+ * imagen (`lib/combo-source.ts`), así que publicar un combo nuevo no deja
+ * ningún paso manual pendiente.
+ *
+ * **Mejor esfuerzo, como `recordRun()` y por lo mismo.** Congelar precios es lo
+ * que este job existe para garantizar; un fallo escribiendo cinco filas de
+ * composición no puede cancelar eso. Se grita por stderr y el resumen lo dice
+ * con todas las letras, que es lo que Diagnóstico va a leer.
+ */
+async function syncCombos(db: Db): Promise<ComboSyncResult | null> {
+  try {
+    return await syncComboTable(db);
+  } catch (error) {
+    console.error(
+      "reconcile: no se pudo sincronizar la composición de los combos. El barrido sí corrió.",
+      error,
+    );
+    return null;
+  }
 }
 
 /**
@@ -228,6 +270,7 @@ async function scanAndFreeze(
   const report: ReconcileReport = {
     from,
     till,
+    combos: await syncCombos(options.db),
     scanned: appointments.length,
     created: 0,
     untouched: 0,

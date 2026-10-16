@@ -89,6 +89,13 @@ npm run build:migrator && node .next/standalone/scripts/migrate.js
 
 ## 5. La cuenta para entrar
 
+**El camino corto: `DEV_LOGIN=1`.** Con esa línea en `admin/.env.local`, `/admin/entrar` muestra
+tres botones —Dueña, Recepción, Técnica— y un toque basta: sin código, sin app de autenticación.
+Crea sola la cuenta de prueba del rol. En un build de producción los botones no existen y el
+endpoint responde 404, aunque la variable esté puesta (`lib/test-accounts.ts`).
+
+Lo de abajo sigue sirviendo para probar el login por código de verdad:
+
 Acá está el truco que ahorra la media hora de Google Cloud:
 
 ```bash
@@ -194,8 +201,68 @@ historia por `source_id`— así que se puede probar sin miedo.
 ## Los tests
 
 ```bash
-cd admin && npm test          # 1.866
+cd admin && npm test          # 1.870 unitarios
+cd admin && npm run e2e       # 35 de punta a punta, con Playwright
 cd ..     && npm test         # 96, la landing
+```
+
+### Por qué hay una suite E2E además de los 1.870
+
+Porque los 1.870 pasaban con tres bugs adentro: cinco pantallas sin barra de navegación, un
+destino del menú apuntando a una ruta que nunca se creó, y el alta de clienta fallando contra
+EA por un campo obligatorio. **Ninguno de esos tests abre el panel.** Las funciones puras
+estaban bien; lo roto era el pegamento, y el pegamento solo se ve cargando la página.
+
+Lo que la suite E2E cubre es exactamente eso: que la pantalla monte, que el enlace lleve a
+algún lado, que el formulario guarde **de verdad contra EA**. No repite la aritmética del
+ticket ni el prorrateo del descuento — eso ya está cubierto donde corresponde.
+
+**Corre contra el entorno real, sin dobles.** Un doble de EA habría aceptado feliz el payload
+sin apellido que EA rechaza con un 500, que es justo el bug que se escapó.
+
+Necesita el stack arriba y el panel corriendo; si falta algo, `global-setup` lo dice con el
+comando que lo arregla en vez de fallar con veinte errores de red. Al terminar borra las
+clientas y citas que creó, para que una corrida no le cambie el resultado a la siguiente.
+
+```bash
+npm run e2e -- --project=escritorio     # solo escritorio
+npm run e2e -- -g "alta de clienta"     # un grupo
+npm run e2e:ui                          # modo interactivo
+npx playwright show-trace test-results/<carpeta>/trace.zip   # autopsia de un fallo
+```
+
+### Reproducir CI en tu máquina
+
+CI no usa tu entorno: levanta **el suyo**, efímero, en puertos altos, y corre al lado del tuyo
+sin tocarlo. Lo mismo se puede hacer local, y es lo primero que conviene intentar cuando CI se
+pone rojo y en tu máquina pasa:
+
+```bash
+cd admin
+npm run e2e:up     # levanta MySQL + EA, instala EA, migra — un par de minutos
+npm run build      # el panel en modo producción, que es contra lo que corre CI
+(cd .next/standalone && PORT=13001 node --env-file=../../.env.ci.local server.js &)
+npm run e2e:ci
+npm run e2e:down   # se lleva todo, incluidos los volúmenes
+```
+
+**Modo producción y no `npm run dev`, y no es un detalle:** el límite de 10 intentos de login
+por minuto **solo se aplica fuera de desarrollo**. La suite lo descubrió con un `429` a mitad
+de corrida que en dev no aparecía nunca — la versión exacta de "en mi máquina pasa".
+
+### Una configuración de EA de la que depende todo
+
+`require_email` tiene que estar en **0** en Easy!Appointments.
+
+Viene en **1** en una instalación nueva, y con eso su API **rechaza con un 500 cualquier
+clienta sin correo**. El estudio trabaja al revés: la mayoría no tiene correo, y el panel se
+niega a inventar uno — un correo falso viaja como invitado del evento de Google, rebota, y
+ensucia la ficha para siempre.
+
+Se comprueba así, y está en el runbook de `docs/DEPLOY.md`:
+
+```sql
+SELECT value FROM ea_settings WHERE name = 'require_email';   -- tiene que dar 0
 ```
 
 Los de integración contra MySQL **se saltan solos** si Docker no está: no fallan, dicen que se

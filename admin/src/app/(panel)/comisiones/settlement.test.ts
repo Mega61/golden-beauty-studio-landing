@@ -256,7 +256,7 @@ describe("buildSettlements", () => {
 
     it("nombra a la técnica por su id en vez de dejar la fila muda", () => {
       const settlements = buildSettlements([entrada()], [], SIN_EA);
-      expect(settlements[0].name).toBe("Técnica #3");
+      expect(settlements[0].name).toBe("Profesional #3");
     });
 
     it("cae al id de la vitrina, y después al del servicio", () => {

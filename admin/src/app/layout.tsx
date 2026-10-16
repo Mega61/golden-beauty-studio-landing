@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
+import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 import { ToastProvider } from "@/components/ui/Toast";
 
 /**
@@ -40,6 +41,15 @@ export const metadata: Metadata = {
   title: "Panel · Golden Beauty Studio",
   // El panel nunca se indexa: vive detrás de auth y de un rewrite.
   robots: { index: false, follow: false },
+  // El manifest (`app/manifest.ts`) lo enlaza Next solo. Esto es lo que iOS
+  // lee en vez del manifest: el nombre bajo el ícono y que abra sin la barra
+  // de Safari. `default` y no `black-translucent`: la barra superior del
+  // panel no deja espacio para que el reloj del sistema se le monte encima.
+  appleWebApp: {
+    capable: true,
+    title: "Golden",
+    statusBarStyle: "default",
+  },
 };
 
 export function generateViewport(): Viewport {
@@ -66,6 +76,7 @@ export default function RootLayout({
             región `aria-live` se desmontara al navegar, el anuncio se perdería
             justo cuando importa. */}
         <ToastProvider>{children}</ToastProvider>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

@@ -42,4 +42,13 @@ export type ServiceOption = {
   /** Minutos. Prellena el fin al elegir el servicio. */
   duration: number | null;
   attendantsNumber: number | null;
+  /**
+   * Precio de lista de EA, en pesos enteros. `null` = EA no lo sabe.
+   *
+   * El formulario **no cobra nada** —eso es de la cuenta, que cierra la técnica—
+   * y tampoco lo guarda. Existe por una sola razón: al componer un combo hay que
+   * poder mostrar la suma de las dos mitades tachada al lado del precio del
+   * combo, y sin los precios de las partes ese tachado no se puede dibujar.
+   */
+  priceCOP: number | null;
 };

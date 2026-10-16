@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { InstallHint } from "../pwa/InstallHint";
 import { ReadOnlyBand } from "../ui/ReadOnlyBand";
 import { Wordmark } from "./Wordmark";
 import { SideNav } from "./SideNav";
@@ -27,6 +28,22 @@ import type { Role } from "./nav";
  * grilla con encabezados pegajosos termina escondiendo la primera hora de la
  * jornada.
  */
+/**
+ * La interfaz de EA **como la ve un navegador**.
+ *
+ * No es `EA_API_URL`: ésa es la interna con la que el panel habla por API, y en
+ * producción es `http://golden-agenda/…`, que no resuelve fuera de la red de
+ * Docker. Un enlace a esa URL abriría una pestaña muerta.
+ *
+ * Sin la variable, el destino "Avanzado (EA)" simplemente no se dibuja. Es
+ * deliberado: un enlace que no lleva a ningún lado cuesta un clic descubrirlo y
+ * deja la sensación de que el panel está roto.
+ */
+function eaPublicUrl(): string | null {
+  const raw = process.env.EA_PUBLIC_URL?.trim();
+  return raw ? raw.replace(/\/+$/, "") : null;
+}
+
 export function AppShell({
   role,
   title,
@@ -51,7 +68,7 @@ export function AppShell({
         Saltar al contenido
       </a>
 
-      <SideNav role={role} />
+      <SideNav role={role} eaUrl={eaPublicUrl()} />
 
       <div className="ui-main">
         <header className="ui-topbar">
@@ -78,6 +95,8 @@ export function AppShell({
         ) : null}
 
         <main className="ui-content" id="contenido" tabIndex={-1}>
+          {/* Solo en celular, una vez, y nunca dentro de la app instalada. */}
+          <InstallHint />
           {children}
         </main>
       </div>

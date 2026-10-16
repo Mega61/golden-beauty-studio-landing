@@ -53,7 +53,7 @@ export function DaySheet({
                           {formatTimeRange(event.appointment.start, event.appointment.end)}
                         </span>
                         <span className={styles.sheetWho}>
-                          {info?.customer ?? "Sin clienta"}
+                          {info?.customer ?? "Sin cliente"}
                           {info?.service ? ` — ${info.service}` : ""}
                         </span>
                         <span className={styles.sheetState}>

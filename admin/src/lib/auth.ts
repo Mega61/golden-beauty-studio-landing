@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthEndpoint } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { nextCookies } from "better-auth/next-js";
+import { randomUUID } from "node:crypto";
 import * as z from "zod";
 
 import { getDb } from "@/db/client";
@@ -11,6 +12,7 @@ import { allowedUserRepository, staffTotpRepository } from "@/db/repositories";
 import type { StaffTotp } from "@/db/types";
 import type { AllowedIdentity } from "./auth-policy";
 import { findAllowedEntry, isAllowedIdentity } from "./auth-policy";
+import { DEV_LOGIN_ACCOUNTS, devLoginEnabled } from "./test-accounts";
 import type { TotpEnrollment } from "./totp";
 import {
   buildOtpauthUrl,
@@ -157,6 +159,8 @@ export function panelBasePath(env: Env = process.env): string {
 
 // ── El plugin de entrada por TOTP ───────────────────────────────────────────
 
+const signInDevBody = z.object({ role: z.enum(["owner", "admin", "staff"]) });
+
 const signInTotpBody = z.object({
   /** El id del `user`, elegido tocando un nombre en la grilla del login. */
   userId: z.string().min(1).max(36),
@@ -210,7 +214,7 @@ function lockedOut(): APIError {
   return new APIError("FORBIDDEN", {
     code: "TOTP_BLOQUEADO",
     message:
-      "Esta cuenta quedó bloqueada por intentos fallidos. La dueña la libera desde Equipo.",
+      "Esta cuenta quedó bloqueada por intentos fallidos. Administración la libera desde Equipo.",
   });
 }
 
@@ -219,6 +223,51 @@ function staffTotpPlugin() {
     id: "gbs-staff-totp",
 
     endpoints: {
+      /**
+       * `POST /sign-in/dev` — entrar sin código, **solo en desarrollo**.
+       *
+       * Existe siempre para que el tipo de `auth.api` sea uno solo, pero
+       * responde 404 salvo con `DEV_LOGIN=1` fuera de un build de producción
+       * (`devLoginEnabled()`; `NODE_ENV` lo fija el build, no el entorno de la
+       * VM). Crea —o reusa— la cuenta de prueba del rol, marcada como tal, y
+       * abre la sesión por la misma API interna que el login de verdad: ninguna
+       * cookie inventada, ver la nota de `dev-seed-cli.ts`.
+       */
+      signInDev: createAuthEndpoint(
+        "/sign-in/dev",
+        { method: "POST", body: signInDevBody },
+        async (ctx) => {
+          if (!devLoginEnabled()) throw new APIError("NOT_FOUND");
+
+          const account = DEV_LOGIN_ACCOUNTS[ctx.body.role];
+          const db = getDb();
+
+          const existing = await db
+            .selectFrom("user")
+            .select("id")
+            .where("email", "=", account.email)
+            .executeTakeFirst();
+          const userId = existing?.id ?? randomUUID();
+          if (!existing) {
+            await db
+              .insertInto("user")
+              .values({ id: userId, name: account.name, email: account.email, emailVerified: 1 })
+              .execute();
+          }
+
+          const allowed = allowedUserRepository(db);
+          const entry = await allowed.findByEmail(account.email);
+          if (entry) await allowed.update(entry.id, { role: ctx.body.role, is_test_account: 1 });
+          else await allowed.insert({ email: account.email, role: ctx.body.role, is_test_account: 1 });
+
+          const user = await ctx.context.internalAdapter.findUserById(userId);
+          if (!user) throw new APIError("INTERNAL_SERVER_ERROR");
+          const session = await ctx.context.internalAdapter.createSession(userId);
+          await setSessionCookie(ctx, { session, user });
+          return ctx.json({ ok: true });
+        },
+      ),
+
       /**
        * `POST /sign-in/totp` — el login de las técnicas.
        *

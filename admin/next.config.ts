@@ -73,7 +73,26 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      /**
+       * El service worker (`public/sw.js`), según la guía de PWA de Next.
+       *
+       * `no-cache` para que una versión nueva del worker llegue en la visita
+       * siguiente y no cuando venza una caché HTTP; un worker viejo pegado es
+       * de los bugs más difíciles de sacar de un celular ajeno. La CSP le
+       * prohíbe cargar scripts de otro origen. `source` va sin `/admin`:
+       * `basePath` lo prefija solo.
+       */
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
+    ];
   },
 };
 

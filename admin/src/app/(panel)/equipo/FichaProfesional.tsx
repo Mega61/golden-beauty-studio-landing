@@ -51,7 +51,7 @@ export function FichaProfesional({
             <EmptyState
               icon="alerta"
               title="La agenda no tiene su horario"
-              body="Sin plan de trabajo, esta profesional nunca va a mostrar disponibilidad. Se configura en Easy!Appointments."
+              body="Sin plan de trabajo, esta persona nunca va a mostrar disponibilidad. Se configura en Easy!Appointments."
             />
           ) : (
             <>
@@ -208,7 +208,7 @@ export function FichaProfesional({
             <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>
               Está en la lista de acceso ({member.account.allowed.email}) pero
               todavía no existe su cuenta. Si entra con la cuenta del estudio se
-              crea sola; si es una técnica, hay que agregarla desde Equipo.
+              crea sola; si entra con código, hay que agregar su cuenta desde Equipo.
             </p>
           ) : puedeAdministrar ? (
             <EnrolarTotp
@@ -219,7 +219,7 @@ export function FichaProfesional({
             />
           ) : (
             <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-              El enrolamiento del código lo hace la dueña.
+              El enrolamiento del código lo hace administración.
             </p>
           )}
         </div>

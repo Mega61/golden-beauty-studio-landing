@@ -170,7 +170,7 @@ describe("dailyClose", () => {
       [appointment()],
       PROVIDERS,
     );
-    expect(result.byProvider[0].name).toBe("Técnica #99");
+    expect(result.byProvider[0].name).toBe("Profesional #99");
   });
 
   it("una cuenta sin técnica se rotula «Sin asignar»", () => {

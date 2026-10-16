@@ -57,9 +57,9 @@ export const metadata = {
 type Rol = "owner" | "reception" | "staff";
 
 const ROLES: ReadonlyArray<[Rol, string]> = [
-  ["owner", "dueña"],
+  ["owner", "administración"],
   ["reception", "recepción"],
-  ["staff", "técnica"],
+  ["staff", "profesional"],
 ];
 
 function parseRol(value: string | undefined): Rol {

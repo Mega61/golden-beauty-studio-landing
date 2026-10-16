@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseEaLocalDate, parseEaLocalDateTime } from "./ea/datetime";
-import { pickProvider, publicSlots, type ProviderOffer } from "./public-availability";
+import { chainSlots, pickProvider, publicSlots, type ProviderOffer } from "./public-availability";
 import type { StationSlot } from "./conflict";
 import type { Appointment, BlockedPeriod } from "./ea/types";
 
@@ -248,5 +248,28 @@ describe("a quién le toca una reserva de «cualquiera»", () => {
 
   it("sin candidatas devuelve null en vez de inventar una técnica", () => {
     expect(pickProvider([], [])).toBeNull();
+  });
+});
+
+describe("chainSlots", () => {
+  const slot = (time: string, end: string, providerIds: number[]) =>
+    ({
+      time,
+      start: `2026-10-16 ${time}:00`,
+      end: `2026-10-16 ${end}:00`,
+      providerIds,
+    }) as never;
+
+  it("solo las horas donde la segunda mitad cabe justo después, con la misma persona", () => {
+    const manos = [slot("09:00", "10:00", [4, 5]), slot("10:00", "11:00", [4]), slot("11:00", "12:00", [5])];
+    const pies = [slot("10:00", "11:15", [5]), slot("11:00", "12:15", [5]), slot("12:00", "13:15", [4])];
+    const out = chainSlots(manos, pies);
+    expect(out.map((s) => [s.time, s.providerIds, s.end, s.splitAt])).toEqual([
+      ["09:00", [5], "2026-10-16 11:15:00", "2026-10-16 10:00:00"],
+    ]);
+  });
+
+  it("si nadie puede hacer las dos, la hora no sale", () => {
+    expect(chainSlots([slot("09:00", "10:00", [4])], [slot("10:00", "11:00", [5])])).toEqual([]);
   });
 });

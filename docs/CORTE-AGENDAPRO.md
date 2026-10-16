@@ -297,6 +297,29 @@ relativa recibe el prefijo del idioma. Los tres lugares con CTA —nav, servicio
 **Así que jubilar Agenda Pro del sitio público es cambiar una variable a `/reservar`**, y los dos
 idiomas siguen. No hay commit de por medio el día del corte.
 
+### Estado (2026-10-15): flujo rehecho, y un bug que habría tumbado el corte
+
+El flujo de `/reservar` se rehízo en tres pasos (servicio → día y hora → datos), uno por pantalla,
+con el resumen siempre a la vista y cada paso como entrada del historial (el gesto de "atrás" del
+celular retrocede un paso en vez de sacarla de la página). Lo que importa para el corte:
+
+- **El limitador por IP era uno solo para las tres rutas**, cada una midiéndolo contra su propio
+  tope. Una clienta que cargaba el catálogo y miraba cuatro o cinco días ya había gastado el cupo de
+  5 del POST: su reserva salía **429** al confirmar. Ahora hay un contador por ruta
+  (`rateLimited(ip, max, bucket)`) y un test que fija la regresión.
+- **Todos los CTA pasan por `bookingHref(lang)`.** Hero, Técnicas, Contacto, Footer y las promos
+  leían la variable cruda; con `/reservar` habrían mandado a cualquiera al flujo sin idioma y en
+  pestaña nueva. Cada renglón de la lista de precios enlaza a `/reservar?servicio=<id>` con el
+  servicio ya elegido (solo cuando la reserva es propia).
+- El catálogo público manda el **id de vitrina** (`slug`, de `service_map`) y **qué días trabaja**
+  cada técnica (`schedule`, `lib/public-schedule.ts`): la landing pone nombres y descripciones en el
+  idioma de quien reserva, y apaga los días cerrados antes de que alguien los toque.
+- **La confirmación es para la clienta, no solo para la pantalla:** botón de WhatsApp con el resumen
+  ya escrito (le queda la cita en el chat del estudio y el estudio se entera), y `.ics` / Google
+  Calendar con avisos el día antes y dos horas antes. No reemplaza a X7, pero tapa el hueco mientras
+  Meta no apruebe plantillas.
+- `/reservar` ya no se prerenderiza: leía "hoy" en el build y lo congelaba en la fecha del deploy.
+
 ## X7 — Recordatorios por WhatsApp
 
 **El trámite arranca ya, antes que el código.** Coexistence sobre el número actual exige verificación
@@ -329,14 +352,58 @@ Hecho: la migración `020` (`wa_message` con `UNIQUE (ea_appointment_id, kind)` 
   retención no es lugar para eso.
 - La baja es del **número**, no de la ficha: sobrevive a que alguien borre y recree la clienta.
 
-Falta —y depende de Meta, no de nosotros— el alta de Coexistence, **las plantillas `utility`
-aprobadas**, el cliente de `lib/whatsapp/` contra la Cloud API, el webhook de estado y el cron. El
-trámite es lo que hay que empezar ya: el código sin plantilla aprobada no manda nada.
+### Estado (2026-10-15): ✅ código completo, apagado hasta que Meta esté listo
+
+Construido y detrás de variables de entorno (`WHATSAPP_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID`):
+
+- **`lib/whatsapp/cloud-api.ts`**: cliente mínimo de plantillas, con los códigos de error de Meta
+  mapeados. Un timeout **no** se reintenta (pudo haber salido); solo lo que Meta rechazó por límite
+  de tasa o caída declarada.
+- **Confirmación** al reservar en la página (en `after()`, nunca tumba la reserva; el 201 dice
+  `whatsappConfirmation: "sending" | "disabled"` para que la landing no prometa un mensaje que no
+  sale) y al crear una cita en la agenda con la casilla marcada (con bitácora a nombre de quien la
+  creó).
+- **`jobs/reminders-run.ts`** + servicio `admin-recordatorios` cada 30 min: fila antes de Meta,
+  reintento solo de fallos reintentables y solo dentro de la ventana, corrida en `job_run`. Las
+  omisiones **no** se escriben como filas `omitido`: la `UNIQUE` congelaría un motivo pasajero (un
+  teléfono corregido diez minutos después ya no recibiría su aviso).
+- **Webhook** público y firmado (`/admin/api/public/whatsapp/webhook`): estados solo hacia
+  adelante, y "BAJA"/"STOP"/"NO" como mensaje completo dan de baja el número.
+- **`/recordatorios`** muestra si el aviso automático salió y si llegó; un fallo del automático se
+  manda a mano **sobre la misma fila**. **Diagnóstico** tiene su renglón.
+- Las plantillas tienen **cuatro** variables, no cinco: día y hora viajan juntos porque Meta no
+  acepta dos variables pegadas y "a las 1:00 p. m." delataría a la máquina.
+
+Falta lo de Meta, que es de la dueña: verificación del negocio, alta de Coexistence, token del
+System User, las dos plantillas `utility` aprobadas y el webhook registrado. Paso a paso en
+**`docs/WHATSAPP.md`**.
 
 **Es la regresión más visible del corte.** Agenda Pro manda recordatorios hoy; el día que se cancele,
 si esto no está, la clienta simplemente deja de recibirlos y la inasistencia sube. Si el trámite se
 alarga, el paliativo es un botón que abre `wa.me` con el texto listo: trabajo humano diario, pero
 nadie se queda sin aviso.
+
+### Estado del paliativo: ✅ construido (2026-10-15)
+
+`/admin/recordatorios` (y un acceso con el conteo de pendientes en Hoy), para dueña y recepción
+(`recordatorios:enviar`, `recordatorios:baja`). La técnica no: el aviso tiene que salir del WhatsApp
+del estudio, que es a donde la clienta responde para reprogramar.
+
+- **Por día, no por ventana.** Lista lo que falta de hoy (tipo `recordatorio_2h`) y todo mañana
+  (`recordatorio_24h`), con estado: pendiente, ya recordada (por quién y a qué hora), sin teléfono,
+  baja, o estado que no aplica. Las reglas de estado son las de `jobs/reminders.ts`
+  (`isSendableStatus`); la selección y el texto, puros y testeados, en `lib/whatsapp/manual-reminder.ts`.
+- **La fila va antes del enlace.** "Enviar por WhatsApp" inserta en `wa_message` (`channel =
+  'manual'`, `sent_by_user_id`, plantilla `manual-wa-me-v1`, `enviado`) y recién después abre `wa.me`.
+  Un segundo toque choca contra la `UNIQUE` y solo reabre la conversación.
+- **El emisor automático va a ver esas filas y saltarlas**: comparte el `kind`, así que la `UNIQUE
+  (ea_appointment_id, kind)` cruza los dos canales. Cuando se construya, su `ya-existe` cubre el caso
+  sin código nuevo. Migración `021` (`channel`, `sent_by_user_id`).
+- **"No quiere recordatorios"** registra la baja del número en `wa_optout`, con bitácora. Deshacer una
+  baja no tiene botón todavía: se hace a mano en la base.
+- **Lo que no hace:** no sabe si la persona de verdad le dio "enviar" en WhatsApp — la fila dice que
+  se abrió con el texto listo. Y una fila `fallido`/`omitido` del futuro emisor bloquea el envío manual
+  de ese aviso (la `UNIQUE`); se muestra como "no salió" para que alguien lo vea.
 
 ## X8 — El corte
 
@@ -368,7 +435,7 @@ LO QUE FALTA PARA CANCELAR AGENDA PRO
   ✅ X3 clientas RW          construido, sin desplegar
   ✅ X5 estados y combos     construidos · el pin de EA es operación en Portainer
   ⚙️  X6 reserva pública      commitear + una variable de entorno
-  ⏳ X7 WhatsApp             lógica lista · falta Meta (trámite + plantillas)
+  ⏳ X7 WhatsApp             código listo y apagado · falta Meta (docs/WHATSAPP.md)
   ⬜ X8 corte                operación: respaldo, ensayo, ciclo en paralelo
 
 FUERA DEL CAMINO DEL CORTE
@@ -440,6 +507,12 @@ columna que coincida.
 > liquidaría 40 % también sobre esas 35. Las tres salidas —Mariana es la dueña y no cobra
 > comisión; es una segunda técnica con su propia tasa; o el 40 % vale para las dos— son una
 > migración de dos sentencias, pero hay que elegir una. Es la fila que X4 estaba esperando.
+>
+> **Resuelto (2026-10-15):** Kati ya no trabaja en el estudio. Atiende **una sola técnica,
+> Mariana** —que no es la dueña: se llaman igual—, y el export de octubre lo confirma (64 de 64).
+> Con una sola persona la regla global de `018` da exactamente lo correcto, así que **no se toca**:
+> amarrarla ahora a Mariana podría dejar sin liquidar las últimas citas de Kati. X4 sigue con la
+> misma fecha de vencimiento: antes del primer día de una segunda técnica.
 
 **Dos cosas menores que el archivo también trae:** 20 de 173 apellidos son un guion bajo (se
 limpian; si no, quedan clientas llamadas "Julian \_" y ese nombre va en la confirmación), y 37

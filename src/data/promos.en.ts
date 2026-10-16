@@ -1,8 +1,8 @@
 import type { PromosBySlug } from "./promos.types";
 import { promoPrice, promoPriceRows } from "./promo-prices";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 
-const BOOKING = siteConfig.bookingUrl ?? "#contacto";
+const BOOKING = bookingHref("en") ?? "#contacto";
 
 // Same shape as promos.es.ts. Keeping the slug keys identical so the
 // language-agnostic selector can resolve either locale by the same slug.
@@ -41,7 +41,7 @@ export const PROMOS_DATA: PromosBySlug = {
         eyebrow: "Referrals",
         title: "Bring a friend, both of you win",
         body:
-          "For every referral who books her first appointment, both of you receive 10% off your next refill.",
+          "For every referral who books their first appointment, both of you receive 10% off your next refill.",
         cta_label: "See details",
         cta_href: "#contacto",
         accent: "mocha",
@@ -50,7 +50,7 @@ export const PROMOS_DATA: PromosBySlug = {
           "Applies only when the referral is a new client with no prior appointments at the studio.",
           "The 10% discount applies to each one's next refill — not stackable with other promotions and not redeemable for cash.",
           "The referral must mention the referrer's name at the time of booking; it cannot be applied retroactively.",
-          "The benefit is unlocked once the referral completes (not just books) her first appointment.",
+          "The benefit is unlocked once the referral completes (not just books) their first appointment.",
           "A referral counts toward only one referrer — multiple referrers cannot claim the same person.",
           "Valid while the opening edition is active; the studio may adjust or close the mechanic with prior notice.",
         ],

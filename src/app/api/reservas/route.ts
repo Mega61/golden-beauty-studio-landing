@@ -1,4 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
+
+import { capiConfigured, sendCapiEvent } from "@/lib/meta-capi";
+import { fbcFrom } from "@/lib/meta-events";
 
 import {
   MIN_FILL_SECONDS,
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Per-IP burst.
-  if (rateLimited(ip, RATE_MAX)) return fail("rate_limited", 429);
+  if (rateLimited(ip, RATE_MAX, "reservar")) return fail("rate_limited", 429);
 
   // 4. Turnstile, if the studio ever turns it on.
   if (!(await turnstileOk(text(body["cf-turnstile-response"]) || null, ip))) {
@@ -67,6 +70,7 @@ export async function POST(req: NextRequest) {
   // has no idea what a honeypot is and shouldn't have to.
   const payload = {
     serviceId: body.serviceId,
+    thenServiceId: body.thenServiceId ?? null,
     date: body.date,
     time: body.time,
     providerId: body.providerId ?? null,
@@ -86,6 +90,41 @@ export async function POST(req: NextRequest) {
 
     if (res.status === 201) {
       const created: unknown = await res.json();
+      // The booking, reported to Meta from the server — after the response, so
+      // the client never waits on Facebook. Same `eventId` as the browser's
+      // Pixel event, so Meta counts one booking, not two.
+      if (capiConfigured()) {
+        const eventId = text(body.eventId) || `schedule-${Date.now()}`;
+        const referer = req.headers.get("referer") ?? `${req.nextUrl.origin}/es/reservar`;
+        const fbclid = (() => {
+          try {
+            return new URL(referer).searchParams.get("fbclid");
+          } catch {
+            return null;
+          }
+        })();
+        const value = Number(body.value);
+        after(() =>
+          sendCapiEvent({
+            eventName: "Schedule",
+            eventId,
+            eventTime: new Date(),
+            sourceUrl: referer,
+            ip,
+            userAgent: req.headers.get("user-agent"),
+            fbc: fbcFrom(req.cookies.get("_fbc")?.value, fbclid),
+            fbp: req.cookies.get("_fbp")?.value ?? null,
+            phone: payload.phone,
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            customData: {
+              currency: "COP",
+              ...(Number.isFinite(value) && value > 0 ? { value } : {}),
+              ...(text(body.serviceSlug) ? { content_ids: [text(body.serviceSlug)], content_type: "product" } : {}),
+            },
+          }),
+        );
+      }
       return NextResponse.json(
         { ok: true, booking: created },
         { status: 201, headers: { "Cache-Control": "no-store" } },
@@ -96,7 +135,12 @@ export async function POST(req: NextRequest) {
     // mistake the client made, and the form has to say so without blaming her.
     if (res.status === 409) return fail("taken", 409);
 
-    if (res.status === 400) return fail("validation", 400);
+    // The panel names the field it refused. The phone is the one a person can
+    // fix on the spot, so it gets its own message; the rest stay generic.
+    if (res.status === 400) {
+      const refused = (await res.json().catch(() => null)) as { field?: string } | null;
+      return fail(refused?.field === "phone" ? "phone" : "validation", 400);
+    }
 
     console.error("[reservas] el panel rechazó la reserva", res.status);
     return fail("unavailable", res.status === 503 ? 503 : 502);

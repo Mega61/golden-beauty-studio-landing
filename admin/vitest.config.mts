@@ -86,6 +86,16 @@ export default defineConfig({
         },
         "src/lib/metrics.ts": { branches: 100, functions: 100, lines: 100 },
         "src/lib/conflict.ts": { branches: 100, functions: 100, lines: 100 },
+        // Decide **qué servicio** queda agendado cuando se compone un combo, y
+        // con eso qué precio se cobra. No mueve plata por sí solo; elige el
+        // renglón sobre el que después se calcula todo.
+        //
+        // `combo-source.ts` no está acá y no es un olvido: la mitad de ese
+        // archivo es una consulta a `service_map` y un upsert, que no se cubren
+        // sin base. Lo que sí se puede probar puro —`toEaIds` y `handsShareBp`,
+        // que es el que fija el reparto de comisión— tiene sus tests, y el resto
+        // lo cubre la suite E2E contra un MySQL de verdad.
+        "src/lib/combos.ts": { branches: 100, functions: 100, lines: 100 },
         "src/lib/calendar-layout.ts": {
           branches: 100,
           functions: 100,

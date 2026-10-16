@@ -10,6 +10,8 @@ import { EaApiError } from "@/lib/ea";
 import { createEaClient } from "@/lib/ea/client";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 
+import { splitName } from "@/jobs/import-agendapro";
+
 import { normalizePhoneE164 } from "./identity";
 import { describeMerge, planMerge } from "./merge";
 
@@ -38,12 +40,29 @@ import { describeMerge, planMerge } from "./merge";
 export type ClientActionResult = {
   ok: boolean;
   message: string;
+  /**
+   * La clienta recién creada, solo en el alta y solo cuando salió bien.
+   *
+   * Existe porque el formulario de **cita** crea clientas sin salir de la
+   * pantalla: sin el id habría que buscarla de nuevo justo después de crearla,
+   * y esa segunda búsqueda puede no encontrarla —la de EA es por texto y el
+   * nombre recién escrito puede estar mal tipeado— dejando a alguien con la
+   * clienta creada y la cita sin poder armarse.
+   */
+  customer?: { id: number; name: string };
 };
 
 const MAX_NAME = 120;
 
 const ClientSchema = z.object({
   firstName: z.string().trim().min(1, "Falta el nombre").max(MAX_NAME),
+  /**
+   * Puede llegar vacío y **no puede viajar vacío a EA**: su API exige
+   * `last_name` y responde **500** sin él, con el cuerpo `"Not all required
+   * fields are provided"`. Un 500 se clasifica como error transitorio, así que
+   * el panel decía "la agenda no respondió" sobre algo que no se arreglaba
+   * reintentando nunca. Ver `toEaPayload()`.
+   */
   lastName: z.string().trim().max(MAX_NAME),
   phone: z.string().trim().min(1, "Falta el teléfono"),
   email: z.string().trim().max(200),
@@ -52,11 +71,34 @@ const ClientSchema = z.object({
 
 export type ClientInput = z.input<typeof ClientSchema>;
 
+/**
+ * El fallo de una escritura, dicho para quien está con la clienta enfrente.
+ *
+ * ⚠ **Un 500 de EA no siempre es "reintenta".** `isTransient` agrupa red,
+ * timeout y `server`, y EA responde **500 a un payload que rechaza** — por
+ * ejemplo sin `last_name`, con el cuerpo `"Not all required fields are
+ * provided"`. Decirle a alguien "la agenda no respondió" sobre eso lo manda a
+ * reintentar un error que no se arregla nunca reintentando, y esconde la
+ * causa. Cuando el cuerpo delata un rechazo, se dice que es un rechazo.
+ *
+ * Y siempre se registra en el log del servidor: esta función traga el error
+ * original para dar un mensaje legible, y sin el `console.error` la causa se
+ * pierde entera — que fue exactamente lo que costó encontrar este bug.
+ */
 function describeEaFailure(error: unknown, fallback: string): string {
+  console.error("[clientes] la escritura a la agenda falló", error);
+
   if (error instanceof EaApiError) {
     if (error.isConfiguration) {
       return "El panel no puede autenticarse contra la agenda. Es configuración, no un caído.";
     }
+
+    // EA usa 500 para "no me diste un campo obligatorio". Reintentarlo no
+    // cambia nada; lo que hace falta es el dato.
+    if (/required fields|not all required/i.test(error.message)) {
+      return `La agenda rechazó los datos: ${error.message.slice(0, 200)}`;
+    }
+
     if (error.isTransient) {
       return "La agenda no respondió. Se puede reintentar en un momento.";
     }
@@ -73,18 +115,69 @@ function describeEaFailure(error: unknown, fallback: string): string {
  * Campo vacío es más honesto que campo inventado — la misma regla de
  * `identity.ts`.
  */
-function toEaPayload(data: z.output<typeof ClientSchema>) {
+/**
+ * Los campos que viajan a EA, con el teléfono normalizado y el nombre partido.
+ *
+ * Devuelve el motivo en vez del payload cuando algo no puede viajar, para que
+ * el mensaje lo dé quien tiene el contexto y no un `null` mudo.
+ *
+ * ## El apellido es obligatorio, y lo impone EA
+ *
+ * Su API responde **500** con `last_name` nulo o vacío —`"Not all required
+ * fields are provided"`— y acepta `" "`, un espacio. Mandar ese espacio sería
+ * inventar un apellido que después aparece en la ficha y en la confirmación de
+ * la cita como un nombre con una cola rara. Se pide de frente: en el mostrador
+ * se pregunta el nombre completo igual.
+ *
+ * ## El correo vacío viaja como `null`, no como `""`
+ *
+ * EA deduplica por correo, y una cadena vacía repetida en veinte clientas es
+ * una colisión esperando. Campo vacío es más honesto que campo inventado.
+ */
+function toEaPayload(
+  data: z.output<typeof ClientSchema>,
+): { payload: EaCustomerPayload } | { error: string } {
   const phone = normalizePhoneE164(data.phone);
-  if (phone === null) return null;
+  if (phone === null) {
+    return {
+      error:
+        "Ese teléfono no se puede usar como identidad. Tiene que ser un número real: " +
+        "un celular de diez dígitos, o un fijo con indicativo.",
+    };
+  }
+
+  // Quien escribe "Ana Ríos" en un solo campo está dando nombre y apellido, y
+  // guardarlo entero como nombre de pila deja la ficha mal partida para
+  // siempre. Se separa en el primer espacio: "Ana María Ríos" queda "Ana" +
+  // "María Ríos" — imperfecto, y conserva el nombre completo, que es lo que la
+  // clienta lee en su confirmación.
+  const { firstName, lastName } = splitName(data.firstName, data.lastName);
+
+  if (firstName === "") return { error: "Falta el nombre." };
+  if (lastName === "") {
+    return {
+      error: `Falta el apellido de ${firstName}. La agenda lo exige para poder guardar la ficha.`,
+    };
+  }
 
   return {
-    firstName: data.firstName,
-    lastName: data.lastName === "" ? null : data.lastName,
-    phone,
-    email: data.email === "" ? null : data.email,
-    notes: data.notes === "" ? null : data.notes,
+    payload: {
+      firstName,
+      lastName,
+      phone,
+      email: data.email === "" ? null : data.email,
+      notes: data.notes === "" ? null : data.notes,
+    },
   };
 }
+
+type EaCustomerPayload = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string | null;
+  notes: string | null;
+};
 
 export async function crearClienta(input: ClientInput): Promise<ClientActionResult> {
   let session;
@@ -92,7 +185,7 @@ export async function crearClienta(input: ClientInput): Promise<ClientActionResu
     session = await requireCapability("clientes:editar");
   } catch (error) {
     unstable_rethrow(error);
-    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede crear clientas." };
+    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede crear clientes." };
     return { ok: false, message: "No se pudo verificar la sesión." };
   }
 
@@ -101,15 +194,9 @@ export async function crearClienta(input: ClientInput): Promise<ClientActionResu
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Faltan datos." };
   }
 
-  const payload = toEaPayload(parsed.data);
-  if (payload === null) {
-    return {
-      ok: false,
-      message:
-        "Ese teléfono no se puede usar como identidad. Tiene que ser un número real: " +
-        "un celular de diez dígitos, o un fijo con indicativo.",
-    };
-  }
+  const built = toEaPayload(parsed.data);
+  if ("error" in built) return { ok: false, message: built.error };
+  const { payload } = built;
 
   try {
     const ea = createEaClient();
@@ -143,10 +230,17 @@ export async function crearClienta(input: ClientInput): Promise<ClientActionResu
     });
 
     revalidatePath("/clientes");
-    return { ok: true, message: `${payload.firstName} quedó creada.` };
+    return {
+      ok: true,
+      message: `${[payload.firstName, payload.lastName].filter(Boolean).join(" ")} quedó creada.`,
+      customer: {
+        id: created.id,
+        name: [payload.firstName, payload.lastName].filter(Boolean).join(" "),
+      },
+    };
   } catch (error) {
     unstable_rethrow(error);
-    return { ok: false, message: describeEaFailure(error, "No se pudo crear la clienta.") };
+    return { ok: false, message: describeEaFailure(error, "No se pudo crear la ficha.") };
   }
 }
 
@@ -168,12 +262,12 @@ export async function editarClienta(
     session = await requireCapability("clientes:editar");
   } catch (error) {
     unstable_rethrow(error);
-    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede editar clientas." };
+    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede editar clientes." };
     return { ok: false, message: "No se pudo verificar la sesión." };
   }
 
   if (!Number.isSafeInteger(eaCustomerId) || eaCustomerId <= 0) {
-    return { ok: false, message: "El id de la clienta llegó mal." };
+    return { ok: false, message: "El id de la ficha llegó mal." };
   }
 
   const parsed = ClientSchema.safeParse(input);
@@ -181,10 +275,9 @@ export async function editarClienta(
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Faltan datos." };
   }
 
-  const payload = toEaPayload(parsed.data);
-  if (payload === null) {
-    return { ok: false, message: "Ese teléfono no se puede usar como identidad." };
-  }
+  const built = toEaPayload(parsed.data);
+  if ("error" in built) return { ok: false, message: built.error };
+  const { payload } = built;
 
   try {
     const ea = createEaClient();
@@ -228,7 +321,7 @@ export async function editarClienta(
     return { ok: true, message: "Quedó corregida." };
   } catch (error) {
     unstable_rethrow(error);
-    return { ok: false, message: describeEaFailure(error, "No se pudo corregir la clienta.") };
+    return { ok: false, message: describeEaFailure(error, "No se pudo corregir la ficha.") };
   }
 }
 
@@ -256,7 +349,7 @@ export async function fusionarClienta(
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof ForbiddenError) {
-      return { ok: false, message: "Solo la dueña puede fusionar clientas: borra filas de la agenda." };
+      return { ok: false, message: "Solo administración puede unir fichas: borra filas de la agenda." };
     }
     return { ok: false, message: "No se pudo verificar la sesión." };
   }

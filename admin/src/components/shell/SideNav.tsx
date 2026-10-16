@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { salir } from "@/app/(auth)/entrar/actions";
 import { Icon } from "../ui/Icon";
 import { Wordmark } from "./Wordmark";
 import { activeDestinationId, destinationsFor, type Role } from "./nav";
@@ -18,10 +19,10 @@ import { activeDestinationId, destinationsFor, type Role } from "./nav";
  * En modo riel el nombre no desaparece del todo: viaja en `title` y en
  * `aria-label`, así que el destino nunca depende de reconocer un dibujo.
  */
-export function SideNav({ role }: { role: Role }) {
+export function SideNav({ role, eaUrl }: { role: Role; eaUrl?: string | null }) {
   const pathname = usePathname();
   const activeId = activeDestinationId(pathname, role);
-  const items = destinationsFor(role);
+  const items = destinationsFor(role, eaUrl);
 
   return (
     <aside className="ui-side">
@@ -80,6 +81,18 @@ export function SideNav({ role }: { role: Role }) {
           );
         })}
       </nav>
+
+      <form action={salir} className="ui-side__logout">
+        <button
+          type="submit"
+          className="ui-nav__item"
+          title="Cerrar sesión"
+          aria-label="Cerrar sesión"
+        >
+          <Icon name="salir" size={20} className="ui-nav__icon" />
+          <span className="ui-nav__label">Cerrar sesión</span>
+        </button>
+      </form>
     </aside>
   );
 }

@@ -14,6 +14,22 @@ export type PriceItem = {
   priceCOP: number;
   fromPrice?: boolean;
   durationMin: number | null;
+  /**
+   * For `combos` only: which two standalone services this combo replaces.
+   *
+   * It is how a combo is *reached*: neither the admin agenda nor the public
+   * booking flow offers the combos as a list to pick from. You choose the hands
+   * service and the feet service, and the combo is what the appointment becomes
+   * — with its own price and its own duration, which are **not** the sum of the
+   * parts and are never derived from them. The parts are shown struck through
+   * next to the combo price, so the saving is visible instead of implied.
+   *
+   * Both values are ids of standalone items in this same file. `scripts/
+   * check-pricing.mjs` fails the build if one of them doesn't exist, points at
+   * another combo, or if a `combos` item is missing the field entirely — a
+   * combo nobody can reach is worse than no combo.
+   */
+  composedOf?: { hands: string; feet: string };
 };
 
 export type PriceCategory = {
@@ -65,11 +81,36 @@ export const pricing: readonly PriceCategory[] = [
   {
     id: "combos",
     items: [
-      { id: "polygel-overlay-hands-semi-feet", priceCOP: 135000, durationMin: 150 },
-      { id: "builder-gel-overlay-hands-semi-feet", priceCOP: 130000, durationMin: 150 },
-      { id: "acrylic-overlay-hands-semi-feet", priceCOP: 125000, durationMin: 150 },
-      { id: "semi-permanent-hands-feet", priceCOP: 95000, durationMin: 120 },
-      { id: "semi-permanent-hands-traditional-feet", priceCOP: 77000, durationMin: 120 },
+      {
+        id: "polygel-overlay-hands-semi-feet",
+        priceCOP: 135000,
+        durationMin: 150,
+        composedOf: { hands: "polygel-overlay", feet: "semi-permanent-feet" },
+      },
+      {
+        id: "builder-gel-overlay-hands-semi-feet",
+        priceCOP: 130000,
+        durationMin: 150,
+        composedOf: { hands: "builder-gel-overlay", feet: "semi-permanent-feet" },
+      },
+      {
+        id: "acrylic-overlay-hands-semi-feet",
+        priceCOP: 125000,
+        durationMin: 150,
+        composedOf: { hands: "acrylic-overlay", feet: "semi-permanent-feet" },
+      },
+      {
+        id: "semi-permanent-hands-feet",
+        priceCOP: 95000,
+        durationMin: 120,
+        composedOf: { hands: "semi-permanent-hands", feet: "semi-permanent-feet" },
+      },
+      {
+        id: "semi-permanent-hands-traditional-feet",
+        priceCOP: 77000,
+        durationMin: 120,
+        composedOf: { hands: "semi-permanent-hands", feet: "traditional-feet" },
+      },
     ],
   },
   {

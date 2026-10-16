@@ -30,7 +30,10 @@
  * `016` (arreglo de Better Auth), `017` (`job_run`, de la consolidación WP-E1),
  * `018` (la regla de comisión del 40 %, que siembra datos sobre la tabla que ya
  * creó la `007`) y `019` (`appointment_payment`, el pago dividido de X1) y `020` (`wa_message`,
- * los recordatorios de X7).
+ * los recordatorios de X7) y `021` (canal y autora de un recordatorio, para el
+ * paliativo manual por `wa.me` de X7) y `022` (`push_subscription`, el aviso al
+ * celular cuando alguien reserva desde la página) y `023` (`ad_spend`, la
+ * inversión mensual en anuncios del reporte de costo por clienta nueva).
  * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
  * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
  * detecta que alguien editó una migración ya aplicada.
@@ -58,6 +61,10 @@ import { migration as m017 } from "./017-job-run";
 import { migration as m018 } from "./018-commission-rule";
 import { migration as m019 } from "./019-appointment-payment";
 import { migration as m020 } from "./020-wa-message";
+import { migration as m021 } from "./021-wa-message-manual";
+import { migration as m022 } from "./022-push-subscription";
+import { migration as m023 } from "./023-ad-spend";
+import { migration as m024 } from "./024-allowed-user-test-account";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -80,6 +87,10 @@ export const MIGRATIONS: readonly Migration[] = [
   m018,
   m019,
   m020,
+  m021,
+  m022,
+  m023,
+  m024,
 ];
 
 /**
@@ -111,6 +122,8 @@ export const EXPECTED_TABLES: readonly string[] = [
   "job_run",
   "wa_message",
   "wa_optout",
+  "push_subscription",
+  "ad_spend",
   // Infraestructura
   "schema_migration",
 ];

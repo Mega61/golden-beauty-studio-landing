@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale } from "./dictionaries";
-import { siteConfig } from "@/config/site";
+import { bookingHref, siteConfig } from "@/config/site";
 import { getActiveScenarios } from "@/data/promos";
 import { getReviews } from "@/data/reviews";
 import { getJobRoles } from "@/data/careers";
@@ -44,7 +44,7 @@ export default async function Page({
       <JsonLd lang={typedLang} dict={dict} />
       <PromoStrip scenarios={scenarios} dict={dict.promos} />
       <Nav lang={lang} dict={dict.nav} sections={sections} />
-      <Hero dict={dict.hero} />
+      <Hero dict={dict.hero} lang={lang} />
       <Highlights
         scenarios={scenarios}
         dict={dict.promos}
@@ -70,13 +70,13 @@ export default async function Page({
       {sections.servicios && sections.diccionario && <BrandDivider />}
       {sections.diccionario && <Diccionario dict={dict.diccionario} />}
       {sections.diccionario && sections.tecnicas && <BrandDivider tone="dark" />}
-      {sections.tecnicas && <Tecnicas dict={dict.tecnicas} />}
+      {sections.tecnicas && <Tecnicas dict={dict.tecnicas} lang={lang} />}
       {sections.tecnicas && sections.estudio && <BrandDivider />}
       {sections.estudio && <Estudio dict={dict.estudio} />}
       {sections.reviews && <Reviews dict={dict.reviews} data={reviews} />}
-      {sections.contacto && <Contacto dict={dict.contacto} />}
-      <Footer dict={dict.footer} />
-      <FloatingActions dict={dict.floating} />
+      {sections.contacto && <Contacto dict={dict.contacto} lang={lang} />}
+      <Footer dict={dict.footer} lang={lang} />
+      <FloatingActions dict={dict.floating} bookingHref={bookingHref(lang)} />
       <BackToTop label={dict.floating.backToTop} />
     </>
   );

@@ -301,6 +301,15 @@ export type ResolvedClient = {
   /** `null` cuando la fila de EA no tiene teléfono utilizable. */
   phone: E164 | null;
   name: string;
+  /**
+   * Nombre y apellido por separado, de la **misma** fila que ganó `name`.
+   *
+   * Hacen falta sueltos para la audiencia de Meta (`fn` y `ln` son columnas
+   * distintas), y partir `name` de vuelta por el primer espacio adivinaría mal
+   * cada "María José". Vacío cuando la fila no lo trae: nunca se inventa.
+   */
+  firstName: string;
+  lastName: string;
   /** El correo que se puede usar. `null` si no hay o si parece inventado. */
   email: string | null;
   /** Correos que se descartaron por parecer relleno. Se muestran, con aviso. */
@@ -417,6 +426,8 @@ function fuse(phone: E164 | null, rows: readonly Customer[]): ResolvedClient {
         : { kind: "tel", phone },
     phone,
     name: displayName(best),
+    firstName: (best.firstName ?? "").trim(),
+    lastName: (best.lastName ?? "").trim(),
     email: emails[0] ?? null,
     suspiciousEmails: suspicious,
     eaCustomerIds: sorted.map((row) => row.id),

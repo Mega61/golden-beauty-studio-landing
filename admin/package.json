@@ -15,7 +15,13 @@
     "build:reconcile": "esbuild src/jobs/reconcile-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/reconcile.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
     "build:estados": "esbuild src/jobs/status-options-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/estados.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
     "build:importar": "esbuild src/jobs/import-agendapro-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/importar.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
-    "dev:seed": "esbuild src/jobs/dev-seed-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/dev-seed.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning && node --env-file=.env.local .next/dev-seed.js"
+    "build:recordatorios": "esbuild src/jobs/reminders-run-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/recordatorios.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
+    "dev:seed": "esbuild src/jobs/dev-seed-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/dev-seed.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning && node --env-file=.env.local .next/dev-seed.js",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:up": "docker compose -p gbs-ci -f ../deploy/compose/ci-stack.yml up -d --wait && ./scripts/ci-prepare-ea.sh gbs-ci ../deploy/compose/ci-stack.yml && ./scripts/ci-env.sh && npm run build:migrator && node --env-file=.env.ci.local .next/standalone/scripts/migrate.js",
+    "e2e:down": "docker compose -p gbs-ci -f ../deploy/compose/ci-stack.yml down -v",
+    "e2e:ci": "E2E_BASE_URL=http://localhost:13001 E2E_ENV_FILE=.env.ci.local E2E_MYSQL_CONTAINER=gbs-ci-mysql-1 playwright test"
   },
   "dependencies": {
     "better-auth": "^1.7.2",
@@ -24,13 +30,16 @@
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "web-push": "^3.6.7",
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.1.11",
     "esbuild": "^0.28.2",
     "eslint": "^9",

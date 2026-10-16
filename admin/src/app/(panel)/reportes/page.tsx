@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import { EmptyState } from "@/components/ui";
 import type { UserRole } from "@/db/types";
-import { ForbiddenError, requireCapability } from "@/lib/dal";
+import { ForbiddenError, requireCapability, sessionCan } from "@/lib/dal";
 import { instantToEaDate } from "@/lib/ea";
 
 import styles from "./charts.module.css";
@@ -81,7 +81,7 @@ export default async function ReportesPage({
       <AppShell role="staff" title="Reportes">
         <EmptyState
           icon="candado"
-          title="Reportes es de la dueña"
+          title="Reportes es solo de administración"
           body="Tu rol no incluye los reportes del estudio. Tu liquidación y tu ticket promedio están en Comisiones."
         />
       </AppShell>
@@ -92,7 +92,10 @@ export default async function ReportesPage({
   const now = new Date();
   const period = resolvePeriod(params, instantToEaDate(now));
 
-  const data = await loadReports(period, now);
+  const [data, canEditAdSpend] = await Promise.all([
+    loadReports(period, now),
+    sessionCan("pauta:registrar"),
+  ]);
 
   const dbDown = data.problems.some((problem) => problem.source === "db");
   const eaDown = data.problems.some((problem) => problem.source === "ea");
@@ -133,7 +136,9 @@ export default async function ReportesPage({
     <div className={styles.grid}>
       {period.cadence === "dia" ? <DailyReports data={data} /> : null}
       {period.cadence === "quincena" ? <FortnightReports data={data} /> : null}
-      {period.cadence === "mes" ? <MonthlyReports data={data} /> : null}
+      {period.cadence === "mes" ? (
+        <MonthlyReports canEditAdSpend={canEditAdSpend} data={data} />
+      ) : null}
     </div>,
   );
 }

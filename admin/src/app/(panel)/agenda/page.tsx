@@ -2,6 +2,8 @@ import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import { datesFor, parseAnchor, parseRangeMode } from "@/components/calendar";
 import type { UserRole } from "@/db/types";
+import { whatsappConfigured } from "@/lib/whatsapp/config";
+
 import { AgendaClient } from "./AgendaClient";
 import { loadAgenda, todayInStudio } from "./data";
 
@@ -77,6 +79,8 @@ export default async function AgendaPage({
                 blockedPeriods: [],
                 meta: {},
                 services: [],
+                combos: [],
+                combosReason: null,
                 capacities: [],
                 stations: result.stations,
                 fetchedAt: new Date().toISOString(),
@@ -95,6 +99,7 @@ export default async function AgendaPage({
         // es una fila de Equipo a medio configurar — `staff` sin
         // `ea_provider_id` no es dueña de ninguna columna.
         canWrite={result.session.role !== "staff" || result.session.eaProviderId !== null}
+        whatsappConfirmation={whatsappConfigured()}
       />
     </AppShell>
   );

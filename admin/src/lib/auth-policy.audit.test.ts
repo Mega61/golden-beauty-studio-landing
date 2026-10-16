@@ -43,6 +43,11 @@ const TODAS: Capability[] = [
   "catalogo:publicar",
   "diagnostico:ver",
   "ea:avanzado",
+  "recordatorios:enviar",
+  "recordatorios:baja",
+  "avisos:reservas-web",
+  "pauta:registrar",
+  "clientes:exportar",
 ];
 
 /**
@@ -74,6 +79,19 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "catalogo:publicar": false,
     "diagnostico:ver": true,
     "ea:avanzado": false,
+    // Recordatorios por `wa.me` (X7): recepción atiende el WhatsApp del
+    // estudio, así que manda los avisos y registra las bajas.
+    "recordatorios:enviar": true,
+    "recordatorios:baja": true,
+    // Reservas de la página (push): recepción confirma y acomoda la agenda,
+    // así que es quien tiene que enterarse en el momento.
+    "avisos:reservas-web": true,
+    // Recepción **ve** el costo por clienta nueva (es un reporte), pero no
+    // escribe la inversión en anuncios: es plata y decisión de la dueña.
+    "pauta:registrar": false,
+    // La lista para Meta es una exportación masiva de datos personales hacia
+    // un tercero. Va cifrada, y aun así es de la dueña sola.
+    "clientes:exportar": false,
   },
   staff: {
     "cuenta:cerrar-propia": true,
@@ -93,11 +111,20 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "catalogo:publicar": false,
     "diagnostico:ver": false,
     "ea:avanzado": false,
+    // El aviso sale del WhatsApp del estudio, no del celular de la técnica: es
+    // a ese número a donde la clienta responde para reprogramar.
+    "recordatorios:enviar": false,
+    "recordatorios:baja": false,
+    // El aviso nombra clienta y técnica de cualquier columna: es agenda de
+    // todo el equipo, que la técnica no ve.
+    "avisos:reservas-web": false,
+    "pauta:registrar": false,
+    "clientes:exportar": false,
   },
 };
 
 describe("AUDIT · la matriz completa, celda por celda, contra el plan", () => {
-  it("51 celdas × las dos posiciones de TICKET_STAFF_COBRA", () => {
+  it("66 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
     for (const role of ["owner", "admin", "staff"] as UserRole[]) {
       for (const capability of TODAS) {
         const esperado = DEL_PLAN[role][capability];

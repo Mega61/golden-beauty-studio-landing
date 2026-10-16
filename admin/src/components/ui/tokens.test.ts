@@ -176,6 +176,13 @@ describe("reglas del sistema que se pueden leer del CSS", () => {
   });
 
   it("la página no scrollea de lado", () => {
-    expect(CSS).toMatch(/overflow-x:\s*hidden/);
+    expect(CSS).toMatch(/overflow-x:\s*clip/);
+  });
+
+  it("y lo hace con `clip`, nunca con `hidden`", () => {
+    // `hidden` en <html> y <body> convierte al <body> en contenedor de scroll y
+    // rompe todo lo `sticky` del panel: la barra lateral y la superior se iban
+    // con la página. Pasó; este test es para que no vuelva.
+    expect(CSS).not.toMatch(/overflow-x:\s*hidden/);
   });
 });

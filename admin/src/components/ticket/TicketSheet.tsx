@@ -166,7 +166,7 @@ export function TicketSheet({
 
         {readOnly ? (
           <Aviso tono="warn">
-            La cuenta ya entró al cierre del día. Corregirla exige un ajuste y lo hace la dueña.
+            La cuenta ya entró al cierre del día. Corregirla exige un ajuste y lo hace administración.
           </Aviso>
         ) : null}
 
@@ -295,7 +295,7 @@ export function TicketSheet({
             ))}
           </div>
 
-          <Field label="Qué pasó" hint="Se guarda en el panel y aparece en la ficha de la clienta.">
+          <Field label="Qué pasó" hint="Se guarda en el panel y aparece en la ficha de cliente.">
             {({ id, describedBy }) => (
               <TextArea
                 id={id}

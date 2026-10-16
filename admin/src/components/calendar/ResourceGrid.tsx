@@ -82,12 +82,35 @@ export type ResourceGridProps = {
   onPickAppointment: (appointment: GridEvent["appointment"]) => void;
   onMove: (pick: MovePick) => void;
   onResize: (pick: ResizePick) => void;
-  /** Correr el inicio o el fin de la jornada visible para descubrir una oculta. */
+  /**
+   * Correr el inicio o el fin de la jornada visible.
+   *
+   * Lo llaman dos cosas distintas: el aviso de "hay 2 citas antes" y los dos
+   * botones del gutter, que están **siempre**. Los segundos existen porque
+   * agendar fuera de horario necesitaba antes que ya hubiera algo escondido
+   * ahí: había que crear la cita para poder ver dónde crearla.
+   */
   onRevealHidden: (direction: -1 | 1) => void;
 };
 
-/** Alto de fila por defecto: 14 px por 15 minutos ≈ 670 px de jornada. */
+/** Alto de fila con ratón: 14 px por 15 minutos ≈ 670 px de jornada. */
 const DEFAULT_SLOT_H = 14;
+
+/**
+ * Alto de fila **con el dedo**: 24 px por 15 minutos ≈ 96 px la hora.
+ *
+ * Con 14 px el hueco de cuarto de hora es un objetivo de `303 × 14`, y tocarlo
+ * con el pulgar es una lotería — noventa y seis de esos por pantalla. El panel
+ * se usa principalmente desde el teléfono, así que la densidad que vale es la
+ * del dedo, no la del ratón.
+ *
+ * 24 y no 44 —el objetivo táctil del resto del sistema— porque una jornada de
+ * doce horas a 44 px el cuarto mide 2.100 px y encontrar la tarde cuesta más
+ * que errarle a un hueco. 24 deja la hora en 96 px, que es la densidad de las
+ * agendas móviles que la gente ya sabe usar, y el bloque de una cita de hora y
+ * media pasa de 84 a 144 px: legible sin ampliar.
+ */
+const TOUCH_SLOT_H = 24;
 
 /** Debajo de esto un bloque solo muestra la hora; no cabe otra línea. */
 const TWO_LINE_MIN_PX = 30;
@@ -116,7 +139,7 @@ type DragState = {
 export function ResourceGrid({
   days,
   meta,
-  slotHeight = DEFAULT_SLOT_H,
+  slotHeight,
   today,
   selectedId = null,
   movingId = null,
@@ -130,6 +153,18 @@ export function ResourceGrid({
 }: ResourceGridProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const [canDrag, setCanDrag] = useState(false);
+
+  /**
+   * La densidad se decide por el puntero, no por el ancho.
+   *
+   * Reusa la misma señal que `canDrag` —`(pointer: fine)`— porque es la misma
+   * pregunta: una tablet de 1024 px se usa con el dedo y una ventana angosta
+   * en un portátil, con el ratón. Arranca en la densidad táctil porque el
+   * servidor no sabe qué puntero hay del otro lado, y de los dos errores
+   * posibles el que se nota menos es que en escritorio la grilla se comprima
+   * en el primer fotograma.
+   */
+  const slotH = slotHeight ?? (canDrag ? DEFAULT_SLOT_H : TOUCH_SLOT_H);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [activeSlot, setActiveSlot] = useState<{ key: ColumnKey; minute: number } | null>(null);
   const scrolledFor = useRef<string>("");
@@ -194,7 +229,7 @@ export function ResourceGrid({
 
     const move = (event: PointerEvent) => {
       if (event.pointerId !== drag.pointerId) return;
-      const delta = dragDeltaMinutes(event.clientY - drag.originY, range, slotHeight);
+      const delta = dragDeltaMinutes(event.clientY - drag.originY, range, slotH);
       const target = document.elementFromPoint(event.clientX, event.clientY);
       const col = target?.closest<HTMLElement>("[data-colkey]");
       const overKey = drag.kind === "move" ? (col?.dataset.colkey ?? drag.overKey) : drag.overKey;
@@ -218,12 +253,12 @@ export function ResourceGrid({
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
     };
-  }, [drag, range, slotHeight, finishDrag]);
+  }, [drag, range, slotH, finishDrag]);
 
   if (!range) return null;
 
-  const bodyHeight = columnHeight(days[0].rowCount, slotHeight);
-  const hourHeight = (60 / range.slotMinutes) * slotHeight;
+  const bodyHeight = columnHeight(days[0].rowCount, slotH);
+  const hourHeight = (60 / range.slotMinutes) * slotH;
   const columns = days.flatMap((day) =>
     day.columns.map((column) => ({ day, column, key: columnKey(day.date, column.providerId) })),
   );
@@ -302,7 +337,7 @@ export function ResourceGrid({
         style={
           {
             "--cols": columns.length,
-            "--slot-h": `${slotHeight}px`,
+            "--slot-h": `${slotH}px`,
             "--hour-h": `${hourHeight}px`,
           } as React.CSSProperties
         }
@@ -341,6 +376,39 @@ export function ResourceGrid({
             se escribe siempre porque una jornada de 8 a 20 cruza el mediodía y
             "8" a secas es ambiguo en una hoja impresa. */}
         <div className={styles.gutter} style={{ height: bodyHeight }}>
+          {/* Correr la jornada visible, sin depender de que haya una cita
+              escondida. La grilla arranca en el plan de trabajo —correcto casi
+              siempre— y estos dos botones son lo que hace agendable el casi:
+              "entra a las 7 porque la clienta viaja" es un martes cualquiera en
+              un estudio. Van en el gutter y no por columna: la ventana visible
+              es una sola para toda la grilla. */}
+          {range.startMinute > 0 ? (
+            <button
+              type="button"
+              className={`${styles.stretch} ${styles.stretchTop}`}
+              onClick={() => onRevealHidden(-1)}
+              // El gutter mide 3.25 rem: la etiqueta entera no cabe. Va en el
+              // `title` y en el `aria-label`, que es donde igual la iba a leer
+              // quien la necesite — con el lector de pantalla o al dudar.
+              title="Mostrar una hora más temprano"
+              aria-label="Mostrar una hora más temprano"
+            >
+              ↑ 1 h
+            </button>
+          ) : null}
+
+          {range.endMinute < 24 * 60 ? (
+            <button
+              type="button"
+              className={`${styles.stretch} ${styles.stretchBottom}`}
+              onClick={() => onRevealHidden(1)}
+              title="Mostrar una hora más tarde"
+              aria-label="Mostrar una hora más tarde"
+            >
+              ↓ 1 h
+            </button>
+          ) : null}
+
           {slotMinutes
             .filter((minute) => minute % 60 === 0)
             .map((minute) => (
@@ -349,7 +417,7 @@ export function ResourceGrid({
                 className={`${styles.gutterMark}${
                   minute === range.startMinute ? ` ${styles.gutterMarkFirst}` : ""
                 }`}
-                style={{ top: minuteToPx(minute, range, slotHeight) }}
+                style={{ top: minuteToPx(minute, range, slotH) }}
               >
                 {formatHour12(Math.floor(minute / 60), minute % 60)}
               </span>
@@ -384,7 +452,7 @@ export function ResourceGrid({
                     data-colkey={key}
                     data-minute={minute}
                     className={styles.slot}
-                    style={{ top: minuteToPx(minute, range, slotHeight), height: slotHeight }}
+                    style={{ top: minuteToPx(minute, range, slotH), height: slotH }}
                     tabIndex={isActive(activeSlot, key, minute, columns[0]?.key, range.startMinute) ? 0 : -1}
                     onFocus={() => setActiveSlot({ key, minute })}
                     onClick={() =>
@@ -398,7 +466,7 @@ export function ResourceGrid({
                 ))}
 
               {column.bands.map((band) => (
-                <Band key={band.key} band={band} range={range} slotHeight={slotHeight} />
+                <Band key={band.key} band={band} range={range} slotHeight={slotH} />
               ))}
 
               {column.events.map((event) => (
@@ -407,7 +475,7 @@ export function ResourceGrid({
                   event={event}
                   meta={meta[event.appointment.id]}
                   range={range}
-                  slotHeight={slotHeight}
+                  slotHeight={slotH}
                   drag={drag}
                   colKey={key}
                   canDrag={canDrag && !readOnly}
@@ -455,7 +523,7 @@ export function ResourceGrid({
               {day.nowLine ? (
                 <div
                   className={styles.now}
-                  style={{ top: minuteToPx(day.nowLine.minute, range, slotHeight) }}
+                  style={{ top: minuteToPx(day.nowLine.minute, range, slotH) }}
                   aria-hidden
                 />
               ) : null}
@@ -479,7 +547,7 @@ const BAND_CLASS: Record<GridBand["kind"], string> = {
 };
 
 const BAND_TITLE: Record<GridBand["kind"], string> = {
-  "off-hours": "Fuera del horario de la profesional",
+  "off-hours": "Fuera de su horario",
   break: "Descanso",
   blocked: "El estudio está cerrado",
   unavailable: "La profesional no está disponible",
@@ -563,7 +631,7 @@ function EventBlock({
   const status = mapEaStatus(event.appointment.status);
   const statusMeta = STATUS_META[status];
   const tint = serviceTint(event.appointment.color ?? meta?.serviceColor ?? null);
-  const who = meta?.customer ?? "Sin clienta";
+  const who = meta?.customer ?? "Sin cliente";
   const what = meta?.service ?? "Sin servicio";
   const time = formatTimeRange(event.appointment.start, event.appointment.end);
 

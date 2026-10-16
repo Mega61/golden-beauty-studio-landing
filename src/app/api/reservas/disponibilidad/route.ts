@@ -19,19 +19,24 @@ import { adminOrigin, bookingUrl, clientIp, fail, rateLimited } from "../guards"
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const RATE_MAX = 60;
+// Doubled from 60 when the flow started prefetching the next two days: one
+// person looking at ten days now makes ~30 calls. The panel caches the
+// expensive part, so this is about scripts, not about cost.
+const RATE_MAX = 120;
 
 export async function GET(req: NextRequest) {
-  if (rateLimited(clientIp(req), RATE_MAX)) return fail("rate_limited", 429);
+  if (rateLimited(clientIp(req), RATE_MAX, "disponibilidad")) return fail("rate_limited", 429);
 
   const origin = adminOrigin();
   if (!origin) return fail("unavailable", 503);
 
   const params = req.nextUrl.searchParams;
   const query = new URLSearchParams();
-  // Only the three parameters the panel knows. Forwarding the whole query
+  // Only the parameters the panel knows. Forwarding the whole query
   // string would let a caller smuggle anything we later add to the sub-API.
-  for (const key of ["serviceId", "date", "providerId"]) {
+  // `thenServiceId`: the second half of a hands + feet pair, booked right
+  // after the first with the same professional.
+  for (const key of ["serviceId", "thenServiceId", "date", "providerId"]) {
     const value = params.get(key);
     if (value !== null && value !== "") query.set(key, value);
   }

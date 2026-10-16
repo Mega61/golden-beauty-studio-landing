@@ -44,6 +44,21 @@ export type PricingEntry = {
    * una línea en la landing y nada acá.
    */
   showcaseOnly: boolean;
+  /**
+   * Solo en `combos`: los dos servicios sueltos que el combo reemplaza, por id
+   * de vitrina.
+   *
+   * Es **cómo se llega** a un combo: ni la agenda ni el flujo público lo
+   * ofrecen en una lista. Se eligen el servicio de manos y el de pies, y la
+   * cita se convierte en el combo — con su precio y su duración propios, que no
+   * son la suma y nunca se derivan de ella. `lib/combo-composition.ts` traduce
+   * estos ids a los de EA con `service_map`.
+   *
+   * `null` en todo lo que no sea un combo. Un combo **sin** esto no se puede
+   * alcanzar desde ninguna pantalla, y por eso el build de la landing falla
+   * antes (`scripts/check-pricing.mjs`) en vez de dejarlo pasar en silencio.
+   */
+  composedOf: { hands: string; feet: string } | null;
 };
 
 export class PricingParseError extends Error {
@@ -138,11 +153,58 @@ function extractPricingArray(source: string): string {
 
 const CATEGORY_RE =
   /\{\s*id\s*:\s*["']([^"']+)["']\s*,\s*items\s*:\s*\[([\s\S]*?)\]\s*,?\s*\}/g;
-const ITEM_RE = /\{([^{}]*)\}/g;
+/**
+ * Los cuerpos de los objetos de primer nivel de un `items: [ … ]`.
+ *
+ * Es un barrido por profundidad de llaves y no una expresión regular porque un
+ * ítem puede traer un objeto adentro —`composedOf: { hands, feet }`— y
+ * `/\{([^{}]*)\}/` devolvería **ese** objeto interno como si fuera un ítem más:
+ * el parser entonces se quejaba de un ítem sin id sobre un archivo perfectamente
+ * válido, y la pantalla de Servicios se quedaba sin catálogo entero.
+ */
+function itemBodies(itemsBody: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let from = 0;
 
+  for (let i = 0; i < itemsBody.length; i += 1) {
+    const c = itemsBody[i];
+    if (c === "{") {
+      if (depth === 0) from = i + 1;
+      depth += 1;
+    } else if (c === "}") {
+      depth -= 1;
+      if (depth === 0) out.push(itemsBody.slice(from, i));
+    }
+  }
+
+  return out;
+}
+
+/** `composedOf: { hands: "…", feet: "…" }`, en cualquier orden de las dos claves. */
+function composition(body: string): { hands: string; feet: string } | null {
+  const block = /\bcomposedOf\s*:\s*\{([^{}]*)\}/.exec(body);
+  if (!block) return null;
+
+  const hands = /\bhands\s*:\s*["']([^"']+)["']/.exec(block[1]);
+  const feet = /\bfeet\s*:\s*["']([^"']+)["']/.exec(block[1]);
+  if (!hands || !feet) return null;
+
+  return { hands: hands[1], feet: feet[1] };
+}
+
+/**
+ * El valor escalar de una clave del ítem.
+ *
+ * Se busca sobre el cuerpo **sin** los objetos anidados: con `composedOf: {…}`
+ * adentro, un `\bhands\s*:` cualquiera podría confundirse con una clave del
+ * ítem. Quitarlos primero cuesta un `replace` y elimina toda una clase de
+ * lectura equivocada.
+ */
 function field(body: string, name: string): string | null {
+  const flat = body.replace(/\{[^{}]*\}/g, "");
   const re = new RegExp(`\\b${name}\\s*:\\s*([^,}]+)`);
-  const m = re.exec(body);
+  const m = re.exec(flat);
   return m ? m[1].trim() : null;
 }
 
@@ -180,10 +242,7 @@ export function parsePricingSource(source: string): PricingEntry[] {
     const categoryId = category[1];
     const itemsBody = category[2];
 
-    ITEM_RE.lastIndex = 0;
-    let item: RegExpExecArray | null;
-    while ((item = ITEM_RE.exec(itemsBody)) !== null) {
-      const body = item[1];
+    for (const body of itemBodies(itemsBody)) {
       const idMatch = /\bid\s*:\s*["']([^"']+)["']/.exec(body);
       if (!idMatch) {
         throw new PricingParseError(
@@ -213,6 +272,7 @@ export function parsePricingSource(source: string): PricingEntry[] {
           durationRaw === "null" ? null : requiredInt(body, "durationMin", id),
         fromPrice: field(body, "fromPrice") === "true",
         showcaseOnly: field(body, "showcaseOnly") === "true",
+        composedOf: composition(body),
       });
     }
   }

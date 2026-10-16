@@ -64,6 +64,9 @@ export default async function VistaPreviaPage({
         eaFailure={null}
         ownProviderId={role === "staff" ? 1 : null}
         canWrite
+        // Prendida para poder revisar la casilla de confirmación por WhatsApp.
+        // La acción vuelve a mirar la configuración real antes de mandar nada.
+        whatsappConfirmation
       />
 
       {/* Lo único que la vista previa no puede producir sola: el reporte de

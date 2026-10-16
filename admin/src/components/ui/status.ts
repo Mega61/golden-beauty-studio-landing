@@ -50,7 +50,7 @@ export const STATUS_META: Record<StatusToken, StatusMeta> = {
   confirmada: {
     id: "confirmada",
     label: "Confirmada",
-    description: "La clienta confirmó que viene.",
+    description: "Confirmó que viene.",
   },
   completada: {
     id: "completada",
@@ -65,7 +65,7 @@ export const STATUS_META: Record<StatusToken, StatusMeta> = {
   "no-asistio": {
     id: "no-asistio",
     label: "No asistió",
-    description: "La clienta no llegó y la silla se perdió.",
+    description: "No llegó nadie y la silla se perdió.",
   },
   desconocido: {
     id: "desconocido",

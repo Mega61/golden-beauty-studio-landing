@@ -233,6 +233,34 @@ export function isAllowedIdentity(
  * - `catalogo:publicar` — el diff `pricing.ts` ↔ EA en el sentido de escritura.
  * - `diagnostico:ver` — el tablero de estado del sistema.
  * - `ea:avanzado` — el link a la interfaz de EA.
+ * - `recordatorios:enviar` — ver la lista de recordatorios de hoy y mañana y
+ *   mandarlos a mano por `wa.me` (el paliativo de X7). Es trabajo de mostrador.
+ *   **No es de la técnica**, aunque sean sus clientas: el aviso tiene que salir
+ *   del WhatsApp del estudio, que es a donde la clienta va a responder "no
+ *   puedo, ¿me cambias?". Desde el celular personal de la técnica, esa
+ *   respuesta llega a un número que la recepción no ve, y la cita no se mueve.
+ * - `recordatorios:baja` — registrar que un número no quiere más recordatorios.
+ *   Corta todos los avisos futuros de esa persona, incluidos los automáticos,
+ *   así que es de quien atiende el WhatsApp del estudio y queda en bitácora.
+ * - `avisos:reservas-web` — recibir en el celular una notificación push cada
+ *   vez que alguien reserva desde la página. El aviso nombra a la clienta, el
+ *   servicio, la hora **y la técnica**: es un pedazo de la agenda de todo el
+ *   equipo. Por eso va con `agenda:ver-todas` y **no es de la técnica**: ella ve
+ *   su columna, no la de las demás, y un aviso en su pantalla de bloqueo con la
+ *   clienta de otra rompería ese alcance por la puerta de atrás. Si algún día
+ *   se quiere que la técnica sepa de *sus* reservas, es otra capacidad con su
+ *   propio filtro por `ea_provider_id`, no esta abierta a un rol más.
+ * - `pauta:registrar` — anotar cuánto se invirtió en anuncios en un mes (la
+ *   tabla `ad_spend`, migración `023`). Es la cifra que convierte "clientas
+ *   nuevas" en "costo por clienta nueva", y es plata que solo la dueña sabe y
+ *   decide: recepción ve el reporte (tiene `reportes:ver`), pero no escribe el
+ *   denominador de una decisión de inversión que no es suya.
+ * - `clientes:exportar` — bajar la lista de clientas para una audiencia
+ *   personalizada de Meta. Va **cifrada** (SHA-256), pero sigue siendo una
+ *   exportación masiva de datos personales que sale del estudio hacia un
+ *   tercero, así que es de la dueña sola, como `clientes:fusionar`: recepción
+ *   corrige una ficha con la clienta enfrente; sacar a toda la clientela en un
+ *   archivo no es trabajo de mostrador. Cada descarga queda en la bitácora.
  */
 export type Capability =
   | "cuenta:cerrar-propia"
@@ -251,7 +279,12 @@ export type Capability =
   | "clientes:fusionar"
   | "catalogo:publicar"
   | "diagnostico:ver"
-  | "ea:avanzado";
+  | "ea:avanzado"
+  | "recordatorios:enviar"
+  | "recordatorios:baja"
+  | "avisos:reservas-web"
+  | "pauta:registrar"
+  | "clientes:exportar";
 
 /**
  * Contexto que hace variar una fila de la matriz.
@@ -294,6 +327,11 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "catalogo:publicar",
     "diagnostico:ver",
     "ea:avanzado",
+    "recordatorios:enviar",
+    "recordatorios:baja",
+    "avisos:reservas-web",
+    "pauta:registrar",
+    "clientes:exportar",
   ]),
 
   // Recepción. Opera el día completo y cierra la caja, pero no corrige después
@@ -308,6 +346,13 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "agenda:ver-todas",
     "clientes:editar",
     "diagnostico:ver",
+    // Recepción es quien atiende el WhatsApp del estudio: manda los avisos y
+    // registra a quien pide no recibir más.
+    "recordatorios:enviar",
+    "recordatorios:baja",
+    // La reserva web llega sin que nadie la vea: recepción es quien confirma
+    // por WhatsApp y acomoda la agenda, así que es quien tiene que enterarse.
+    "avisos:reservas-web",
   ]),
 
   // La técnica. Su alcance es su propio día, sus propias cuentas y su propia

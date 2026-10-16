@@ -68,7 +68,7 @@ export function ComisionesVista({ view }: { view: ComisionesView }) {
           <EmptyState
             icon="candado"
             title="Tu cuenta todavía no está enlazada a tu agenda"
-            body="Sin ese enlace no hay forma de saber cuál liquidación es la tuya. La dueña lo conecta desde Equipo."
+            body="Sin ese enlace no hay forma de saber cuál liquidación es la tuya. Administración lo conecta desde Equipo."
           />
         </Card>
       ) : (
@@ -195,7 +195,7 @@ function Resumen({ view }: { view: ComisionesView }) {
         >
           <Cifra label="Sobre lo cobrado" value={formatCOP(base)} />
           <Cifra
-            label={settlements.length === 1 ? "Técnica" : "Técnicas"}
+            label={settlements.length === 1 ? "Profesional" : "Profesionales"}
             value={String(settlements.length)}
           />
           <Cifra label="Ya pagadas" value={`${pagadas} de ${settlements.length}`} />
@@ -568,7 +568,7 @@ function SinLiquidar({ view }: { view: ComisionesView }) {
         body={
           view.canAdmin
             ? "Calcularla lee las cuentas cerradas del periodo y congela la comisión de cada renglón. Se puede volver a calcular tantas veces como haga falta: no duplica nada."
-            : "Cuando la dueña la calcule, tu liquidación aparece acá con el desglose por cita."
+            : "Cuando administración la calcule, tu liquidación aparece acá con el desglose por cita."
         }
       />
     </Card>
@@ -595,7 +595,7 @@ const PENDIENTES: ReadonlyArray<Column<PendingAccount>> = [
   },
   {
     key: "tecnica",
-    header: "Técnica",
+    header: "Profesional",
     from: "md",
     listSlot: "secondary",
     render: (row) => row.provider,
@@ -634,7 +634,7 @@ function SinComision({ rows }: { rows: readonly PendingAccount[] }) {
       <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.75rem" }}>
         <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
           Se cobraron pero no generaron comisión. Suele ser porque la cuenta no cuadra o porque
-          la cita tiene dos técnicas y no hay un combo que diga en qué proporción se reparte.
+          la cita tiene dos profesionales y no hay un combo que diga en qué proporción se reparte.
         </p>
         <DataTable
           columns={PENDIENTES}

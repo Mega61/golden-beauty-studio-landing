@@ -98,8 +98,8 @@ export const BLOCK_RESOURCE_LABEL: Readonly<
 > = {
   blocked_periods: { one: "cierre del estudio", many: "cierres del estudio" },
   unavailabilities: {
-    one: "ausencia de la profesional",
-    many: "ausencias de la profesional",
+    one: "ausencia de profesional",
+    many: "ausencias de profesional",
   },
   working_plan_exceptions: { one: "horario excepcional", many: "horarios excepcionales" },
 };

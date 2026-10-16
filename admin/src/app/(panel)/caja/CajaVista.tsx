@@ -151,7 +151,7 @@ function shiftDate(date: string, days: number): string {
 const ISSUE_COLUMNS: ReadonlyArray<Column<DayIssue>> = [
   {
     key: "clienta",
-    header: "Clienta",
+    header: "Cliente",
     from: "siempre",
     listSlot: "primary",
     render: (row) => row.customerName,
@@ -431,7 +431,7 @@ function accountColumns(
   return [
   {
     key: "clienta",
-    header: "Clienta",
+    header: "Cliente",
     from: "siempre",
     listSlot: "primary",
     render: nombre,
@@ -498,7 +498,7 @@ function Cerradas({
             <EmptyState
               icon="caja"
               title="Todavía no hay ninguna cuenta cerrada"
-              body="Las cuentas las cierra cada técnica desde Hoy, al terminar el servicio. Acá aparecen a medida que entran."
+              body="Las cuentas las cierra cada profesional desde Hoy, al terminar el servicio. Acá aparecen a medida que entran."
             />
           }
         />

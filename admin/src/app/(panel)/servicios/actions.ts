@@ -7,6 +7,7 @@ import { auditLogRepository, serviceMapRepository } from "@/db/repositories";
 import { EaApiError } from "@/lib/ea";
 import { createEaClient } from "@/lib/ea/client";
 import { requireCapability } from "@/lib/dal";
+import { forgetComboCompositions } from "@/lib/combo-source";
 
 import { CREATE_BLOCKER_MESSAGE, createPayload, publishPayload } from "./diff";
 import { loadServicesView } from "./data";
@@ -185,11 +186,11 @@ export async function crearServicio(
   let eaServiceId: number;
   try {
     const ea = createEaClient();
-    const created = await ea.services.create({
-      name: payload.name,
-      price: payload.price,
-      duration: payload.duration,
-    });
+    // Se manda el payload entero y no campo por campo: enumerarlos acá fue
+    // cómo `attendantsNumber` se quedó fuera y crear un servicio no funcionó
+    // nunca contra una EA de verdad. `createPayload()` es puro y está testeado;
+    // que decida él qué viaja.
+    const created = await ea.services.create(payload);
     eaServiceId = created.id;
   } catch (error) {
     return { ok: false, message: describeWriteFailure(error) };
@@ -200,6 +201,10 @@ export async function crearServicio(
     const db = getDb();
     await serviceMapRepository(db).link(pricingId, eaServiceId);
     await serviceMapRepository(db).markPublished(pricingId, at);
+    // El mapa vitrina↔EA acaba de cambiar. Sin esto, el combo recién creado
+    // tardaría hasta un minuto en poder componerse desde la agenda — el tiempo
+    // exacto en que alguien concluye que no funciona.
+    forgetComboCompositions();
     await auditLogRepository(db).append({
       actorUserId: session.userId,
       action: "catalogo.crear",
@@ -245,6 +250,7 @@ export async function vincularServicio(
   try {
     const db = getDb();
     await serviceMapRepository(db).link(pricingId, eaServiceId);
+    forgetComboCompositions();
     await auditLogRepository(db).append({
       actorUserId: session.userId,
       action: "catalogo.vincular",
@@ -281,6 +287,10 @@ export async function desvincularServicio(pricingId: string): Promise<ActionResu
     const db = getDb();
     const before = await serviceMapRepository(db).findByPricingId(pricingId);
     await serviceMapRepository(db).unlink(pricingId);
+    // Desvincular también: un combo cuya mitad de manos dejó de estar mapeada
+    // no se puede componer, y seguir ofreciéndolo un minuto más es ofrecer un
+    // par que al guardar apunta a un servicio que el panel ya no conoce.
+    forgetComboCompositions();
     await auditLogRepository(db).append({
       actorUserId: session.userId,
       action: "catalogo.desvincular",

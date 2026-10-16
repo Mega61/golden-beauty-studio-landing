@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 
-import { requireCapability } from "@/lib/dal";
+import { AppShell } from "@/components/shell";
+import type { Role } from "@/components/shell/nav";
+import type { UserRole } from "@/db/types";
+import { requireCapability, sessionCan } from "@/lib/dal";
 
 import { ClientesLista } from "./ClientesLista";
 import { searchClients } from "./data";
@@ -17,25 +20,40 @@ import { searchClients } from "./data";
  */
 
 export const metadata: Metadata = {
-  title: "Clientas · Panel",
+  title: "Clientes · Panel",
   robots: { index: false, follow: false },
 };
 
 /** Lee la sesión y consulta EA en cada visita: nada de esto se puede cachear. */
 export const dynamic = "force-dynamic";
 
+
+/** `admin` en la base es "recepción" en la navegación. */
+function navRole(role: UserRole): Role {
+  return role === "admin" ? "reception" : role;
+}
+
 export default async function ClientesPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireCapability("agenda:ver-todas");
+  const session = await requireCapability("agenda:ver-todas");
 
   const params = await searchParams;
   const raw = params.q;
   const query = typeof raw === "string" ? raw : null;
+  const rawPage = Number(typeof params.pagina === "string" ? params.pagina : 1);
+  const page = Number.isInteger(rawPage) && rawPage > 0 && rawPage < 1000 ? rawPage : 1;
 
-  const result = await searchClients(query);
+  const [result, canExport] = await Promise.all([
+    searchClients(query, page),
+    sessionCan("clientes:exportar"),
+  ]);
 
-  return <ClientesLista result={result} />;
+  return (
+    <AppShell role={navRole(session.role)} title="Clientes">
+      <ClientesLista canExport={canExport} result={result} />
+    </AppShell>
+  );
 }

@@ -1,0 +1,73 @@
+# Las dependencias que la suite E2E necesita, para CI y para reproducir CI local.
+#
+# No es `dev-stack.yml` con otras variables, y la diferencia importa:
+#
+#   · **Sin `container_name`.** El de desarrollo los fija (`gbs-dev-mysql`), y
+#     dos stacks con nombres fijos no pueden convivir. Acá los pone Compose a
+#     partir del nombre del proyecto, así que esto corre **al lado** del stack
+#     de desarrollo sin tocarlo — que es justo lo que hace falta para poder
+#     reproducir un fallo de CI en la máquina de alguien sin apagarle su
+#     entorno.
+#   · **Sin Mailpit.** La suite no lee correo.
+#   · **Puertos altos por defecto.** Para no chocar con nada de lo que ya corre.
+#   · **Sin volúmenes con nombre.** El estado se tira con el stack: en CI cada
+#     corrida empieza de cero, y localmente `down` deja la máquina como estaba.
+#
+# Reproducir CI local:
+#
+#   docker compose -p gbs-ci -f deploy/compose/ci-stack.yml up -d
+#   npm --prefix admin run e2e:ci
+#   docker compose -p gbs-ci -f deploy/compose/ci-stack.yml down -v
+
+name: gbs-ci
+
+services:
+  easyappointments:
+    # **Pinear**, igual que en producción. Un `latest` acá significa que un
+    # martes cualquiera CI se pone rojo por una versión de EA que nadie pidió,
+    # y el fallo no se parece en nada a su causa.
+    image: alextselegidis/easyappointments:${EA_VERSION:-1.6.0}
+    restart: "no"
+    ports:
+      - "${CI_EA_PORT:-18080}:80"
+    environment:
+      BASE_URL: http://localhost:${CI_EA_PORT:-18080}
+      DEBUG_MODE: "TRUE"
+      DB_HOST: mysql
+      DB_NAME: easyappointments
+      DB_USERNAME: easyappointments
+      DB_PASSWORD: easyappointments_ci
+      # EA guarda datetimes locales sin zona. Un contenedor en UTC desplaza
+      # cinco horas cada cálculo, y los tests de hora de pared fallarían por
+      # una diferencia que no existe en producción.
+      TZ: America/Bogota
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    restart: "no"
+    ports:
+      - "${CI_MYSQL_PORT:-33307}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: easyappointments
+      MYSQL_USER: easyappointments
+      MYSQL_PASSWORD: easyappointments_ci
+      TZ: America/Bogota
+    command: >
+      --default-time-zone=-05:00
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    volumes:
+      # El mismo init que el de desarrollo: crea `gbs_admin` y los dos usuarios
+      # de MySQL. Compartirlo es deliberado — el día que cambie, CI y la
+      # máquina de quien desarrolla cambian juntos o el fallo aparece en uno
+      # solo de los dos.
+      - ./dev-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-psecret"]
+      interval: 3s
+      timeout: 5s
+      retries: 30

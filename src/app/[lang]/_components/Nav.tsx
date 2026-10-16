@@ -40,6 +40,7 @@ export default function Nav({
   sections,
   onLanding = true,
   switchPath = "",
+  showCta = true,
 }: {
   lang: Locale;
   dict: NavDict;
@@ -50,6 +51,11 @@ export default function Nav({
    * being bare in-page hashes that would resolve to nothing.
    */
   onLanding?: boolean;
+  /**
+   * False on `/reservar`: an "Agendar" button on the booking page itself is a
+   * button to where you already are.
+   */
+  showCta?: boolean;
   /**
    * Path after the locale segment for the page this nav sits on, e.g.
    * "/trabaja-con-nosotros". Lets the language switcher land on the *same* page
@@ -78,7 +84,7 @@ export default function Nav({
     }));
   // Locale-aware: an absolute URL passes through, a relative one gets the
   // language prefixed. See `bookingHref` in `src/config/site.ts`.
-  const bookingUrl = bookingHref(lang);
+  const bookingUrl = showCta ? bookingHref(lang) : null;
 
   return (
     <header
@@ -90,7 +96,12 @@ export default function Nav({
           <Logo variant="text" size={12} />
         </Link>
 
-        <nav className="hidden gap-7 lg:flex lg:gap-9">
+        {/* Full menu from 1280 px, not 1024: seven links plus the CTA don't
+            fit an iPad in landscape — at 1024 the CTA and the language switch
+            were pushed off-screen, and up to ~1200 the CTA wrapped to two
+            lines. Below 1280 the compact header (logo + Agendar + menu) is
+            what fits. */}
+        <nav className="hidden gap-7 xl:flex 2xl:gap-9">
           {anchors.map((a) => {
             const className =
               "font-sans text-[11px] font-medium uppercase tracking-[0.28em] text-ink no-underline hover:text-gold";
@@ -108,9 +119,12 @@ export default function Nav({
           })}
         </nav>
 
-        <div className="hidden items-center gap-4 lg:flex">
+        <div className="hidden shrink-0 items-center gap-4 xl:flex">
           <Link
             href={switchHref}
+            // Viewport prefetch would download the whole other-language page
+            // (~190 KB) for every visitor; almost nobody switches.
+            prefetch={false}
             className="font-sans text-[10px] font-semibold uppercase tracking-[0.28em] text-ink-mute no-underline hover:text-gold"
             aria-label={`Switch to ${otherLang.toUpperCase()}`}
           >

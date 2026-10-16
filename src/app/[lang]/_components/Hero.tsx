@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { EyebrowLabel, PrimaryCTA, SecondaryCTA } from "./atoms";
-import { siteConfig } from "@/config/site";
+import { bookingHref } from "@/config/site";
 import { getHeroImage } from "@/data/hero";
 
 type HeroDict = {
@@ -15,7 +15,7 @@ type HeroDict = {
   metaStatus: string;
 };
 
-export default async function Hero({ dict }: { dict: HeroDict }) {
+export default async function Hero({ dict, lang }: { dict: HeroDict; lang: string }) {
   const heroSrc = await getHeroImage();
   return (
     <section className="relative bg-carbon">
@@ -45,18 +45,18 @@ export default async function Hero({ dict }: { dict: HeroDict }) {
         />
 
         {/* Brand watermark — ghosted FullLogoTexture, bottom-right bleed.
-            Acts as a paper-stamp brand presence behind the photo. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logos/optimized/FullLogoTexture.webp"
-          alt=""
+            Acts as a paper-stamp brand presence behind the photo.
+            A background, not an <img>: it's desktop-only, and a hidden <img>
+            still downloads — 116 KB on every phone for nothing. A background
+            on a `display:none` element is never fetched. */}
+        <div
           aria-hidden
-          decoding="async"
-          className="pointer-events-none absolute hidden md:block"
+          className="pointer-events-none absolute hidden aspect-square bg-contain bg-no-repeat md:block"
           style={{
             right: "-6%",
             bottom: "-12%",
             width: "min(560px, 50%)",
+            backgroundImage: "url(/logos/optimized/FullLogoTexture.webp)",
             opacity: 0.13,
             mixBlendMode: "soft-light",
           }}
@@ -81,7 +81,7 @@ export default async function Hero({ dict }: { dict: HeroDict }) {
             {dict.body}
           </p>
           <div className="mt-7 flex flex-wrap gap-3.5 md:mt-10">
-            <PrimaryCTA href={siteConfig.bookingUrl} trackLocation="hero">
+            <PrimaryCTA href={bookingHref(lang)} trackLocation="hero">
               {dict.ctaPrimary}
             </PrimaryCTA>
             <SecondaryCTA onLight={false} trackLocation="hero">

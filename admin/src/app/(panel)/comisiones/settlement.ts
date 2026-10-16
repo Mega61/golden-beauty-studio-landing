@@ -81,7 +81,7 @@ export type SettlementNames = {
   services: ReadonlyMap<number, string>;
 };
 
-const SIN_NOMBRE = "Técnica";
+const SIN_NOMBRE = "Profesional";
 
 /**
  * Cómo se llama un renglón cuando EA no contestó.

@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale, type Locale } from "../dictionaries";
 import { siteConfig } from "@/config/site";
-import { EyebrowLabel, GoldRule } from "../_components/atoms";
 import Nav from "../_components/Nav";
 import Footer from "../_components/Footer";
-import ReservaFlow from "./ReservaFlow";
+import ReservaFlow, { type Catalog, type ServiceCopy } from "./ReservaFlow";
+import { adminOrigin, bookingUrl } from "@/app/api/reservas/guards";
+import { getReviews } from "@/data/reviews";
+import { handsForFeet, serviceAreas } from "@/data/service-areas";
 
 /**
  * `/[lang]/reservar` — the booking flow.
@@ -64,16 +66,78 @@ function todayInStudio(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
 }
 
+/**
+ * Name, description and category of each service in the visitor's language,
+ * keyed by the price-list id.
+ *
+ * EA only knows the Spanish names, so without this an English visitor books
+ * "Esculpidas en polygel". The panel sends each service's price-list id
+ * (`slug`), and the flow looks it up here; a service with no entry falls back
+ * to EA's name, so a new service is bookable before anyone translates it.
+ */
+function serviceCopy(categories: Record<string, {
+  label: string;
+  items: Record<string, { name: string; desc: string }>;
+}>): Record<string, ServiceCopy> {
+  const out: Record<string, ServiceCopy> = {};
+  for (const [catId, cat] of Object.entries(categories)) {
+    for (const [id, item] of Object.entries(cat.items)) {
+      out[id] = { name: item.name, desc: item.desc, category: cat.label, categoryId: catId };
+    }
+  }
+  return out;
+}
+
+/**
+ * The catalog, rendered with the page instead of fetched after it.
+ *
+ * Services and technicians change a few times a year; making a phone on 4G
+ * wait for a second round trip — and stare at a skeleton — before it can pick
+ * anything was the slowest part of the flow. Cached for a minute in Next's data
+ * cache, so a burst of ad traffic costs the panel one request a minute, not one
+ * per visitor. Availability is never cached here: that stays a live call.
+ *
+ * Bounded at 2.5 s and allowed to fail: the client fetches it itself when this
+ * comes back null, which is exactly how the page worked before.
+ */
+async function loadCatalog(): Promise<Catalog | null> {
+  const origin = adminOrigin();
+  if (!origin) return null;
+  try {
+    const res = await fetch(bookingUrl(origin, "catalogo"), {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 60, tags: ["booking-catalog"] },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as Catalog;
+    return { ...body, combos: body.combos ?? [] };
+  } catch {
+    return null;
+  }
+}
+
 export default async function ReservarPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ lang: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { lang } = await params;
   if (!hasLocale(lang)) notFound();
   const typedLang: Locale = lang;
 
-  const dict = await getDictionary(typedLang);
+  // Reading the query is also what makes this page render per request. It has
+  // to: `todayInStudio()` at build time would freeze "today" on the deploy date.
+  const query = await searchParams;
+  const initialSlug = typeof query.servicio === "string" ? query.servicio : null;
+
+  const [dict, catalog, reviews] = await Promise.all([
+    getDictionary(typedLang),
+    loadCatalog(),
+    getReviews(typedLang).catch(() => null),
+  ]);
   const t = dict.reservar;
 
   return (
@@ -84,25 +148,40 @@ export default async function ReservarPage({
         sections={siteConfig.sections}
         onLanding={false}
         switchPath={`/${PATH}`}
+        showCta={false}
       />
 
-      <main className="bg-ivory pt-12 md:pt-16">
-        <header className="mx-auto max-w-[760px] px-5 pb-4 text-center">
-          <EyebrowLabel className="text-gold-dark">{t.eyebrow}</EyebrowLabel>
-          <h1 className="mt-3 font-display text-4xl text-ink md:text-5xl">{t.title}</h1>
-          <GoldRule className="my-5" width={90} />
-          <p className="font-sans text-sm text-ink-soft">{t.intro}</p>
-        </header>
-
+      {/* No page heading: the studio header inside the flow is the heading —
+          photo, name, rating — the way a booking app presents a business.
+          The deeper background is what the booking card sits on. */}
+      <main className="bg-ivory-deep/50">
+        <h1 className="sr-only">{t.title}</h1>
         <ReservaFlow
           dict={t}
           lang={typedLang}
           today={todayInStudio()}
-          whatsappHref={siteConfig.whatsappUrl}
+          initialSlug={initialSlug}
+          initialCatalog={catalog}
+          rating={
+            reviews?.rating && reviews.count
+              ? { value: reviews.rating, count: reviews.count }
+              : null
+          }
+          copy={serviceCopy(dict.servicios.categories)}
+          areas={serviceAreas()}
+          handsForFeet={handsForFeet()}
+          whatsappNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() || null}
+          mapsUrl={
+            // Same shape as the footer's link: the documented Maps URL, pinned
+            // to the business listing when the Place ID is set.
+            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+              "Golden Beauty Studio, Calle 69 Sur #43a - 41, Sabaneta",
+            )}${siteConfig.mapsPlaceId ? `&query_place_id=${siteConfig.mapsPlaceId}` : ""}`
+          }
         />
       </main>
 
-      <Footer dict={dict.footer} />
+      <Footer dict={dict.footer} lang={typedLang} />
     </>
   );
 }

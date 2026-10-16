@@ -340,6 +340,11 @@ En la misma pantalla, **Environment variables**. Ninguna de estas entra al repo;
 | `GOOGLE_WORKSPACE_DOMAIN` | `goldenbeautystudio.com.co` |
 | `TOTP_ENC_KEY` | `openssl rand -base64 32` |
 | `INGEST_URL` / `INGEST_SHARED_SECRET` | los del Strapi del CRM |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` (dentro de `admin/`), **una vez** — opcionales, ver abajo |
+| `VAPID_SUBJECT` | `mailto:` de un buzón del estudio que alguien lea |
+| `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | token permanente del *System User* y el *Phone number ID* — opcionales, ver abajo |
+| `WHATSAPP_APP_SECRET` / `WHATSAPP_VERIFY_TOKEN` | secreto de la app de Meta y la frase del webhook — opcionales |
+| `WHATSAPP_TEMPLATE_LANG` / `WHATSAPP_TPL_CONFIRMACION` / `WHATSAPP_TPL_RECORDATORIO` / `WHATSAPP_GRAPH_VERSION` | opcionales: `es`, `confirmacion_cita`, `recordatorio_cita`, `v23.0` |
 | `MYSQL_HOST` / `MYSQL_PORT` | `mysql-transversal` / `3306` (respaldo) |
 | `BACKUP_GBS_USER` / `BACKUP_GBS_PASSWORD` | `gbs_admin` y su contraseña |
 | `BACKUP_EA_USER` / `BACKUP_EA_PASSWORD` | `gbs_ea_ro` y su contraseña |
@@ -351,6 +356,44 @@ del rewrite de Vercel y el `Host` que le llega es el del origen, no el que la
 persona escribió. Derivarla del `Host` rompe los redirects de OAuth.
 
 La explicación de cada variable está en `docs/DEV-LOCAL.md` § Paso 4.
+
+**Las tres `VAPID_*` son los avisos al celular de reservas web, y son
+opcionales.** Sin ellas (o con alguna mal formada) Ajustes no muestra el
+interruptor y una reserva no intenta avisar a nadie; nada más cambia. Con
+ellas, cada reserva confirmada en `/reservar` manda una notificación push a los
+dispositivos de la dueña y de recepción que la hayan prendido en
+`/admin/ajustes`. Tres cosas que no son obvias:
+
+- **No se rotan a la ligera.** Cada suscripción queda atada a la llave pública
+  con la que se creó. Cambiar el par deja mudos todos los celulares hasta que
+  cada persona apague y vuelva a prender el aviso (el envío los poda solo tras
+  diez fallas seguidas). Se generan una vez y se guardan con los demás
+  secretos.
+- **No son `NEXT_PUBLIC_*`.** La pública le llega al navegador como prop de la
+  pantalla de Ajustes, leída en tiempo de ejecución, así que la imagen sigue
+  siendo la misma para cualquier par de llaves.
+- **El service worker no cachea nada.** `admin/public/sw.js` solo muestra el
+  aviso y abre la agenda al tocarlo; no tiene manejador de `fetch`, así que el
+  panel instalado nunca muestra una agenda vieja. Ver su cabecera.
+
+**Las `WHATSAPP_*` prenden la confirmación y los recordatorios automáticos por
+la Cloud API de Meta, y son opcionales.** Sin `WHATSAPP_TOKEN` y
+`WHATSAPP_PHONE_NUMBER_ID` nada intenta mandar: la reserva responde
+`whatsappConfirmation: "disabled"`, la agenda no muestra la casilla de
+confirmación, el servicio `admin-recordatorios` escribe una línea y se queda
+dormido, y `/admin/recordatorios` sigue siendo el canal manual. El paso a paso
+de Meta (verificación, Coexistence, token, plantillas, webhook) está en
+**`docs/WHATSAPP.md`**. Dos cosas de infraestructura:
+
+- **El webhook de Meta es público a propósito**:
+  `https://www.goldenbeautystudio.com.co/admin/api/public/whatsapp/webhook`.
+  Vive bajo `/admin/api/public/`, que Caddy deja pasar; el bloque `@webhook` de
+  abajo solo cierra `/admin/api/webhooks/*` (el de EA, que no se firma). El de
+  Meta se verifica con `X-Hub-Signature-256` contra `WHATSAPP_APP_SECRET`, y sin
+  esa variable responde 503 a todo.
+- **`admin-recordatorios` duerme exactamente 1800 s entre corridas.** Las
+  ventanas de `jobs/reminders.ts` tienen ±35 min de tolerancia porque asumen ese
+  intervalo, y `jobs/reminders-run.test.ts` lee el compose y falla si cambia.
 
 ### Lo primero que hay que mirar en el primer despliegue
 
@@ -661,6 +704,31 @@ que ese día sea encender algo y no escribirlo bajo presión.
 
 ---
 
+## Preparar EA para el corte — el correo opcional
+
+**Un ajuste, y sin él el alta de clientas está rota.**
+
+`require_email` viene en **1** en una instalación nueva de Easy!Appointments, y con eso su API
+**rechaza con un 500 cualquier clienta sin correo**. El estudio trabaja al revés: la mayoría de
+las clientas no tiene correo, y el panel se niega a inventar uno — un correo falso viaja como
+invitado del evento de Google, rebota, y ensucia la ficha para siempre.
+
+El síntoma, si nadie lo mira, es que recepción no puede dar de alta a nadie y el panel dice *"la
+agenda no respondió"*, que es un mensaje que invita a reintentar algo que no se va a arreglar.
+
+Se comprueba y se corrige desde la interfaz de EA (**Ajustes → Reservas**, "Correo obligatorio"),
+o por SQL:
+
+```sql
+SELECT value FROM ea_settings WHERE name = 'require_email';   -- tiene que dar 0
+UPDATE ea_settings SET value = '0' WHERE name = 'require_email';
+```
+
+La suite E2E corre con este ajuste en 0 justamente para probar la configuración real del estudio
+(`admin/scripts/ci-prepare-ea.sh`).
+
+---
+
 ## Preparar EA para el corte — la lista de estados
 
 **Antes de que exista una sola cita real.** EA guarda el estado de cada cita como
@@ -717,6 +785,36 @@ inventar el texto que la clienta lee en su confirmación de cita.
 Si la creación en EA funciona pero el vínculo falla, el servicio queda creado y sin vincular:
 aparece abajo como *solo en la agenda* y el desplegable de **Vincular** lo ofrece. **No hay
 que borrarlo en EA** — el mensaje de error lo dice con esas palabras.
+
+### Componer un combo: no hay paso siguiente
+
+En la agenda y en `/reservar` **a un combo no se llega eligiéndolo de la lista**:
+se elige el servicio de manos, aparece "¿también pies?", y al resolver el par la
+cita pasa a ser el combo (con la suma de las dos mitades tachada al lado de su
+precio). Eso necesita saber de qué se compone cada combo, y esa composición
+**viaja horneada dentro de la imagen** — `admin/src/data/combo-composition.ts`,
+generado desde la vitrina y commiteado. No hay botón que apretar ni archivo que
+montar: en cuanto los tres servicios existen en EA y están vinculados en
+`service_map`, el combo se compone.
+
+La tabla `gbs_admin.combo` sigue existiendo, pero ya no para agendar: de ahí
+sacan las comisiones el reparto de un combo trabajado a cuatro manos
+(`allocation_hands_bp`). La rellena el **reconcile nocturno**, y su resumen dice
+cuántos combos quedaron sincronizados y nombra los que todavía no se pueden
+componer porque a alguna de sus tres partes le falta publicarse. Si nunca se
+llena, el síntoma es que esas cuentas se saltan en la liquidación como
+`reparto-desconocido`.
+
+### `PRICING_SOURCE_PATH` — para el diff de Servicios, no para los combos
+
+La pantalla de Servicios compara la vitrina contra el catálogo de EA, y para eso
+sí necesita leer `src/data/pricing.ts`, que no está en la imagen. Hay que montar
+el archivo en el contenedor y apuntarle `PRICING_SOURCE_PATH`; sin eso la
+pantalla entra en su estado de "no pude leer la vitrina" y **no se puede crear ni
+vincular ningún servicio** — que es el paso de arriba.
+
+Lo que **no** depende de eso es agendar: un combo ya vinculado se compone aunque
+el archivo falte, porque su composición va horneada.
 
 ---
 

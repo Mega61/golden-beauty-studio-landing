@@ -21,6 +21,7 @@ import {
   type Check,
   type JobRunFact,
   type RegisteredWebhook,
+  whatsappCheck,
 } from "./checks";
 
 const NOW = new Date("2026-08-31T14:00:00-05:00");
@@ -549,5 +550,40 @@ describe("parseBackupStatus", () => {
     expect(parseBackupStatus(null)).toBeNull();
     expect(parseBackupStatus("")).toBeNull();
     expect(parseBackupStatus("ok")).toBeNull();
+  });
+});
+
+describe("whatsappCheck", () => {
+  const NOW = new Date("2026-10-15T15:00:00Z");
+  const run = (minutesAgo: number, ok = true) => ({
+    startedAt: new Date(NOW.getTime() - minutesAgo * 60_000),
+    finishedAt: new Date(NOW.getTime() - minutesAgo * 60_000 + 5_000),
+    ok,
+    summary: "3 enviados",
+  });
+
+  it("sin configuración es amarillo y dice cómo se mandan mientras tanto", () => {
+    const check = whatsappCheck({ configured: false, lastRun: null, failed24h: 0, now: NOW });
+    expect(check.level).toBe("warn");
+    expect(check.detail).toMatch(/a mano/);
+  });
+
+  it("configurado y nunca corrió: rojo", () => {
+    expect(whatsappCheck({ configured: true, lastRun: null, failed24h: 0, now: NOW }).level).toBe("down");
+  });
+
+  it("corrida que falló, o vieja: rojo", () => {
+    expect(whatsappCheck({ configured: true, lastRun: run(10, false), failed24h: 0, now: NOW }).level).toBe("down");
+    expect(whatsappCheck({ configured: true, lastRun: run(120), failed24h: 0, now: NOW }).level).toBe("down");
+  });
+
+  it("corre pero hubo fallos en 24 h: amarillo con la cifra", () => {
+    const check = whatsappCheck({ configured: true, lastRun: run(10), failed24h: 2, now: NOW });
+    expect(check.level).toBe("warn");
+    expect(check.figure).toBe("2");
+  });
+
+  it("corre y nada falló: verde", () => {
+    expect(whatsappCheck({ configured: true, lastRun: run(10), failed24h: 0, now: NOW }).level).toBe("ok");
   });
 });

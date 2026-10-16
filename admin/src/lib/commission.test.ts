@@ -426,7 +426,7 @@ describe("computeCommissions", () => {
   it("rechaza un renglón sin técnica asignada", () => {
     expect(() =>
       computeCommissions([{ line: line({ itemId: 1 }), assignments: [] }], []),
-    ).toThrow(/sin técnica asignada/);
+    ).toThrow(/sin profesional/);
   });
 
   it("rechaza una base con centavos", () => {

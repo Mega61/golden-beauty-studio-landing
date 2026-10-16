@@ -105,7 +105,7 @@ export function BlockForm({
               <span className={styles.choiceText}>
                 <span className={styles.choiceTitle}>Todo el estudio</span>
                 <span className={styles.choiceHint}>
-                  Un festivo, vacaciones, una obra. Tapa a todas las profesionales.
+                  Un festivo, vacaciones, una obra. Tapa a todo el equipo.
                 </span>
               </span>
             </label>

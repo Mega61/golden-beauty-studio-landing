@@ -71,6 +71,8 @@ export type AgendaClientProps = {
   /** La técnica solo puede bloquearse a sí misma. `null` en dueña y recepción. */
   ownProviderId: number | null;
   canWrite: boolean;
+  /** ¿Está prendida la confirmación por WhatsApp (Cloud API)? */
+  whatsappConfirmation: boolean;
 };
 
 /** Cada cuánto se vuelve a pedir el rango visible. */
@@ -93,6 +95,7 @@ export function AgendaClient({
   eaFailure,
   ownProviderId,
   canWrite,
+  whatsappConfirmation,
 }: AgendaClientProps) {
   const { toast } = useToast();
 
@@ -126,7 +129,17 @@ export function AgendaClient({
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const response = await fetch(`datos?dias=${dateKey}`, {
+        // **Absoluta, no relativa.** `fetch("datos?…")` desde `/admin/agenda`
+        // —sin barra final— resuelve contra `/admin/`, no contra
+        // `/admin/agenda/`: pedía `/admin/datos`, que no existe. El fallo era
+        // invisible porque el `catch` de abajo se traga los errores de red a
+        // propósito, así que la agenda simplemente no se actualizaba nunca:
+        // una cita recién creada no aparecía hasta recargar a mano, y el
+        // sondeo de 30 s tampoco traía nada.
+        //
+        // `basePath` va explícito porque `fetch` no lo agrega —solo lo hacen
+        // `<Link>` y el router— y la app entera vive bajo `/admin`.
+        const response = await fetch(`/admin/agenda/datos?dias=${dateKey}`, {
           signal,
           cache: "no-store",
         });
@@ -369,6 +382,10 @@ export function AgendaClient({
           endTime: hhmm(minute + 60),
           notes: "",
           status: "Reservada",
+          // Arranca apagado siempre: forzar el horario es una decisión de ese
+          // turno, no una preferencia que se quede pegada al formulario.
+          allowOutsideHours: false,
+          sendWhatsappConfirmation: true,
         },
       });
     },
@@ -387,6 +404,9 @@ export function AgendaClient({
         end: `${draft.date} ${draft.endTime}:00`,
         notes: draft.notes,
         status: draft.status,
+        allowOutsideHours: draft.allowOutsideHours,
+        sendWhatsappConfirmation:
+          whatsappConfirmation && draft.id === undefined && draft.sendWhatsappConfirmation,
         force,
       });
 
@@ -434,7 +454,7 @@ export function AgendaClient({
   const doCancel = (appointment: Appointment) => {
     // La única acción destructiva que **sí** confirma: cancelar notifica a la
     // clienta, y una notificación no se deshace (§ Interacción).
-    if (!globalThis.confirm("Cancelar la cita le avisa a la clienta. ¿Seguro?")) return;
+    if (!globalThis.confirm("Cancelar la cita le avisa a quien reservó. ¿Seguro?")) return;
 
     startSave(async () => {
       const result = await cancelAppointment(appointment.id, appointment.providerId ?? 0);
@@ -487,10 +507,13 @@ export function AgendaClient({
         draft={panel.draft}
         providers={data.providers.map((p) => ({ id: p.id, name: p.name }))}
         services={data.services}
+        combos={data.combos}
+        combosReason={data.combosReason}
         meta={data.meta}
         report={report}
         error={formError}
         saving={saving}
+        canConfirmByWhatsapp={whatsappConfirmation}
         onSubmit={submitAppointment}
         onCancel={() => setPanel({ kind: "none" })}
       />
@@ -726,8 +749,8 @@ function AppointmentDetail({
   return (
     <div className={styles.detail}>
       <div className={styles.detailRows}>
-        <span className={styles.detailKey}>Clienta</span>
-        <span className={styles.detailValue}>{info?.customer ?? "Sin clienta"}</span>
+        <span className={styles.detailKey}>Cliente</span>
+        <span className={styles.detailValue}>{info?.customer ?? "Sin cliente"}</span>
 
         {info?.phone ? (
           <>
@@ -854,5 +877,7 @@ function draftFrom(appointment: Appointment, meta: AgendaData["meta"]): Appointm
     endTime: appointment.end.slice(11, 16),
     notes: appointment.notes ?? "",
     status: appointment.status,
+    allowOutsideHours: false,
+    sendWhatsappConfirmation: false,
   };
 }

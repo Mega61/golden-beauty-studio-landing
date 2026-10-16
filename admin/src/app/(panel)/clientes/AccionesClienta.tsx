@@ -97,7 +97,7 @@ function CamposClienta({ valores, prefijo }: { valores: ValoresClienta; prefijo:
       <Field
         label="Teléfono"
         required
-        hint="Es la identidad de la clienta: por acá se sabe que es la misma persona."
+        hint="Es la identidad de cada cliente: por acá se sabe que es la misma persona."
       >
         {({ id, describedBy }) => (
           <input
@@ -174,7 +174,7 @@ export function NuevaClienta() {
     return (
       <div>
         <Button type="button" size="sm" onClick={() => setAbierto(true)}>
-          Nueva clienta
+          Agregar cliente
         </Button>
         <Resultado estado={estado} />
       </div>
