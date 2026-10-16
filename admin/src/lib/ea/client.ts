@@ -46,6 +46,8 @@
 
 import "server-only";
 
+import { readPolicyFor, resourceOfPath, sharedEaCache, type EaCache } from "./cache";
+import { recordEaCall } from "./call-stats";
 import { eaDatePart, instantToEaDate, type EaLocalDate, type EaLocalDateTime } from "./datetime";
 import { EaApiError, kindForStatus, kindForThrown, safeBody, scrubSecret } from "./errors";
 import {
@@ -104,6 +106,20 @@ export type EaClientConfig = {
   pageLength?: number;
   /** Tope de páginas de `list()`. Al superarlo lanza, nunca trunca. */
   maxPages?: number;
+  /**
+   * La caché de lecturas del proceso (ver `cache.ts`). `eaConfigFromEnv()` la
+   * pone siempre, así que **toda escritura** de un cliente del panel invalida
+   * lo que depende de ese recurso, lea o no de caché ese cliente. Los tests que
+   * arman la configuración a mano no la traen y no tocan nada compartido.
+   */
+  cache?: EaCache | null;
+  /**
+   * Si las lecturas de colecciones salen de `cache`. **Apagado por defecto**: el
+   * cliente de siempre lee fresco, y quien quiera caché la pide con
+   * `createCachedEaClient()` — un camino que decide una escritura no puede
+   * heredarla por accidente.
+   */
+  cachedReads?: boolean;
 };
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -143,6 +159,8 @@ export function eaConfigFromEnv(env: Env = process.env): EaClientConfig {
     token,
     timeoutMs: numberFromEnv(env.EA_API_TIMEOUT_MS) ?? DEFAULT_TIMEOUT_MS,
     pageLength: numberFromEnv(env.EA_API_PAGE_LENGTH) ?? DEFAULT_PAGE_LENGTH,
+    cache: sharedEaCache(),
+    cachedReads: false,
   };
 }
 
@@ -409,6 +427,18 @@ export type EaClient = {
   raw(options: RequestOptions): Promise<unknown>;
 };
 
+/**
+ * Un cliente cuyas lecturas de colecciones salen de la caché del proceso.
+ *
+ * Para los caminos que **solo leen** y que se repiten mucho: el catálogo y la
+ * disponibilidad públicos, y el refresco de la agenda. Nunca para uno que
+ * decida una escritura — `reservar/data.ts` y las Server Actions usan
+ * `createEaClient()`, que lee fresco.
+ */
+export function createCachedEaClient(config: EaClientConfig = eaConfigFromEnv()): EaClient {
+  return createEaClient({ ...config, cache: config.cache ?? sharedEaCache(), cachedReads: true });
+}
+
 export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaClient {
   const doFetch = config.fetch ?? globalThis.fetch;
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -419,7 +449,42 @@ export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaCl
   // resolvería a `…/api/appointments`.
   const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
 
-  async function request({ method, path, params, body }: RequestOptions): Promise<unknown> {
+  const store = config.cache ?? null;
+
+  /**
+   * La puerta de toda petición: decide si una lectura sale de caché y hace que
+   * toda escritura invalide.
+   *
+   * Solo se cachean **colecciones** (`services`, no `services/17`): un `get` por
+   * id es lo que usan los leer-modificar-guardar —las excepciones de plan, la
+   * técnica que se nombra al confirmar— y esos tienen que ver lo de ahora.
+   *
+   * La escritura invalida en el `finally`, haya salido bien o no: un timeout no
+   * dice si EA alcanzó a guardar, y en la duda se vuelve a leer.
+   */
+  async function request(options: RequestOptions): Promise<unknown> {
+    const { method, path, params } = options;
+    const resource = resourceOfPath(path);
+
+    if (method !== "GET") {
+      try {
+        return await send(options);
+      } finally {
+        store?.invalidateResource(resource);
+      }
+    }
+
+    const policy = config.cachedReads && store && !path.includes("/") ? readPolicyFor(resource) : null;
+    if (!policy || !store) return send(options);
+
+    const key = `${path}?${params?.toString() ?? ""}`;
+    const value = await store.read(key, [resource], policy, () => send(options));
+    // Copia: el valor guardado lo comparten todas las peticiones, y un llamador
+    // que mutara lo que recibió le cambiaría la respuesta a los demás.
+    return structuredClone(value);
+  }
+
+  async function send({ method, path, params, body }: RequestOptions): Promise<unknown> {
     const url = new URL(path, base);
     if (params) url.search = params.toString();
 
@@ -445,6 +510,7 @@ export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaCl
       });
     } catch (error) {
       const kind = kindForThrown(error);
+      recordEaCall(method, resourceOfPath(path), kind);
       throw new EaApiError(
         kind === "timeout"
           ? `EA no respondió en ${timeoutMs} ms (${method} ${path})`
@@ -452,6 +518,8 @@ export function createEaClient(config: EaClientConfig = eaConfigFromEnv()): EaCl
         { ...context, kind, cause: error },
       );
     }
+
+    recordEaCall(method, resourceOfPath(path), response.status);
 
     if (!response.ok) {
       // El 401 de EA responde texto plano ("You are not authorized…") y el 500

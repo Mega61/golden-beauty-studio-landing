@@ -5,7 +5,7 @@ import {
   phoneSearchVariants,
   type E164,
 } from "@/app/(panel)/clientes/identity";
-import { createEaClient, type EaClient } from "@/lib/ea/client";
+import { createEaClient, eaConfigFromEnv, type EaClient } from "@/lib/ea/client";
 import type { EaLocalDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
 import { pickProvider } from "@/lib/public-availability";
@@ -59,9 +59,21 @@ export type BookingResult =
   | { status: "invalid-phone" }
   | { status: "unknown-service" };
 
+/**
+ * El cliente de este camino lee **siempre fresco**, y se dice explícito en vez
+ * de confiar en el default: la disponibilidad pública se sirve de una caché de
+ * 15 s (`availability/data.ts`), y lo único que hace segura esa caché es que
+ * acá se vuelve a mirar EA antes de escribir. Si esta verificación leyera de
+ * memoria, un hueco ocupado hace diez segundos se vendería otra vez. La
+ * escritura, eso sí, invalida la caché compartida como cualquier otra.
+ */
+function freshClient(): EaClient {
+  return createEaClient({ ...eaConfigFromEnv(), cachedReads: false });
+}
+
 export async function createBooking(
   input: BookingRequest,
-  client: EaClient = createEaClient(),
+  client: EaClient = freshClient(),
 ): Promise<BookingResult> {
   const phone = normalizePhoneE164(input.phone);
   // Un número a medias deduplica mal, que es peor que no deduplicar.

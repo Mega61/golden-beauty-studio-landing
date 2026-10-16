@@ -987,6 +987,27 @@ clienta nunca se entere de que "cualquiera" era en realidad una decisión nuestr
 al backend). Dos formularios de reserva vivos es una forma elegante de darle dos disponibilidades
 distintas a la misma clienta.
 
+### El cupo de EA y la caché de lecturas
+
+EA limita a **100 peticiones por IP cada 120 s** (`rate_limit_helper.php`, activado fijo en el código),
+y el panel entero sale por una IP. Sin caché, el catálogo costaba 3 llamadas y cada consulta de horarios
+~7 (servicios, técnicas, citas del día, bloqueos, periodos bloqueados y una `availabilities` por
+técnica): cuatro clientas mirando tres días agotaban el cupo y EA le devolvía 429 también a la agenda.
+
+`admin/src/lib/ea/cache.ts` lo resuelve con una caché en memoria del proceso (TTL, un solo vuelo por
+clave, servir lo viejo ante 429/5xx con tope de edad, tope de 500 entradas). Las políticas, los tiempos
+y la tabla de qué escritura invalida qué viven en ese archivo. Tres reglas de diseño:
+
+- **Leer de caché es opt-in** (`createCachedEaClient()`); escribir invalida siempre, desde cualquier
+  cliente, y los webhooks de EA invalidan el recurso de su acción (después de verificar el secreto: un
+  POST sin secreto no puede vaciar la caché y empujar al panel contra el cupo).
+- **El camino que decide una escritura lee fresco.** `reservar/data.ts` re-verifica el hueco con un
+  cliente sin caché; por eso la disponibilidad pública sí puede servir un resultado de 15 s (o uno de
+  hasta 2 min si EA está caído): lo peor de un hueco viejo es un "ese horario se ocupó", no una silla
+  vendida dos veces.
+- **Es por proceso.** El panel es un contenedor con un `next start`; con dos réplicas cada una
+  invalidaría solo lo suyo.
+
 ---
 
 ## Reportes — cambiar el productor, no construir un pipeline

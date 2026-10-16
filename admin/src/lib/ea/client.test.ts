@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { parseEaLocalDate } from "./datetime";
 import { EaApiError } from "./errors";
@@ -11,6 +11,7 @@ import {
   listDayAppointments,
   type EaClientConfig,
 } from "./client";
+import { createEaCache, sharedEaCache } from "./cache";
 
 const TOKEN = "un-token-de-ea-larguisimo-y-secreto";
 const BASE = "http://ea.internal/index.php/api/v1";
@@ -695,5 +696,152 @@ describe("excepciones al plan de trabajo", () => {
       ea.workingPlanExceptions.create({ startDate: parseEaLocalDate("2026-03-10") }),
     ).rejects.toThrow(/providerId/);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("la caché de lecturas", () => {
+  const service = (id: number, name = `Servicio ${id}`) => ({ id, name, duration: 60 });
+
+  function cachedClient(handler: (call: Call) => Response, cachedReads = true) {
+    const cache = createEaCache();
+    const { impl, calls } = fakeFetch((call) => handler(call));
+    const config = { baseUrl: BASE, token: TOKEN, fetch: impl, cache };
+    return {
+      cached: createEaClient({ ...config, cachedReads }),
+      fresh: createEaClient(config),
+      cache,
+      calls,
+    };
+  }
+
+  it("un cliente sin `cachedReads` lee siempre de EA, aunque la caché tenga el dato", async () => {
+    const { cached, fresh, calls } = cachedClient(() => json([service(1)]));
+
+    await cached.services.list();
+    await fresh.services.list();
+    await fresh.services.list();
+
+    expect(calls).toHaveLength(3);
+  });
+
+  it("con `cachedReads`, las colecciones salen de memoria y los `get` por id no", async () => {
+    const { cached, calls } = cachedClient((call) =>
+      call.url.pathname.endsWith("/services/1") ? json(service(1)) : json([service(1)]),
+    );
+
+    await cached.services.list();
+    await cached.services.list();
+    await cached.services.get(1);
+    await cached.services.get(1);
+
+    expect(calls.map((c) => c.url.pathname.split("/").slice(-2).join("/"))).toEqual([
+      "v1/services",
+      "services/1",
+      "services/1",
+    ]);
+  });
+
+  it("la clienta y la técnica no se cachean; las citas sí, por rango", async () => {
+    const { cached, calls } = cachedClient(() => json([]));
+
+    await cached.customers.list({ q: "300" });
+    await cached.customers.list({ q: "300" });
+    await cached.appointments.list({ date: "2026-10-16" });
+    await cached.appointments.list({ date: "2026-10-16" });
+    await cached.appointments.list({ date: "2026-10-17" });
+
+    expect(calls.filter((c) => c.url.pathname.endsWith("/customers"))).toHaveLength(2);
+    expect(calls.filter((c) => c.url.pathname.endsWith("/appointments"))).toHaveLength(2);
+  });
+
+  it("una escritura desde un cliente **sin** caché invalida la del otro", async () => {
+    let name = "Antes";
+    const { cached, fresh, calls } = cachedClient((call) =>
+      call.init.method === "PUT" ? json(service(1, (name = "Después"))) : json([service(1, name)]),
+    );
+
+    expect((await cached.services.list())[0].name).toBe("Antes");
+    await fresh.services.update(1, { name: "Después" });
+    expect((await cached.services.list())[0].name).toBe("Después");
+    expect(calls).toHaveLength(3);
+  });
+
+  it("una cita creada vence las citas y los horarios, no el catálogo", async () => {
+    const { cached, fresh, calls } = cachedClient((call) =>
+      call.init.method === "POST" ? json(appointment(9)) : json([]),
+    );
+
+    await cached.services.list();
+    await cached.appointments.list({ date: "2026-10-16" });
+    await fresh.appointments.create({ start: "2026-10-16 10:00:00" as never });
+    await cached.services.list();
+    await cached.appointments.list({ date: "2026-10-16" });
+
+    const paths = calls.map((c) => `${c.init.method ?? "GET"} ${c.url.pathname.split("/").pop()}`);
+    expect(paths).toEqual([
+      "GET services",
+      "GET appointments",
+      "POST appointments",
+      "GET appointments",
+    ]);
+  });
+
+  it("una escritura que falla también invalida: un timeout no dice si EA guardó", async () => {
+    let fail = false;
+    const { cached, fresh, calls } = cachedClient(() =>
+      fail ? json({ error: "x" }, 500) : json([service(1)]),
+    );
+
+    await cached.services.list();
+    fail = true;
+    await expect(fresh.services.remove(1)).rejects.toThrow();
+    fail = false;
+    await cached.services.list();
+
+    expect(calls).toHaveLength(3);
+  });
+
+  it("las escrituras por `raw()` también invalidan", async () => {
+    const { cached, calls } = cachedClient(() => json([]));
+
+    await cached.providers.list();
+    await cached.raw({ method: "PUT", path: "providers/4", body: {} });
+    await cached.providers.list();
+
+    expect(calls).toHaveLength(3);
+  });
+
+  it("cada llamador recibe su copia: mutar lo recibido no cambia la caché", async () => {
+    const { cached } = cachedClient(() => json([service(1, "Original")]));
+
+    const first = (await cached.raw({ method: "GET", path: "services" })) as Array<{ name: string }>;
+    first[0].name = "Pisado";
+    const second = (await cached.raw({ method: "GET", path: "services" })) as Array<{
+      name: string;
+    }>;
+
+    expect(second[0].name).toBe("Original");
+  });
+
+  it("con EA en 429, el catálogo cacheado sigue saliendo", async () => {
+    let throttled = false;
+    const { cached, cache } = cachedClient(() =>
+      throttled ? new Response("", { status: 429 }) : json([service(1)]),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await cached.services.list();
+    cache.invalidate(["services"]);
+    throttled = true;
+
+    expect((await cached.services.list()).map((s) => s.id)).toEqual([1]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("`eaConfigFromEnv()` engancha la caché del proceso con lecturas frescas", () => {
+    const config = eaConfigFromEnv({ EA_API_URL: BASE, EA_API_TOKEN: TOKEN });
+    expect(config.cache).toBe(sharedEaCache());
+    expect(config.cachedReads).toBe(false);
   });
 });

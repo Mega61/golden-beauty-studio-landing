@@ -6,6 +6,7 @@ import type { GridProvider } from "@/lib/calendar-layout";
 import type { ServiceCapacity, StationSlot } from "@/lib/conflict";
 import { requireSession, type PanelSession } from "@/lib/dal";
 import {
+  createCachedEaClient,
   createEaClient,
   decodeAppointmentWithRelations,
   type EaClient,
@@ -121,7 +122,12 @@ export async function loadAgenda(
   const stations = await loadStations();
 
   try {
-    const client = options.client ?? createEaClient();
+    // De caché: el refresco de cada pestaña abierta, cada 30 s, se reparte el
+    // mismo cupo de EA que la reserva pública. Lo de referencia vale 60 s y las
+    // citas 15 s **sin** respaldo viejo, así que si EA cae la agenda sigue
+    // entrando en solo lectura en vez de pintar citas de hace minutos. Toda
+    // escritura del panel invalida antes de que llegue el refresco.
+    const client = options.client ?? createCachedEaClient();
     const data = await fetchFromEa(client, dates, session, stations);
     return { ok: true, data, session };
   } catch (error) {

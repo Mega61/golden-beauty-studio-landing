@@ -2,7 +2,12 @@ import "server-only";
 
 import { getDb } from "@/db/client";
 import { stationRepository } from "@/db/repositories";
-import { createEaClient, type EaClient } from "@/lib/ea/client";
+import {
+  PUBLIC_AVAILABILITY_POLICY,
+  PUBLIC_AVAILABILITY_TAG,
+  sharedEaCache,
+} from "@/lib/ea/cache";
+import { createCachedEaClient, createEaClient, type EaClient } from "@/lib/ea/client";
 import { eaDatePart, type EaLocalDate } from "@/lib/ea/datetime";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
 import { publicSlots, type ProviderOffer, type PublicSlot } from "@/lib/public-availability";
@@ -32,6 +37,32 @@ export type AvailabilityResult =
   | { status: "unbookable-service" }
   | { status: "no-providers" };
 
+/**
+ * La disponibilidad que ve la landing: el mismo cálculo, guardado 15 s.
+ *
+ * Una clienta que pasa por tres días y vuelve al primero, o diez que miran el
+ * mismo sábado a la vez, piden lo mismo. Sin esto cada consulta eran ~7
+ * llamadas a EA (ver `lib/ea/cache.ts`); con esto, diez consultas simultáneas
+ * del mismo día son un solo cálculo, y adentro las lecturas de referencia
+ * salen de la caché de 60 s.
+ *
+ * **Solo para mostrar.** Quien confirma (`reservar/data.ts`) llama a
+ * `loadAvailability` con un cliente fresco: un hueco servido de memoria puede
+ * estar ocupado, y eso se descubre ahí antes de escribir. Cualquier escritura
+ * de citas, bloqueos, técnicas o servicios —del panel, de la reserva pública o
+ * por webhook— vence estas entradas al instante.
+ */
+export function loadPublicAvailability(query: AvailabilityQuery): Promise<AvailabilityResult> {
+  const key = `${PUBLIC_AVAILABILITY_TAG}:${query.serviceId}:${query.date}:${query.providerId ?? "*"}`;
+  return sharedEaCache().read(key, [PUBLIC_AVAILABILITY_TAG], PUBLIC_AVAILABILITY_POLICY, () =>
+    loadAvailability(query, createCachedEaClient()),
+  );
+}
+
+/**
+ * El cálculo, contra el cliente que se le pase. Por defecto, uno **fresco**:
+ * es lo que usa la re-verificación de la reserva.
+ */
 export async function loadAvailability(
   query: AvailabilityQuery,
   client: EaClient = createEaClient(),

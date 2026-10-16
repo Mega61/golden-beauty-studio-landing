@@ -1,4 +1,5 @@
 import { getDb } from "@/db";
+import { resourceOfWebhookAction, sharedEaCache } from "@/lib/ea/cache";
 import { createEaClient, eaConfigFromEnv } from "@/lib/ea/client";
 import { webhookSecretFromEnv } from "@/lib/webhook-verify";
 
@@ -60,8 +61,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const config = eaConfigFromEnv();
+  // El handler consume el cuerpo; la acción se lee de una copia.
+  const copy = request.clone();
 
-  return handleEaWebhook(request, {
+  const response = await handleEaWebhook(request, {
     db: getDb(),
     ea: createEaClient({ ...config, timeoutMs: LOOKUP_TIMEOUT_MS }),
     secret,
@@ -71,4 +74,33 @@ export async function POST(request: Request): Promise<Response> {
     // lee a mano y se pega en un chat cuando algo falla.
     redact: [config.token, secret.token, process.env.DATABASE_URL],
   });
+
+  await invalidateFor(copy, response.status);
+  return response;
+}
+
+/**
+ * Vence la caché de lecturas (`lib/ea/cache.ts`) según el recurso del evento.
+ *
+ * Es lo que hace que un cambio hecho **en la interfaz de EA** —una cita que la
+ * dueña movió desde allá, un bloqueo— se vea en la agenda y en la reserva
+ * pública sin esperar al TTL.
+ *
+ * Solo con el secreto verificado (todo lo que no sea 401). La ruta es
+ * alcanzable desde internet (ver arriba), y un POST anónimo que pudiera vaciar
+ * la caché sería una forma barata de empujar al panel contra el cupo de 100
+ * peticiones de EA. Se invalida aunque el procesamiento haya fallado: el
+ * cambio en EA ya ocurrió, falle o no el snapshot de precio.
+ */
+async function invalidateFor(copy: Request, status: number): Promise<void> {
+  if (status === 401) return;
+  try {
+    const body = JSON.parse(await copy.text()) as { action?: unknown };
+    const resource =
+      typeof body.action === "string" ? resourceOfWebhookAction(body.action) : null;
+    if (resource) sharedEaCache().invalidateResource(resource);
+  } catch {
+    // Un cuerpo ilegible ya quedó anotado por el handler; no cambió nada en EA
+    // que sepamos invalidar.
+  }
 }

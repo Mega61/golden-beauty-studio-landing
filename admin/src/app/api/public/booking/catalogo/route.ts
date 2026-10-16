@@ -4,7 +4,7 @@ import { getDb } from "@/db/client";
 import { serviceMapRepository } from "@/db/repositories";
 import { loadComboCompositions } from "@/lib/combo-source";
 import { comboServiceIds } from "@/lib/combos";
-import { createEaClient } from "@/lib/ea/client";
+import { createCachedEaClient } from "@/lib/ea/client";
 import { instantToEaDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
@@ -62,7 +62,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const client = createEaClient();
+    // De caché (60 s, ver `lib/ea/cache.ts`): es la primera pantalla de cada
+    // visita desde un anuncio, y si EA está estrangulado se sirve el catálogo
+    // de hace unos minutos en vez de un 503.
+    const client = createCachedEaClient();
     const [services, providers, categories, composition, serviceMap] = await Promise.all([
       client.services.list(),
       client.providers.list(),
