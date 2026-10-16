@@ -70,14 +70,31 @@ function seedAccount(): { userId: string; code: string } {
   return { userId, code };
 }
 
+/**
+ * La primera celda de lo que imprimió `mysql -N -B`, o `null` si no hay fila
+ * **o si la celda es NULL**.
+ *
+ * El cliente imprime un NULL de SQL como el texto `NULL`, y tomarlo tal cual
+ * hacía que `expect.poll(...).not.toBeNull()` diera por llegada una columna que
+ * todavía no tenía valor: la cuenta se cierra con la fila de plata ya creada
+ * —`amount_charged` en NULL— y el monto entra después, en una transacción. En
+ * la máquina de desarrollo el sondeo casi siempre llegaba tarde y pasaba; en
+ * CI llegaba en medio y `Number("NULL")` daba `NaN`.
+ */
+function primeraCelda(out: string): string | null {
+  const celda = out.trim().split("\n")[0];
+  return celda === "" || celda === "NULL" ? null : celda;
+}
+
 /** Una consulta de una sola celda contra el MySQL del stack de desarrollo. */
 export function queryOne(sql: string): string | null {
-  const out = execFileSync(
-    "docker",
-    ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "-N", "-B", "gbs_admin", "-e", sql],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-  ).trim();
-  return out === "" ? null : out.split("\n")[0];
+  return primeraCelda(
+    execFileSync(
+      "docker",
+      ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "-N", "-B", "gbs_admin", "-e", sql],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ),
+  );
 }
 
 /**
@@ -151,12 +168,13 @@ export function contarCitasEnEa(): number {
  * comprueba donde el dato está, no donde se ve.
  */
 export function queryEa(sql: string): string | null {
-  const out = execFileSync(
-    "docker",
-    ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "-N", "-B", "easyappointments", "-e", sql],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-  ).trim();
-  return out === "" ? null : out.split("\n")[0];
+  return primeraCelda(
+    execFileSync(
+      "docker",
+      ["exec", MYSQL_CONTAINER, "mysql", "-uroot", "-psecret", "-N", "-B", "easyappointments", "-e", sql],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ),
+  );
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, useToast } from "@/components/ui";
 
 import {
   crearServicio,
@@ -28,6 +28,32 @@ import {
 
 const initial: ActionResult | null = null;
 
+/**
+ * `useActionState` con el aviso de éxito en un toast.
+ *
+ * Un éxito casi siempre **saca la fila de la tabla**: la tabla lista solo lo
+ * pendiente, y lo que se acaba de crear, vincular o publicar deja de estarlo.
+ * El formulario se desmonta con la fila y su mensaje con él, así que el "quedó
+ * creado" no se llegaba a ver nunca — la única señal era que la fila
+ * desaparecía. El toast vive en el layout y sobrevive a la revalidación.
+ *
+ * Los errores se quedan en el sitio: ahí la fila no se va, y el mensaje sirve
+ * justo al lado de lo que hay que corregir.
+ */
+function useAccion(
+  accion: (formData: FormData) => Promise<ActionResult>,
+): [ActionResult | null, (formData: FormData) => void, boolean] {
+  const { toast } = useToast();
+  return useActionState<ActionResult | null, FormData>(async (_previo, formData) => {
+    const resultado = await accion(formData);
+    if (resultado.ok) {
+      toast({ message: resultado.message, tone: "ok" });
+      return null;
+    }
+    return resultado;
+  }, initial);
+}
+
 function Resultado({ estado }: { estado: ActionResult | null }) {
   if (!estado) return null;
   return (
@@ -45,10 +71,7 @@ function Resultado({ estado }: { estado: ActionResult | null }) {
 }
 
 export function BotonPublicar({ pricingId }: { pricingId: string }) {
-  const [estado, enviar, enviando] = useActionState<ActionResult | null>(
-    () => publicarPrecio(pricingId),
-    initial,
-  );
+  const [estado, enviar, enviando] = useAccion(() => publicarPrecio(pricingId));
 
   return (
     <form action={enviar}>
@@ -61,10 +84,7 @@ export function BotonPublicar({ pricingId }: { pricingId: string }) {
 }
 
 export function BotonPublicarTodo({ cantidad }: { cantidad: number }) {
-  const [estado, enviar, enviando] = useActionState<ActionResult | null>(
-    () => publicarTodo(),
-    initial,
-  );
+  const [estado, enviar, enviando] = useAccion(() => publicarTodo());
 
   return (
     <form action={enviar}>
@@ -83,10 +103,7 @@ export function BotonPublicarTodo({ cantidad }: { cantidad: number }) {
 }
 
 export function BotonDesvincular({ pricingId }: { pricingId: string }) {
-  const [estado, enviar, enviando] = useActionState<ActionResult | null>(
-    () => desvincularServicio(pricingId),
-    initial,
-  );
+  const [estado, enviar, enviando] = useAccion(() => desvincularServicio(pricingId));
 
   return (
     <form action={enviar}>
@@ -113,9 +130,8 @@ export type OpcionServicio = { id: number; label: string };
  * relee de la vitrina. Es la misma regla que Publicar.
  */
 export function FormCrear({ pricingId }: { pricingId: string }) {
-  const [estado, enviar, enviando] = useActionState<ActionResult | null, FormData>(
-    (_previo, formData) => crearServicio(pricingId, String(formData.get("name") ?? "")),
-    initial,
+  const [estado, enviar, enviando] = useAccion((formData: FormData) =>
+    crearServicio(pricingId, String(formData.get("name") ?? "")),
   );
 
   return (
@@ -154,10 +170,8 @@ export function FormVincular({
   pricingId: string;
   opciones: readonly OpcionServicio[];
 }) {
-  const [estado, enviar, enviando] = useActionState<ActionResult | null, FormData>(
-    (_previo, formData) =>
-      vincularServicio(pricingId, Number(formData.get("eaServiceId"))),
-    initial,
+  const [estado, enviar, enviando] = useAccion((formData: FormData) =>
+    vincularServicio(pricingId, Number(formData.get("eaServiceId"))),
   );
 
   if (opciones.length === 0) {

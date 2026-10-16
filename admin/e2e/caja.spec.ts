@@ -24,8 +24,16 @@ import { expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
  * a la pantalla sobre la plata.
  */
 
-/** Una hora de hoy fuera de la jornada: no choca con lo que dejen otros specs. */
-const HORA = "07:00";
+/**
+ * Una hora de hoy fuera de la jornada: no choca con lo que dejen otros specs.
+ *
+ * Las franjas de la suite, que comparten agenda y técnica hasta el teardown:
+ * combos 00:30 (2 h justas), horario 03:00, caja 05:30, agenda 08:00 y
+ * horario 21:00. Cada una deja **dos horas** antes de la siguiente, porque el
+ * servicio es "el primero del catálogo" y su duración depende de la base: en
+ * la de desarrollo es de 1 h 30 y a las 07:00 se encimaba con la de las 08:00.
+ */
+const HORA = "05:30";
 
 test.describe("cerrar una cuenta", () => {
   test("de la cita a la fila de plata, con su método de pago", async ({ panel }) => {

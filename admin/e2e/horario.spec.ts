@@ -31,7 +31,7 @@ import { contarCitasEnEa, expect, phoneNuevo, test } from "./fixtures";
  * suite, no del código. Cada grupo se lleva su franja.
  */
 const TARDE = "21:00";
-const TEMPRANO = "06:00";
+const TEMPRANO = "03:00"; // franjas de la suite: ver `caja.spec.ts`
 
 /** Deja el formulario listo con una clienta nueva, a la hora que se pida. */
 async function armarCita(panel: Page, marca: string, hora: string) {

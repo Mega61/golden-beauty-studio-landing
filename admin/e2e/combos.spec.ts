@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { contarCitasEnEa, expect, phoneNuevo, queryEa, test } from "./fixtures";
+import { aviso, contarCitasEnEa, expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
 
 /**
  * Llegar a un combo eligiendo sus dos mitades.
@@ -33,7 +33,9 @@ import { contarCitasEnEa, expect, phoneNuevo, queryEa, test } from "./fixtures";
  *
  * Los nombres los escribe una persona, acá y en el estudio: `pricing.ts` guarda
  * id, precio y duración, y los nombres viven en los diccionarios de la landing,
- * que el panel no importa.
+ * que el panel no importa. `nombre` es el que se usa **si hay que crearla**; si
+ * la pieza ya estaba vinculada —la base de desarrollo trae las del estudio, con
+ * sus nombres de verdad— manda el que tiene en EA. Ver `nombresVinculados()`.
  */
 const PIEZAS = [
   { pricingId: "semi-permanent-hands", nombre: "E2E Semipermanente manos" },
@@ -41,25 +43,59 @@ const PIEZAS = [
   { pricingId: "semi-permanent-hands-feet", nombre: "E2E Combo manos y pies" },
 ] as const;
 
+type PricingId = (typeof PIEZAS)[number]["pricingId"];
+
 /** Lo que `src/data/pricing.ts` dice de estas tres. La prueba de que no se suma. */
 const PRECIO_MANOS = 50_000;
 const PRECIO_PIES = 55_000;
 const PRECIO_COMBO = 95_000;
 const SUMA = PRECIO_MANOS + PRECIO_PIES; // 105.000 — lo que NO se cobra.
 
+/** El texto de una opción es el nombre, solo o con la duración pegada ("… · 1 h"). */
+function textoDeOpcion(nombre: string): RegExp {
+  const literal = nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^\\s*${literal}(\\s·|\\s*$)`);
+}
+
 /**
- * Elige en un `<select>` la opción cuyo texto contiene lo que se pide.
+ * Elige en un `<select>` la opción que es ese servicio.
  *
  * `selectOption({ label })` exige el texto **exacto**, y las opciones de la
- * agenda llevan la duración pegada ("E2E Semipermanente manos · 1 h"): la
+ * agenda llevan la duración pegada ("Semipermanente manos · 1 h"): la
  * coincidencia exacta falla y el mensaje —"expected string, got object" si se
  * intenta con una expresión regular— no habla de eso. Se resuelve por el
  * `value`, que es el id de EA y es lo único estable.
+ *
+ * Y no por "contiene": con los nombres del estudio, "Semipermanente manos" está
+ * dentro de "Semipermanente manos + pies", y elegir el primero que lo contenga
+ * puede ser elegir el combo.
  */
-async function elegirPorTexto(select: Locator, contiene: string): Promise<void> {
-  const opcion = select.locator("option").filter({ hasText: contiene }).first();
-  await expect(opcion, `no hay ninguna opción que diga "${contiene}"`).toHaveCount(1);
+async function elegirPorTexto(select: Locator, nombre: string): Promise<void> {
+  const opcion = select.locator("option").filter({ hasText: textoDeOpcion(nombre) });
+  await expect(opcion, `no hay exactamente una opción "${nombre}"`).toHaveCount(1);
   await select.selectOption(await opcion.getAttribute("value"));
+}
+
+/**
+ * Con qué nombre quedó en EA cada pieza, leído de `service_map`.
+ *
+ * Es lo que la agenda muestra, y no tiene por qué ser el `nombre` de `PIEZAS`:
+ * contra la base de desarrollo las piezas ya existen con los nombres del
+ * estudio, y suponer los de la suite hacía fallar todo con "no hay ninguna
+ * opción" sin que nada estuviera roto.
+ */
+function nombresVinculados(): Record<PricingId, string> {
+  const nombres = {} as Record<PricingId, string>;
+  for (const { pricingId } of PIEZAS) {
+    const nombre = queryOne(
+      `SELECT s.name FROM service_map m
+         JOIN easyappointments.ea_services s ON s.id = m.ea_service_id
+        WHERE m.pricing_id = '${pricingId}'`,
+    );
+    if (!nombre) throw new Error(`${pricingId} no quedó vinculado a ningún servicio de EA`);
+    nombres[pricingId] = nombre;
+  }
+  return nombres;
 }
 
 /**
@@ -69,7 +105,7 @@ async function elegirPorTexto(select: Locator, contiene: string): Promise<void> 
  * stack— la fila deja de ofrecer "Crear" y no hay nada que hacer. Un `beforeAll`
  * que fallara la segunda vez convertiría la suite en dependiente del orden.
  */
-async function publicarPiezas(panel: Page): Promise<void> {
+async function publicarPiezas(panel: Page): Promise<Record<PricingId, string>> {
   for (const pieza of PIEZAS) {
     await panel.goto("/admin/servicios");
 
@@ -81,16 +117,28 @@ async function publicarPiezas(panel: Page): Promise<void> {
     await campo.fill(pieza.nombre);
     await campo.locator("xpath=following-sibling::button[1]").click();
 
+    // Llega como toast: la fila sale de la lista de pendientes en cuanto queda
+    // vinculada, y el formulario —con su mensaje— se va con ella.
     await expect(
-      panel.getByText(new RegExp(`quedó creado en la agenda y vinculado a "${pieza.pricingId}"`)),
+      aviso(panel),
       `no se pudo publicar ${pieza.pricingId}`,
-    ).toBeVisible({ timeout: 20_000 });
+    ).toContainText(`quedó creado en la agenda y vinculado a "${pieza.pricingId}"`, {
+      timeout: 20_000,
+    });
   }
+  return nombresVinculados();
 }
 
 test.describe("componer un combo desde la agenda", () => {
+  let MANOS = "";
+  let PIES = "";
+  let COMBO = "";
+
   test.beforeEach(async ({ panel }) => {
-    await publicarPiezas(panel);
+    const nombres = await publicarPiezas(panel);
+    MANOS = nombres["semi-permanent-hands"];
+    PIES = nombres["semi-permanent-feet"];
+    COMBO = nombres["semi-permanent-hands-feet"];
   });
 
   test("el combo no está en la lista de servicios", async ({ panel }) => {
@@ -103,9 +151,9 @@ test.describe("componer un combo desde la agenda", () => {
     const servicio = panel.getByRole("combobox", { name: /^Servicio/ });
     const opciones = await servicio.locator("option").allTextContents();
 
-    expect(opciones.some((o) => o.includes("E2E Semipermanente manos"))).toBe(true);
+    expect(opciones.some((o) => textoDeOpcion(MANOS).test(o))).toBe(true);
     expect(
-      opciones.some((o) => o.includes("E2E Combo manos y pies")),
+      opciones.some((o) => textoDeOpcion(COMBO).test(o)),
       "el combo se ofrece en la lista: se llega a él componiendo, no eligiéndolo",
     ).toBe(false);
   });
@@ -120,13 +168,13 @@ test.describe("componer un combo desde la agenda", () => {
 
     await elegirPorTexto(
       panel.getByRole("combobox", { name: /^Servicio/ }),
-      "E2E Semipermanente manos",
+      MANOS,
     );
 
     const acompañante = panel.getByLabel(/¿También pies\?/);
     await expect(acompañante, "elegir manos no ofreció los pies").toBeVisible();
 
-    await elegirPorTexto(acompañante, "E2E Semipermanente pies");
+    await elegirPorTexto(acompañante, PIES);
 
     // El "antes y después". Las dos cifras tienen que estar a la vez: la suma
     // de las mitades —el precio que **no** se va a cobrar, tachado— y el del
@@ -158,8 +206,8 @@ test.describe("componer un combo desde la agenda", () => {
     await panel.getByRole("button", { name: /nueva cita/i }).click();
 
     const servicio = panel.getByRole("combobox", { name: /^Servicio/ });
-    await elegirPorTexto(servicio, "E2E Semipermanente manos");
-    await elegirPorTexto(panel.getByLabel(/¿También pies\?/), "E2E Semipermanente pies");
+    await elegirPorTexto(servicio, MANOS);
+    await elegirPorTexto(panel.getByLabel(/¿También pies\?/), PIES);
     await expect(panel.getByText(/Ahorra/)).toBeVisible();
 
     await elegirPorTexto(panel.getByLabel(/¿También pies\?/), "No, solo manos");
@@ -191,13 +239,16 @@ test.describe("componer un combo desde la agenda", () => {
 
     await elegirPorTexto(
       panel.getByRole("combobox", { name: /^Servicio/ }),
-      "E2E Semipermanente manos",
+      MANOS,
     );
-    await elegirPorTexto(panel.getByLabel(/¿También pies\?/), "E2E Semipermanente pies");
+    await elegirPorTexto(panel.getByLabel(/¿También pies\?/), PIES);
 
     // Una franja propia y fuera de horario, para no chocar con lo que dejaron
-    // los otros archivos de la suite. La casilla lo autoriza de una.
-    await panel.getByLabel(/^Empieza/).fill("22:00");
+    // los otros archivos de la suite (ver las franjas en `caja.spec.ts`). A las
+    // 22:00 el combo se encimaba con la cita de las 21:00 de `horario.spec.ts`
+    // en cuanto el primer servicio durara más de una hora. La casilla lo
+    // autoriza de una.
+    await panel.getByLabel(/^Empieza/).fill("00:30");
     await panel.getByRole("checkbox", { name: /fuera del horario/i }).check();
     await panel.getByRole("button", { name: /^crear cita$/i }).click();
 
@@ -209,8 +260,8 @@ test.describe("componer un combo desde la agenda", () => {
     // Y quedó guardada con el servicio del **combo**, no con el de las manos.
     //
     // Se comprueba en la base de EA y no en la grilla: la cita se agendó a las
-    // 22:00 para no chocar con el resto de la suite, y la jornada visible llega
-    // hasta las 20:00 — el bloque existe y no está dibujado. Buscarlo en
+    // 00:30 para no chocar con el resto de la suite, y la jornada visible empieza
+    // a las 08:00 — el bloque existe y no está dibujado. Buscarlo en
     // pantalla daría rojo hablando de otra cosa.
     const servicio = queryEa(
       `SELECT s.name FROM ea_appointments a
@@ -219,9 +270,7 @@ test.describe("componer un combo desde la agenda", () => {
         WHERE c.first_name = '${marca}'
         ORDER BY a.id DESC LIMIT 1`,
     );
-    expect(servicio, "la cita quedó con el servicio suelto en vez del combo").toBe(
-      "E2E Combo manos y pies",
-    );
+    expect(servicio, "la cita quedó con el servicio suelto en vez del combo").toBe(COMBO);
   });
 });
 

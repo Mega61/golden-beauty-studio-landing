@@ -52,14 +52,26 @@ test.describe("el catálogo público", () => {
     // Un `toHaveProperty` por campo esperado no detecta el campo de más, que es
     // justo el que hace daño.
     for (const p of body.providers) {
-      expect(Object.keys(p).sort()).toEqual(["id", "name", "serviceIds"]);
+      expect(Object.keys(p).sort()).toEqual(["id", "name", "schedule", "serviceIds"]);
+      // El horario sale, pero solo **qué días** trabaja: ni horas, ni descansos,
+      // ni el motivo de una excepción. Lo justo para que el calendario no
+      // ofrezca un día en el que no hay nadie.
+      expect(Object.keys(p.schedule as object).sort()).toEqual([
+        "closedDates",
+        "offWeekdays",
+        "openDates",
+      ]);
     }
 
     for (const s of body.services) {
       expect(Object.keys(s).sort()).toEqual(
-        ["category", "durationMin", "id", "isCombo", "name", "priceCOP"].sort(),
+        ["category", "durationMin", "id", "isCombo", "name", "priceCOP", "slug"].sort(),
       );
     }
+
+    // Y nada de más en la raíz: `chained` avisa que manos + pies sin combo se
+    // reservan como dos citas seguidas.
+    expect(Object.keys(body).sort()).toEqual(["chained", "combos", "providers", "services"]);
 
     // Los combos viajan aparte para que la landing pueda esconderlos de la
     // lista y llegar a ellos componiendo, igual que la agenda del panel.
