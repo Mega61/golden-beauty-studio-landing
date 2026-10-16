@@ -111,6 +111,9 @@ export default function Nav({
         <div className="hidden items-center gap-4 lg:flex">
           <Link
             href={switchHref}
+            // Viewport prefetch would download the whole other-language page
+            // (~190 KB) for every visitor; almost nobody switches.
+            prefetch={false}
             className="font-sans text-[10px] font-semibold uppercase tracking-[0.28em] text-ink-mute no-underline hover:text-gold"
             aria-label={`Switch to ${otherLang.toUpperCase()}`}
           >

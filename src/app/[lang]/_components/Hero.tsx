@@ -45,18 +45,18 @@ export default async function Hero({ dict, lang }: { dict: HeroDict; lang: strin
         />
 
         {/* Brand watermark — ghosted FullLogoTexture, bottom-right bleed.
-            Acts as a paper-stamp brand presence behind the photo. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logos/optimized/FullLogoTexture.webp"
-          alt=""
+            Acts as a paper-stamp brand presence behind the photo.
+            A background, not an <img>: it's desktop-only, and a hidden <img>
+            still downloads — 116 KB on every phone for nothing. A background
+            on a `display:none` element is never fetched. */}
+        <div
           aria-hidden
-          decoding="async"
-          className="pointer-events-none absolute hidden md:block"
+          className="pointer-events-none absolute hidden aspect-square bg-contain bg-no-repeat md:block"
           style={{
             right: "-6%",
             bottom: "-12%",
             width: "min(560px, 50%)",
+            backgroundImage: "url(/logos/optimized/FullLogoTexture.webp)",
             opacity: 0.13,
             mixBlendMode: "soft-light",
           }}

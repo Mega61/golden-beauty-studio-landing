@@ -138,6 +138,7 @@ export default function MobileMenu({
           <div className="mt-auto flex flex-col gap-3 px-6 pb-10">
             <Link
               href={switchHref}
+              prefetch={false}
               onClick={close}
               className="font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-mute no-underline"
             >
