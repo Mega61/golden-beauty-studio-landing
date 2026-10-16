@@ -96,6 +96,12 @@ RUN npm run build:recordatorios
 # técnicas. En seco por defecto, como `estados.js` e `importar.js`.
 RUN npm run build:catalogo
 
+# Los pagos del historial de Agenda Pro. `scripts/historial-pagos.js`, a mano,
+# una vez: lee los reportes de ventas y transacciones de Agenda Pro (efectivo,
+# transferencia, propinas) y los casa con `legacy_appointment`. En seco por
+# defecto, como `importar.js`. Solo para pantalla: nunca va a ingest.
+RUN npm run build:historial-pagos
+
 # `public/` puede no existir todavía (hoy no existe). Crearlo acá hace que el
 # `COPY` de abajo funcione igual, en vez de romper el build el día que alguien
 # borre el último archivo estático — o el día que agregue el primero.

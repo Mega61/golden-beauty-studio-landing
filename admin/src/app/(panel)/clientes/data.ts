@@ -1,14 +1,19 @@
 import "server-only";
 
 import { getDb } from "@/db/client";
-import { appointmentFinanceRepository } from "@/db/repositories";
+import { appointmentFinanceRepository, legacyPaymentRepository } from "@/db/repositories";
 import type { LegacyAppointment } from "@/db/types";
 import { EaApiError, type Customer, type Provider, type Service } from "@/lib/ea";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
 
 import { splitName } from "@/jobs/import-agendapro";
 
-import { buildUnifiedHistory, type EaHistoryInput, type UnifiedHistory } from "./history";
+import {
+  buildUnifiedHistory,
+  type EaHistoryInput,
+  type LegacyPaymentLink,
+  type UnifiedHistory,
+} from "./history";
 import {
   clientKeyToParam,
   displayName,
@@ -181,6 +186,7 @@ export type ClientProfileResult =
 export async function loadClientProfile(key: ClientKey): Promise<ClientProfileResult> {
   const ea = eaClientOrNull();
   const legacy = await loadLegacyByPhone(key.kind === "tel" ? key.phone : null);
+  const legacyPayments = await loadLegacyPayments(legacy);
 
   if ("failure" in ea) {
     // Sin EA todavía se puede mostrar la mitad histórica, que es mejor que un
@@ -193,7 +199,7 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
       found: true,
       profile: {
         client: legacyOnlyClient(key, legacy),
-        history: buildUnifiedHistory([], legacy),
+        history: buildUnifiedHistory([], legacy, legacyPayments),
         historyPartial: true,
         failure: ea.failure,
       },
@@ -215,7 +221,7 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
         found: true,
         profile: {
           client: legacyOnlyClient(key, legacy),
-          history: buildUnifiedHistory([], legacy),
+          history: buildUnifiedHistory([], legacy, legacyPayments),
           historyPartial: false,
           failure: null,
         },
@@ -240,7 +246,7 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
     found: true,
     profile: {
       client,
-      history: buildUnifiedHistory(eaHistory, legacy),
+      history: buildUnifiedHistory(eaHistory, legacy, legacyPayments),
       historyPartial,
       failure,
     },
@@ -348,6 +354,34 @@ async function loadLegacyByPhone(phone: string | null): Promise<LegacyAppointmen
       .execute();
   } catch (error) {
     console.error("[clientes] no se pudo leer el histórico", error);
+    return [];
+  }
+}
+
+/**
+ * Cómo se pagó cada cita heredada de esta clienta (`legacy_payment`, enlazado
+ * por `scripts/historial-pagos.js`).
+ *
+ * Si la tabla no existe todavía (la `025` sin aplicar) o no responde, la ficha
+ * sale igual, sin método: es un dato de más, no uno del que dependa nada.
+ */
+async function loadLegacyPayments(legacy: readonly LegacyAppointment[]): Promise<LegacyPaymentLink[]> {
+  if (legacy.length === 0) return [];
+  try {
+    const rows = await legacyPaymentRepository(getDb()).listByAppointmentIds(legacy.map((row) => row.id));
+    return rows.flatMap((row) =>
+      row.legacy_appointment_id === null
+        ? []
+        : [
+            {
+              legacyAppointmentId: row.legacy_appointment_id,
+              method: row.method,
+              courtesy: Number(row.is_courtesy) === 1,
+            },
+          ],
+    );
+  } catch (error) {
+    console.error("[clientes] no se pudieron leer los pagos del histórico", error);
     return [];
   }
 }

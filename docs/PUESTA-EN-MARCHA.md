@@ -106,6 +106,44 @@ docker exec gbs-admin node scripts/importar.js /tmp/reservas.xlsx --solo-histori
 Correrlo dos veces no duplica nada. Las citas **futuras** que ya estaban agendadas en Agenda Pro
 no se crean solas: pasarlas a mano a la agenda del panel.
 
+### 4.1 Cómo se pagó cada venta (efectivo, transferencia, cortesías)
+
+El export de reservas no dice **cómo** se pagó. Eso sale de los reportes de plata de Agenda Pro
+—**Ventas** (`ventas_<inicio>_<fin>.xlsx`) y **Transacciones** (`transacciones_<inicio>_<fin>.xlsx`)—,
+que Agenda Pro deja bajar de a ~1 mes: se bajan todos los tramos y se pasan juntos (los que se pisan
+no duplican nada). Va **después** de la historia de arriba, porque casa cada pago con su cita.
+
+El archivo de correcciones (`agendapro-correcciones.json`, solo ids, sin datos de clientas) trae lo
+que la dueña corrigió a mano en Actual Budget: el medio real donde Agenda Pro dice otro, el pago de
+la venta 1119 partido en efectivo + transferencia, y las cortesías (sin cobro a la clienta). Los
+archivos tienen nombres de clientas: no se commitean ni se dejan en la VM al terminar.
+
+```bash
+# En la VM, con los archivos ya subidos (scp) a `exports/` y `agendapro-correcciones.json`.
+docker exec gbs-admin mkdir -p /tmp/finanzas
+docker cp exports/agendapro-finanzas/. gbs-admin:/tmp/finanzas/
+docker cp agendapro-correcciones.json gbs-admin:/tmp/finanzas/correcciones.json
+# `docker cp` deja los archivos de root; el panel corre como `node`.
+docker exec -u root gbs-admin chown -R node:node /tmp/finanzas
+
+# En seco: imprime bruto, cortesías, neto y neto por medio, por mes, y cuántos pagos casaron.
+docker exec gbs-admin node scripts/historial-pagos.js /tmp/finanzas --correcciones=/tmp/finanzas/correcciones.json
+```
+
+Cotejar con Actual Budget antes de aplicar. Con los tramos del 2026-03-21 al 2026-10-16 tiene que
+decir **182 transacciones**, bruto **$14.789.600**, cortesías **9 · $630.000**, neto
+**$14.159.600** (efectivo $3.965.000 · transferencia $10.194.600), y casar los 182 con su cita. Si
+avisa una corrección "con otra venta que la del archivo", no aplica: hay que revisarla.
+
+```bash
+docker exec gbs-admin node scripts/historial-pagos.js /tmp/finanzas --correcciones=/tmp/finanzas/correcciones.json --aplicar
+docker exec -u root gbs-admin rm -rf /tmp/finanzas
+```
+
+Correrlo dos veces no duplica nada, y correrlo con un archivo de correcciones nuevo deja la tabla
+como dice el archivo nuevo. **Nada de esto va a Actual ni a comisiones**: esa plata ya está allá. Se
+ve en **Reportes** («Cómo se pagó · historial de Agenda Pro») y en la ficha de cada clienta.
+
 ## 5. Prender la reserva propia
 
 1. **Probarla en producción antes de anunciarla:** abrir

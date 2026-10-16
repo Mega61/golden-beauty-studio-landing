@@ -558,6 +558,39 @@ export interface LegacyAppointmentTable {
 }
 
 /**
+ * Un pago del historial de Agenda Pro (migración `025`): cómo se pagó una
+ * venta, con su propina. Sale de los reportes de ventas y transacciones de
+ * Agenda Pro, no del de reservas.
+ *
+ * `legacy_appointment_id` es un enlace **sin FK** a la reserva que le
+ * corresponde, decidido por el importador; `null` = no casó con ninguna.
+ * Lectura para pantalla: nunca alimenta caja, ingest ni comisiones.
+ */
+export interface LegacyPaymentTable {
+  id: Generated<number>;
+  source_tx_id: string;
+  /** `0` salvo en un pago partido en dos medios (`0`, `1`). */
+  part: Generated<number>;
+  sale_id: string | null;
+  paid_at: SqlDateTime;
+  amount: Cop;
+  tip: Generated<Cop>;
+  /** El medio **real** (corregido). Es el que leen los reportes. */
+  method: PaymentMethod;
+  /** El que dijo Agenda Pro, para auditar la corrección. */
+  method_agendapro: PaymentMethod;
+  method_raw: string | null;
+  /** Cortesía: no entró plata. Fuera de ventas, reparto y ticket. */
+  is_courtesy: Generated<number>;
+  client_name: string | null;
+  service_name: string | null;
+  provider_name: string | null;
+  booked_at: SqlDateTime | null;
+  legacy_appointment_id: number | null;
+  imported_at: CreatedAt;
+}
+
+/**
  * Quién cambió qué desde el panel.
  *
  * **Sin llaves foráneas, a propósito.** Es un log append-only: una FK hacia
@@ -746,6 +779,7 @@ export interface Database {
   station: StationTable;
   staff_totp: StaffTotpTable;
   legacy_appointment: LegacyAppointmentTable;
+  legacy_payment: LegacyPaymentTable;
   audit_log: AuditLogTable;
   job_run: JobRunTable;
   wa_message: WaMessageTable;
@@ -815,6 +849,9 @@ export type NewStaffTotp = Insertable<StaffTotpTable>;
 
 export type LegacyAppointment = Selectable<LegacyAppointmentTable>;
 export type NewLegacyAppointment = Insertable<LegacyAppointmentTable>;
+
+export type LegacyPayment = Selectable<LegacyPaymentTable>;
+export type NewLegacyPayment = Insertable<LegacyPaymentTable>;
 
 export type AuditLogRow = Selectable<AuditLogTable>;
 export type NewAuditLog = Insertable<AuditLogTable>;
