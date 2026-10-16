@@ -34,7 +34,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return new Response("Hace falta iniciar sesión.", { status: 401 });
   }
   if (!can(session.role, "clientes:exportar")) {
-    return new Response("Exportar la lista de clientas es de la dueña.", { status: 403 });
+    return new Response("Exportar la lista de clientes es solo de administración.", { status: 403 });
   }
 
   const segment = parseSegment(request.nextUrl.searchParams.get("segmento"));

@@ -19,7 +19,7 @@ test.describe("alta de clienta", () => {
     const apellido = `Prueba${Date.now().toString().slice(-6)}`;
 
     await panel.goto("/admin/clientes");
-    await panel.getByRole("button", { name: /nueva clienta/i }).click();
+    await panel.getByRole("button", { name: /agregar cliente/i }).click();
 
     await panel.getByLabel(/^Nombre\b/).fill("Ana");
     await panel.getByLabel(/^Apellido/).fill(apellido);
@@ -39,7 +39,7 @@ test.describe("alta de clienta", () => {
     // Es el bug exacto: EA responde 500 y el panel decía "no respondió".
     // Reintentar no servía de nada, y el mensaje no decía qué faltaba.
     await panel.goto("/admin/clientes");
-    await panel.getByRole("button", { name: /nueva clienta/i }).click();
+    await panel.getByRole("button", { name: /agregar cliente/i }).click();
 
     await panel.getByLabel(/^Nombre\b/).fill("Solonombre");
     await panel.getByLabel(/^Teléfono/).fill(phoneNuevo());
@@ -54,7 +54,7 @@ test.describe("alta de clienta", () => {
     // La identidad de la clienta es el número. Un número a medias deduplica
     // mal, que es peor que no deduplicar.
     await panel.goto("/admin/clientes");
-    await panel.getByRole("button", { name: /nueva clienta/i }).click();
+    await panel.getByRole("button", { name: /agregar cliente/i }).click();
 
     await panel.getByLabel(/^Nombre\b/).fill("Ana");
     await panel.getByLabel(/^Apellido/).fill("Ríos");
@@ -71,7 +71,7 @@ test.describe("alta de clienta", () => {
 
     for (const intento of [1, 2]) {
       await panel.goto("/admin/clientes");
-      await panel.getByRole("button", { name: /nueva clienta/i }).click();
+      await panel.getByRole("button", { name: /agregar cliente/i }).click();
       await panel.getByLabel(/^Nombre\b/).fill("Repetida");
       await panel.getByLabel(/^Apellido/).fill(`Dos${intento}`);
       await panel.getByLabel(/^Teléfono/).fill(phone);
@@ -89,7 +89,7 @@ test.describe("alta de clienta", () => {
     const apellido = `Bitacora${Date.now().toString().slice(-6)}`;
 
     await panel.goto("/admin/clientes");
-    await panel.getByRole("button", { name: /nueva clienta/i }).click();
+    await panel.getByRole("button", { name: /agregar cliente/i }).click();
     await panel.getByLabel(/^Nombre\b/).fill("Ana");
     await panel.getByLabel(/^Apellido/).fill(apellido);
     await panel.getByLabel(/^Teléfono/).fill(phoneNuevo());

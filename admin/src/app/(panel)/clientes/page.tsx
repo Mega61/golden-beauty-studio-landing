@@ -20,7 +20,7 @@ import { searchClients } from "./data";
  */
 
 export const metadata: Metadata = {
-  title: "Clientas · Panel",
+  title: "Clientes · Panel",
   robots: { index: false, follow: false },
 };
 
@@ -52,7 +52,7 @@ export default async function ClientesPage({
   ]);
 
   return (
-    <AppShell role={navRole(session.role)} title="Clientas">
+    <AppShell role={navRole(session.role)} title="Clientes">
       <ClientesLista canExport={canExport} result={result} />
     </AppShell>
   );

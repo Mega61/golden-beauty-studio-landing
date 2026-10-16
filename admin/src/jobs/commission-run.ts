@@ -562,7 +562,7 @@ export function planFortnight(input: PlanFortnightInput): CommissionPlan {
     const primary = account.eaProviderId;
     if (primary === null) {
       skipped.push(
-        skip(account, "sin-tecnica", "La cita no tiene técnica asignada."),
+        skip(account, "sin-tecnica", "A la cita no se le asignó profesional."),
       );
       continue;
     }
@@ -607,7 +607,7 @@ export function planFortnight(input: PlanFortnightInput): CommissionPlan {
         skip(
           account,
           "reparto-desconocido",
-          "Dos técnicas trabajaron esta cita y no hay un combo que diga en qué " +
+          "Dos profesionales trabajaron esta cita y no hay un combo que diga en qué " +
             "proporción se reparte.",
         ),
       );

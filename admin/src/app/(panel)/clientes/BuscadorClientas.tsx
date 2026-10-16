@@ -37,7 +37,7 @@ export function BuscadorClientas({ initial }: { initial: string }) {
   return (
     <Form action="/clientes" style={{ display: "flex", gap: "0.5rem", flex: 1, minWidth: 0 }}>
       <label className="ui-sr" htmlFor="q">
-        Buscar clienta por nombre, teléfono o correo
+        Buscar cliente por nombre, teléfono o correo
       </label>
       <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
         <input

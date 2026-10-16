@@ -34,7 +34,7 @@ export async function guardarInversion(
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof ForbiddenError) {
-      return { ok: false, message: "Solo la dueña registra la inversión en anuncios." };
+      return { ok: false, message: "Solo administración registra la inversión en anuncios." };
     }
     throw error;
   }

@@ -148,7 +148,7 @@ export type ProviderRow = { id: number; name: string };
 
 function nameOf(providers: readonly ProviderRow[], id: number | null): string {
   if (id === null) return "Sin asignar";
-  return providers.find((provider) => provider.id === id)?.name ?? `Técnica #${id}`;
+  return providers.find((provider) => provider.id === id)?.name ?? `Profesional #${id}`;
 }
 
 function serviceName(services: readonly ServiceRow[], id: number | null): string {

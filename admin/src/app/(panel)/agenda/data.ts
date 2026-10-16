@@ -372,7 +372,7 @@ export async function searchCustomers(
 
   return found.items.map((customer) => ({
     id: customer.id,
-    name: fullName(customer.firstName, customer.lastName) ?? `Clienta ${customer.id}`,
+    name: fullName(customer.firstName, customer.lastName) ?? `Cliente ${customer.id}`,
     phone: customer.phone,
   }));
 }

@@ -362,7 +362,7 @@ export function applyRule(rule: CommissionRuleInput, baseAmount: Cop): { amount:
  */
 function splitBase(baseAmount: Cop, assignments: readonly LineAssignment[]): Cop[] {
   if (assignments.length === 0) {
-    throw new CommissionError("Un renglón sin técnica asignada no se puede comisionar");
+    throw new CommissionError("Un renglón sin profesional no se puede comisionar");
   }
 
   const total = assignments.reduce((sum, a) => sum + a.shareBp, 0);

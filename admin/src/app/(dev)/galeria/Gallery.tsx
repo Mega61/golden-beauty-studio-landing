@@ -54,7 +54,7 @@ import { CITAS, type CitaDemo } from "./fixtures";
 const COLUMNAS: Column<CitaDemo>[] = [
   {
     key: "clienta",
-    header: "Clienta",
+    header: "Cliente",
     from: "siempre",
     listSlot: "primary",
     render: (r) => r.clienta,
@@ -654,7 +654,7 @@ function Campos() {
       {conError ? (
         <FormErrorSummary
           errors={[
-            { id: "demo-nombre", message: "Falta el nombre de la clienta." },
+            { id: "demo-nombre", message: "Falta el nombre." },
             {
               id: "demo-tel",
               message: "El teléfono tiene que empezar por +57 y tener 10 dígitos.",
@@ -670,14 +670,14 @@ function Campos() {
           gridTemplateColumns: "repeat(auto-fit, minmax(15rem, 1fr))",
         }}
       >
-        <Field label="Nombre de la clienta" required>
+        <Field label="Nombre" required>
           {(ids) => <TextInput {...ids} placeholder="Marcela Ríos" />}
         </Field>
 
         <Field
           label="Teléfono"
           required
-          hint="Con indicativo. Es la identidad de la clienta en todo el sistema."
+          hint="Con indicativo. Es la identidad de cada cliente en todo el sistema."
         >
           {(ids) => (
             <TextInput {...ids} inputMode="tel" placeholder="+57 300 123 4567" />
@@ -784,7 +784,7 @@ function Tabla() {
             <EmptyState
               icon="agenda"
               title="Todavía no hay citas hoy"
-              body="Cuando la recepción agende la primera, aparece acá con su hora, la profesional y el estado."
+              body="Cuando la recepción agende la primera, aparece acá con su hora, quién atiende y el estado."
               action={
                 <Button variant="primary" icon="mas-signo">
                   Nueva cita
@@ -1047,7 +1047,7 @@ function Vacios() {
           <EmptyState
             icon="agenda"
             title="Todavía no hay citas hoy"
-            body="Cuando la recepción agende la primera, aparece acá con su hora, la profesional y el estado."
+            body="Cuando la recepción agende la primera, aparece acá con su hora, quién atiende y el estado."
             action={
               <Button variant="primary" icon="mas-signo">
                 Nueva cita
@@ -1058,7 +1058,7 @@ function Vacios() {
         <div className="ui-card">
           <EmptyState
             icon="buscar"
-            title="Ninguna clienta con «mar»"
+            title="Nadie con «mar»"
             body="La búsqueda mira nombre y teléfono. Prueba con el número completo, que es la identidad de la ficha."
             action={<Button>Limpiar la búsqueda</Button>}
             secondary={<Button variant="ghost">Crear una ficha nueva</Button>}

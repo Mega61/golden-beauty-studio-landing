@@ -181,7 +181,7 @@ test.describe("componer un combo desde la agenda", () => {
     await panel.goto("/admin/agenda");
     await panel.getByRole("button", { name: /nueva cita/i }).click();
 
-    await panel.getByRole("textbox", { name: /^Clienta/ }).fill(`${marca} Test`);
+    await panel.getByRole("textbox", { name: /^Cliente/ }).fill(`${marca} Test`);
     await panel.getByRole("button", { name: /crear «/i }).click();
     await panel.getByRole("textbox", { name: /^Nombre\b/ }).fill(marca);
     await panel.getByRole("textbox", { name: /^Apellido\b/ }).fill("Test");

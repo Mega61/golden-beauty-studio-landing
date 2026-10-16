@@ -25,7 +25,7 @@ test.describe("crear una cita", () => {
     await panel.goto("/admin/agenda");
     await panel.getByRole("button", { name: /nueva cita/i }).click();
 
-    await expect(panel.getByRole("textbox", { name: /^Clienta/ })).toBeVisible();
+    await expect(panel.getByRole("textbox", { name: /^Cliente/ })).toBeVisible();
     await expect(panel.getByRole("combobox", { name: /^Servicio/ })).toBeVisible();
     await expect(panel.getByRole("combobox", { name: /^Profesional/ })).toBeVisible();
   });
@@ -38,7 +38,7 @@ test.describe("crear una cita", () => {
     await panel.getByRole("button", { name: /nueva cita/i }).click();
 
     // Buscar a alguien que no existe.
-    await panel.getByRole("textbox", { name: /^Clienta/ }).fill(`${marca} Perez`);
+    await panel.getByRole("textbox", { name: /^Cliente/ }).fill(`${marca} Perez`);
 
     // La salida tiene que ofrecerse ahí mismo.
     const crear = panel.getByRole("button", { name: /crear «/i });
@@ -56,7 +56,7 @@ test.describe("crear una cita", () => {
 
     // Y el buscador ya no está: verlo con el mismo nombre arriba se lee como
     // "escríbelo otra vez".
-    await expect(panel.getByRole("textbox", { name: /^Clienta/ })).toHaveCount(0);
+    await expect(panel.getByRole("textbox", { name: /^Cliente/ })).toHaveCount(0);
 
     await panel.getByRole("textbox", { name: /^Teléfono/ }).fill(phoneNuevo());
     await panel.getByRole("button", { name: /crear y usar/i }).click();
@@ -76,7 +76,7 @@ test.describe("crear una cita", () => {
 
     await panel.goto("/admin/agenda");
     await panel.getByRole("button", { name: /nueva cita/i }).click();
-    await panel.getByRole("textbox", { name: /^Clienta/ }).fill(`${marca} Maria Rios`);
+    await panel.getByRole("textbox", { name: /^Cliente/ }).fill(`${marca} Maria Rios`);
     await panel.getByRole("button", { name: /crear «/i }).click();
 
     // La sugerencia parte en el primer espacio, que acá es la partición
@@ -97,7 +97,7 @@ test.describe("crear una cita", () => {
     await panel.getByRole("button", { name: /nueva cita/i }).click();
 
     const numero = phoneNuevo();
-    await panel.getByRole("textbox", { name: /^Clienta/ }).fill(numero);
+    await panel.getByRole("textbox", { name: /^Cliente/ }).fill(numero);
     await panel.getByRole("button", { name: /crear «/i }).click();
 
     await expect(panel.getByRole("textbox", { name: /^Teléfono/ })).toHaveValue(numero);
@@ -115,7 +115,7 @@ test.describe("crear una cita", () => {
     await panel.goto("/admin/agenda");
     await panel.getByRole("button", { name: /nueva cita/i }).click();
 
-    await panel.getByRole("textbox", { name: /^Clienta/ }).fill(`${marca} Test`);
+    await panel.getByRole("textbox", { name: /^Cliente/ }).fill(`${marca} Test`);
     await panel.getByRole("button", { name: /crear «/i }).click();
     await panel.getByRole("textbox", { name: /^Nombre\b/ }).fill(marca);
     await panel.getByRole("textbox", { name: /^Apellido\b/ }).fill("Test");

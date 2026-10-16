@@ -55,10 +55,10 @@ export type OptoutResult = { ok: boolean; message: string };
 const InputSchema = z.object({ eaAppointmentId: z.number().int().positive() });
 
 const STATE_MESSAGE = {
-  "sin-telefono": "La clienta no tiene un teléfono válido. Corrígelo en Clientas.",
+  "sin-telefono": "Esta ficha no tiene un teléfono válido. Corrígelo en Clientes.",
   "opt-out": "Este número pidió no recibir recordatorios.",
   "estado-no-aplica": "Esta cita ya no lleva recordatorio por su estado en la agenda.",
-  "no-enviada": "Ya hay un registro de este aviso que dice que no salió. Revísalo con la dueña.",
+  "no-enviada": "Ya hay un registro de este aviso que dice que no salió. Revísalo con administración.",
 } as const;
 
 /** La cita, reducida a lo que deciden las funciones puras. Leída de EA. */

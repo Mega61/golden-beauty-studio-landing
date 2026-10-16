@@ -185,7 +185,7 @@ export async function crearClienta(input: ClientInput): Promise<ClientActionResu
     session = await requireCapability("clientes:editar");
   } catch (error) {
     unstable_rethrow(error);
-    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede crear clientas." };
+    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede crear clientes." };
     return { ok: false, message: "No se pudo verificar la sesión." };
   }
 
@@ -240,7 +240,7 @@ export async function crearClienta(input: ClientInput): Promise<ClientActionResu
     };
   } catch (error) {
     unstable_rethrow(error);
-    return { ok: false, message: describeEaFailure(error, "No se pudo crear la clienta.") };
+    return { ok: false, message: describeEaFailure(error, "No se pudo crear la ficha.") };
   }
 }
 
@@ -262,12 +262,12 @@ export async function editarClienta(
     session = await requireCapability("clientes:editar");
   } catch (error) {
     unstable_rethrow(error);
-    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede editar clientas." };
+    if (error instanceof ForbiddenError) return { ok: false, message: "Tu rol no puede editar clientes." };
     return { ok: false, message: "No se pudo verificar la sesión." };
   }
 
   if (!Number.isSafeInteger(eaCustomerId) || eaCustomerId <= 0) {
-    return { ok: false, message: "El id de la clienta llegó mal." };
+    return { ok: false, message: "El id de la ficha llegó mal." };
   }
 
   const parsed = ClientSchema.safeParse(input);
@@ -321,7 +321,7 @@ export async function editarClienta(
     return { ok: true, message: "Quedó corregida." };
   } catch (error) {
     unstable_rethrow(error);
-    return { ok: false, message: describeEaFailure(error, "No se pudo corregir la clienta.") };
+    return { ok: false, message: describeEaFailure(error, "No se pudo corregir la ficha.") };
   }
 }
 
@@ -349,7 +349,7 @@ export async function fusionarClienta(
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof ForbiddenError) {
-      return { ok: false, message: "Solo la dueña puede fusionar clientas: borra filas de la agenda." };
+      return { ok: false, message: "Solo administración puede unir fichas: borra filas de la agenda." };
     }
     return { ok: false, message: "No se pudo verificar la sesión." };
   }

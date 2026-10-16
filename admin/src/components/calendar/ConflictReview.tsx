@@ -101,7 +101,7 @@ function describeSubject(
 ): string {
   switch (subject.kind) {
     case "appointment": {
-      const who = meta[subject.id]?.customer ?? "una clienta";
+      const who = meta[subject.id]?.customer ?? "una cita";
       const when = formatTimeRange(subject.start, subject.end);
       // En el choque de columna el sujeto es de la misma técnica; en el de
       // puestos, de cualquiera. La frase nombra a la profesional en los dos

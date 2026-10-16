@@ -395,7 +395,7 @@ describe("checkConflicts · capacidad del servicio", () => {
     });
 
     expect(reasons(report)).toEqual(["service-capacity"]);
-    expect(report.conflicts[0].message).toContain("admite 2 clientas");
+    expect(report.conflicts[0].message).toContain("admite 2 personas");
     expect(report.conflicts[0].with).toHaveLength(2);
   });
 

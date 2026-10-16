@@ -36,7 +36,7 @@ export const dynamic = "force-dynamic";
 
 const MENSAJES: Record<string, string> = {
   acceso_denegado:
-    "Esa cuenta no tiene acceso al panel. Si debería tenerlo, pídele a la dueña que la agregue desde Equipo.",
+    "Esa cuenta no tiene acceso al panel. Si debería tenerlo, pídele a administración que la agregue desde Equipo.",
   configuracion:
     "El panel no pudo hablar con Google. Es un problema de configuración, no tuyo: avísale a quien administra el sistema.",
 };
@@ -115,7 +115,7 @@ export default async function EntrarPage({
           <p style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
             Desarrollo · entrar sin código
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(8.5rem, 100%), 1fr))", gap: "0.5rem" }}>
             {(Object.keys(DEV_LOGIN_ACCOUNTS) as (keyof typeof DEV_LOGIN_ACCOUNTS)[]).map((role) => (
               <form key={role} action={entrarComoDev}>
                 <input type="hidden" name="role" value={role} />

@@ -230,7 +230,7 @@ export async function loadToday(
           start: appointment.start,
           end: appointment.end,
           status: appointment.status,
-          customerName: personName(customer, "Sin clienta"),
+          customerName: personName(customer, "Sin cliente"),
           customerPhone: customer?.phone ?? null,
           eaProviderId: appointment.providerId,
           providerName: personName(provider, "Sin asignar"),

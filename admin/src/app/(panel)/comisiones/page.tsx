@@ -63,8 +63,8 @@ export default async function ComisionesPage({
       <AppShell role="reception" title="Comisiones">
         <EmptyState
           icon="candado"
-          title="Comisiones es de la dueña y de cada técnica"
-          body="Cuánto gana cada una no forma parte de operar el día. Si necesitas algo de acá, pídeselo a la dueña."
+          title="Comisiones es de administración y de cada profesional"
+          body="Cuánto gana cada profesional no forma parte de operar el día. Si necesitas algo de acá, pídeselo a administración."
         />
       </AppShell>
     );

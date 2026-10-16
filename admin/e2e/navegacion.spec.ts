@@ -18,7 +18,7 @@ const PANTALLAS = [
   { ruta: "/admin/hoy", titulo: "Hoy" },
   { ruta: "/admin/agenda", titulo: "Agenda" },
   { ruta: "/admin/caja", titulo: "Caja" },
-  { ruta: "/admin/clientes", titulo: "Clientas" },
+  { ruta: "/admin/clientes", titulo: "Clientes" },
   { ruta: "/admin/comisiones", titulo: "Comisiones" },
   { ruta: "/admin/servicios", titulo: "Servicios" },
   { ruta: "/admin/equipo", titulo: "Equipo" },

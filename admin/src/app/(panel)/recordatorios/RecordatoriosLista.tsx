@@ -155,7 +155,7 @@ export function RecordatoriosLista({
 /** Lo que dice cada estado que no es "pendiente". */
 const STATE_NOTE: Record<Exclude<ReminderView["state"], "pendiente" | "recordada">, string> = {
   "fallo-automatico": "El envío automático no salió. Mándalo a mano.",
-  "sin-telefono": "Sin teléfono válido. Corrígelo en Clientas para poder avisarle.",
+  "sin-telefono": "Sin teléfono válido. Corrígelo en Clientes para poder avisarle.",
   "opt-out": "Pidió no recibir recordatorios.",
   "estado-no-aplica": "Por su estado en la agenda, esta cita no lleva recordatorio.",
   "no-enviada": "Hay un registro de este aviso que dice que no salió.",

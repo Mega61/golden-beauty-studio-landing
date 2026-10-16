@@ -345,7 +345,7 @@ export const CREATE_BLOCKER_MESSAGE: Readonly<Record<CreateBlocker, string>> = {
   "sin-precio": "no tiene precio en la vitrina.",
   "sin-duracion":
     "no tiene duración en la vitrina. La agenda necesita minutos para poder dibujarlo; un adicional que se cobra dentro de otra cita no se crea acá.",
-  "sin-nombre": "necesita un nombre. Es el texto que la clienta ve en su confirmación.",
+  "sin-nombre": "necesita un nombre. Es el texto que ve quien reserva en su confirmación.",
 };
 
 export function publishPayload(row: DiffRow): PublishPayload | null {

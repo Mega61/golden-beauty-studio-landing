@@ -20,7 +20,7 @@ import { parseClientKeyParam } from "../identity";
  */
 
 export const metadata: Metadata = {
-  title: "Clienta · Panel",
+  title: "Cliente · Panel",
   robots: { index: false, follow: false },
 };
 
@@ -50,7 +50,7 @@ export default async function ClientaPage({
     // porque el panel le dijo que no estaba.
     if (result.failure) {
       return (
-        <AppShell role={navRole(session.role)} title="Clientas">
+        <AppShell role={navRole(session.role)} title="Clientes">
           <div style={{ display: "grid", gap: "0.75rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
             <ReadOnlyBand
               reason={result.failure.message}
@@ -59,7 +59,7 @@ export default async function ClientaPage({
             <EmptyState
               icon="alerta"
               title="No se pudo abrir la ficha"
-              body="La agenda no respondió, así que no se sabe si esta clienta existe. No la crees de nuevo: vuelve a intentar en un momento."
+              body="La agenda no respondió, así que no se sabe si esta ficha existe. No la crees de nuevo: vuelve a intentar en un momento."
             />
           </div>
         </AppShell>
@@ -69,7 +69,7 @@ export default async function ClientaPage({
   }
 
   return (
-    <AppShell role={navRole(session.role)} title="Clientas">
+    <AppShell role={navRole(session.role)} title="Clientes">
       <FichaClienta profile={result.profile} />
     </AppShell>
   );

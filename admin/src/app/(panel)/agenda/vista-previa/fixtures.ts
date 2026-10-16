@@ -262,7 +262,7 @@ export function previewConflicts(today: EaLocalDate): ConflictReport {
       {
         reason: "during-break",
         severity: "soft",
-        message: "La cita cae dentro de un descanso de la profesional.",
+        message: "La cita cae dentro de un descanso de quien atiende.",
         window: {
           start: `${d} 13:00:00` as EaLocalDateTime,
           end: `${d} 14:00:00` as EaLocalDateTime,

@@ -111,9 +111,9 @@ export function parseQuincena(
 
 function describeEaFailure(error: unknown): string {
   if (error instanceof EaApiError && error.isConfiguration) {
-    return "El panel no puede autenticarse contra la agenda, así que las técnicas y los servicios salen por su id.";
+    return "El panel no puede autenticarse contra la agenda, así que profesionales y servicios salen por su id.";
   }
-  return "La agenda no está respondiendo, así que las técnicas y los servicios salen por su id.";
+  return "La agenda no está respondiendo, así que profesionales y servicios salen por su id.";
 }
 
 /** Nombres de EA, o mapas vacíos y el motivo. */
@@ -134,7 +134,7 @@ async function loadNames(): Promise<{
         providers.map((provider) => [
           provider.id,
           [provider.firstName, provider.lastName].filter(Boolean).join(" ").trim() ||
-            `Técnica #${provider.id}`,
+            `Profesional #${provider.id}`,
         ]),
       ),
       services: new Map(
@@ -244,8 +244,8 @@ export async function loadComisionesView(
         amountCharged: row.amountCharged,
         provider:
           row.eaProviderId === null
-            ? "Sin técnica"
-            : (names.providers.get(row.eaProviderId) ?? `Técnica #${row.eaProviderId}`),
+            ? "Sin profesional"
+            : (names.providers.get(row.eaProviderId) ?? `Profesional #${row.eaProviderId}`),
       })),
     assessment,
     blockers: fortnightBlockers(assessment),

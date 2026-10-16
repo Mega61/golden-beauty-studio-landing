@@ -38,7 +38,7 @@ async function armarCita(panel: Page, marca: string, hora: string) {
   await panel.goto("/admin/agenda");
   await panel.getByRole("button", { name: /nueva cita/i }).click();
 
-  await panel.getByRole("textbox", { name: /^Clienta/ }).fill(`${marca} Test`);
+  await panel.getByRole("textbox", { name: /^Cliente/ }).fill(`${marca} Test`);
   await panel.getByRole("button", { name: /crear «/i }).click();
   await panel.getByRole("textbox", { name: /^Nombre\b/ }).fill(marca);
   await panel.getByRole("textbox", { name: /^Apellido\b/ }).fill("Test");
@@ -79,7 +79,7 @@ test.describe("fuera del horario de la profesional", () => {
 
     await armarCita(panel, marca, TARDE);
     await panel
-      .getByRole("checkbox", { name: /fuera del horario de la profesional/i })
+      .getByRole("checkbox", { name: /fuera del horario de quien atiende/i })
       .check();
 
     await panel.getByRole("button", { name: /^crear cita$/i }).click();
@@ -111,7 +111,7 @@ test.describe("fuera del horario de la profesional", () => {
     // sedimento de otro test.
     await armarCita(panel, marca, TEMPRANO);
     await panel
-      .getByRole("checkbox", { name: /fuera del horario de la profesional/i })
+      .getByRole("checkbox", { name: /fuera del horario de quien atiende/i })
       .check();
     await panel.getByRole("button", { name: /^crear cita$/i }).click();
     await expect(panel.getByText("Cita creada.")).toBeVisible({ timeout: 15_000 });
@@ -120,7 +120,7 @@ test.describe("fuera del horario de la profesional", () => {
     const otra = `T4${Date.now().toString().slice(-6)}`;
     await armarCita(panel, otra, TEMPRANO);
     await panel
-      .getByRole("checkbox", { name: /fuera del horario de la profesional/i })
+      .getByRole("checkbox", { name: /fuera del horario de quien atiende/i })
       .check();
     await panel.getByRole("button", { name: /^crear cita$/i }).click();
 

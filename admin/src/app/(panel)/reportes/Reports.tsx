@@ -96,9 +96,9 @@ export function DailyReports({ data }: { data: Data }) {
       }
       table={
         <DataView
-          caption="Ingreso y propinas por técnica"
+          caption="Ingreso y propinas por profesional"
           columns={[
-            { header: "Técnica", cell: (row) => row.name },
+            { header: "Profesional", cell: (row) => row.name },
             { header: "Cuentas", numeric: true, cell: (row) => row.count },
             { header: "Ingreso", numeric: true, cell: (row) => money(row.revenue) },
             { header: "Propinas", numeric: true, cell: (row) => money(row.tips) },
@@ -181,7 +181,7 @@ export function FortnightReports({ data }: { data: Data }) {
     <>
       <ChartFrame
         title="Liquidación de la quincena"
-        decision="Cuánto se le paga a cada una. La cifra es la que congeló el motor de comisiones al liquidar; acá no se recalcula nada."
+        decision="Cuánto se le paga a cada profesional. La cifra es la que congeló el motor de comisiones al liquidar; acá no se recalcula nada."
         note={
           liquidacion.rows.length === 0
             ? {
@@ -210,9 +210,9 @@ export function FortnightReports({ data }: { data: Data }) {
         }
         table={
           <DataView
-            caption="Base, comisión y estado de pago por técnica"
+            caption="Base, comisión y estado de pago por profesional"
             columns={[
-              { header: "Técnica", cell: (row) => row.name },
+              { header: "Profesional", cell: (row) => row.name },
               { header: "Renglones", numeric: true, cell: (row) => row.entries },
               { header: "Base", numeric: true, cell: (row) => money(row.base) },
               { header: "Comisión", numeric: true, cell: (row) => money(row.commission) },
@@ -233,7 +233,7 @@ export function FortnightReports({ data }: { data: Data }) {
       </ChartFrame>
 
       <ChartFrame
-        title="Variación de precio, por técnica y motivo"
+        title="Variación de precio, por profesional y motivo"
         decision="Dónde se escapa la plata. Variación es lo cobrado por debajo del precio de lista, venga por descuento, por un total escrito a mano o por un renglón que resta."
         note={
           variacion.withoutReason > 0
@@ -252,9 +252,9 @@ export function FortnightReports({ data }: { data: Data }) {
         }
         table={
           <DataView
-            caption="Variación por técnica"
+            caption="Variación por profesional"
             columns={[
-              { header: "Técnica", cell: (row) => row.name },
+              { header: "Profesional", cell: (row) => row.name },
               { header: "Variación", numeric: true, cell: (row) => money(row.amount) },
             ]}
             rowKey={(row) => String(row.eaProviderId ?? "sin")}
@@ -284,7 +284,7 @@ export function FortnightReports({ data }: { data: Data }) {
               id: reason.reason,
               label: reason.reason === "sin-motivo" ? "Sin motivo" : VARIANCE_LABEL[reason.reason],
             }))}
-            rowHeader="Técnica"
+            rowHeader="Profesional"
             rows={variacion.providers.map((provider) => ({
               id: String(provider.eaProviderId ?? "sin"),
               label: provider.name,
@@ -463,7 +463,7 @@ export function MonthlyReports({
 
       {/* --- Ocupación ---------------------------------------------------- */}
       <ChartFrame
-        title="Ocupación por hora de puesto y por técnica"
+        title="Ocupación por hora de puesto y por profesional"
         decision="¿Contrato a alguien? ¿Abro otro puesto? Con dos estaciones la capacidad del negocio son horas de puesto, no personas."
         note={{
           tone: "info",
@@ -485,9 +485,9 @@ export function MonthlyReports({
         }}
         table={
           <DataView
-            caption="Ocupación por técnica"
+            caption="Ocupación por profesional"
             columns={[
-              { header: "Técnica", cell: (row) => row.name },
+              { header: "Profesional", cell: (row) => row.name },
               {
                 header: "Disponible",
                 numeric: true,
@@ -533,7 +533,7 @@ export function MonthlyReports({
         {perProvider.length === 0 ? (
           <EmptyState
             icon="equipo"
-            title="No hay técnicas con plan de trabajo"
+            title="No hay profesionales con plan de trabajo"
             body="La ocupación necesita el plan de trabajo que vive en Easy!Appointments. Equipo muestra cuál falta."
           />
         ) : (
@@ -553,7 +553,7 @@ export function MonthlyReports({
       {/* --- Agendado vs. realizado --------------------------------------- */}
       <ChartFrame
         title="Servicio agendado vs. realizado"
-        decision="Arreglar el menú o el flujo de reserva, no a la técnica: la tasa de cambio es una señal de la vitrina, no un error de quien atendió."
+        decision="Arreglar el menú o el flujo de reserva, no a quien atendió: la tasa de cambio es una señal de la vitrina, no un error de quien atendió."
         table={
           <DataView
             caption="Cambios de servicio más frecuentes"
@@ -609,13 +609,13 @@ export function MonthlyReports({
 
       {/* --- Adicionales -------------------------------------------------- */}
       <ChartFrame
-        title="Adicionales: enganche por técnica"
+        title="Adicionales: enganche por profesional"
         decision="Dónde entrenar y qué ofrecer por defecto. El monto va en la tabla y no en el mismo gráfico: son dos medidas de escala distinta, y un doble eje inventaría una correlación."
         table={
           <DataView
-            caption="Enganche y monto de adicionales por técnica"
+            caption="Enganche y monto de adicionales por profesional"
             columns={[
-              { header: "Técnica", cell: (row) => row.name },
+              { header: "Profesional", cell: (row) => row.name },
               { header: "Cuentas", numeric: true, cell: (row) => row.tickets },
               { header: "Con adicional", numeric: true, cell: (row) => row.withExtras },
               { header: "Enganche", numeric: true, cell: (row) => formatRate(row.attachRate) },
@@ -663,11 +663,11 @@ export function MonthlyReports({
 
       {/* --- Clientas ----------------------------------------------------- */}
       <ChartFrame
-        title="Clientas nuevas vs. que vuelven"
+        title="Primera visita vs. regreso"
         decision="Cuánto invertir en captación vs. en volver a traer."
         legend={[
-          { label: "Nuevas", color: SERIES[0] },
-          { label: "Que vuelven", color: SERIES[1] },
+          { label: "Primera visita", color: SERIES[0] },
+          { label: "Regreso", color: SERIES[1] },
         ]}
         note={
           clientas.withoutKey > 0
@@ -677,7 +677,7 @@ export function MonthlyReports({
                   <>
                     {clientas.withoutKey} visita
                     {clientas.withoutKey === 1 ? "" : "s"} sin teléfono quedaron fuera de la
-                    cuenta: la identidad de la clienta es el teléfono, y sin él no hay forma
+                    cuenta: la identidad de cada cliente es su teléfono, y sin él no hay forma
                     de saber si volvió.
                   </>
                 ),
@@ -689,24 +689,24 @@ export function MonthlyReports({
             caption="Composición de la clientela del periodo"
             columns={[
               { header: "Grupo", cell: (row) => row.label },
-              { header: "Clientas", numeric: true, cell: (row) => row.value },
+              { header: "Personas", numeric: true, cell: (row) => row.value },
             ]}
             rowKey={(row) => row.label}
             rows={[
-              { label: "Nuevas", value: clientas.newCustomers },
-              { label: "Que vuelven", value: clientas.returningCustomers },
+              { label: "Primera visita", value: clientas.newCustomers },
+              { label: "Regreso", value: clientas.returningCustomers },
             ]}
           />
         }
       >
         <TileRow>
           <StatTile
-            label="Nuevas en el periodo"
+            label="Primera visita en el periodo"
             value={`${clientas.newCustomers}`}
             deltaNote={
               clientas.newShare === null
-                ? "Sin clientas atendidas"
-                : `${formatRate(clientas.newShare)} de las atendidas`
+                ? "Nadie vino en el periodo"
+                : `${formatRate(clientas.newShare)} de quienes vinieron`
             }
           />
           <StatTile
@@ -725,13 +725,13 @@ export function MonthlyReports({
           data={[
             {
               id: "nuevas",
-              label: "Nuevas",
+              label: "Primera visita",
               value: clientas.newCustomers,
               display: `${clientas.newCustomers}`,
             },
             {
               id: "vuelven",
-              label: "Que vuelven",
+              label: "Regreso",
               value: clientas.returningCustomers,
               display: `${clientas.returningCustomers}`,
             },
@@ -741,7 +741,7 @@ export function MonthlyReports({
         {clientas.retention.rate === null && clientas.retention.cohort > 0 ? (
           <p className={styles.decision}>
             La retención dice <strong>{NOT_MEASURABLE}</strong> porque{" "}
-            {clientas.retention.pending} de las {clientas.retention.cohort} clientas del
+            {clientas.retention.pending} de las {clientas.retention.cohort} personas del
             periodo todavía están dentro de sus 60 días. Contarlas como &laquo;no
             volvió&raquo; haría que este número se viera catastrófico hoy y mejorara solo en
             dos meses, sin que cambiara un solo dato.

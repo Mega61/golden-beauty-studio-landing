@@ -53,9 +53,9 @@ export function ClientesLista({
           <p className={styles.meta} aria-live="polite">
             {result.query !== null
               ? result.total === 1
-                ? "1 clienta"
-                : `${result.total ?? result.clients.length} clientas con «${result.query}»`
-              : "Las más recientes primero"}
+                ? "1 cliente"
+                : `${result.total ?? result.clients.length} clientes con «${result.query}»`
+              : "Lo más reciente primero"}
             {countMerged(result.clients) > 0
               ? ` · ${countMerged(result.clients)} con más de una ficha en la agenda`
               : ""}
@@ -90,13 +90,13 @@ export function ClientesLista({
           columns={columns}
           rows={result.clients}
           rowKey={(row) => keyOf(row)}
-          caption="Clientas"
+          caption="Clientes"
           empty={emptyFor(result)}
         />
       </div>
 
       {result.clients.length > 0 && (result.page > 1 || result.hasNext) ? (
-        <nav className={styles.pager} aria-label="Páginas de clientas">
+        <nav className={styles.pager} aria-label="Páginas de clientes">
           {result.page > 1 ? (
             <Link className="ui-btn ui-btn--secondary ui-btn--sm" href={pageHref(result.page - 1)}>
               ← Anteriores
@@ -135,7 +135,7 @@ function clientColumns(): Array<Column<ResolvedClient>> {
   return [
     {
       key: "nombre",
-      header: "Clienta",
+      header: "Cliente",
       from: "siempre",
       listSlot: "primary",
       width: "34%",
@@ -213,7 +213,7 @@ function emptyFor(result: ClientListResult): React.ReactNode {
       <EmptyState
         icon="alerta"
         title="No se pudo consultar la agenda"
-        body="Las clientas viven en Easy!Appointments y ahora mismo no responde. El histórico y la caja siguen disponibles."
+        body="Los datos de clientes viven en Easy!Appointments y ahora mismo no responde. El histórico y la caja siguen disponibles."
       />
     );
   }
@@ -221,11 +221,11 @@ function emptyFor(result: ClientListResult): React.ReactNode {
     return (
       <EmptyState
         icon="buscar"
-        title={`Ninguna clienta con «${result.query}»`}
+        title={`Nadie con «${result.query}»`}
         body="Prueba con menos letras, con el número sin espacios, o con el apellido. La búsqueda mira nombre, teléfono y correo."
         secondary={
           <Link className="ui-btn ui-btn--ghost" href="/clientes">
-            Ver las más recientes
+            Ver lo más reciente
           </Link>
         }
       />
@@ -234,7 +234,7 @@ function emptyFor(result: ClientListResult): React.ReactNode {
   return (
     <EmptyState
       icon="clientas"
-      title="Todavía no hay clientas"
+      title="Todavía no hay clientes"
       body="Aparecen acá en cuanto se agenda la primera cita, o cuando se importe el histórico de Agenda Pro."
     />
   );

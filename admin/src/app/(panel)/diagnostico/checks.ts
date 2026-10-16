@@ -402,8 +402,8 @@ export function googleMirrorCheck(input: {
     level: input.unmirrored === 0 ? "ok" : "down",
     detail:
       input.unmirrored === 0
-        ? `Ninguna cita de los últimos ${input.windowDays} días quedó sin id de Google en técnicas con sync activo.`
-        : `${input.unmirrored} cita${input.unmirrored === 1 ? "" : "s"} de los últimos ${input.windowDays} días sin id_google_calendar, en técnicas con google_sync activo. El push falla en silencio —EA responde 201 igual—, así que esto es un token vencido o un calendario borrado, y la técnica no está viendo su agenda en el celular. Se reintenta con un PUT a la cita ("Reenviar a Google").`,
+        ? `Ninguna cita de los últimos ${input.windowDays} días quedó sin id de Google en profesionales con sync activo.`
+        : `${input.unmirrored} cita${input.unmirrored === 1 ? "" : "s"} de los últimos ${input.windowDays} días sin id_google_calendar, en profesionales con google_sync activo. El push falla en silencio —EA responde 201 igual—, así que esto es un token vencido o un calendario borrado, y la técnica no está viendo su agenda en el celular. Se reintenta con un PUT a la cita ("Reenviar a Google").`,
     figure: `${input.unmirrored}`,
     lastSeen: relativeAge(input.at, input.now),
   };

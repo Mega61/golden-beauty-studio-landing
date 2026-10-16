@@ -67,7 +67,7 @@ export const DESTINATIONS: readonly Destination[] = [
   },
   {
     id: "clientas",
-    label: "Clientas",
+    label: "Clientes",
     href: "/clientes",
     icon: "clientas",
     roles: NO_STAFF,

@@ -454,7 +454,7 @@ export function AgendaClient({
   const doCancel = (appointment: Appointment) => {
     // La única acción destructiva que **sí** confirma: cancelar notifica a la
     // clienta, y una notificación no se deshace (§ Interacción).
-    if (!globalThis.confirm("Cancelar la cita le avisa a la clienta. ¿Seguro?")) return;
+    if (!globalThis.confirm("Cancelar la cita le avisa a quien reservó. ¿Seguro?")) return;
 
     startSave(async () => {
       const result = await cancelAppointment(appointment.id, appointment.providerId ?? 0);
@@ -749,8 +749,8 @@ function AppointmentDetail({
   return (
     <div className={styles.detail}>
       <div className={styles.detailRows}>
-        <span className={styles.detailKey}>Clienta</span>
-        <span className={styles.detailValue}>{info?.customer ?? "Sin clienta"}</span>
+        <span className={styles.detailKey}>Cliente</span>
+        <span className={styles.detailValue}>{info?.customer ?? "Sin cliente"}</span>
 
         {info?.phone ? (
           <>

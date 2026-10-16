@@ -147,7 +147,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   } catch (error) {
     unstable_rethrow(error);
     console.error("[hoy] el panel está mal configurado", error);
-    return rechazo("El panel no está bien configurado. Avisa a la dueña.");
+    return rechazo("El panel no está bien configurado. Avisa a administración.");
   }
 
   // --- La cita, desde EA (es quien manda sobre de quién es) ---------------

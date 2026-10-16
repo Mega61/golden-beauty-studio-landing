@@ -40,7 +40,7 @@ export function FichaClienta({ profile }: { profile: ClientProfile }) {
       ) : null}
 
       <p style={{ margin: 0, fontSize: "var(--text-2xs)" }}>
-        <Link href="/clientes">← Clientas</Link>
+        <Link href="/clientes">← Clientes</Link>
       </p>
 
       <Card padded={false}>
@@ -52,7 +52,7 @@ export function FichaClienta({ profile }: { profile: ClientProfile }) {
               color: "var(--color-carbon)",
             }}
           >
-            {client.name || "Clienta sin nombre"}
+            {client.name || "Sin nombre"}
           </h2>
 
           <dl style={dlStyle}>
@@ -92,7 +92,7 @@ export function FichaClienta({ profile }: { profile: ClientProfile }) {
 
           {client.merged ? (
             <Aviso tono="warn">
-              Esta clienta tiene <strong>{client.eaCustomerIds.length} fichas</strong> en
+              Esta persona tiene <strong>{client.eaCustomerIds.length} fichas</strong> en
               Easy!Appointments con el mismo teléfono. El panel las muestra como
               una sola; la agenda sigue viéndolas separadas hasta unirlas.
             </Aviso>
@@ -270,7 +270,7 @@ function historyColumns(): Array<Column<HistoryEntry>> {
     },
     {
       key: "tecnica",
-      header: "Técnica",
+      header: "Profesional",
       from: "lg",
       listSlot: "secondary",
       text: (row) => row.providerName ?? "",

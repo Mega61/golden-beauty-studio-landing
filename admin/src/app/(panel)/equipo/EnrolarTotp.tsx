@@ -193,9 +193,9 @@ function Codigo({
 
 const ESTADO_LABEL: Record<TotpState, { texto: string; tono: "ok" | "warn" | "error" | "info" }> = {
   "sin-enrolar": { texto: "Sin código", tono: "info" },
-  pendiente: { texto: "Enrolada sin confirmar", tono: "warn" },
+  pendiente: { texto: "Código sin confirmar", tono: "warn" },
   activo: { texto: "Puede entrar", tono: "ok" },
-  bloqueado: { texto: "Bloqueada", tono: "error" },
+  bloqueado: { texto: "Cuenta bloqueada", tono: "error" },
 };
 
 export function EstadoTotp({
@@ -210,7 +210,7 @@ export function EstadoTotp({
     <span
       title={
         estado === "bloqueado" && lockedUntil
-          ? `Bloqueada por intentos fallidos hasta que la dueña la suelte.`
+          ? `Cuenta bloqueada por intentos fallidos hasta que administración la libere.`
           : undefined
       }
       style={{

@@ -214,7 +214,7 @@ function lockedOut(): APIError {
   return new APIError("FORBIDDEN", {
     code: "TOTP_BLOQUEADO",
     message:
-      "Esta cuenta quedó bloqueada por intentos fallidos. La dueña la libera desde Equipo.",
+      "Esta cuenta quedó bloqueada por intentos fallidos. Administración la libera desde Equipo.",
   });
 }
 

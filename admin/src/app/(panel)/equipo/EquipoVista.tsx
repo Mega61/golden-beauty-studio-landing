@@ -84,19 +84,19 @@ export function EquipoVista({
         <CardHead title="Cuentas del panel" />
         <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.75rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
           <p style={meta}>
-            La dueña y la recepción entran con la cuenta del estudio; las
-            técnicas, con un código de seis dígitos desde su celular.
+            Administración y recepción entran con la cuenta del estudio; cada
+            profesional, con un código de seis dígitos desde su celular.
           </p>
           <DataTable
             columns={accountColumns()}
             rows={view.unlinkedAccounts}
             rowKey={(row) => String(row.allowed.id)}
-            caption="Cuentas del panel sin profesional enlazada"
+            caption="Cuentas del panel sin profesional enlazado"
             empty={
               <EmptyState
                 icon="candado"
                 title="Todas las cuentas están enlazadas"
-                body="Cada cuenta del panel corresponde a una profesional de la agenda."
+                body="Cada cuenta del panel corresponde a alguien del equipo en la agenda."
               />
             }
           />
@@ -105,7 +105,7 @@ export function EquipoVista({
 
       {puedeAdministrar ? (
         <Card padded={false}>
-          <CardHead title="Agregar una técnica" />
+          <CardHead title="Agregar profesional" />
           <div style={{ padding: "0 1rem 1rem" }}>
             <NuevaTecnica
               profesionales={view.members.map((member) => ({
@@ -119,8 +119,8 @@ export function EquipoVista({
 
       <Card>
         <p style={{ margin: 0, fontSize: "var(--text-xs)" }}>
-          <strong>Lo que no se administra desde acá:</strong> secretarias,
-          administradoras y toda la configuración de Easy!Appointments se
+          <strong>Lo que no se administra desde acá:</strong> las cuentas de
+          secretaría y de administración de Easy!Appointments, y toda su configuración, se
           enlazan a su propia interfaz. Se tocan cada varios meses, y cada campo
           que el panel reconstruyera es un campo que habría que volver a
           verificar en cada actualización de la agenda.
@@ -257,9 +257,9 @@ function accountColumns(): Array<Column<PanelAccount>> {
 }
 
 const ROL: Record<PanelAccount["allowed"]["role"], string> = {
-  owner: "Dueña",
+  owner: "Administración",
   admin: "Recepción",
-  staff: "Técnica",
+  staff: "Profesional",
 };
 
 const meta: React.CSSProperties = {

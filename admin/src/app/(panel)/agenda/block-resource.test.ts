@@ -244,11 +244,11 @@ describe("validación", () => {
 describe("describePlan", () => {
   it("dice en voz alta lo que el formulario esconde", () => {
     const uno = planOf();
-    expect(describePlan(uno.plan, uno.days)).toBe("Se va a registrar 1 ausencia de la profesional.");
+    expect(describePlan(uno.plan, uno.days)).toBe("Se va a registrar 1 ausencia de profesional.");
 
     const dos = planOf({ endDate: d("2026-09-03") });
     expect(describePlan(dos.plan, dos.days)).toBe(
-      "Se van a registrar 2 ausencias de la profesional.",
+      "Se van a registrar 2 ausencias de profesional.",
     );
   });
 

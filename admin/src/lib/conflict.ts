@@ -512,7 +512,7 @@ export function checkConflicts(input: ConflictInput): ConflictReport {
       conflicts.push({
         reason: "service-capacity",
         severity: "hard",
-        message: `El servicio admite ${capacity} clientas a la vez y ya hay ${sameService.length}.`,
+        message: `El servicio admite ${capacity} personas a la vez y ya hay ${sameService.length}.`,
         window,
         with: sameService.map(subjectOf),
       });
@@ -693,10 +693,10 @@ function checkWorkingPlan(
       message:
         source === "plan"
           ? dayOff
-            ? "La profesional no trabaja ese día."
-            : "La cita queda fuera del horario de la profesional."
+            ? "Quien atiende no trabaja ese día."
+            : "La cita queda fuera del horario de quien atiende."
           : dayOff
-            ? "Ese día la profesional tiene el día libre por una excepción."
+            ? "Quien atiende tiene ese día libre por una excepción."
             : "La cita queda fuera del horario excepcional de ese día.",
       window: { start: pieces[0].start, end: pieces[pieces.length - 1].end },
       with: pieces.map(asSubject),
@@ -707,7 +707,7 @@ function checkWorkingPlan(
     out.push({
       reason: "during-break",
       severity: "soft",
-      message: "La cita cae dentro de un descanso de la profesional.",
+      message: "La cita cae dentro de un descanso de quien atiende.",
       window: { start: inBreak[0].start, end: inBreak[inBreak.length - 1].end },
       with: inBreak.map(asSubject),
     });

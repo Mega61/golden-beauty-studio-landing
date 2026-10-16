@@ -210,7 +210,7 @@ export function PushToggle({
     <div style={{ display: "grid", gap: "0.75rem" }}>
       <Checkbox
         label="Avisarme cuando alguien reserve en la página"
-        hint="Solo en este dispositivo. El aviso dice el servicio, el nombre, el día y la hora, y con quién. Nunca el teléfono de la clienta."
+        hint="Solo en este dispositivo. El aviso dice el servicio, el nombre, el día y la hora, y con quién. Nunca el teléfono de quien reserva."
         checked={state === "prendido"}
         disabled={busy || state === "bloqueado"}
         onChange={(e) => void onChange(e.currentTarget.checked)}

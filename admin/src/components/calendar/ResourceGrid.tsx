@@ -547,7 +547,7 @@ const BAND_CLASS: Record<GridBand["kind"], string> = {
 };
 
 const BAND_TITLE: Record<GridBand["kind"], string> = {
-  "off-hours": "Fuera del horario de la profesional",
+  "off-hours": "Fuera de su horario",
   break: "Descanso",
   blocked: "El estudio está cerrado",
   unavailable: "La profesional no está disponible",
@@ -631,7 +631,7 @@ function EventBlock({
   const status = mapEaStatus(event.appointment.status);
   const statusMeta = STATUS_META[status];
   const tint = serviceTint(event.appointment.color ?? meta?.serviceColor ?? null);
-  const who = meta?.customer ?? "Sin clienta";
+  const who = meta?.customer ?? "Sin cliente";
   const what = meta?.service ?? "Sin servicio";
   const time = formatTimeRange(event.appointment.start, event.appointment.end);
 

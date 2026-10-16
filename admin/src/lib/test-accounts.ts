@@ -49,9 +49,9 @@ export function devLoginEnabled(env: Env = process.env): boolean {
 
 /** Las cuentas que crea la entrada de desarrollo, una por rol. */
 export const DEV_LOGIN_ACCOUNTS: Record<UserRole, { email: string; name: string; label: string }> = {
-  owner: { email: "dev@goldenbeautystudio.com.co", name: "Dev (dueña)", label: "Dueña" },
+  owner: { email: "dev@goldenbeautystudio.com.co", name: "Dev (administración)", label: "Administración" },
   admin: { email: "dev-recepcion@goldenbeautystudio.com.co", name: "Dev (recepción)", label: "Recepción" },
-  staff: { email: "dev-tecnica@goldenbeautystudio.com.co", name: "Dev (técnica)", label: "Técnica" },
+  staff: { email: "dev-tecnica@goldenbeautystudio.com.co", name: "Dev (profesional)", label: "Profesional" },
 };
 
 export function isDevLoginRole(value: unknown): value is UserRole {

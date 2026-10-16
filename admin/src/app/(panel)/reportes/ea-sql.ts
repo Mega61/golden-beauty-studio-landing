@@ -253,7 +253,7 @@ export async function loadProviders(): Promise<EaProvider[]> {
     const name = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
     return {
       id: row.id,
-      name: name === "" ? `Técnica #${row.id}` : name,
+      name: name === "" ? `Profesional #${row.id}` : name,
       workingPlan: parsePlan(row.working_plan),
       googleSync: row.google_sync === 1,
       googleCalendar: row.google_calendar,

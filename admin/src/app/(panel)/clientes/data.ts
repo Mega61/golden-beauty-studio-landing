@@ -361,7 +361,7 @@ function legacyOnlyClient(key: ClientKey, legacy: LegacyAppointment[]): Resolved
   return {
     key,
     phone: key.kind === "tel" ? key.phone : null,
-    name: named?.client_name?.trim() ?? "Clienta sin nombre",
+    name: named?.client_name?.trim() ?? "Sin nombre",
     firstName: split.firstName,
     lastName: split.lastName,
     email: null,

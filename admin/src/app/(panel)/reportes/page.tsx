@@ -81,7 +81,7 @@ export default async function ReportesPage({
       <AppShell role="staff" title="Reportes">
         <EmptyState
           icon="candado"
-          title="Reportes es de la dueña"
+          title="Reportes es solo de administración"
           body="Tu rol no incluye los reportes del estudio. Tu liquidación y tu ticket promedio están en Comisiones."
         />
       </AppShell>

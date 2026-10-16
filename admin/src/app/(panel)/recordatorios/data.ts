@@ -185,7 +185,7 @@ export async function loadReminders(now: Date = new Date()): Promise<RemindersDa
       customerFirstName: customer?.firstName ?? null,
       customerName:
         [customer?.firstName, customer?.lastName].filter(Boolean).join(" ").trim() ||
-        "Sin clienta",
+        "Sin cliente",
       serviceName: service?.name ?? null,
     }));
   } catch (error) {

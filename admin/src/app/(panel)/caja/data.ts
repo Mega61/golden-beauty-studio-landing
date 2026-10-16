@@ -64,7 +64,7 @@ export function loadDayAppointments(client?: EaClient): DayAppointmentSource {
       status: appointment.status,
       start: appointment.start,
       end: appointment.end,
-      customerName: personName(customer, "Sin clienta"),
+      customerName: personName(customer, "Sin cliente"),
       providerName: personName(provider, "Sin asignar"),
     }));
   };

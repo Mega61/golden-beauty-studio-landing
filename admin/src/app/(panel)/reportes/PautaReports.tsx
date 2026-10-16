@@ -238,7 +238,7 @@ export function AcquisitionFrame({
       case "sin-pauta":
         return "no se pautó";
       case "sin-clientas":
-        return "sin clientas nuevas";
+        return "nadie vino por primera vez";
       case "sin-lectura":
         return "no se pudo leer";
     }
@@ -249,7 +249,7 @@ export function AcquisitionFrame({
     notes.push(
       <Fragment key="n5">
         <strong>No se pudo leer la inversión en anuncios.</strong> Falta aplicar la migración 023
-        (<code>ad_spend</code>) o la base no respondió. Las clientas nuevas y lo que pagaron sí
+        (<code>ad_spend</code>) o la base no respondió. Las primeras visitas y lo que se pagó en ellas sí
         salen.
       </Fragment>,
     );
@@ -288,18 +288,18 @@ export function AcquisitionFrame({
           },
           {
             id: "pagado",
-            name: "Lo que pagaron las nuevas",
+            name: "Lo que pagaron quienes vinieron por primera vez",
             value: report.revenueFromNew,
             display: money(report.revenueFromNew),
-            meta: plural(report.newWithRevenue, "clienta", "clientas"),
+            meta: plural(report.newWithRevenue, "persona", "personas"),
           },
         ]
       : [];
 
   return (
     <ChartFrame
-      title="Costo por clienta nueva"
-      decision="Si la pauta se paga sola: cuánto costó traer a cada clienta nueva, y cuánto de eso ya volvió en lo que pagaron."
+      title="Costo por primera visita"
+      decision="Si la pauta se paga sola: cuánto costó traer a cada persona por primera vez, y cuánto de eso ya volvió en lo que pagaron."
       note={notes.length > 0 ? { tone: "info", text: <>{notes}</> } : undefined}
       table={
         <DataView
@@ -315,9 +315,9 @@ export function AcquisitionFrame({
     >
       <TileRow>
         <StatTile
-          label="Clientas nuevas"
+          label="Primeras visitas"
           value={String(report.newCustomers)}
-          deltaNote="La misma cuenta de «Clientas nuevas vs. que vuelven»"
+          deltaNote="La misma cuenta de «Primera visita vs. regreso»"
         />
         <StatTile
           label="Inversión en anuncios"
@@ -326,12 +326,12 @@ export function AcquisitionFrame({
           deltaNote={listMonths(report.months)}
         />
         <StatTile
-          label="Costo por clienta nueva"
+          label="Costo por primera visita"
           soft={report.costPerNew === null}
           value={costValue}
           deltaNote={
             report.state === "ok"
-              ? `${money(report.spend)} ÷ ${plural(report.newCustomers, "nueva", "nuevas")}`
+              ? `${money(report.spend)} ÷ ${plural(report.newCustomers, "primera visita", "primeras visitas")}`
               : undefined
           }
         />
@@ -341,7 +341,7 @@ export function AcquisitionFrame({
           value={report.recovered === null ? dash : formatRate(report.recovered)}
           deltaNote={
             report.spend === null || report.spend === 0
-              ? `${money(report.revenueFromNew)} pagado por las nuevas`
+              ? `${money(report.revenueFromNew)} pagado por quienes vinieron por primera vez`
               : `${money(report.revenueFromNew)} de ${money(report.spend)}`
           }
         />

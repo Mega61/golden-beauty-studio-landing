@@ -131,7 +131,7 @@ export async function liquidarQuincena(quincena: string): Promise<LiquidarResult
       message:
         tecnicas === 0
           ? "No hay nada que liquidar en esta quincena."
-          : `Quincena liquidada: ${tecnicas} ${tecnicas === 1 ? "técnica" : "técnicas"}.`,
+          : `Quincena liquidada: ${tecnicas} ${tecnicas === 1 ? "profesional" : "profesionales"}.`,
       detail,
     };
   } catch (error) {
@@ -176,7 +176,7 @@ export async function marcarRevisada(
   const parsed = QuincenaSchema.safeParse(quincena);
   const provider = ProviderSchema.safeParse(eaProviderId);
   if (!parsed.success || !provider.success) {
-    return { ok: false, message: "La quincena o la técnica llegaron mal." };
+    return { ok: false, message: "La quincena o el profesional llegaron mal." };
   }
 
   let session;
@@ -223,7 +223,7 @@ export async function marcarPagada(
   const parsed = QuincenaSchema.safeParse(quincena);
   const provider = ProviderSchema.safeParse(eaProviderId);
   if (!parsed.success || !provider.success) {
-    return { ok: false, message: "La quincena o la técnica llegaron mal." };
+    return { ok: false, message: "La quincena o el profesional llegaron mal." };
   }
 
   let session;

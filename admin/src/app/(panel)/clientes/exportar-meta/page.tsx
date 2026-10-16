@@ -25,7 +25,7 @@ import { loadMetaAudience } from "../meta-export-data";
  */
 
 export const metadata: Metadata = {
-  title: "Exportar para Meta · Clientas · Panel",
+  title: "Exportar para Meta · Clientes · Panel",
   robots: { index: false, follow: false },
 };
 
@@ -53,8 +53,8 @@ export default async function ExportarMetaPage() {
       <AppShell role={navRole(role)} title="Exportar para Meta">
         <EmptyState
           icon="candado"
-          title="Exportar la clientela es de la dueña"
-          body="Es una exportación masiva de datos personales hacia Meta. Aunque va cifrada, solo la dueña la baja, y cada descarga queda en la bitácora."
+          title="Exportar la clientela es solo de administración"
+          body="Es una exportación masiva de datos personales hacia Meta. Aunque va cifrada, solo administración la baja, y cada descarga queda en la bitácora."
         />
       </AppShell>
     );
@@ -66,20 +66,20 @@ export default async function ExportarMetaPage() {
     <AppShell role={navRole(role)} title="Exportar para Meta">
       <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
         <a className="ui-btn ui-btn--ghost ui-btn--sm" href="/admin/clientes" style={{ justifySelf: "start" }}>
-          ← Clientas
+          ← Clientes
         </a>
 
         <section className="ui-card">
           <header className="ui-card__head">
-            <h2 className="ui-card__title">Lista de clientas para Meta</h2>
+            <h2 className="ui-card__title">Lista de clientes para Meta</h2>
           </header>
 
           <div style={{ display: "grid", gap: "1rem", padding: "0.75rem 1rem 1rem" }}>
             <p style={text}>
-              Un archivo CSV con el teléfono, el nombre y el país de cada clienta,{" "}
+              Un archivo CSV con el teléfono, el nombre y el país de cada cliente,{" "}
               <strong>cifrados con SHA-256</strong> en el formato de lista de clientes de Meta. Ningún
               dato viaja en claro: Meta compara los cifrados contra los suyos y nunca ve el número.
-              Las clientas de la agenda y las del histórico de Agenda Pro se unen por teléfono.
+              Las fichas de la agenda y las del histórico de Agenda Pro se unen por teléfono.
             </p>
 
             {!load.ok ? (
@@ -91,7 +91,7 @@ export default async function ExportarMetaPage() {
                     <li key={segment.id} style={{ fontSize: "var(--text-sm)" }}>
                       <strong>{segment.label}</strong>{" "}
                       <span className="ui-num">
-                        — {load.counts[segment.id]} clienta{load.counts[segment.id] === 1 ? "" : "s"}
+                        — {load.counts[segment.id]} persona{load.counts[segment.id] === 1 ? "" : "s"}
                       </span>
                       <br />
                       <span style={{ color: "var(--color-ink-soft)" }}>{segment.use}</span>
@@ -106,7 +106,7 @@ export default async function ExportarMetaPage() {
                     {load.audience.customersWithoutPhone === 1 ? "" : "s"} de la agenda y{" "}
                     {load.audience.legacyWithoutPhone} cita
                     {load.audience.legacyWithoutPhone === 1 ? "" : "s"} del histórico. El teléfono es
-                    la identidad de la clienta: sin él no hay nada que Meta pueda comparar. Corregirlo
+                    la identidad de cada cliente: sin él no hay nada que Meta pueda comparar. Corregirlo
                     en su ficha la suma a la próxima descarga.
                   </p>
                 ) : null}
@@ -143,18 +143,18 @@ export default async function ExportarMetaPage() {
                 En el Administrador de anuncios, ve a <strong>Públicos</strong> → <strong>Crear
                 público</strong> → <strong>Público personalizado</strong> → <strong>Lista de
                 clientes</strong> y sube el archivo; Meta reconoce las columnas solas y avisa que ya
-                vienen cifradas. Con la lista de <em>atendidas en los últimos 180 días</em>, abre el
+                vienen cifradas. Con la lista de quienes <em>vinieron en los últimos 180 días</em>, abre el
                 conjunto de anuncios de la campaña de captación y, en <strong>Público</strong>, usa{" "}
                 <strong>Excluir</strong> con ese público: así la pauta de «primera visita» no se gasta
-                en quien ya es clienta. La de <em>sin venir hace más de 60 días</em> va al revés: como
-                público <strong>incluido</strong> de una campaña para volver a traerlas. Baja una lista
+                en quien ya es cliente. La de <em>sin venir hace más de 60 días</em> va al revés: como
+                público <strong>incluido</strong> de una campaña para volver a traer a esas personas. Baja una lista
                 nueva cada mes; Meta no la actualiza sola.
               </p>
             </details>
 
             <p style={{ ...text, fontSize: "var(--text-2xs)" }}>
               Cada descarga queda en la bitácora con el segmento y el número de filas, nunca con los
-              datos. Las clientas que pidieron no recibir recordatorios por WhatsApp <strong>sí</strong>{" "}
+              datos. Quienes pidieron no recibir recordatorios por WhatsApp <strong>sí</strong>{" "}
               van en la lista: pidieron que no se les escriba, y esta lista no le escribe a nadie —sirve
               sobre todo para <em>no</em> mostrarles anuncios de captación.
             </p>

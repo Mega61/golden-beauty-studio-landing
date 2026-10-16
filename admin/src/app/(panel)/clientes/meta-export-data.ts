@@ -125,7 +125,7 @@ export async function loadMetaAudience(now: Date = new Date()): Promise<MetaExpo
     return {
       ok: false,
       message:
-        "No se pudo leer la agenda (Easy!Appointments). Sin las clientas de EA la lista saldría incompleta, así que no se ofrece.",
+        "No se pudo leer la agenda (Easy!Appointments). Sin la clientela de EA la lista saldría incompleta, así que no se ofrece.",
     };
   }
 
@@ -146,7 +146,7 @@ export async function loadMetaAudience(now: Date = new Date()): Promise<MetaExpo
     return {
       ok: false,
       message:
-        "No se pudo leer el histórico de Agenda Pro. Sin él, las clientas de antes del corte saldrían como si nunca hubieran venido.",
+        "No se pudo leer el histórico de Agenda Pro. Sin él, quienes vinieron antes del corte saldrían como si nunca hubieran venido.",
     };
   }
 

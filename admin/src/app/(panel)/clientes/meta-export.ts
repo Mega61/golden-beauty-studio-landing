@@ -70,13 +70,13 @@ export const META_SEGMENTS: readonly {
 }[] = [
   {
     id: "todas",
-    label: "Todas las clientas",
+    label: "Toda la clientela",
     use: "Toda la clientela con teléfono. Para excluirla de una campaña de captación o como base de un público similar.",
   },
   {
     id: "ultimos-180",
-    label: "Atendidas en los últimos 180 días",
-    use: "Clientas activas. Es la lista de exclusión de las campañas de captación: no tiene sentido pagar para que vean «tu primera visita».",
+    label: "Vinieron en los últimos 180 días",
+    use: "Clientela activa. Es la lista de exclusión de las campañas de captación: no tiene sentido pagar para que vean «tu primera visita».",
   },
   {
     id: "inactivas-60",

@@ -449,7 +449,7 @@ export function AppointmentForm({
       <Checkbox
         checked={draft.allowOutsideHours}
         onChange={(e) => set("allowOutsideHours", e.target.checked)}
-        label="Agendar fuera del horario de la profesional"
+        label="Agendar fuera del horario de quien atiende"
         hint="Ignora el plan de trabajo, los descansos y los días libres. Los choques con otra cita o con los puestos siguen avisando."
       />
 
@@ -462,13 +462,13 @@ export function AppointmentForm({
           checked={draft.sendWhatsappConfirmation}
           onChange={(e) => set("sendWhatsappConfirmation", e.target.checked)}
           label="Enviar confirmación por WhatsApp"
-          hint="Le llega a la clienta un mensaje con el servicio, el día, la hora y la profesional. Sin precio."
+          hint="Le llega a quien reserva un mensaje con el servicio, el día, la hora y quién atiende. Sin precio."
         />
       ) : null}
 
       <Field
         label="Notas"
-        hint="Las ve la técnica en su agenda. No es la cuenta del servicio."
+        hint="Las ve quien atiende, en su agenda. No es la cuenta del servicio."
       >
         {(wired) => (
           <TextArea
@@ -482,7 +482,7 @@ export function AppointmentForm({
 
       {service?.attendantsNumber && service.attendantsNumber > 1 ? (
         <p className={styles.formPreview}>
-          Este servicio admite {service.attendantsNumber} clientas a la vez con la misma
+          Este servicio admite {service.attendantsNumber} personas a la vez con el mismo
           profesional.
         </p>
       ) : null}
@@ -573,7 +573,7 @@ function CustomerPicker({
 
   if (chosen) {
     return (
-      <Field label="Clienta" required>
+      <Field label="Cliente" required>
         {() => (
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <span style={{ flex: 1, fontWeight: 600 }}>{chosen.name}</span>
@@ -603,7 +603,7 @@ function CustomerPicker({
   // hacer. El término sigue a la vista, en texto, con su botón para corregirlo.
   if (creating) {
     return (
-      <Field label="Clienta nueva" required>
+      <Field label="Cliente por primera vez" required>
         {() => (
           <AltaRapida
             termino={trimmed}
@@ -616,7 +616,7 @@ function CustomerPicker({
   }
 
   return (
-    <Field label="Clienta" required hint="Busca por nombre o teléfono.">
+    <Field label="Cliente" required hint="Busca por nombre o teléfono.">
       {(wired) => (
         <>
           <TextInput
@@ -786,7 +786,7 @@ function AltaRapida({
         </Field>
       </div>
 
-      <Field label="Teléfono" required hint="Es la identidad de la clienta.">
+      <Field label="Teléfono" required hint="Es la identidad de cada cliente.">
         {(w) => (
           <TextInput
             {...w}

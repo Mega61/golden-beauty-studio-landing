@@ -68,7 +68,7 @@ export async function crearCuentaTecnica(
   }
   const eaProviderId = rawProvider === "" ? null : Number(rawProvider);
   if (eaProviderId !== null && !Number.isSafeInteger(eaProviderId)) {
-    return { ok: false, message: "El id de la profesional no es válido." };
+    return { ok: false, message: "El id de profesional no es válido." };
   }
 
   const db = getDb();
@@ -281,7 +281,7 @@ export async function quitarDelPanel(
   if (email.toLowerCase() === session.email.toLowerCase()) {
     return {
       ok: false,
-      message: "No te puedes quitar a ti misma: quedaría el panel sin dueña.",
+      message: "No puedes quitar tu propia cuenta: el panel quedaría sin administración.",
     };
   }
 

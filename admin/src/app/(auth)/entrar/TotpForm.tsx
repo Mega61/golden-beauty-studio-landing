@@ -79,7 +79,7 @@ export function TotpForm({ people }: { people: readonly TotpLoginCandidate[] }) 
                     color: "var(--color-error-ink)",
                   }}
                 >
-                  bloqueada
+                  cuenta bloqueada
                 </span>
               ) : null}
             </button>
@@ -99,7 +99,7 @@ export function TotpForm({ people }: { people: readonly TotpLoginCandidate[] }) 
             padding: "0.625rem 0.75rem",
           }}
         >
-          Esta cuenta quedó bloqueada por intentos fallidos. Pídele a la dueña que
+          Esta cuenta quedó bloqueada por intentos fallidos. Pídele a administración que
           la libere desde Equipo; el código nuevo no va a servir hasta entonces.
         </p>
       ) : null}
