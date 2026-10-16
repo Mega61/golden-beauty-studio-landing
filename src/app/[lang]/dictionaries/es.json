@@ -40,7 +40,7 @@
     "body": "Lujo en cada detalle. Nos especializamos en uñas con acabados impecables y una experiencia premium que combina belleza, elegancia y cuidado en cada cita. -Más que uñas, creamos detalles que elevan tu esencia-",
     "ctaPrimary": "Agendar cita",
     "ctaSecondary": "Ver Precios",
-    "metaHours": "LUN - DOM",
+    "metaHours": "LUN - SÁB",
     "metaArea": "Sabaneta",
     "metaStatus": "Agenda abierta"
   },
@@ -344,7 +344,7 @@
     "studio": {
       "name": "Golden Beauty Studio",
       "area": "Sabaneta, Antioquia",
-      "hours": "Lun–sáb 9 a. m. – 7 p. m. · Dom 10 a. m. – 3 p. m.",
+      "hours": "Lun–sáb 1 p. m. – 7 p. m. · Domingos y festivos cerrado",
       "address": "Calle 69 Sur #43a - 41, primer piso · Sabaneta",
       "directions": "Cómo llegar",
       "photoAlt": "El estudio: pared de mármol dorado con el logo de Golden iluminado"
@@ -370,7 +370,7 @@
       },
       {
         "q": "¿Necesito agendar cita previa?",
-        "a": "Sí. Atendemos solo con cita para dedicarle el tiempo completo a cada servicio: un montaje toma alrededor de dos horas y media. Puedes agendar por WhatsApp. Abrimos de lunes a sábado de 9:00 a 19:00 y los domingos de 10:00 a 15:00."
+        "a": "Sí. Atendemos solo con cita para dedicarle el tiempo completo a cada servicio: un montaje toma alrededor de dos horas y media. Puedes agendar por WhatsApp. Abrimos de lunes a sábado de 13:00 a 19:00; domingos y festivos cerramos."
       },
       {
         "q": "¿Dónde queda el estudio?",
@@ -549,11 +549,11 @@
       "rows": [
         [
           "Lun — Sáb",
-          "09:00 — 19:00"
+          "13:00 — 19:00"
         ],
         [
-          "Domingo",
-          "10:00 — 15:00"
+          "Domingo y festivos",
+          "Cerrado"
         ]
       ],
       "closed": "Cerrado"
@@ -715,7 +715,7 @@
       "title": "Visítanos",
       "address1": "Calle 69 Sur #43a - 41, Primer Piso",
       "address2": "Sabaneta, Antioquia",
-      "hours": "Lun – Dom"
+      "hours": "Lun – Sáb · 1 – 7 p. m."
     },
     "find": {
       "title": "Encuéntranos",

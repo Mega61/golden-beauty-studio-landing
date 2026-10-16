@@ -177,7 +177,8 @@ export const business = {
   priceRange: "$$",
   telephone,
   sameAs,
-  // Schema.org dayOfWeek values. Mon–Sat 09:00–19:00, Sun 10:00–15:00.
+  // Schema.org dayOfWeek values. Mon–Sat 13:00–19:00; closed Sundays and Colombian
+  // public holidays (those live in the agenda, not here).
   openingHours: [
     {
       days: [
@@ -188,10 +189,9 @@ export const business = {
         "Friday",
         "Saturday",
       ],
-      opens: "09:00",
+      opens: "13:00",
       closes: "19:00",
     },
-    { days: ["Sunday"], opens: "10:00", closes: "15:00" },
   ],
 } as const;
 
