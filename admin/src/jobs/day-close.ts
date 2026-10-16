@@ -139,6 +139,7 @@ export function toDayAccount(
     paidOn: row.paid_at === null ? null : instantToEaDate(row.paid_at),
     eaProviderId: row.ea_provider_id,
     performedServiceId: row.performed_service_id,
+    houseCourtesy: row.is_house_courtesy === 1,
     closedAt: row.closed_at,
     dayCloseId: row.day_close_id,
     pushedToIngestAt: row.pushed_to_ingest_at,
@@ -162,10 +163,20 @@ export type DayTotals = {
   sinMetodo: Cop;
   /** Aparte, siempre. Nunca entra al ingreso ni a la base de comisión. */
   tips: Cop;
-  /** Cuentas cerradas contadas. */
+  /** Cuentas cerradas contadas. **Sin las cortesías de la casa.** */
   count: number;
   /** Ingreso del estudio: los tres métodos más lo que falta asignar. */
   ingreso: Cop;
+  /**
+   * Cortesías de la casa cerradas en el día. Van aparte y no suman a nada: no
+   * entraron al cajón ni al banco, y contarlas en `count` bajaría el ticket
+   * promedio del día con cuentas que nadie pagó.
+   *
+   * Solo lo sabe la revisión en vivo: `day_close` no tiene columna para esto
+   * (`totalsOf()` lo deja en cero), y no hace falta — las cuentas siguen
+   * enganchadas a su cierre con la marca puesta.
+   */
+  cortesias: number;
 };
 
 const CERO: DayTotals = {
@@ -176,6 +187,7 @@ const CERO: DayTotals = {
   tips: 0,
   count: 0,
   ingreso: 0,
+  cortesias: 0,
 };
 
 /**
@@ -194,6 +206,14 @@ export function summarizeDayTotals(accounts: readonly DayAccount[]): DayTotals {
 
   for (const account of accounts) {
     if (account.closedAt === null) continue;
+
+    if (account.houseCourtesy === true) {
+      // Fuera del ingreso, de las columnas por método, de las propinas y del
+      // conteo. Que una cortesía con plata adentro no se cuele callada lo cuida
+      // `reviewDay()`, que la bloquea.
+      totals.cortesias += 1;
+      continue;
+    }
 
     const amount = account.amountCharged ?? 0;
     totals.count += 1;
@@ -238,6 +258,7 @@ export function totalsOf(row: DayClose): DayTotals {
     tips: row.total_tips,
     count: row.appointment_count,
     ingreso: row.total_efectivo + row.total_transferencia + row.total_otro,
+    cortesias: 0,
   };
 }
 
@@ -254,7 +275,9 @@ export function totalsOf(row: DayClose): DayTotals {
  * - `cuenta-incompleta` — la cuenta está cerrada pero le falta el método de
  *   pago, el monto o la fecha de caja. **Bloquea**: sin método esa plata no
  *   entra a ninguna columna del cierre y `buildIngestPayment()` la rechazaría a
- *   mitad del push.
+ *   mitad del push. Una **cortesía de la casa** no tiene método ni fecha de
+ *   caja y no le faltan: no se cobró. Lo que bloquea en ella es lo contrario,
+ *   que traiga cobro, pagos o propina.
  */
 export type DayIssueKind = "sin-cuenta" | "en-curso" | "cuenta-incompleta";
 
@@ -434,6 +457,11 @@ export function reviewDay(input: ReviewDayInput): DayReview {
 
 /** Qué le falta a una cuenta cerrada para poder viajar, o `null` si nada. */
 function missingOf(account: DayAccount): string | null {
+  if (account.houseCourtesy === true) {
+    return (account.amountCharged ?? 0) !== 0 || account.payments.length > 0 || account.tip !== 0
+      ? "Cortesía de la casa con cobro: revisa la cuenta"
+      : null;
+  }
   if (account.amountCharged === null) {
     return "Sin monto cobrado";
   }

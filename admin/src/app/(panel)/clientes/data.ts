@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getDb } from "@/db/client";
-import { appointmentFinanceRepository, legacyPaymentRepository } from "@/db/repositories";
+import { appointmentFinanceRepository, legacyPaymentRepository, repositories } from "@/db/repositories";
 import type { LegacyAppointment } from "@/db/types";
 import { EaApiError, type Customer, type Provider, type Service } from "@/lib/ea";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
@@ -168,6 +168,12 @@ export type ClientProfile = {
   /** `true` si la mitad de EA de la historia no se pudo traer. */
   historyPartial: boolean;
   failure: EaFailure | null;
+  /**
+   * Alguna de sus fichas está marcada "cortesía de la casa por defecto"
+   * (`customer_setting`, migración `026`). `false` también si no se pudo leer:
+   * es una comodidad de la hoja de la cuenta, nunca una decisión de cobro.
+   */
+  houseCourtesyDefault: boolean;
 };
 
 export type ClientProfileResult =
@@ -202,6 +208,7 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
         history: buildUnifiedHistory([], legacy, legacyPayments),
         historyPartial: true,
         failure: ea.failure,
+        houseCourtesyDefault: false,
       },
     };
   }
@@ -224,6 +231,7 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
           history: buildUnifiedHistory([], legacy, legacyPayments),
           historyPartial: false,
           failure: null,
+          houseCourtesyDefault: false,
         },
       };
     }
@@ -249,8 +257,21 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
       history: buildUnifiedHistory(eaHistory, legacy, legacyPayments),
       historyPartial,
       failure,
+      houseCourtesyDefault: await loadHouseCourtesy(client.eaCustomerIds),
     },
   };
+}
+
+/** ¿Alguna de estas fichas es cortesía por defecto? Sin base, no. */
+async function loadHouseCourtesy(eaCustomerIds: readonly number[]): Promise<boolean> {
+  if (eaCustomerIds.length === 0) return false;
+  try {
+    const ids = await repositories(getDb()).customerSettings.listHouseCourtesyIds(eaCustomerIds);
+    return ids.size > 0;
+  } catch (error) {
+    console.error("[clientes] no se pudo leer la cortesía por defecto", error);
+    return false;
+  }
 }
 
 async function findCustomers(ea: EaClient, key: ClientKey): Promise<Customer[]> {

@@ -1,13 +1,14 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 
-import { Button, Field } from "@/components/ui";
+import { Button, Checkbox, Field } from "@/components/ui";
 
 import {
   crearClienta,
   editarClienta,
   fusionarClienta,
+  marcarCortesiaPorDefecto,
   type ClientActionResult,
 } from "./actions";
 
@@ -290,5 +291,53 @@ export function FusionarClienta({ eaCustomerIds }: { eaCustomerIds: number[] }) 
       </div>
       <Resultado estado={estado} />
     </form>
+  );
+}
+
+/**
+ * "Cortesía de la casa por defecto": la casilla de la ficha. Solo se dibuja
+ * para la dueña; el permiso lo vuelve a comprobar la Server Action.
+ *
+ * Es una casilla que se guarda al tocarla, no un formulario con botón: es un
+ * sí/no y la respuesta aparece al lado. Se marcan todas las fichas de la
+ * persona a la vez.
+ */
+export function CortesiaPorDefecto({
+  eaCustomerIds,
+  marcada,
+}: {
+  eaCustomerIds: number[];
+  marcada: boolean;
+}) {
+  const [valor, setValor] = useState(marcada);
+  const [estado, enviar, enviando] = useActionState<ClientActionResult | null, boolean>(
+    async (_previo, siguiente) => {
+      const result = await marcarCortesiaPorDefecto(eaCustomerIds, siguiente);
+      // Si el servidor dijo que no, la casilla vuelve a lo que estaba: una
+      // casilla marcada que no quedó guardada es peor que ninguna.
+      if (!result.ok) setValor(!siguiente);
+      return result;
+    },
+    initial,
+  );
+
+  return (
+    <div style={{ display: "grid", gap: "0.125rem" }}>
+      <Checkbox
+        label="Cortesía de la casa por defecto"
+        hint="Sus cuentas llegan marcadas como cortesía: no se cobran y la profesional cobra su comisión sobre el precio de lista. Se puede desmarcar en cada cuenta."
+        checked={valor}
+        disabled={enviando}
+        onChange={(e) => {
+          const siguiente = e.target.checked;
+          setValor(siguiente);
+          // `startTransition` lo pone `useActionState` cuando la acción se
+          // despacha desde un formulario; acá se despacha a mano, así que se
+          // envuelve para que `enviando` refleje el envío.
+          startTransition(() => enviar(siguiente));
+        }}
+      />
+      <Resultado estado={estado} />
+    </div>
   );
 }

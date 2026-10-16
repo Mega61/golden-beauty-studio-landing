@@ -281,6 +281,10 @@ export function parseDraft(raw: unknown): TicketDraft | null {
     notes: str(raw.notes),
     payments,
     tip: tip < 0 ? 0 : tip,
+    // Un borrador de antes de la cortesía de la casa no trae el campo, y
+    // ausente es **no**: ante la duda se cobra. Solo `true` estricto la marca —
+    // un `"true"` escrito a mano en la consola no regala un servicio.
+    houseCourtesy: raw.houseCourtesy === true,
     updatedAt,
   };
 }

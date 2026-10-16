@@ -28,6 +28,8 @@
 import {
   TicketError,
   computeTicketTotals,
+  houseCourtesyTicket,
+  validateHouseCourtesyClose,
   validateTicketClose,
   type TicketItemInput,
   type TicketPayment,
@@ -81,6 +83,13 @@ export type TicketDraft = {
    */
   payments: readonly TicketPayment[];
   tip: Cop;
+  /**
+   * **Cortesía de la casa**: la clienta no paga, la profesional cobra su
+   * comisión sobre el precio de lista. Con esto prendido el total es cero, no
+   * hay método de pago ni propina, y el motivo lo pone el servidor
+   * (`cortesia`). Solo la dueña lo puede guardar.
+   */
+  houseCourtesy: boolean;
   /** Epoch ms de la última tecla. Sirve para ordenar y para depurar. */
   updatedAt: number;
 };
@@ -103,6 +112,12 @@ export function emptyDraft(
   eaAppointmentId: number,
   bookedServiceId: number | null,
   now = Date.now(),
+  /**
+   * La cuenta arranca marcada como cortesía de la casa. Lo decide quien llama
+   * —la clienta es cortesía por defecto **y** quien abre la hoja puede
+   * otorgarla—; acá solo se respeta.
+   */
+  houseCourtesy = false,
 ): TicketDraft {
   return {
     version: DRAFT_VERSION,
@@ -117,6 +132,7 @@ export function emptyDraft(
     notes: "",
     payments: [],
     tip: 0,
+    houseCourtesy,
     updatedAt: now,
   };
 }
@@ -145,6 +161,8 @@ export function draftFromFinance(
     serviceNotes: string;
     varianceReasonCode: VarianceReasonCode | null;
     varianceReason: string;
+    /** Ausente = no es cortesía. */
+    houseCourtesy?: boolean;
     items: readonly {
       kind: "servicio" | "adicional" | "manual";
       eaServiceId: number | null;
@@ -171,18 +189,25 @@ export function draftFromFinance(
     }
   }
 
+  // Una cortesía guarda su "descuento" del 100 % y el motivo `cortesia`, pero
+  // no los escribió nadie: los puso el servidor al marcar la casilla. Volver a
+  // abrirla con el total escrito en cero y el motivo elegido dejaría a quien la
+  // desmarca con una cuenta en $0 que ya no es cortesía.
+  const cortesia = finance.houseCourtesy === true;
+
   return {
     version: DRAFT_VERSION,
     eaAppointmentId,
     performedServiceId: finance.performedServiceId ?? bookedServiceId,
     extras,
     manual,
-    totalOverride: finance.discount > 0 ? finance.amountCharged : null,
-    varianceReasonCode: finance.varianceReasonCode,
-    varianceReason: finance.varianceReason,
+    totalOverride: !cortesia && finance.discount > 0 ? finance.amountCharged : null,
+    varianceReasonCode: cortesia ? null : finance.varianceReasonCode,
+    varianceReason: cortesia ? "" : finance.varianceReason,
     notes: finance.serviceNotes,
     payments: finance.payments,
     tip: finance.tip,
+    houseCourtesy: cortesia,
     updatedAt: now,
   };
 }
@@ -223,7 +248,8 @@ export function isDirty(draft: TicketDraft, baseline: TicketDraft): boolean {
     draft.varianceReason !== baseline.varianceReason ||
     draft.notes !== baseline.notes ||
     JSON.stringify(draft.payments) !== JSON.stringify(baseline.payments) ||
-    draft.tip !== baseline.tip
+    draft.tip !== baseline.tip ||
+    draft.houseCourtesy !== baseline.houseCourtesy
   );
 }
 
@@ -396,6 +422,29 @@ export function priceDraft(
 ): DraftPricing {
   const { items, flags } = draftToItems(draft, catalog, pricing);
   const errors: string[] = [];
+
+  if (draft.houseCourtesy) {
+    // La cortesía tiene su propia puerta en `lib/ticket.ts`, la misma que usa
+    // el servidor: el total escrito y el motivo no aplican, y la propina y el
+    // método de pago se rechazan con el texto de allá.
+    let courtesy: TicketTotals | null = null;
+
+    try {
+      courtesy = houseCourtesyTicket(items);
+    } catch (error) {
+      errors.push(messageOf(error));
+    }
+
+    if (courtesy !== null) {
+      try {
+        validateHouseCourtesyClose({ items, tip: draft.tip, payments: draft.payments });
+      } catch (error) {
+        errors.push(messageOf(error));
+      }
+    }
+
+    return { items, flags, subtotal: courtesy?.subtotal ?? null, totals: courtesy, errors };
+  }
 
   let base: TicketTotals | null = null;
 

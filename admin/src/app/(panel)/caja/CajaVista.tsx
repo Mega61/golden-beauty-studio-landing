@@ -361,6 +361,11 @@ function Totales({ totals, cerrado }: { totals: DayTotals; cerrado: boolean }) {
               comisión: es de la técnica, no del estudio. */}
           <Tile label="Propinas (aparte)" value={formatCOP(totals.tips)} />
           <Tile label="Cuentas cerradas" value={String(totals.count)} />
+          {/* Las cortesías de la casa no entran a ningún total: se cuentan
+              aparte para que el número de cuentas cuadre con la lista. */}
+          {totals.cortesias === 0 ? null : (
+            <Tile label="Cortesías (fuera de caja)" value={String(totals.cortesias)} />
+          )}
         </div>
       </div>
     </Card>
@@ -405,6 +410,9 @@ const METHOD_LABEL: Record<string, string> = {
  * cuánto efectivo debería estar contando.
  */
 function describeMethods(row: DayAccount): string {
+  // No es un método: es que no se cobró, a propósito. "Sin método" la pintaría
+  // como un pendiente que recepción tiene que reclamar.
+  if (row.houseCourtesy === true) return "Cortesía de la casa";
   if (row.payments.length === 0) return "Sin método";
   if (row.payments.length === 1) return METHOD_LABEL[row.payments[0].method];
 
@@ -450,8 +458,11 @@ function accountColumns(
     header: "En el CRM",
     from: "lg",
     listSlot: "oculto",
-    render: (row) => (row.pushedToIngestAt === null ? "No" : "Sí"),
-    text: (row) => (row.pushedToIngestAt === null ? "No" : "Sí"),
+    // Una cortesía no viaja al CRM: no hubo plata. "No" la haría ver pendiente.
+    render: (row) =>
+      row.houseCourtesy === true ? "No aplica" : row.pushedToIngestAt === null ? "No" : "Sí",
+    text: (row) =>
+      row.houseCourtesy === true ? "No aplica" : row.pushedToIngestAt === null ? "No" : "Sí",
   },
   // `formatPesos` y no `formatCOP` en las columnas: el encabezado ya dice que
   // la columna es plata, y repetir el `$` treinta veces solo agrega ruido.

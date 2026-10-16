@@ -15,6 +15,7 @@ import {
   TicketError,
   assertPaymentsCoverCharge,
   ticketFromEnteredTotal,
+  validateHouseCourtesyClose,
   validateTicketClose,
 } from "@/lib/ticket";
 import { upsertAppointmentFinance } from "@/jobs/snapshot";
@@ -67,6 +68,15 @@ import { loadCatalogForClose } from "./catalog-server";
  * personal: una observación interna sobre una clienta no puede terminar ahí. Y
  * reescribir `id_services` dispararía la notificación de "tu cita cambió" por
  * algo que ya pasó. EA guarda la reserva; el panel guarda la entrega.
+ *
+ * ## Cortesía de la casa
+ *
+ * Con `houseCourtesy` la cuenta se cierra con cobro cero, sin pagos ni propina,
+ * motivo `cortesia` y la marca `is_house_courtesy` (migración `026`); la
+ * liquidación le paga a la profesional sobre el precio de lista. **Tocar una
+ * cortesía es de la dueña** (`cortesia:otorgar`): marcarla, mantenerla al
+ * editar la cuenta, o quitarla. Una técnica que pudiera mantenerla podría
+ * sumarle adicionales a una cuenta que nadie paga y cobrar comisión por ellos.
  */
 
 const REASONS = ["cambio_servicio", "adicionales", "cortesia", "correccion", "otro"] as const;
@@ -93,6 +103,9 @@ const InputSchema = z.object({
     .array(z.object({ method: z.enum(METHODS), amount: z.number().int().min(0).max(MAX_PESOS) }))
     .max(METHODS.length),
   tip: z.number().int().min(0).max(MAX_PESOS),
+  // Opcional: un borrador que quedó en la cola antes de esta versión no lo trae,
+  // y ausente es **no** — la cuenta se cobra como siempre.
+  houseCourtesy: z.boolean().optional(),
   clientRequestId: z.string().max(64),
 });
 
@@ -116,6 +129,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   }
 
   const data = parsed.data;
+  const houseCourtesy = data.houseCourtesy === true;
 
   let session;
   try {
@@ -197,6 +211,20 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     return masTarde("La cuenta desapareció entre dos consultas. Se reintenta solo.");
   }
 
+  // Antes del cierre diario, para que el mensaje sea el del permiso y no otro.
+  // `existing` y no la entrada: quitarle la marca a una cortesía ya guardada
+  // también es decidir sobre ella.
+  if (
+    (houseCourtesy || existing.is_house_courtesy === 1) &&
+    !can(session.role, "cortesia:otorgar")
+  ) {
+    return rechazo(
+      existing.is_house_courtesy === 1
+        ? "Esta cuenta es una cortesía de la casa. Solo la dueña la puede cambiar."
+        : "Solo la dueña puede cerrar una cuenta como cortesía de la casa.",
+    );
+  }
+
   if (existing.day_close_id !== null) {
     // Después del cierre diario los números ya salieron hacia Strapi y Actual
     // Budget, y editarlos en sitio los desincroniza en silencio. La corrección
@@ -225,6 +253,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     notes: data.notes,
     payments: data.payments,
     tip: data.tip,
+    houseCourtesy,
     updatedAt: Date.now(),
   };
 
@@ -235,8 +264,12 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
 
   let totals;
   try {
-    totals =
-      data.totalOverride === null
+    totals = houseCourtesy
+      ? // La cortesía no tiene total escrito ni motivo que elegir: el total es
+        // cero y el motivo es ella misma. Lo que no puede traer (propina, pago)
+        // lo rechaza `lib/ticket.ts`, no esta función.
+        validateHouseCourtesyClose({ items, tip: data.tip, payments: data.payments })
+      : data.totalOverride === null
         ? validateTicketClose({
             items,
             discount: 0,
@@ -260,7 +293,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // método el monto es **todo lo cobrado**, y el total definitivo lo acaba de
   // calcular esta función. Con dos, los montos vienen escritos y solo se
   // verifican.
-  const payments = draftToPayments(draft, totals.amountCharged);
+  const payments = houseCourtesy ? [] : draftToPayments(draft, totals.amountCharged);
 
   try {
     assertPaymentsCoverCharge(payments, totals.amountCharged);
@@ -284,11 +317,17 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     }),
   );
 
+  // Una cortesía se registra con el motivo `cortesia` siempre, lo haya elegido
+  // alguien o no: es lo que la agrupa en la bitácora y en Diagnóstico sin tener
+  // que leer la columna nueva. Sin texto libre — el motivo es la casilla.
+  const varianceReasonCode = houseCourtesy ? "cortesia" : data.varianceReasonCode;
+
   const patch = {
     performed_service_id: data.performedServiceId,
     discount: totals.discount,
     tip: totals.tip,
     amount_charged: totals.amountCharged,
+    is_house_courtesy: houseCourtesy ? 1 : 0,
     // Shim de rollback, no fuente de verdad: la fuente es `appointment_payment`.
     // Con un solo método se escribe ése, y con dos queda en `null` — el código
     // de la imagen anterior lo muestra como "sin método", que es visible y
@@ -296,12 +335,12 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     payment_method: payments.length === 1 ? payments[0].method : null,
     paid_at: paidAt,
     service_notes: data.notes.trim() === "" ? null : data.notes,
-    variance_reason_code: data.varianceReasonCode,
+    variance_reason_code: varianceReasonCode,
     // El CHECK `ck_af_variance_text_needs_code` rechaza un texto sin código: un
     // motivo huérfano no se puede agrupar en el reporte de variación, que es
     // para lo que existe.
     variance_reason:
-      data.varianceReasonCode === null || data.varianceReason.trim() === ""
+      houseCourtesy || varianceReasonCode === null || data.varianceReason.trim() === ""
         ? null
         : data.varianceReason,
     closed_by: session.userId,
@@ -330,6 +369,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
           discount: existing.discount,
           tip: existing.tip,
           amount_charged: existing.amount_charged,
+          is_house_courtesy: existing.is_house_courtesy,
           payments: existingPayments.map((payment) => ({
             method: payment.method,
             amount: payment.amount,
@@ -337,7 +377,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
           closed_at: existing.closed_at,
         },
         after: { ...patch, clientRequestId: data.clientRequestId },
-        reason: data.varianceReasonCode,
+        reason: varianceReasonCode,
         at: now,
       });
     });

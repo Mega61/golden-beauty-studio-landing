@@ -91,6 +91,16 @@ El 40 % de lo cobrado, quincenal. El motor de reglas puro vive en
   renglón del combo; los adicionales de esa misma cuenta van completos a la
   técnica principal, porque `appointment_finance` guarda una sola técnica
   secundaria para toda la cuenta y no por renglón.
+- **Cortesía de la casa: la clienta paga $0 y la profesional cobra el 40 % del
+  precio de lista.** Es la única excepción a "la base es lo cobrado", y la
+  decide la casilla de la dueña al cerrar (`cortesia:otorgar`), no un motivo de
+  variación: `appointment_finance.is_house_courtesy` (migración `026`), base =
+  `lineTotal` del renglón (`commissionBasesOf()` en `lib/ticket.ts`), sin pagos
+  ni propina (CHECK `ck_af_house_courtesy`), fuera de Caja, del `day_close`, del
+  push a Strapi/Actual y de los reportes de ventas, con su propia línea de costo
+  en Reportes y rotulada "cortesía" en Comisiones. La ficha de la clienta trae
+  "cortesía de la casa por defecto" (`customer_setting`), que solo pre-marca la
+  casilla: se puede desmarcar en cada cuenta, porque a veces pagan.
 - **Las quincenas son 1–15 y 16–fin de mes**, en calendario de Bogotá.
 - **Los pesos sobrantes del redondeo** se reparten con `allocateByWeights`, el
   mismo repartidor que usa el resto del panel, para que la suma de los renglones

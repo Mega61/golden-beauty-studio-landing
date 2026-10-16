@@ -16,7 +16,7 @@ import {
 } from "@/components/ui";
 import type { PaymentMethod } from "@/db/types";
 
-import { EditarClienta, FusionarClienta } from "./AccionesClienta";
+import { CortesiaPorDefecto, EditarClienta, FusionarClienta } from "./AccionesClienta";
 import type { ClientProfile } from "./data";
 import type { HistoryEntry } from "./history";
 
@@ -28,7 +28,14 @@ import type { HistoryEntry } from "./history";
  * puede contestar mirando dos pantallas. La columna "Origen" existe para que se
  * pueda saber de dónde salió cada renglón sin tener que separarlos.
  */
-export function FichaClienta({ profile }: { profile: ClientProfile }) {
+export function FichaClienta({
+  profile,
+  canGiveCourtesy = false,
+}: {
+  profile: ClientProfile;
+  /** `cortesia:otorgar`: solo la dueña cambia la cortesía por defecto. */
+  canGiveCourtesy?: boolean;
+}) {
   const { client, history, historyPartial, failure } = profile;
 
   return (
@@ -89,7 +96,22 @@ export function FichaClienta({ profile }: { profile: ClientProfile }) {
             ) : null}
 
             {client.notes ? <Dato etiqueta="Notas">{client.notes}</Dato> : null}
+
+            {/* Quien no la puede cambiar igual la ve: recepción tiene que saber
+                por qué esa cuenta no se cobra. */}
+            {!canGiveCourtesy && profile.houseCourtesyDefault ? (
+              <Dato etiqueta="Cortesía de la casa">
+                Sí, por defecto: sus cuentas no se cobran. Lo decide la dueña.
+              </Dato>
+            ) : null}
           </dl>
+
+          {canGiveCourtesy && client.eaCustomerIds.length > 0 ? (
+            <CortesiaPorDefecto
+              eaCustomerIds={client.eaCustomerIds}
+              marcada={profile.houseCourtesyDefault}
+            />
+          ) : null}
 
           {client.merged ? (
             <Aviso tono="warn">

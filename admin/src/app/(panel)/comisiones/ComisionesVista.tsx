@@ -434,6 +434,14 @@ function tituloCita(cita: SettlementAppointment): string {
   return resto.length === 0 ? primera.label : `${primera.label} +${resto.length}`;
 }
 
+/**
+ * El rótulo con la marca de cortesía, en texto: es lo que lee la lista de dos
+ * líneas del celular y lo que copia quien exporta la tabla.
+ */
+function tituloCitaTexto(cita: SettlementAppointment): string {
+  return cita.houseCourtesy ? `${tituloCita(cita)} · cortesía` : tituloCita(cita);
+}
+
 /** Los renglones, en una línea: "Forrado · Diseño por uña ×3". */
 function renglones(cita: SettlementAppointment): string {
   return cita.lines
@@ -467,9 +475,27 @@ const COLUMNAS: ReadonlyArray<Column<SettlementAppointment>> = [
           />
         ) : null}
         {tituloCita(cita)}
+        {cita.houseCourtesy ? (
+          // Una cortesía de la casa cobró cero y paga sobre el precio de lista:
+          // sin el rótulo, "base 180.000" sobre una cuenta en $0 parece un error.
+          <span
+            title="Cortesía de la casa: no se cobró; la comisión es sobre el precio de lista"
+            style={{
+              padding: "0 0.375rem",
+              borderRadius: "999px",
+              border: "1px solid var(--color-info-line)",
+              background: "var(--color-info-tint)",
+              color: "var(--color-info-ink)",
+              fontSize: "var(--text-2xs)",
+              fontWeight: 600,
+            }}
+          >
+            cortesía
+          </span>
+        ) : null}
       </span>
     ),
-    text: tituloCita,
+    text: tituloCitaTexto,
   },
   {
     key: "fecha",

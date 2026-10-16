@@ -43,6 +43,12 @@ export type CommissionEntryDetail = {
   financeId: number;
   eaAppointmentId: number;
   appointmentStartAt: Date | null;
+  /**
+   * La cuenta es una cortesía de la casa: la base de este renglón es el precio
+   * de lista, no lo cobrado. La pantalla lo rotula para que nadie lea "base
+   * 180.000" sobre una cuenta que cobró cero y crea que es un error.
+   */
+  houseCourtesy: boolean;
 };
 
 /**
@@ -179,6 +185,7 @@ export function commissionEntryRepository(db: Db) {
           "af.id as finance_id",
           "af.ea_appointment_id",
           "af.appointment_start_at",
+          "af.is_house_courtesy",
         ])
         .where("ce.period_start", ">=", periodStart)
         .where("ce.period_end", "<=", periodEnd);
@@ -214,6 +221,7 @@ export function commissionEntryRepository(db: Db) {
         financeId: row.finance_id,
         eaAppointmentId: row.ea_appointment_id,
         appointmentStartAt: row.appointment_start_at,
+        houseCourtesy: row.is_house_courtesy === 1,
       }));
     },
 
@@ -276,6 +284,33 @@ export function commissionEntryRepository(db: Db) {
         appointmentStartAt: row.appointment_start_at,
         amountCharged: row.amount_charged,
       }));
+    },
+
+    /**
+     * Las comisiones ya calculadas de unas citas, renglón por renglón.
+     *
+     * Lo usa el reporte de cortesías de la casa ("¿cuánto me costaron?"), que
+     * necesita la comisión de **esas** citas y no la de una quincena: el
+     * periodo del reporte puede ser un día o un mes. Sin sumar acá — la suma la
+     * hace `courtesyReport()`, que es pura.
+     */
+    async listAmountsByEaAppointmentIds(
+      eaAppointmentIds: readonly number[],
+    ): Promise<Array<{ eaAppointmentId: number; amount: Cop }>> {
+      if (eaAppointmentIds.length === 0) return [];
+      const rows = await db
+        .selectFrom("commission_entry as ce")
+        .innerJoin(
+          "appointment_finance_item as afi",
+          "afi.id",
+          "ce.appointment_finance_item_id",
+        )
+        .innerJoin("appointment_finance as af", "af.id", "afi.appointment_finance_id")
+        .select(["af.ea_appointment_id", "ce.amount"])
+        .where("af.ea_appointment_id", "in", [...new Set(eaAppointmentIds)])
+        .orderBy("ce.id")
+        .execute();
+      return rows.map((row) => ({ eaAppointmentId: row.ea_appointment_id, amount: row.amount }));
     },
 
     async listByRun(commissionRunId: number): Promise<CommissionEntry[]> {

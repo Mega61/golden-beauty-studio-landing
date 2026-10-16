@@ -488,3 +488,76 @@ export function validateTicketClose(input: TicketCloseInput): TicketTotals {
 
   return totals;
 }
+
+// ── Cortesía de la casa ─────────────────────────────────────────────────────
+
+/**
+ * La cuenta de una **cortesía de la casa**: las uñas de la dueña, de su
+ * hermana, de su pareja. La clienta no paga y la profesional **sí** cobra su
+ * comisión, sobre el precio de lista (confirmado por la dueña el 2026-10-16).
+ *
+ * Se modela con la misma invariante de siempre, sin excepciones:
+ * `Σ line_total − discount === amount_charged`. Los renglones quedan a precio de
+ * lista —el precio congelado de siempre, el mismo que `draftToItems()` pone— y
+ * el descuento es el subtotal entero, así que lo cobrado es cero. Que el número
+ * de lista siga en la fila es lo que le permite a la liquidación pagar sobre él
+ * sin inventar nada (`commissionBasesOf()`), y al reporte decir cuánto costaron
+ * las cortesías del mes.
+ *
+ * Sin propina: no hay cobro del que salga. Una cortesía con subtotal negativo no
+ * es una cortesía —es una corrección mal armada— y no hace falta una guarda
+ * propia: `computeTicketTotals()` ya rechaza un subtotal por debajo del
+ * descuento, y acá el descuento de partida es cero.
+ */
+export function houseCourtesyTicket(items: readonly TicketItemInput[]): TicketTotals {
+  const priced = computeTicketTotals(items, 0, 0);
+  return computeTicketTotals(items, priced.subtotal, 0);
+}
+
+/**
+ * La cortesía tal como la manda la hoja, con lo que no puede traer.
+ *
+ * **Se rechaza, no se descarta.** Una propina o un método de pago en una
+ * cortesía significan que alguien creyó que se cobró algo; guardarla igual
+ * borrando esos datos en silencio dejaría a la persona creyendo que quedó
+ * registrado. La hoja ya los limpia al marcar la casilla; esto es para el
+ * borrador viejo que vuelve de la cola y para quien llame a la acción directo.
+ */
+export function validateHouseCourtesyClose(input: {
+  items: readonly TicketItemInput[];
+  tip: Cop;
+  payments: readonly TicketPayment[];
+}): TicketTotals {
+  if (input.tip !== 0) {
+    throw new TicketError(
+      "Una cortesía de la casa no lleva propina: no hay cobro del que salga. Quita la propina.",
+    );
+  }
+
+  if (input.payments.length > 0) {
+    throw new TicketError(
+      "Una cortesía de la casa no se cobra. Quita el método de pago, o desmarca la cortesía.",
+    );
+  }
+
+  return houseCourtesyTicket(input.items);
+}
+
+/**
+ * La base de comisión de cada renglón, en el orden de los renglones.
+ *
+ * - **Cuenta normal:** `netTotal`, lo cobrado en el renglón con el descuento ya
+ *   prorrateado. "Quien da el descuento también se baja su comisión" (§
+ *   Comisiones).
+ * - **Cortesía de la casa:** `lineTotal`, el precio de lista. El descuento de
+ *   una cortesía no lo dio la técnica: lo decidió la dueña, y la técnica hizo el
+ *   trabajo completo. La propina nunca entra, en ninguno de los dos casos.
+ *
+ * Vive acá y no en `jobs/commission-run.ts` por la regla de ese archivo: ahí no
+ * se decide ningún monto, se reconstruye la cuenta con las funciones que la
+ * cerraron. Dos implementaciones de "cuál es la base" son dos liquidaciones
+ * distintas del mismo periodo.
+ */
+export function commissionBasesOf(totals: TicketTotals, houseCourtesy: boolean): Cop[] {
+  return totals.lines.map((line) => (houseCourtesy ? line.lineTotal : line.netTotal));
+}

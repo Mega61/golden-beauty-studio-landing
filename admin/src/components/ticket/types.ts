@@ -52,6 +52,11 @@ export type TicketFinanceView = {
   serviceNotes: string;
   varianceReasonCode: VarianceReasonCode | null;
   varianceReason: string;
+  /**
+   * La cuenta se cerró como **cortesía de la casa** (migración `026`): no se
+   * cobró, y la profesional cobra su comisión sobre el precio de lista.
+   */
+  houseCourtesy: boolean;
   /** Hora de pared del cierre de la cuenta. `null` = sigue abierta. */
   closedAt: string | null;
   /** La cuenta ya entró a un cierre diario: solo `owner`, y como ajuste. */
@@ -73,6 +78,14 @@ export type TodayAppointment = {
   status: string;
   customerName: string;
   customerPhone: string | null;
+  /** La ficha de EA. `null` en modo degradado, cuando EA no respondió. */
+  eaCustomerId: number | null;
+  /**
+   * La clienta está marcada como **cortesía de la casa por defecto** en su
+   * ficha. Solo pre-marca la casilla de una cuenta nueva: no decide nada sola,
+   * y la cuenta se puede cobrar igual —a veces pagan—.
+   */
+  houseCourtesyDefault: boolean;
   eaProviderId: number | null;
   providerName: string;
   bookedServiceId: number | null;
@@ -104,6 +117,14 @@ export type CloseTicketInput = {
    */
   payments: readonly TicketPayment[];
   tip: number;
+  /**
+   * Cerrar como **cortesía de la casa**: cobro cero, sin pagos ni propina, y la
+   * comisión sobre el precio de lista. Solo la dueña (`cortesia:otorgar`).
+   *
+   * Opcional porque un borrador encolado antes de esta versión no lo trae, y
+   * ausente es **no**: la cuenta se cobra.
+   */
+  houseCourtesy?: boolean;
   /** Rastro del intento, para la bitácora. Ver `draft-store.ts`. */
   clientRequestId: string;
 };

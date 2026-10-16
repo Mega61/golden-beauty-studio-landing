@@ -30,6 +30,11 @@
  * - **Fecha en base caja**, `YYYY-MM-DD`. Se cobra siempre el mismo día, así
  *   que base caja = base servicio y no hay cuentas por cobrar que conciliar.
  * - Los identificadores salen de `lib/ingest-id.ts` y de ningún otro lado.
+ * - **Una cortesía de la casa no produce ningún movimiento.** No entró plata,
+ *   así que no hay fila `Payment` ni transacción en Actual: ni de `$0` —que
+ *   sería ruido en la conciliación— ni con un método inventado. Su llave
+ *   `ea-appt:<id>` queda sin usar, y como la cuenta queda congelada por el
+ *   cierre del día, nunca va a llegar a usarse con otra cifra.
  *
  * Los **nombres de campo** de `IngestPayment` son provisionales y hay que
  * confirmarlos contra el CRM antes de que C3 conecte el push. Cambiarlos es
@@ -96,6 +101,13 @@ export type FinanceForIngest = {
   paidOn: string | null;
   eaProviderId: number | null;
   performedServiceId: number | null;
+  /**
+   * Cortesía de la casa (migración `026`): no se cobró y no viaja. Ausente es
+   * **no** — y es la dirección que falla ruidoso: una cortesía leída sin la
+   * marca no tiene pagos, y `buildIngestPayment()` la rechaza por "sin método"
+   * en vez de dejarla pasar.
+   */
+  houseCourtesy?: boolean;
 };
 
 /**
@@ -247,6 +259,19 @@ function adjustmentMethodOf(payments: readonly TicketPayment[]): PaymentMethod {
  * la duplicaría.
  */
 export function buildIngestPayment(finance: FinanceForIngest): IngestPayment[] {
+  if (finance.houseCourtesy === true) {
+    // Ningún movimiento, pero con la misma desconfianza que el resto: una
+    // cortesía con plata adentro es una fila escrita por fuera del cierre, y
+    // dejarla pasar en silencio sería perder ese ingreso de Actual para siempre.
+    if ((finance.amountCharged ?? 0) !== 0 || finance.payments.length > 0) {
+      throw new IngestPayloadError(
+        `La cita ${finance.eaAppointmentId} está marcada como cortesía de la casa y trae ` +
+          "cobro o pagos. No se empuja una cifra que no cuadra.",
+      );
+    }
+    return [];
+  }
+
   if (finance.amountCharged === null) {
     throw new IngestPayloadError(
       `La cita ${finance.eaAppointmentId} no tiene cuenta cerrada y no se puede empujar`,
@@ -294,6 +319,15 @@ export function buildIngestAdjustment(
   sequence: number,
 ): IngestPayment {
   assertPesos(delta, `El ajuste de la cita ${finance.eaAppointmentId}`);
+
+  if (finance.houseCourtesy === true) {
+    // Una cortesía no tuvo ingreso, así que no hay ingreso que corregir. Si
+    // resulta que sí se cobró, eso no es un ajuste: es otra decisión, y la
+    // toma la dueña fuera de este camino.
+    throw new IngestPayloadError(
+      `La cita ${finance.eaAppointmentId} es una cortesía de la casa: no tiene ingreso que ajustar.`,
+    );
+  }
 
   if (delta === 0) {
     throw new IngestPayloadError(

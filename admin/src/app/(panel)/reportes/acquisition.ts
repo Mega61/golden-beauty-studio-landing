@@ -34,7 +34,7 @@
 import type { AdChannel, Cop } from "@/db/types";
 import { splitCustomers, type DateRange, type VisitRecord } from "@/lib/metrics";
 
-import type { FinanceRow } from "./aggregate";
+import { isPaidTicket, type FinanceRow } from "./aggregate";
 import { daysInMonth } from "./period";
 
 export const AD_CHANNELS: readonly AdChannel[] = ["meta", "google", "otro"];
@@ -139,7 +139,8 @@ export function acquisitionReport(input: {
   let revenueFromNew = 0;
   const paying = new Set<string>();
   for (const row of input.finance) {
-    if (!row.closed || row.amountCharged === null || row.startAt === null) continue;
+    // Una cortesía de la casa no es una clienta que pagó.
+    if (!isPaidTicket(row) || row.amountCharged === null || row.startAt === null) continue;
     const day = row.startAt.slice(0, 10);
     if (day < input.period.from || day > input.period.to) continue;
     const customer = input.customerOf.get(row.eaAppointmentId) ?? null;

@@ -166,6 +166,7 @@ export function useTicketOutbox({
       // alguien escribió y el servidor verifica que sumen.
       payments: p.draft.payments,
       tip: p.draft.tip,
+      houseCourtesy: p.draft.houseCourtesy,
       clientRequestId: p.clientRequestId,
     });
     if (result.ok) savedRef.current?.(result);

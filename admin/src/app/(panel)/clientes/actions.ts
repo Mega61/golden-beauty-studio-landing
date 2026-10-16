@@ -5,7 +5,7 @@ import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 
 import { getDb } from "@/db/client";
-import { auditLogRepository } from "@/db/repositories";
+import { auditLogRepository, repositories } from "@/db/repositories";
 import { EaApiError } from "@/lib/ea";
 import { createEaClient } from "@/lib/ea/client";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
@@ -35,6 +35,10 @@ import { describeMerge, planMerge } from "./merge";
  *
  * La clienta vive en EA: es quien manda sobre las citas y quien sincroniza con
  * Google. `gbs_admin` solo guarda la bitácora de quién tocó qué.
+ *
+ * La excepción es la marca **"cortesía de la casa por defecto"**
+ * (`marcarCortesiaPorDefecto`), que vive en `gbs_admin.customer_setting` y no
+ * viaja a EA: "a esta clienta no se le cobra" no es un dato de la agenda.
  */
 
 export type ClientActionResult = {
@@ -431,4 +435,69 @@ export async function fusionarClienta(
       ),
     };
   }
+}
+
+/**
+ * Marcar —o desmarcar— a una clienta como **cortesía de la casa por defecto**.
+ *
+ * Son siempre las mismas tres o cuatro personas (la familia de la dueña), y con
+ * la marca la hoja de la cuenta llega con la casilla de cortesía ya puesta. No
+ * decide nada sola: la cuenta se puede cobrar igual, porque a veces pagan.
+ *
+ * **Solo la dueña** (`cortesia:otorgar`): marcar a alguien como cortesía es
+ * decidir de antemano regalarle los servicios. Se marcan **todas** las fichas
+ * de la persona a la vez —una clienta puede tener varias filas en EA con el
+ * mismo teléfono— para que la próxima reserva por cualquiera de ellas llegue
+ * igual. Queda en la bitácora con quién y cuándo.
+ */
+export async function marcarCortesiaPorDefecto(
+  eaCustomerIds: number[],
+  enabled: boolean,
+): Promise<ClientActionResult> {
+  let session;
+  try {
+    session = await requireCapability("cortesia:otorgar");
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ForbiddenError) {
+      return { ok: false, message: "Solo la dueña marca a una clienta como cortesía de la casa." };
+    }
+    return { ok: false, message: "No se pudo verificar la sesión." };
+  }
+
+  const ids = [...new Set(eaCustomerIds)].filter((id) => Number.isSafeInteger(id) && id > 0);
+  if (ids.length === 0 || typeof enabled !== "boolean") {
+    return { ok: false, message: "La ficha llegó mal." };
+  }
+
+  try {
+    const db = getDb();
+    await db.transaction().execute(async (trx) => {
+      const tx = repositories(trx);
+      const before = await tx.customerSettings.listHouseCourtesyIds(ids);
+      await tx.customerSettings.setHouseCourtesy(ids, enabled, session.userId);
+      await tx.auditLog.append({
+        actorUserId: session.userId,
+        action: "clienta.cortesia",
+        entity: "ea_customer",
+        entityId: String(Math.min(...ids)),
+        before: { eaCustomerIds: ids, houseCourtesyDefault: [...before].sort((a, b) => a - b) },
+        after: { eaCustomerIds: ids, houseCourtesyDefault: enabled },
+        at: new Date(),
+      });
+    });
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[clientes] no se pudo guardar la cortesía por defecto", error);
+    return { ok: false, message: "No se pudo guardar. Vuelve a intentar en un momento." };
+  }
+
+  revalidatePath("/clientes");
+  revalidatePath("/hoy");
+  return {
+    ok: true,
+    message: enabled
+      ? "Marcada: sus cuentas van a llegar como cortesía de la casa. Se puede desmarcar en cada cuenta."
+      : "Desmarcada: sus cuentas se cobran como las de cualquiera.",
+  };
 }

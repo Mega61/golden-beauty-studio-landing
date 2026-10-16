@@ -114,6 +114,7 @@ function cuenta(over: Partial<CommissionAccount> = {}): CommissionAccount {
         ? over.amountCharged
         : items.reduce((sum, item) => sum + item.lineTotal, 0) - discount,
     tip: over.tip ?? 0,
+    houseCourtesy: over.houseCourtesy ?? false,
     items,
   };
 }
@@ -246,6 +247,7 @@ describe("toCommissionAccount", () => {
     discount: 0,
     amount_charged: 180_000,
     tip: 20_000,
+    is_house_courtesy: 0,
     payment_method: "efectivo",
     paid_at: new Date("2026-09-08T20:00:00Z"),
     service_notes: null,

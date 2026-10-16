@@ -30,6 +30,7 @@ function finance(start: string, charged: number | null, closed = charged !== nul
     payments: [],
     varianceReasonCode: null,
     closed,
+    houseCourtesy: false,
     items: [],
   };
 }

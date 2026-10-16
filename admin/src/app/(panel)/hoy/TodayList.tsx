@@ -53,6 +53,7 @@ export function TodayList({
   catalog,
   scope,
   canCharge,
+  canGiveCourtesy = false,
   canSeeTotals,
   canFixAfterClose,
   readOnly,
@@ -63,6 +64,8 @@ export function TodayList({
   /** Id de la sesión: separa los borradores en una tablet compartida. */
   scope: string;
   canCharge: boolean;
+  /** `cortesia:otorgar`: solo la dueña marca una cortesía de la casa. */
+  canGiveCourtesy?: boolean;
   canSeeTotals: boolean;
   canFixAfterClose: boolean;
   /** EA no responde: se puede mirar, no guardar. */
@@ -98,9 +101,18 @@ export function TodayList({
         appointment.bookedServiceId,
         appointment.finance,
       );
+      // Una cuenta nueva de una clienta marcada "cortesía de la casa por
+      // defecto" arranca con la casilla marcada — solo si quien abre la hoja la
+      // puede otorgar. Una cuenta ya guardada manda lo que se guardó: la marca
+      // de la ficha no reescribe una decisión que alguien ya tomó.
       const base =
         appointment.finance.financeId === null || appointment.finance.items.length === 0
-          ? emptyDraft(appointment.eaAppointmentId, appointment.bookedServiceId)
+          ? emptyDraft(
+              appointment.eaAppointmentId,
+              appointment.bookedServiceId,
+              Date.now(),
+              canGiveCourtesy && appointment.houseCourtesyDefault,
+            )
           : guardado;
 
       // Lo que quedó escrito en el celular gana sobre lo que hay en la base:
@@ -112,7 +124,7 @@ export function TodayList({
       setDraft(local ?? base);
       setOpenId(appointment.eaAppointmentId);
     },
-    [outbox],
+    [outbox, canGiveCourtesy],
   );
 
   const change = useCallback(
@@ -219,6 +231,8 @@ export function TodayList({
             bookedSnapshot: current.finance.snapshot,
           }}
           canCharge={canCharge}
+          canGiveCourtesy={canGiveCourtesy}
+          courtesyFromDefault={current.houseCourtesyDefault && current.finance.closedAt === null}
           readOnly={readOnly || (current.finance.frozenByDayClose && !canFixAfterClose)}
           saving={saving}
           dirty={isDirty(draft, baseline)}
@@ -351,7 +365,11 @@ function AppointmentCard({
             >
               <Icon name="check" size={14} /> cuenta cerrada
             </span>
-            {canSeeTotals && finance.amountCharged !== null ? (
+            {finance.houseCourtesy ? (
+              <span style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "var(--color-info-ink)" }}>
+                cortesía de la casa
+              </span>
+            ) : canSeeTotals && finance.amountCharged !== null ? (
               <span className="ui-num" style={{ fontWeight: 600 }}>
                 {formatCOP(finance.amountCharged)}
               </span>

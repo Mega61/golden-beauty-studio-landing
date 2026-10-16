@@ -56,6 +56,7 @@ function finance(over: Partial<FinanceRow> = {}): FinanceRow {
     payments: [{ method: "efectivo", amount: 115_000 }],
     varianceReasonCode: null,
     closed: true,
+    houseCourtesy: false,
     ...over,
     items,
   };

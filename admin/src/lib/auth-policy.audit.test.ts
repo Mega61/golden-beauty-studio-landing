@@ -48,6 +48,7 @@ const TODAS: Capability[] = [
   "avisos:reservas-web",
   "pauta:registrar",
   "clientes:exportar",
+  "cortesia:otorgar",
 ];
 
 /**
@@ -92,6 +93,8 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // La lista para Meta es una exportación masiva de datos personales hacia
     // un tercero. Va cifrada, y aun así es de la dueña sola.
     "clientes:exportar": false,
+    // Cortesía de la casa: regalar un servicio es decisión de la dueña.
+    "cortesia:otorgar": false,
   },
   staff: {
     "cuenta:cerrar-propia": true,
@@ -120,11 +123,14 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "avisos:reservas-web": false,
     "pauta:registrar": false,
     "clientes:exportar": false,
+    // La técnica no regala servicios: una cortesía le paga comisión sobre un
+    // trabajo que nadie cobró, así que marcarla sería decidir su propia plata.
+    "cortesia:otorgar": false,
   },
 };
 
 describe("AUDIT · la matriz completa, celda por celda, contra el plan", () => {
-  it("66 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
+  it("69 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
     for (const role of ["owner", "admin", "staff"] as UserRole[]) {
       for (const capability of TODAS) {
         const esperado = DEL_PLAN[role][capability];

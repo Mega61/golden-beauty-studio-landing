@@ -562,6 +562,11 @@ de indexar la agenda por rango y la liquidación por técnica sin un JOIN que no
 | `legacy_appointment` | histórico de Agenda Pro, para continuidad de reportes sin ensuciar el calendario de EA |
 | `audit_log` | quién cambió qué desde el panel |
 | `ad_spend` | inversión en anuncios por mes (`"YYYY-MM"`) y canal, en pesos enteros — el denominador del costo por clienta nueva (migración `023`) |
+| `customer_setting` | lo que el panel sabe de una ficha de EA y EA no, por `ea_customer_id`: hoy, `house_courtesy_default` — "cortesía de la casa por defecto" (migración `026`). No viaja a EA. |
+
+`appointment_finance.is_house_courtesy` (migración `026`) marca la **cortesía de la casa**: cobro cero,
+sin pagos ni propina (CHECK `ck_af_house_courtesy`), y la profesional cobra su comisión sobre el precio
+de lista. Ver "Cortesía de la casa" en Comisiones.
 
 **Webhooks de EA → `POST /admin/api/webhooks/ea`** crean la fila `appointment_finance` y congelan el
 precio del servicio en el momento en que se agenda la cita — incluyendo reservas hechas desde la
@@ -796,6 +801,7 @@ diferencia sin acusar a nadie:
 | Ver su propia liquidación y su propio ticket promedio | ✅ | — | ✅ |
 | Anotar la inversión en anuncios del mes (`pauta:registrar`) | ❌ | ❌ (ve el reporte) | ✅ |
 | Exportar la lista de clientas para Meta (`clientes:exportar`) | ❌ | ❌ | ✅ |
+| Cerrar una cuenta como **cortesía de la casa**, o marcar a una clienta como cortesía por defecto (`cortesia:otorgar`) | ❌ (ni marcarla, ni mantenerla al editar, ni quitarla) | ❌ | ✅ |
 
 `TICKET_STAFF_COBRA` existe porque la respuesta cambia con el día: en un estudio de dos personas la
 técnica cobra; con recepción de planta, no. Es una decisión de operación, no de código.
@@ -904,6 +910,31 @@ provider + service   ▶ provider + category ▶ provider
   también se baja su comisión, y el incentivo se alinea solo. La alternativa (sobre precio de lista) se
   descartó por eso.
 - Redondeo a pesos al final del renglón, no al final de la quincena.
+
+### Cortesía de la casa
+
+Las uñas de la dueña, de su hermana, de su pareja. La clienta paga **$0** y la profesional cobra su
+comisión **completa sobre el precio de lista** (confirmado por la dueña el 2026-10-16) — es la única
+excepción a "base = lo cobrado", y la decide la casilla, no un motivo de variación.
+
+- **Se marca al cerrar la cuenta**, con la casilla "Cortesía de la casa — no se cobra, la profesional sí
+  cobra su comisión". Solo la dueña (`cortesia:otorgar`): la técnica no la puede marcar, ni mantener al
+  editar la cuenta, ni quitar. La Server Action lo vuelve a comprobar.
+- **La cuenta** (`houseCourtesyTicket()` en `lib/ticket.ts`): renglones al precio congelado de siempre,
+  descuento = subtotal, `amount_charged = 0`, sin pagos, sin propina, motivo `cortesia`,
+  `is_house_courtesy = 1`. La invariante `Σ line_total − discount = amount_charged` se cumple igual.
+- **La base** (`commissionBasesOf()`): `lineTotal` del renglón en vez de `netTotal`. Tasa, vigencia,
+  reparto a cuatro manos y quincena pagada inmutable son los de siempre.
+- **No es plata del estudio**: fuera de los totales de Caja y del `day_close` (se cuentan aparte), sin
+  movimiento hacia Strapi/Actual (ni de $0), y sin ajuste posterior al cierre. Sí queda congelada bajo el
+  cierre del día, para que su comisión no se mueva.
+- **Reportes**: fuera de ventas, ticket promedio, reparto por método, adicionales, hora de silla,
+  variación, demanda y adquisición (`isPaidTicket()`); su costo sale en una línea propia — "Cortesías: N ·
+  $X a precio de lista · comisión $Y" (`courtesyReport()`). En Comisiones, la cita sale rotulada
+  "cortesía".
+- **Por clienta**: la ficha tiene "Cortesía de la casa por defecto" (`customer_setting`, solo la dueña).
+  Con la marca, la hoja de una cuenta nueva llega con la casilla puesta **y lo dice** ("Marcada por
+  defecto"), porque a veces esas mismas personas pagan y hay que poder desmarcarla.
 
 ### El ciclo quincenal
 

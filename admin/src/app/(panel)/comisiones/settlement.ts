@@ -44,6 +44,11 @@ export type SettlementAppointment = {
   base: Cop;
   amount: Cop;
   flagged: boolean;
+  /**
+   * Cortesía de la casa: no se cobró y la comisión se calculó sobre el precio
+   * de lista. La pantalla la rotula "cortesía".
+   */
+  houseCourtesy: boolean;
   lines: SettlementLine[];
 };
 
@@ -177,6 +182,7 @@ export function buildSettlements(
         base: 0,
         amount: 0,
         flagged: false,
+        houseCourtesy: entry.houseCourtesy,
         lines: [],
       };
       appointments.set(key, appointment);
