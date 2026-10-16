@@ -284,3 +284,25 @@ function summarize(entries: readonly HistoryEntry[]): HistorySummary {
     lastVisit,
   };
 }
+
+/**
+ * ¿La clienta llegó alguna vez antes de `asOf`? Lo contrario es **primera
+ * visita**, la que lleva el 10% (`lib/promos.ts`).
+ *
+ * Cuenta como visita lo atendido, igual que `summarize()`, **más** una cita de
+ * EA con la cuenta cerrada (`amountCharged !== null`) aunque su estado no diga
+ * Completada: hasta el 2026-10-16 cerrar la cuenta no marcaba la cita en EA, y
+ * esas clientas sí estuvieron en la silla. Una inasistencia o una cancelación
+ * no cuentan: quien reservó y no llegó sigue siendo nueva.
+ *
+ * Solo decide un sí/no. Ningún monto del historial de Agenda Pro sale de acá
+ * hacia la cuenta, que es lo que protege `legacy-history.money-paths.test.ts`.
+ */
+export function hasVisitedBefore(entries: readonly HistoryEntry[], asOf: EaLocalDateTime): boolean {
+  return entries.some(
+    (entry) =>
+      entry.start < asOf &&
+      (entry.outcome === "atendida" ||
+        (entry.source === "ea" && entry.amountCharged !== null && entry.outcome === "desconocido")),
+  );
+}

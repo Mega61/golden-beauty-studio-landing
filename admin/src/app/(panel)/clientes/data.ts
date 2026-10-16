@@ -21,6 +21,7 @@ import {
   normalizePhoneE164,
   phoneSearchVariants,
   type ClientKey,
+  type E164,
   type ResolvedClient,
 } from "./identity";
 
@@ -260,6 +261,32 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
       houseCourtesyDefault: await loadHouseCourtesy(client.eaCustomerIds),
     },
   };
+}
+
+/**
+ * El historial unificado (EA ∪ Agenda Pro) de un teléfono, sin el resto de la
+ * ficha. Lo usan quienes necesitan solo saber qué se hizo la clienta y si es
+ * nueva: el formulario de la agenda, la cuenta de Hoy y la cotización pública.
+ *
+ * Recibe el cliente de EA para que la ruta pública pase uno con caché
+ * (`createCachedEaClient`): son varias lecturas por consulta y EA corta a 100
+ * cada 120 s por IP. Una falla de EA no lanza: devuelve lo que haya con
+ * `partial: true`, y quien decide un descuento con eso debe tratarlo como
+ * "no se sabe" (no aplicar el 10% automático).
+ */
+export async function loadHistoryByPhone(
+  phone: E164,
+  ea: EaClient = createEaClient(),
+): Promise<{ history: UnifiedHistory; partial: boolean }> {
+  const legacy = await loadLegacyByPhone(phone);
+  try {
+    const customers = await findCustomers(ea, { kind: "tel", phone });
+    const eaHistory = customers.length === 0 ? [] : await loadEaHistory(ea, customers.map((c) => c.id));
+    return { history: buildUnifiedHistory(eaHistory, legacy), partial: false };
+  } catch (error) {
+    console.error("[clientes] historial por teléfono incompleto", error);
+    return { history: buildUnifiedHistory([], legacy), partial: true };
+  }
 }
 
 /** ¿Alguna de estas fichas es cortesía por defecto? Sin base, no. */

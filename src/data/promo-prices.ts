@@ -1,8 +1,10 @@
 import { formatPrice, type PricingLocale } from "./pricing-format";
 import { getPriceCOP } from "./pricing";
 import type { PromoPriceRow } from "./promos.types";
+import { PROMO_RULES } from "./promo-rules";
 
-// Promo prices — one number per offer, shared by `promos.es.ts` and
+// Promo prices — the numbers live in `promo-rules.ts` (also baked into the
+// admin panel); one number per offer, shared by `promos.es.ts` and
 // `promos.en.ts` so the two languages can never quote different amounts.
 //
 // `regularId` points at the service in `src/data/pricing.ts` whose normal price
@@ -11,11 +13,8 @@ import type { PromoPriceRow } from "./promos.types";
 // `promos.test.ts` fails if a promo price is not actually below the regular one
 // — a strikethrough that saves nothing is false advertising.
 export const PROMO_PRICES = {
-  "sabado-press": [{ key: "press-on", regularId: "press-on", promoCOP: 80000 }],
-  "miercoles-pies": [
-    { key: "traditional-feet", regularId: "traditional-feet", promoCOP: 25000 },
-    { key: "semi-permanent-feet", regularId: "semi-permanent-feet", promoCOP: 40000 },
-  ],
+  "sabado-press": PROMO_RULES["sabado-press"].items,
+  "miercoles-pies": PROMO_RULES["miercoles-pies"].items,
 } as const;
 
 const CURRENCY_SUFFIX: Record<PricingLocale, string> = { es: "", en: " COP" };
