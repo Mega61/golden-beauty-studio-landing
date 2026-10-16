@@ -32,6 +32,8 @@
  *   `legacyRaw()`): ventas mezcladas con las del panel, una profesional que casa
  *   por nombre de pila (Lina), una que ya no está (Kati), una cancelada, una
  *   inasistencia, una reserva y una atendida **sin monto**.
+ * - **Pagos de ese historial** (ver `legacyPaymentsRaw()`): efectivo contra
+ *   transferencia del mes y de los dos anteriores, una propina y una cortesía.
  */
 
 import { parseEaLocalDate, parseEaLocalDateTime } from "@/lib/ea";
@@ -47,6 +49,7 @@ import type {
 } from "../aggregate";
 import type { ReportData } from "../data";
 import { legacyReportRows, type LegacyRawRow } from "../legacy-blend";
+import type { LegacyPaymentRow } from "../legacy-payments";
 import { windowOverRange } from "../occupancy";
 import { eachDay, resolvePeriod, type Cadence } from "../period";
 
@@ -364,8 +367,49 @@ function legacyRaw(month: string): LegacyRawRow[] {
     row(5, "03", "10:00", "Combo manos y pies", "Kati", 95_000, "Asiste"),
     row(6, "03", "14:00", "Semipermanente manos", "Lina", null, "No Asiste"),
     row(7, "04", "09:30", "Forrado", "Kati", null, "Cancelado"),
-    row(8, "04", "17:00", "Retoque express", "lina", 40_000, "Asiste"),
+    { ...row(8, "04", "17:00", "Retoque express", "lina", 40_000, "Asiste"), courtesy: true },
     row(9, "05", "18:00", "Semipermanente manos", "Kati", null, "Reservado"),
+  ];
+}
+
+/**
+ * Lo que traería `legacy_payment`: cómo se pagaron las citas cobradas de
+ * `legacyRaw()` del mes, más dos meses anteriores para que la serie por mes
+ * tenga forma (el efectivo bajando, como en la historia real). Una propina, para
+ * ver el tile que solo aparece cuando hay.
+ */
+function legacyPaymentsRaw(month: string): LegacyPaymentRow[] {
+  const shift = (months: number) => {
+    const [y, m] = month.split("-").map(Number);
+    const date = new Date(Date.UTC(y, m - 1 - months, 1));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+  };
+  const pay = (
+    sale: string,
+    when: string,
+    amount: number,
+    method: LegacyPaymentRow["method"],
+    tip = 0,
+    courtesy = false,
+  ): LegacyPaymentRow => ({ saleKey: sale, paidAt: at(`${when}:00`), amount, tip, method, courtesy });
+
+  const two = shift(2);
+  const one = shift(1);
+  return [
+    pay("P-1", `${two}-03 10:00`, 120_000, "efectivo"),
+    pay("P-2", `${two}-10 15:00`, 95_000, "efectivo"),
+    pay("P-3", `${two}-18 11:00`, 150_000, "transferencia"),
+    pay("P-4", `${one}-05 09:30`, 55_000, "efectivo"),
+    pay("P-5", `${one}-12 16:00`, 180_000, "transferencia"),
+    pay("P-6", `${one}-20 10:00`, 90_000, "transferencia"),
+    // El mes de la vista previa: las atendidas con monto de `legacyRaw()`.
+    pay("AP-1", `${month}-01 10:30`, 150_000, "transferencia"),
+    pay("AP-2", `${month}-01 12:00`, 55_000, "efectivo"),
+    pay("AP-3", `${month}-02 16:20`, 90_000, "transferencia"),
+    pay("AP-5", `${month}-03 11:40`, 95_000, "transferencia", 10_000),
+    // Cortesía (sin cobro a la clienta): está en Agenda Pro con su precio, pero
+    // no entró plata. Sale aparte, fuera del reparto y del ticket.
+    pay("AP-8", `${month}-04 17:50`, 40_000, "transferencia", 0, true),
   ];
 }
 
@@ -435,6 +479,7 @@ export function previewData(cadence: Cadence, anchor: EaLocalDate): ReportData {
       [],
       PROVIDERS,
     ),
+    legacyPayments: legacyPaymentsRaw(month),
     commissionEntries: COMMISSION,
     courtesyCommissions: [],
     // La pauta del mes: Meta casi toda, algo de Google. Con las nuevas del

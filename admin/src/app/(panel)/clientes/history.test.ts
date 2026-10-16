@@ -47,6 +47,7 @@ function ea(patch: {
 }
 
 function legacy(patch: {
+  id?: number;
   sourceId: string;
   started: Date;
   service?: string;
@@ -55,7 +56,7 @@ function legacy(patch: {
   status?: string | null;
 }): LegacyAppointment {
   return {
-    id: 1,
+    id: patch.id ?? 1,
     source_id: patch.sourceId,
     started_at: patch.started,
     ended_at: null,
@@ -229,5 +230,57 @@ describe("buildUnifiedHistory", () => {
     );
     expect(entries[0].rawStatus).toBe("Booked");
     expect(entries[0].outcome).toBe("desconocido");
+  });
+
+  it("le pone a cada cita de Agenda Pro el método con que se pagó, si se sabe", () => {
+    const { entries } = buildUnifiedHistory(
+      [ea({ id: 9, start: "2026-08-01 10:00:00", status: "Completada" })],
+      [
+        legacy({ id: 1, sourceId: "AP-1", started: new Date(2026, 6, 1, 10, 0, 0), amount: 50_000 }),
+        legacy({ id: 2, sourceId: "AP-2", started: new Date(2026, 6, 2, 10, 0, 0), amount: 90_000 }),
+        legacy({ id: 3, sourceId: "AP-3", started: new Date(2026, 6, 3, 10, 0, 0), amount: 40_000 }),
+      ],
+      [
+        { legacyAppointmentId: 1, method: "efectivo", courtesy: false },
+        // Pago dividido: los dos métodos, en orden fijo aunque lleguen al revés.
+        { legacyAppointmentId: 2, method: "transferencia", courtesy: false },
+        { legacyAppointmentId: 2, method: "efectivo", courtesy: false },
+        { legacyAppointmentId: 2, method: "transferencia", courtesy: false },
+        // Un pago enlazado a una cita que no es de esta clienta no aparece.
+        { legacyAppointmentId: 77, method: "otro", courtesy: false },
+      ],
+    );
+    const byId = Object.fromEntries(entries.map((entry) => [entry.id, entry.paymentMethods]));
+    expect(byId).toEqual({
+      "ea-9": [],
+      "legacy-AP-1": ["efectivo"],
+      "legacy-AP-2": ["efectivo", "transferencia"],
+      // Sin pago enlazado: vacío, que es "no se sabe", no "no pagó".
+      "legacy-AP-3": [],
+    });
+  });
+
+  it("el método no cambia la plata del resumen", () => {
+    const rows = [legacy({ id: 1, sourceId: "AP-1", started: new Date(2026, 6, 1, 10, 0, 0), amount: 50_000 })];
+    const without = buildUnifiedHistory([], rows);
+    const withMethod = buildUnifiedHistory([], rows, [{ legacyAppointmentId: 1, method: "efectivo", courtesy: false }]);
+    expect(withMethod.summary).toEqual(without.summary);
+  });
+
+  it("una cortesía es visita con la marca, sin medio, y no suma al total gastado", () => {
+    const { entries, summary } = buildUnifiedHistory(
+      [],
+      [
+        legacy({ id: 1, sourceId: "AP-1", started: new Date(2026, 6, 1, 10, 0, 0), amount: 50_000 }),
+        legacy({ id: 2, sourceId: "AP-2", started: new Date(2026, 6, 2, 10, 0, 0), amount: 90_000 }),
+      ],
+      [
+        { legacyAppointmentId: 1, method: "efectivo", courtesy: false },
+        { legacyAppointmentId: 2, method: "transferencia", courtesy: true },
+      ],
+    );
+    const courtesy = entries.find((entry) => entry.id === "legacy-AP-2");
+    expect(courtesy).toMatchObject({ courtesy: true, paymentMethods: [], amountCharged: 90_000 });
+    expect(summary).toMatchObject({ visits: 2, totalSpent: 50_000, totalIsPartial: false });
   });
 });

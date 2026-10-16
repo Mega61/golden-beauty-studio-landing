@@ -1060,6 +1060,56 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
+        "importan los pagos de Agenda Pro dos veces sin duplicarlos, convergen a las correcciones y completan el enlace",
+        async () => {
+          const { legacyPayments } = repositories(db);
+          const base = {
+            source_tx_id: "tx-1",
+            part: 0,
+            sale_id: "1119",
+            paid_at: new Date("2026-09-19T09:05:00"),
+            amount: 160_000,
+            tip: 0,
+            method: "transferencia" as const,
+            method_agendapro: "transferencia" as const,
+            legacy_appointment_id: null,
+          };
+          // Primera corrida, sin correcciones.
+          await legacyPayments.upsert([base]);
+          await legacyPayments.upsert([base]);
+          // Segunda, con el pago partido y la reserva ya importada.
+          const split = [
+            { ...base, amount: 150_000, method: "efectivo" as const, legacy_appointment_id: 7 },
+            { ...base, part: 1, amount: 10_000, legacy_appointment_id: 7 },
+          ];
+          await legacyPayments.upsert(split);
+          await legacyPayments.upsert(split);
+          // Tercera: un enlace que ya existe no se cambia.
+          await legacyPayments.upsert([{ ...split[0], legacy_appointment_id: 8 }, split[1]]);
+
+          const range = [new Date("2026-09-01T00:00:00"), new Date("2026-10-01T00:00:00")] as const;
+          const all = await legacyPayments.listByPaidRange(...range);
+          expect(all.map((row) => [row.part, row.amount, row.method, row.method_agendapro, row.legacy_appointment_id])).toEqual([
+            [0, 150_000, "efectivo", "transferencia", 7],
+            [1, 10_000, "transferencia", "transferencia", 7],
+          ]);
+          expect(all.reduce((sum, row) => sum + row.amount, 0)).toBe(160_000);
+
+          // Si el archivo de correcciones deja de partirlo, la parte 1 sobra y
+          // se borra; la 0 vuelve a ser el pago entero.
+          await legacyPayments.upsert([{ ...base, is_courtesy: 1 }]);
+          expect(await legacyPayments.pruneParts(new Map([["tx-1", 1]]))).toBe(1);
+          const after = await legacyPayments.listByPaidRange(...range);
+          expect(after).toHaveLength(1);
+          expect(after[0]).toMatchObject({ amount: 160_000, is_courtesy: 1, legacy_appointment_id: 7 });
+
+          expect(await legacyPayments.listByAppointmentIds([7])).toHaveLength(1);
+          expect(await legacyPayments.listByAppointmentIds([])).toEqual([]);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
         "guardan el antes y el después en la bitácora, y la dejan quieta",
         async () => {
           const { auditLog } = repositories(db);
@@ -1184,6 +1234,7 @@ async function resetData(db: Kysely<Database>): Promise<void> {
     "service_map",
     "staff_totp",
     "legacy_appointment",
+    "legacy_payment",
     "allowed_user",
     "session",
     "account",

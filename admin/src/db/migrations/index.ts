@@ -33,12 +33,10 @@
  * los recordatorios de X7) y `021` (canal y autora de un recordatorio, para el
  * paliativo manual por `wa.me` de X7) y `022` (`push_subscription`, el aviso al
  * celular cuando alguien reserva desde la página) y `023` (`ad_spend`, la
- * inversión mensual en anuncios del reporte de costo por clienta nueva) y
+ * inversión mensual en anuncios del reporte de costo por clienta nueva), `025`
+ * (`legacy_payment`, cómo se pagó cada venta del historial de Agenda Pro) y
  * `026` (cortesía de la casa: `appointment_finance.is_house_courtesy` y
- * `customer_setting`). **`025` no es un hueco por error**: está reservada para
- * `feat/historial-pagos` (`025-legacy-payment`), que corre en paralelo. El
- * runner aplica en el orden del array lo que falte en el libro, así que un
- * número intermedio que llega después se aplica igual.
+ * `customer_setting`).
  * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
  * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
  * detecta que alguien editó una migración ya aplicada.
@@ -70,6 +68,7 @@ import { migration as m021 } from "./021-wa-message-manual";
 import { migration as m022 } from "./022-push-subscription";
 import { migration as m023 } from "./023-ad-spend";
 import { migration as m024 } from "./024-allowed-user-test-account";
+import { migration as m025 } from "./025-legacy-payment";
 import { migration as m026 } from "./026-house-courtesy";
 
 export const MIGRATIONS: readonly Migration[] = [
@@ -97,6 +96,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m022,
   m023,
   m024,
+  m025,
   m026,
 ];
 
@@ -125,6 +125,7 @@ export const EXPECTED_TABLES: readonly string[] = [
   "station",
   "staff_totp",
   "legacy_appointment",
+  "legacy_payment",
   "audit_log",
   "job_run",
   "wa_message",

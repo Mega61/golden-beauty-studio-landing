@@ -19,6 +19,14 @@
  *   ocupación (no hay hora de fin: la duración sería inventada), agendado vs.
  *   realizado y adicionales (no hay renglones). Cada uno lo dice en pantalla.
  *
+ * ## Cortesías (sin cobro a la clienta)
+ *
+ * Las ventas marcadas `legacy_payment.is_courtesy` (la dueña, su hermana y
+ * Juan) son citas atendidas pero no ventas: el estudio recibió $0. La técnica
+ * sí cobró su comisión sobre el precio de lista —por fuera del panel—, así que
+ * la cita existe y cuenta en citas y asistencia; su precio nominal va aparte,
+ * nunca dentro de las ventas.
+ *
  * ## ⚠ Esto es lectura para pantalla, nunca plata que sale del panel
  *
  * Nada de acá alimenta `appointment_finance`, caja, el ingest a Strapi/Actual
@@ -61,6 +69,12 @@ export type LegacyReportRow = {
   kind: LegacyReportKind;
   customerKey: string | null;
   clientName: string | null;
+  /**
+   * Cortesía (la dueña, su hermana, Juan): según `legacy_payment.is_courtesy`
+   * de los pagos enlazados a esta cita. No entró plata: no es venta, pero sí
+   * cita y visita.
+   */
+  courtesy: boolean;
 };
 
 /** La fila de la base, ya en hora de pared. */
@@ -73,6 +87,8 @@ export type LegacyRawRow = {
   status: string | null;
   customerKey: string | null;
   clientName: string | null;
+  /** Ver `LegacyReportRow.courtesy`. Sin pagos importados, `false`. */
+  courtesy?: boolean;
 };
 
 /**
@@ -117,14 +133,19 @@ export function legacyReportRows(
       kind: legacyReportKind(row.status),
       customerKey: row.customerKey,
       clientName: row.clientName,
+      courtesy: row.courtesy === true,
     });
   }
   return out;
 }
 
-/** Lo cobrado de una fila heredada que cuenta como venta: atendida y con monto. */
+/**
+ * Lo cobrado de una fila heredada que cuenta como venta: atendida, con monto
+ * y **no** de cortesía. Una cortesía trae el precio en Agenda Pro, pero no
+ * entró plata: sumarla inflaría las ventas con plata que nunca existió.
+ */
 function legacySale(row: LegacyReportRow): Cop | null {
-  return row.kind === "atendida" ? row.amountCharged : null;
+  return row.kind === "atendida" && !row.courtesy ? row.amountCharged : null;
 }
 
 // ── Ventas y citas ──────────────────────────────────────────────────────────
@@ -156,6 +177,11 @@ export type SalesReport = {
    * total es "por lo menos" esto, y la pantalla lo dice.
    */
   legacyUnpriced: number;
+  /**
+   * Citas atendidas de Agenda Pro de **cortesía**: cuentan como citas y como
+   * atendidas, y su precio nominal va acá, aparte, nunca en las ventas.
+   */
+  legacyCourtesy: { count: number; amount: Cop };
   byService: SalesGroup[];
   byProvider: SalesGroup[];
 };
@@ -235,10 +261,16 @@ export function salesReport(
   let legacyTotal = 0;
   let legacyAttended = 0;
   let legacyUnpriced = 0;
+  const legacyCourtesy = { count: 0, amount: 0 };
 
   for (const row of legacy) {
     if (row.kind !== "atendida") continue;
     legacyAttended += 1;
+    if (row.courtesy) {
+      legacyCourtesy.count += 1;
+      legacyCourtesy.amount += row.amountCharged ?? 0;
+      continue;
+    }
     const amount = legacySale(row);
     if (amount === null) {
       legacyUnpriced += 1;
@@ -277,6 +309,7 @@ export function salesReport(
     attended: panelAttended + legacyAttended,
     legacyAttended,
     legacyUnpriced,
+    legacyCourtesy,
     byService: sorted(byService),
     byProvider: sorted(byProvider),
   };

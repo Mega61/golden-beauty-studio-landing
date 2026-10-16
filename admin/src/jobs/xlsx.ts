@@ -17,10 +17,11 @@ import { inflateRawSync } from "node:zlib";
  *
  * ## Qué es un `.xlsx`, en realidad
  *
- * Un ZIP con XML adentro. Lo que hace falta leer son dos entradas:
+ * Un ZIP con XML adentro. Lo que hace falta leer son
  * `xl/sharedStrings.xml` (el diccionario de textos, porque Excel no repite una
- * cadena dos veces) y `xl/worksheets/sheet1.xml` (las celdas, que apuntan al
- * diccionario por índice). Nada más.
+ * cadena dos veces) y las hojas `xl/worksheets/sheetN.xml` (las celdas, que
+ * apuntan al diccionario por índice). Para un libro de varias hojas, además,
+ * `xl/workbook.xml` y sus relaciones, que dicen qué archivo es cada nombre.
  *
  * Node trae `inflateRawSync`, que es el único algoritmo de compresión que un
  * ZIP de Excel usa (método 8, deflate) más el de guardar sin comprimir (método
@@ -121,36 +122,39 @@ function columnIndex(ref: string): number {
 }
 
 /**
- * La primera hoja de un `.xlsx`, como filas de texto.
+ * Las celdas de una hoja, como filas de texto.
  *
  * Las celdas vacías se rellenan con `""` hasta la última columna con contenido
  * de cada fila: sin eso, una fila con la tercera columna vacía correría la
  * cuarta a la posición de la tercera, y el mapeo de columnas —que es por
- * posición— leería el servicio donde debería leer el teléfono.
+ * posición— leería el servicio donde debería leer el teléfono. **La posición
+ * sale de la referencia de la celda (`r="F7"`), nunca del orden en el XML**:
+ * Excel omite las celdas vacías, y contar `<c>` en orden corre todo lo que
+ * viene después del hueco.
+ *
+ * ## Las celdas y filas que se cierran solas
+ *
+ * Una celda con estilo y sin valor se escribe `<c r="B4" s="1"/>`. La primera
+ * versión de este lector usaba `<c([^>]*)…` con el atributo **voraz**: se
+ * comía la `/` y leía el `>` como apertura, y el cuerpo de esa celda vacía
+ * terminaba en el `</c>` de la siguiente — la celda vacía se quedaba con el
+ * valor de su vecina y la vecina desaparecía. Pasaba de verdad en la hoja
+ * "Resumen" del reporte de ventas de Agenda Pro. Por eso los atributos se leen
+ * **perezosos** y el cierre `/>` se prueba primero, en celdas y en filas.
  */
-export function parseXlsx(buffer: Buffer): string[][] {
-  const entries = readZipEntries(buffer);
-
-  const sheetName =
-    [...entries.keys()].find((name) => /^xl\/worksheets\/sheet1\.xml$/.test(name)) ??
-    [...entries.keys()].find((name) => /^xl\/worksheets\/.+\.xml$/.test(name));
-
-  if (sheetName === undefined) throw new XlsxError("El .xlsx no tiene ninguna hoja.");
-
-  const sharedXml = entries.get("xl/sharedStrings.xml")?.toString("utf8") ?? "";
-  const shared = [...sharedXml.matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1]));
-
-  const sheetXml = entries.get(sheetName)!.toString("utf8");
+function parseSheetXml(sheetXml: string, shared: readonly string[]): string[][] {
   const rows: string[][] = [];
 
-  for (const rowMatch of sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
+  for (const rowMatch of sheetXml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
     const cells: string[] = [];
 
-    for (const cellMatch of rowMatch[1].matchAll(/<c([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+    for (const cellMatch of (rowMatch[1] ?? "").matchAll(
+      /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
+    )) {
       const attrs = cellMatch[1];
       const body = cellMatch[2] ?? "";
-      const ref = /r="([A-Z]+\d+)"/.exec(attrs)?.[1] ?? "A1";
-      const type = /t="([^"]+)"/.exec(attrs)?.[1] ?? "n";
+      const ref = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
+      const type = /\bt="([^"]+)"/.exec(attrs)?.[1] ?? "n";
 
       let value = "";
       if (type === "s") {
@@ -162,7 +166,9 @@ export function parseXlsx(buffer: Buffer): string[][] {
         value = unescapeXml(/<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? "");
       }
 
-      const at = columnIndex(ref);
+      // Sin `r` (lo permite el estándar, Excel nunca lo omite) la celda va a
+      // continuación de la anterior, que es lo único que se puede suponer.
+      const at = ref === undefined ? cells.length : columnIndex(ref);
       while (cells.length < at) cells.push("");
       cells[at] = value;
     }
@@ -177,6 +183,68 @@ export function parseXlsx(buffer: Buffer): string[][] {
   }
 
   return rows;
+}
+
+function sharedStrings(entries: Map<string, Buffer>): string[] {
+  const sharedXml = entries.get("xl/sharedStrings.xml")?.toString("utf8") ?? "";
+  return [...sharedXml.matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1]));
+}
+
+/**
+ * La primera hoja de un `.xlsx`, como filas de texto.
+ *
+ * Es lo que usa el importador de reservas, que trae una sola hoja.
+ */
+export function parseXlsx(buffer: Buffer): string[][] {
+  const entries = readZipEntries(buffer);
+
+  const sheetName =
+    [...entries.keys()].find((name) => /^xl\/worksheets\/sheet1\.xml$/.test(name)) ??
+    [...entries.keys()].find((name) => /^xl\/worksheets\/.+\.xml$/.test(name));
+
+  if (sheetName === undefined) throw new XlsxError("El .xlsx no tiene ninguna hoja.");
+
+  return parseSheetXml(entries.get(sheetName)!.toString("utf8"), sharedStrings(entries));
+}
+
+/**
+ * Todas las hojas de un `.xlsx`, por su **nombre** visible ("Ventas",
+ * "Ítems", "Transacciones"), en el orden del libro.
+ *
+ * El reporte de ventas de Agenda Pro trae cuatro hojas y el nombre es lo único
+ * estable entre exports: el archivo `sheetN.xml` lo decide quien escribe el
+ * libro. El camino es el del estándar — `xl/workbook.xml` da nombre → `r:id`,
+ * y `xl/_rels/workbook.xml.rels` da `r:id` → archivo.
+ */
+export function parseXlsxSheets(buffer: Buffer): Map<string, string[][]> {
+  const entries = readZipEntries(buffer);
+  const shared = sharedStrings(entries);
+
+  const workbook = entries.get("xl/workbook.xml")?.toString("utf8") ?? "";
+  const rels = entries.get("xl/_rels/workbook.xml.rels")?.toString("utf8") ?? "";
+
+  const targetById = new Map<string, string>();
+  for (const rel of rels.matchAll(/<Relationship\b([^>]*?)\/?>/g)) {
+    const id = /\bId="([^"]+)"/.exec(rel[1])?.[1];
+    const target = /\bTarget="([^"]+)"/.exec(rel[1])?.[1];
+    if (id === undefined || target === undefined) continue;
+    // El destino es relativo a `xl/`, salvo que venga absoluto (`/xl/...`).
+    targetById.set(id, target.startsWith("/") ? target.slice(1) : `xl/${target}`);
+  }
+
+  const sheets = new Map<string, string[][]>();
+  for (const sheet of workbook.matchAll(/<sheet\b([^>]*?)\/?>/g)) {
+    const name = /\bname="([^"]+)"/.exec(sheet[1])?.[1];
+    const id = /\br:id="([^"]+)"/.exec(sheet[1])?.[1];
+    if (name === undefined || id === undefined) continue;
+    const file = targetById.get(id);
+    const xml = file === undefined ? undefined : entries.get(file);
+    if (xml === undefined) continue;
+    sheets.set(unescapeXml(name), parseSheetXml(xml.toString("utf8"), shared));
+  }
+
+  if (sheets.size === 0) throw new XlsxError("El .xlsx no tiene ninguna hoja.");
+  return sheets;
 }
 
 /** ¿Esto es un `.xlsx`? Por los dos primeros bytes de todo ZIP. */

@@ -21,6 +21,7 @@ import { customerSettingRepository } from "./customer-setting";
 import { dayCloseRepository } from "./day-close";
 import { jobRunRepository } from "./job-run";
 import { legacyAppointmentRepository } from "./legacy-appointment";
+import { legacyPaymentRepository } from "./legacy-payment";
 import { pushSubscriptionRepository } from "./push-subscription";
 import { serviceMapRepository } from "./service-map";
 import { staffTotpRepository } from "./staff-totp";
@@ -45,6 +46,7 @@ export function repositories(db: Db) {
     dayCloses: dayCloseRepository(db),
     jobRuns: jobRunRepository(db),
     legacyAppointments: legacyAppointmentRepository(db),
+    legacyPayments: legacyPaymentRepository(db),
     pushSubscriptions: pushSubscriptionRepository(db),
     serviceMap: serviceMapRepository(db),
     staffTotp: staffTotpRepository(db),
@@ -83,6 +85,7 @@ export {
 } from "./job-run";
 export type { JobRunInput } from "./job-run";
 export { legacyAppointmentRepository } from "./legacy-appointment";
+export { legacyPaymentRepository } from "./legacy-payment";
 export { pushSubscriptionRepository } from "./push-subscription";
 export type { DeliverableSubscription, PushSubscriptionInput } from "./push-subscription";
 export { serviceMapRepository } from "./service-map";

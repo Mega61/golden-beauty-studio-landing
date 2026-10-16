@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 /**
  * El historial de Agenda Pro **no puede llegar** a ningún camino de plata.
  *
- * La regla (gbs-money-auditor): las filas de `legacy_appointment` se leen para
+ * La regla (gbs-money-auditor): las filas de `legacy_appointment` —y las de
+ * `legacy_payment` (migración `025`), cómo se pagó cada venta— se leen para
  * pantalla —agenda de días pasados, ficha, reportes— y nunca entran a
  * `appointment_finance`, la caja / cierre del día, el ingest a Strapi/Actual,
  * las comisiones ni los recordatorios por WhatsApp. Esa plata ya está en Actual
@@ -21,11 +22,13 @@ import { describe, expect, it } from "vitest";
  *
  * 1. que no importe ninguno de los módulos que traducen el historial para
  *    pantalla (`lib/legacy-history`, `agenda/legacy`, `reportes/legacy-blend`,
- *    `clientes/history`);
- * 2. que no nombre la tabla ni su repositorio (`legacy_appointment`,
- *    `legacyAppointment…`), salvo los archivos que la *declaran* —el agregador
- *    de repositorios, el repositorio mismo, los tipos y las migraciones—, que
- *    cualquier camino alcanza al importar `@/db` y que no la leen.
+ *    `reportes/legacy-payments`, `clientes/history`) ni el importador de pagos
+ *    (`jobs/legacy-payments`);
+ * 2. que no nombre las tablas ni sus repositorios (`legacy_appointment`,
+ *    `legacy_payment`, `legacyAppointment…`, `legacyPayment…`), salvo los
+ *    archivos que las *declaran* —el agregador de repositorios, los
+ *    repositorios mismos, los tipos y las migraciones—, que cualquier camino
+ *    alcanza al importar `@/db` y que no las leen.
  *
  * Si este test se pone rojo, no se "arregla" el test: se saca el historial del
  * camino de plata.
@@ -61,18 +64,23 @@ const LEGACY_READERS = [
   "lib/legacy-history.ts",
   "app/(panel)/agenda/legacy.ts",
   "app/(panel)/reportes/legacy-blend.ts",
+  "app/(panel)/reportes/legacy-payments.ts",
   "app/(panel)/clientes/history.ts",
+  // El importador de los pagos: lee los reportes de plata de Agenda Pro, y por
+  // eso mismo es lo último que un camino de plata puede alcanzar.
+  "jobs/legacy-payments.ts",
 ];
 
 /** Los que declaran la tabla sin leerla. Cualquier import de `@/db` los alcanza. */
 const DECLARES_TABLE = [
   /^db\/repositories\/index\.ts$/,
   /^db\/repositories\/legacy-appointment\.ts$/,
+  /^db\/repositories\/legacy-payment\.ts$/,
   /^db\/types\.ts$/,
   /^db\/migrations\//,
 ];
 
-const MENTIONS_TABLE = /legacy_appointment|legacyAppointment/;
+const MENTIONS_TABLE = /legacy_appointment|legacyAppointment|legacy_payment|legacyPayment/;
 
 function listSources(path: string): string[] {
   const absolute = join(SRC, path);
@@ -145,6 +153,9 @@ describe("el historial de Agenda Pro no alcanza ningún camino de plata", () => 
     // tampoco lo vería en un camino de plata.
     const reports = [...reachable(["app/(panel)/reportes/data.ts"])].map(rel);
     expect(reports).toContain("app/(panel)/reportes/legacy-blend.ts");
+    expect(reports).toContain("app/(panel)/reportes/legacy-payments.ts");
+    // Y el patrón de la tabla nueva de verdad ve a quien la lee.
+    expect(MENTIONS_TABLE.test(readFileSync(join(SRC, "app/(panel)/reportes/data.ts"), "utf8"))).toBe(true);
     const agenda = [...reachable(["app/(panel)/agenda/data.ts"])].map(rel);
     expect(agenda).toContain("app/(panel)/agenda/legacy.ts");
   });

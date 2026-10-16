@@ -14,6 +14,7 @@ import {
   formatTime,
   type Column,
 } from "@/components/ui";
+import type { PaymentMethod } from "@/db/types";
 
 import { CortesiaPorDefecto, EditarClienta, FusionarClienta } from "./AccionesClienta";
 import type { ClientProfile } from "./data";
@@ -333,18 +334,63 @@ function historyColumns(): Array<Column<HistoryEntry>> {
       from: "siempre",
       numeric: true,
       listSlot: "trailing",
-      text: (row) => (row.amountCharged === null ? "" : formatCOP(row.amountCharged)),
-      render: (row) =>
-        row.amountCharged === null ? (
-          // `—` y no `$ 0`: no saber cuánto se cobró y haber cobrado cero son
-          // cosas distintas, y la segunda es una cortesía que alguien decidió.
-          <span style={{ color: "var(--color-ink-mute)" }}>—</span>
+      text: (row) =>
+        [
+          row.amountCharged === null ? "" : formatCOP(row.amountCharged),
+          row.courtesy ? COURTESY_LABEL : methodLabel(row.paymentMethods),
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      render: (row) => {
+        const amount =
+          row.amountCharged === null ? (
+            // `—` y no `$ 0`: no saber cuánto se cobró y haber cobrado cero son
+            // cosas distintas, y la segunda es una cortesía que alguien decidió.
+            <span style={{ color: "var(--color-ink-mute)" }}>—</span>
+          ) : (
+            formatCOP(row.amountCharged)
+          );
+        if (row.courtesy) {
+          // El precio de lista se muestra (es sobre lo que se pagó la
+          // comisión), tachado: a la clienta no se le cobró.
+          return (
+            <span style={{ display: "inline-grid", justifyItems: "end", gap: "0.0625rem" }}>
+              <s style={{ color: "var(--color-ink-mute)" }}>{amount}</s>
+              <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+                {COURTESY_LABEL}
+              </span>
+            </span>
+          );
+        }
+        const method = methodLabel(row.paymentMethods);
+        // El método solo existe para el historial de Agenda Pro (los pagos del
+        // panel se ven en la cuenta). Sin método conocido no se escribe nada:
+        // un "Sin método" se leería como "no pagó".
+        return method === "" ? (
+          amount
         ) : (
-          formatCOP(row.amountCharged)
-        ),
+          <span style={{ display: "inline-grid", justifyItems: "end", gap: "0.0625rem" }}>
+            {amount}
+            <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>{method}</span>
+          </span>
+        );
+      },
     },
   ];
 }
+
+/** `["efectivo", "transferencia"]` → `"Efectivo + Transferencia"`. */
+function methodLabel(methods: readonly PaymentMethod[]): string {
+  return methods.map((method) => METHOD_LABEL[method]).join(" + ");
+}
+
+const COURTESY_LABEL = "Cortesía (sin cobro a la clienta)";
+
+const METHOD_LABEL: Record<PaymentMethod, string> = {
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  otro: "Otro",
+};
 
 /** `"2026-08-14 14:00:00"` → `"14 ago 2026"`. */
 function fechaCorta(wallClock: string): string {

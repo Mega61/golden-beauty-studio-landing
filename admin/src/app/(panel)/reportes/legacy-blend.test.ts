@@ -186,6 +186,37 @@ describe("salesReport", () => {
   });
 });
 
+describe("cortesías (sin cobro a la clienta)", () => {
+  const legacy = legacyReportRows(
+    [raw(1), raw(2, { courtesy: true, amountCharged: 90_000 }), raw(3, { courtesy: true, status: "Cancelado" })],
+    SEPT,
+    [],
+    PROVIDERS,
+  );
+  const report = salesReport([], [], legacy, PROVIDERS, SERVICES);
+
+  it("es cita atendida pero no venta: el precio nominal va aparte", () => {
+    expect(report.legacyTotal).toBe(50_000);
+    expect(report.legacyAttended).toBe(2);
+    expect(report.appointments).toBe(3);
+    expect(report.legacyCourtesy).toEqual({ count: 1, amount: 90_000 });
+    // Ni "sin monto" ni barra de servicio: no es una venta que falte.
+    expect(report.legacyUnpriced).toBe(0);
+    expect(report.byService.reduce((sum, row) => sum + row.revenue, 0)).toBe(50_000);
+  });
+
+  it("tampoco suma en el total ni en la serie", () => {
+    expect(salesTotal([], legacy)).toBe(50_000);
+    expect(salesSeries([], legacy, [day("2026-09-10")])).toEqual([50_000]);
+  });
+
+  it("sin la marca, la misma fila sí es venta (lo que había antes de importar los pagos)", () => {
+    const plain = legacyReportRows([raw(2, { amountCharged: 90_000 })], SEPT, [], PROVIDERS);
+    expect(plain[0].courtesy).toBe(false);
+    expect(salesTotal([], plain)).toBe(90_000);
+  });
+});
+
 describe("inasistencia con historial", () => {
   it("las citas de Agenda Pro entran a la tasa por franja", () => {
     const legacy = legacyReportRows(

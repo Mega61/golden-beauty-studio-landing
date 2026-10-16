@@ -50,6 +50,7 @@ import styles from "./charts.module.css";
 import { DataView } from "./DataView";
 import { loadReports } from "./data";
 import { legacyNoShowInputs, salesReport, salesSeries, salesTotal } from "./legacy-blend";
+import { legacyPaymentReport } from "./legacy-payments";
 import { occupancyByProvider, slotLabel, SLOTS, type SlotId } from "./occupancy";
 import { AcquisitionFrame, DemandFrame } from "./PautaReports";
 import { SERIES, statusColor } from "./palette";
@@ -88,6 +89,25 @@ function legacyIncluded(data: Data): ReactNode {
       {data.legacy.length === 1 ? "cita" : "citas"},{" "}
       {/* "$ 0" se leería como "no se vendió nada"; sin monto es "no se sabe". */}
       {amount > 0 ? <strong>{formatCOP(amount)}</strong> : "sin monto registrado"}.
+    </>
+  );
+}
+
+/**
+ * " Cortesías (sin cobro a la clienta): 2 · $ 130.000, fuera de las ventas."
+ *
+ * Una cortesía es una cita de Agenda Pro por la que el estudio recibió $0 (la
+ * dueña, su hermana, Juan). La técnica sí cobró su comisión sobre el precio de
+ * lista, por fuera del panel. Se dice aparte para que la cifra de ventas no
+ * parezca baja ni la de citas parezca inflada.
+ */
+function courtesyLine(courtesy: { count: number; amount: number }): ReactNode {
+  if (courtesy.count === 0) return null;
+  return (
+    <>
+      {" "}
+      Cortesías (sin cobro a la clienta): <strong>{courtesy.count}</strong> ·{" "}
+      <strong>{formatCOP(courtesy.amount)}</strong>, fuera de las ventas.
     </>
   );
 }
@@ -186,7 +206,14 @@ export function SalesFrames({ data }: { data: Data }) {
       <ChartFrame
         title="Ventas y citas del periodo"
         decision="¿Cuánto vendimos y cuántas citas hubo? Lo cobrado en cuentas cerradas del panel más lo cobrado en las citas atendidas de Agenda Pro."
-        scope={legacyIncluded(data)}
+        scope={
+          data.legacy.length > 0 ? (
+            <>
+              {legacyIncluded(data)}
+              {courtesyLine(sales.legacyCourtesy)}
+            </>
+          ) : undefined
+        }
         note={unpricedNote}
         table={
           <DataView
@@ -249,6 +276,8 @@ export function SalesFrames({ data }: { data: Data }) {
         )}
       </ChartFrame>
 
+      <LegacyPaymentsFrame data={data} />
+
       <ChartFrame
         title="Ventas por profesional"
         decision="Quién vendió cuánto en el periodo. Para lo que se le paga a cada quien, la cifra que vale es la liquidación de Comisiones."
@@ -298,6 +327,151 @@ export function SalesFrames({ data }: { data: Data }) {
         )}
       </ChartFrame>
     </>
+  );
+}
+
+// ── Cómo se pagó el historial de Agenda Pro ─────────────────────────────────
+
+/**
+ * Efectivo contra transferencia, propinas y ticket promedio del historial de
+ * Agenda Pro, del periodo y de cada mes (`legacy-payments.ts`).
+ *
+ * Solo aparece si el periodo tiene pagos de Agenda Pro: después del corte la
+ * caja del panel ya dice cómo entró la plata (Cierre del día), y una tarjeta
+ * vacía de "historial" sería ruido. La serie por mes va completa, con el mes
+ * del periodo resaltado, porque la pregunta "¿cuándo dejó de entrar efectivo?"
+ * no se contesta con un solo mes.
+ */
+function LegacyPaymentsFrame({ data }: { data: Data }) {
+  if (data.legacyPayments === null || data.legacyPayments.length === 0) return null;
+
+  const report = legacyPaymentReport(data.legacyPayments, {
+    from: data.period.from,
+    to: data.period.to,
+  });
+  const period = report.period;
+  if (period.payments === 0 && period.courtesy.sales === 0) return null;
+
+  // "Otro" solo se dibuja si existe: en los archivos reales no hay ninguno, y
+  // un tramo vacío en la leyenda haría pensar que falta un dato.
+  const methods = period.byMethod.filter((entry) => entry.method !== "otro" || entry.count > 0);
+  const anyOther = report.months.some((month) => month.byMethod[2].count > 0);
+  const anyTips = report.months.some((month) => month.tips > 0);
+  const anyCourtesy = report.months.some((month) => month.courtesy.sales > 0);
+  const share = (value: number | null) => (value === null ? dash : formatRate(value));
+
+  const monthAxis = axisTicks(
+    Math.max(0, ...report.months.map((month) => month.total)),
+    (value) => formatCOP(value),
+  );
+
+  return (
+    <ChartFrame
+      title="Cómo se pagó · historial de Agenda Pro"
+      decision="¿Cuánto entró en efectivo y cuánto por transferencia en el tiempo de Agenda Pro? Con el medio real, ya corregido donde Agenda Pro decía otro. Va por fecha de pago, así que en los bordes de un mes puede no cuadrar al peso con «Ventas y citas del periodo», que va por fecha de la cita."
+      scope={
+        <>
+          Solo el historial de Agenda Pro: <strong>{period.payments}</strong>{" "}
+          {period.payments === 1 ? "pago" : "pagos"} de <strong>{period.sales}</strong>{" "}
+          {period.sales === 1 ? "venta cobrada" : "ventas cobradas"},{" "}
+          <strong>{formatCOP(period.total)}</strong>.
+          {courtesyLine({ count: period.courtesy.sales, amount: period.courtesy.amount })}
+          {anyTips ? null : " Agenda Pro no registró propinas en estos pagos."}
+        </>
+      }
+      table={
+        <DataView
+          caption="Pagos del historial de Agenda Pro por mes"
+          columns={[
+            { header: "Mes", cell: (row) => (row.inPeriod ? <strong>{row.label}</strong> : row.label) },
+            { header: "Ventas", numeric: true, cell: (row) => row.sales },
+            { header: "Efectivo", numeric: true, cell: (row) => money(row.byMethod[0].amount) },
+            { header: "Transferencia", numeric: true, cell: (row) => money(row.byMethod[1].amount) },
+            ...(anyOther
+              ? [{ header: "Otro", numeric: true, cell: (row: (typeof report.months)[number]) => money(row.byMethod[2].amount) }]
+              : []),
+            ...(anyTips
+              ? [{ header: "Propinas", numeric: true, cell: (row: (typeof report.months)[number]) => money(row.tips) }]
+              : []),
+            ...(anyCourtesy
+              ? [
+                  {
+                    header: "Cortesías (sin cobro)",
+                    numeric: true,
+                    cell: (row: (typeof report.months)[number]) =>
+                      row.courtesy.sales === 0 ? dash : `${row.courtesy.sales} · ${formatCOP(row.courtesy.amount)}`,
+                  },
+                ]
+              : []),
+            { header: "Ticket promedio", numeric: true, cell: (row) => money(row.averageTicket) },
+            { header: "Total", numeric: true, cell: (row) => money(row.total) },
+          ]}
+          rowKey={(row) => row.month}
+          rows={report.months}
+        />
+      }
+    >
+      <TileRow>
+        {methods.map((entry) => (
+          <StatTile
+            key={entry.method}
+            label={entry.label}
+            value={money(entry.amount)}
+            deltaNote={`${share(entry.share)} · ${entry.count} pago${entry.count === 1 ? "" : "s"}`}
+          />
+        ))}
+        <StatTile
+          label="Ticket promedio"
+          value={money(period.averageTicket)}
+          deltaNote="Lo cobrado por venta, sin propina"
+        />
+        {period.courtesy.sales > 0 ? (
+          <StatTile
+            label="Cortesías (sin cobro a la clienta)"
+            value={`${period.courtesy.sales} · ${formatCOP(period.courtesy.amount)}`}
+            deltaNote="El estudio no recibió plata; la técnica sí cobró su comisión"
+          />
+        ) : null}
+        {period.tips > 0 ? (
+          <StatTile
+            label="Propinas"
+            value={money(period.tips)}
+            deltaNote="Aparte: no entran a ventas ni al ticket"
+          />
+        ) : null}
+      </TileRow>
+
+      <StackBar
+        data={methods.map((entry) => ({
+          id: entry.method,
+          label: entry.label,
+          value: entry.amount,
+          // El porcentaje ya está en los tiles: acá solo la cifra, que a 390 px
+          // cabe en una línea.
+          display: money(entry.amount),
+        }))}
+      />
+
+      {report.months.length > 1 ? (
+        <BarRows
+          axis={monthAxis}
+          data={report.months.map((month) => ({
+            id: month.month,
+            name: month.label,
+            value: month.total,
+            display: money(month.total),
+            // Corto a propósito: el valor no se parte de línea y un texto largo
+            // le come el ancho a la pista. El detalle va en la tabla.
+            meta: `${share(month.byMethod[0].share)} efectivo`,
+            // El cuarto tono, no el primero: azul y naranja ya son efectivo y
+            // transferencia en la barra de arriba, y un mes azul se leería
+            // como "todo en efectivo". Los otros meses en gris.
+            seriesIndex: 3,
+            emphasis: month.inPeriod,
+          }))}
+        />
+      ) : null}
+    </ChartFrame>
   );
 }
 

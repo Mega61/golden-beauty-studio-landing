@@ -59,6 +59,7 @@ import {
 } from "./ea-sql";
 import { monthsInPeriod, type AdSpendEntry } from "./acquisition";
 import { legacyReportRows, type LegacyRawRow, type LegacyReportRow } from "./legacy-blend";
+import type { LegacyPaymentRow } from "./legacy-payments";
 import { legacyStartToWallClock } from "../clientes/history";
 import { addDays, eachDay, type Period } from "./period";
 import { dayWindow, windowOverRange, type DayWindow } from "./occupancy";
@@ -96,6 +97,14 @@ export type ReportData = {
   legacy: LegacyReportRow[];
   /** Lo mismo para el periodo anterior, solo para el delta de ventas. */
   previousLegacy: LegacyReportRow[];
+  /**
+   * **Todos** los pagos del historial de Agenda Pro (`legacy_payment`, `025`):
+   * el periodo y la serie por mes salen de acá (`legacy-payments.ts`). Son unos
+   * cientos de filas y no crecen: Agenda Pro ya no cobra. `null` = no se pudo
+   * leer (la `025` no está aplicada o la base no respondió), que **no** es lo
+   * mismo que "no hay pagos importados" (`[]`).
+   */
+  legacyPayments: LegacyPaymentRow[] | null;
   commissionEntries: CommissionEntryRow[];
   /**
    * La comisión ya calculada de las **cortesías de la casa** del periodo, por
@@ -308,6 +317,9 @@ export async function loadReports(
   let previousFinance: FinanceRow[] = [];
   let legacyVisits: ReportData["legacyVisits"] = [];
   let legacyRaw: LegacyRawRow[] = [];
+  // `source_id` → id de la fila, para marcar las cortesías una vez leídos los
+  // pagos (que enlazan por id).
+  const legacyIdBySource = new Map<string, number>();
   let stations = 0;
   let db: ReturnType<typeof getDb> | null = null;
 
@@ -327,6 +339,7 @@ export async function loadReports(
     finance = current;
     previousFinance = previous;
     stations = stationCount;
+    for (const row of legacy) legacyIdBySource.set(row.source_id, row.id);
     legacyRaw = legacy.map((row) => ({
       sourceId: row.source_id,
       // La inversa exacta de lo que hizo el driver, como en la ficha y en la
@@ -404,6 +417,45 @@ export async function loadReports(
     }
   }
 
+  // --- Pagos del historial de Agenda Pro -------------------------------
+  //
+  // Aparte, por la misma razón que `ad_spend`: sin la `025` aplicada los demás
+  // reportes siguen en pie, y el reparto por método simplemente no aparece.
+  let legacyPayments: LegacyPaymentRow[] | null = null;
+  if (db !== null) {
+    try {
+      const rows = await repositories(db).legacyPayments.listByPaidRange(
+        new Date(2000, 0, 1),
+        new Date(2100, 0, 1),
+      );
+      legacyPayments = rows.map((row) => ({
+        saleKey: row.sale_id ?? `tx:${row.source_tx_id}`,
+        // La misma inversa del driver que el resto del historial.
+        paidAt: legacyStartToWallClock(row.paid_at),
+        amount: row.amount,
+        tip: row.tip,
+        method: row.method,
+        courtesy: Number(row.is_courtesy) === 1,
+      }));
+
+      // Una cita heredada cuyo pago es de cortesía sigue siendo cita, pero no
+      // venta: `legacy-blend.ts` la saca de lo vendido y la muestra aparte.
+      const courtesyIds = new Set(
+        rows.flatMap((row) =>
+          Number(row.is_courtesy) === 1 && row.legacy_appointment_id !== null ? [row.legacy_appointment_id] : [],
+        ),
+      );
+      if (courtesyIds.size > 0) {
+        legacyRaw = legacyRaw.map((row) => ({
+          ...row,
+          courtesy: courtesyIds.has(legacyIdBySource.get(row.sourceId) ?? -1),
+        }));
+      }
+    } catch (error) {
+      console.error("[reportes] no se pudo leer legacy_payment", error);
+    }
+  }
+
   // --- Comisiones ---------------------------------------------------------
   //
   // Depende de las dos: la lista de técnicas viene de EA y los renglones de
@@ -474,6 +526,7 @@ export async function loadReports(
     legacyVisits,
     legacy: legacyRows,
     previousLegacy: previousLegacyRows,
+    legacyPayments,
     commissionEntries,
     courtesyCommissions,
     adSpend,

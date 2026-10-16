@@ -27,7 +27,7 @@
 
 import type { Appointment, EaLocalDateTime } from "@/lib/ea";
 import { compareEaLocal, parseEaLocalDateTime } from "@/lib/ea";
-import type { LegacyAppointment } from "@/db/types";
+import type { LegacyAppointment, PaymentMethod } from "@/db/types";
 
 import { eaStatusToken } from "./ea-status";
 
@@ -60,7 +60,31 @@ export type HistoryEntry = {
    * bajaría el total gastado de la clienta sin que nadie lo note.
    */
   amountCharged: number | null;
+  /**
+   * Cómo se pagó, si se sabe. Hoy solo lo trae el historial de Agenda Pro
+   * (`legacy_payment`, enlazado por el importador de pagos); vacío = no se
+   * sabe, nunca "no se pagó". Varios = pago dividido, en el orden del panel.
+   */
+  paymentMethods: PaymentMethod[];
+  /**
+   * Cortesía (sin cobro a la clienta): la dueña, su hermana, Juan. El estudio
+   * recibió $0 y la técnica sí cobró su comisión. Es visita, pero su monto no
+   * entra a "total gastado".
+   */
+  courtesy: boolean;
 };
+
+/**
+ * Un pago del historial de Agenda Pro enlazado a una de sus citas. Solo lo que
+ * la ficha necesita: a qué cita va y con qué se pagó.
+ */
+export type LegacyPaymentLink = {
+  legacyAppointmentId: number;
+  method: PaymentMethod;
+  courtesy: boolean;
+};
+
+const METHOD_ORDER: readonly PaymentMethod[] = ["efectivo", "transferencia", "otro"];
 
 export type HistorySummary = {
   /** Renglones en total, de las dos mitades. */
@@ -69,7 +93,7 @@ export type HistorySummary = {
   visits: number;
   cancellations: number;
   noShows: number;
-  /** Suma de lo cobrado en las visitas con monto conocido. */
+  /** Suma de lo cobrado en las visitas con monto conocido, sin cortesías. */
   totalSpent: number;
   /**
    * `true` si alguna visita no tenía monto. La ficha escribe "$X o más" en vez
@@ -159,8 +183,25 @@ function legacyOutcome(rawStatus: string | null): HistoryOutcome {
 export function buildUnifiedHistory(
   ea: readonly EaHistoryInput[],
   legacy: readonly LegacyAppointment[],
+  legacyPayments: readonly LegacyPaymentLink[] = [],
 ): UnifiedHistory {
   const entries: HistoryEntry[] = [];
+
+  // Métodos por cita heredada. Un pago dividido deja dos; se muestran los dos
+  // en un orden fijo, para que la misma cita no cambie de texto entre renders.
+  const methodsByAppointment = new Map<number, Set<PaymentMethod>>();
+  const courtesyAppointments = new Set<number>();
+  for (const payment of legacyPayments) {
+    if (payment.courtesy) {
+      // En una cortesía no hubo medio de pago: el que diga Agenda Pro es un
+      // registro, no plata. Se muestra "Cortesía" en su lugar.
+      courtesyAppointments.add(payment.legacyAppointmentId);
+      continue;
+    }
+    const set = methodsByAppointment.get(payment.legacyAppointmentId) ?? new Set<PaymentMethod>();
+    set.add(payment.method);
+    methodsByAppointment.set(payment.legacyAppointmentId, set);
+  }
 
   for (const row of ea) {
     const rawStatus = row.appointment.status;
@@ -173,10 +214,13 @@ export function buildUnifiedHistory(
       rawStatus,
       outcome: eaOutcome(rawStatus),
       amountCharged: row.amountCharged,
+      paymentMethods: [],
+      courtesy: false,
     });
   }
 
   for (const row of legacy) {
+    const methods = methodsByAppointment.get(row.id);
     entries.push({
       id: `legacy-${row.source_id}`,
       source: "legacy",
@@ -186,6 +230,8 @@ export function buildUnifiedHistory(
       rawStatus: row.status,
       outcome: legacyOutcome(row.status),
       amountCharged: row.amount_charged,
+      paymentMethods: methods === undefined ? [] : METHOD_ORDER.filter((method) => methods.has(method)),
+      courtesy: courtesyAppointments.has(row.id),
     });
   }
 
@@ -212,10 +258,11 @@ function summarize(entries: readonly HistoryEntry[]): HistorySummary {
     if (entry.outcome !== "atendida") continue;
 
     visits += 1;
-    if (entry.amountCharged === null) {
-      totalIsPartial = true;
-    } else {
-      totalSpent += entry.amountCharged;
+    // Una cortesía es visita, pero no plata que la clienta gastó: ni suma ni
+    // vuelve parcial el total.
+    if (!entry.courtesy) {
+      if (entry.amountCharged === null) totalIsPartial = true;
+      else totalSpent += entry.amountCharged;
     }
 
     if (lastVisit === null || compareEaLocal(entry.start, lastVisit) > 0) {
