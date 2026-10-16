@@ -57,6 +57,8 @@ import {
   type EaProvider,
 } from "./ea-sql";
 import { monthsInPeriod, type AdSpendEntry } from "./acquisition";
+import { legacyReportRows, type LegacyRawRow, type LegacyReportRow } from "./legacy-blend";
+import { legacyStartToWallClock } from "../clientes/history";
 import { addDays, eachDay, type Period } from "./period";
 import { dayWindow, windowOverRange, type DayWindow } from "./occupancy";
 import type { WorkingPlanException } from "@/lib/ea";
@@ -85,6 +87,14 @@ export type ReportData = {
     kind: LegacyStatusKind;
     attended: boolean;
   }[];
+  /**
+   * El historial de Agenda Pro **del periodo**, sin las filas que ya existen
+   * como cita de EA. Lo leen solo los reportes donde es honesto: ventas, citas
+   * e inasistencia (ver `legacy-blend.ts`). Nunca la caja ni las comisiones.
+   */
+  legacy: LegacyReportRow[];
+  /** Lo mismo para el periodo anterior, solo para el delta de ventas. */
+  previousLegacy: LegacyReportRow[];
   commissionEntries: CommissionEntryRow[];
   /**
    * La inversión en anuncios de los meses que toca el periodo (`ad_spend`).
@@ -289,6 +299,7 @@ export async function loadReports(
   let finance: FinanceRow[] = [];
   let previousFinance: FinanceRow[] = [];
   let legacyVisits: ReportData["legacyVisits"] = [];
+  let legacyRaw: LegacyRawRow[] = [];
   let stations = 0;
   let db: ReturnType<typeof getDb> | null = null;
 
@@ -308,6 +319,18 @@ export async function loadReports(
     finance = current;
     previousFinance = previous;
     stations = stationCount;
+    legacyRaw = legacy.map((row) => ({
+      sourceId: row.source_id,
+      // La inversa exacta de lo que hizo el driver, como en la ficha y en la
+      // agenda. Ver `legacyStartToWallClock`.
+      start: legacyStartToWallClock(row.started_at),
+      serviceName: row.service_name,
+      providerName: row.provider_name,
+      amountCharged: row.amount_charged,
+      status: row.status,
+      customerKey: row.client_phone_e164,
+      clientName: row.client_name,
+    }));
     legacyVisits = legacy.map((row) => ({
       customerKey: row.client_phone_e164,
       at: instantToEaLocal(row.started_at),
@@ -393,6 +416,26 @@ export async function loadReports(
 
   const { studioWindow, providerWindows } = windowsFor(providers, days, exceptions);
 
+  // El historial se recorta y se deduplica contra **toda** la historia de EA
+  // leída (no solo la del periodo), así el periodo anterior también descarta
+  // las reservas que se recrearon en EA. Sin EA no hay contra qué deduplicar ni
+  // a quién casar por nombre, y se sigue igual: el historial se muestra con el
+  // nombre de Agenda Pro, que es lo que el dato dice.
+  const providerRows = providers.map((provider) => ({ id: provider.id, name: provider.name }));
+  const eaForDedupe = visitHistory.length > 0 ? visitHistory : appointments;
+  const legacyRows = legacyReportRows(
+    legacyRaw,
+    { from: period.from, to: period.to },
+    eaForDedupe,
+    providerRows,
+  );
+  const previousLegacyRows = legacyReportRows(
+    legacyRaw,
+    { from: previousFrom, to: previousTo },
+    eaForDedupe,
+    providerRows,
+  );
+
   return {
     period,
     days,
@@ -403,6 +446,8 @@ export async function loadReports(
     appointments,
     visitHistory,
     legacyVisits,
+    legacy: legacyRows,
+    previousLegacy: previousLegacyRows,
     commissionEntries,
     adSpend,
     stations,

@@ -746,6 +746,8 @@ export type NoShowReport = {
    * `appointment_status_options` en EA.
    */
   unmapped: string[];
+  /** Cuántas de las citas contadas vienen del historial de Agenda Pro. */
+  legacyCount: number;
   /**
    * ⚠ **El origen de la reserva no se puede reportar, y no es un olvido.**
    *
@@ -767,7 +769,16 @@ export type NoShowReport = {
   originAvailable: false;
 };
 
-export function noShowReport(appointments: readonly AppointmentRow[]): NoShowReport {
+export function noShowReport(
+  appointments: readonly AppointmentRow[],
+  /**
+   * Citas del historial de Agenda Pro del periodo, ya traducidas por
+   * `legacyNoShowInputs()`. Entran al conteo igual que las de EA: la pregunta
+   * "¿esta franja falla?" no cambia porque la cita se haya agendado en otro
+   * sistema. Por defecto ninguna.
+   */
+  legacy: readonly { start: EaLocalDateTime; token: StatusToken }[] = [],
+): NoShowReport {
   const byToken = (row: AppointmentRow): StatusToken => mapEaStatus(row.status);
 
   const unmapped: string[] = [];
@@ -780,20 +791,28 @@ export function noShowReport(appointments: readonly AppointmentRow[]): NoShowRep
     unmapped.push(label);
   }
 
-  const countable = appointments.filter((row) => byToken(row) !== "desconocido");
+  // Una sola lista de `{ start, token }` para las dos fuentes. Lo desconocido
+  // de EA queda fuera del denominador, como siempre; el historial ya llega
+  // traducido y nunca es desconocido.
+  const countable: { start: EaLocalDateTime; token: StatusToken }[] = [
+    ...appointments
+      .map((row) => ({ start: row.start, token: byToken(row) }))
+      .filter((row) => row.token !== "desconocido"),
+    ...legacy,
+  ];
 
   const ids: SlotId[] = [...SLOTS.map((slot) => slot.id), "fuera"];
 
   const slots = ids
     .map((slot): NoShowSlot => {
       const own = countable.filter((row) => slotOf(row.start) === slot);
-      const noShows = own.filter((row) => byToken(row) === "no-asistio").length;
+      const noShows = own.filter((row) => row.token === "no-asistio").length;
       return {
         slot,
         label: SLOTS.find((entry) => entry.id === slot)?.label ?? "Fuera de horario",
         scheduled: own.length,
         noShows,
-        cancelled: own.filter((row) => byToken(row) === "cancelada").length,
+        cancelled: own.filter((row) => row.token === "cancelada").length,
         rate: own.length === 0 ? null : noShows / own.length,
       };
     })
@@ -801,44 +820,26 @@ export function noShowReport(appointments: readonly AppointmentRow[]): NoShowRep
     // fila vacía permanente enseña a ignorar la última fila de la tabla.
     .filter((slot) => slot.slot !== "fuera" || slot.scheduled > 0);
 
-  const noShows = countable.filter((row) => byToken(row) === "no-asistio").length;
+  const noShows = countable.filter((row) => row.token === "no-asistio").length;
 
   return {
     slots,
     scheduled: countable.length,
     noShows,
-    cancelled: countable.filter((row) => byToken(row) === "cancelada").length,
+    cancelled: countable.filter((row) => row.token === "cancelada").length,
     rate: countable.length === 0 ? null : noShows / countable.length,
     unmapped,
+    legacyCount: legacy.length,
     originAvailable: false,
   };
 }
 
 // ── El estado de una fila de Agenda Pro ─────────────────────────────────────
-
-/** Lo que se puede saber de una cita heredada, a partir de su texto libre. */
-export type LegacyStatusKind = "atendida" | "no-asistio" | "cancelada";
-
-/**
- * El estado de una fila de `legacy_appointment`, leído de su texto libre.
- *
- * El histórico de Agenda Pro guarda el estado como texto suyo, no el de EA, y
- * el export no trae una lista cerrada. Por eso la lectura es por **exclusión**:
- * es atendida la que no dice que se cayó. Descartar todo lo que no se
- * reconozca borraría la clientela heredada de los reportes, que es exactamente
- * lo que `legacy_appointment` existe para evitar.
- *
- * Vive acá, una sola vez, porque la usan tres lugares —la unión EA + legacy
- * de "clienta nueva", la demanda por día y hora, y la exportación para Meta—
- * y una segunda expresión regular en otro archivo es una segunda definición de
- * "atendida" que tarde o temprano se separa de la primera.
- */
-export function legacyStatusKind(status: string | null | undefined): LegacyStatusKind {
-  const text = status ?? "";
-  if (/cancel/i.test(text)) return "cancelada";
-  if (/no.?asis|no.?show/i.test(text)) return "no-asistio";
-  return "atendida";
-}
+//
+// La regla vive en `lib/legacy-history.ts` (una sola definición de "atendida"
+// para todo el panel) y se reexporta acá para no cambiarles el import a los
+// tres lugares que ya la leían de este archivo.
+export { legacyStatusKind, type LegacyStatusKind } from "@/lib/legacy-history";
 
 // ── Visitas para el reporte de clientas ─────────────────────────────────────
 

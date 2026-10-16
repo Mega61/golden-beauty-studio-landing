@@ -3,7 +3,7 @@ import { formatDateLong, formatTimeRange } from "../ui/format";
 import { STATUS_META } from "../ui/status";
 import styles from "./calendar.module.css";
 import { mapEaStatus } from "./status-map";
-import type { MetaIndex } from "./types";
+import type { HistoryIndex, MetaIndex } from "./types";
 
 /**
  * La hoja de ruta del día: lo que la recepción pega en el mesón.
@@ -22,10 +22,13 @@ import type { MetaIndex } from "./types";
 export function DaySheet({
   days,
   meta,
+  history,
   studio = "Golden Beauty Studio",
 }: {
   days: readonly DayGrid[];
   meta: MetaIndex;
+  /** Las citas de Agenda Pro salen marcadas también en papel. */
+  history?: HistoryIndex;
   studio?: string;
 }) {
   return (
@@ -57,7 +60,9 @@ export function DaySheet({
                           {info?.service ? ` — ${info.service}` : ""}
                         </span>
                         <span className={styles.sheetState}>
-                          {STATUS_META[mapEaStatus(event.appointment.status)].label}
+                          {history?.[event.appointment.id]
+                            ? `${history[event.appointment.id].source} · ${history[event.appointment.id].statusLabel}`
+                            : STATUS_META[mapEaStatus(event.appointment.status)].label}
                         </span>
                       </div>
                     );

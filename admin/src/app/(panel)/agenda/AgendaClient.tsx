@@ -38,6 +38,16 @@ import { AppointmentForm, type AppointmentDraft } from "./AppointmentForm";
 import { BlockForm } from "./BlockForm";
 import type { BlockForm as BlockFormValues } from "./block-resource";
 import type { AgendaData } from "./data";
+import {
+  isLegacyAgendaId,
+  LEGACY_KIND_LABEL,
+  LEGACY_LANE_ID,
+  legacyHistoryIndex,
+  legacyIndex,
+  legacyLayerForDay,
+  legacyMeta,
+  type LegacyAgendaItem,
+} from "./legacy";
 
 /**
  * La pantalla de la agenda, del lado del navegador.
@@ -84,6 +94,8 @@ const SIDE_PANEL_QUERY = "(min-width: 90rem)";
 type PanelState =
   | { kind: "none" }
   | { kind: "detail"; appointment: Appointment }
+  /** Una cita del historial de Agenda Pro: solo se mira. */
+  | { kind: "legacy"; item: LegacyAgendaItem }
   | { kind: "form"; draft: AppointmentDraft }
   | { kind: "block"; date: EaLocalDate; providerId: number | null };
 
@@ -212,10 +224,21 @@ export function AgendaClient({
     [data.providers, dates, expand],
   );
 
+  // El historial de Agenda Pro entra **solo** a la entrada de la grilla, como
+  // citas sintéticas de id negativo (ver `legacy.ts`). `data.appointments` no
+  // se toca: el formulario, los avisos y las escrituras nunca las ven.
+  const legacyById = useMemo(() => legacyIndex(data.legacy ?? []), [data.legacy]);
+  const history = useMemo(() => legacyHistoryIndex(data.legacy ?? []), [data.legacy]);
+  const gridMeta = useMemo(
+    () => ({ ...data.meta, ...legacyMeta(data.legacy ?? []) }),
+    [data.meta, data.legacy],
+  );
+
   const grids: DayGrid[] = useMemo(
     () =>
-      dates.map((date) =>
-        buildDayGrid({
+      dates.map((date) => {
+        const legacy = legacyLayerForDay(data.legacy ?? [], data.providers, date);
+        return buildDayGrid({
           range: {
             date,
             startMinute: window_.startMinute,
@@ -225,15 +248,20 @@ export function AgendaClient({
             // cambiar de paso según qué cita se mire.
             slotMinutes: 15,
           },
-          providers: data.providers,
-          appointments: data.appointments,
+          providers: legacy.providers,
+          appointments: [...data.appointments, ...legacy.appointments],
           unavailabilities: data.unavailabilities,
           blockedPeriods: data.blockedPeriods,
           now,
-        }),
-      ),
+        });
+      }),
     [dates, window_, data, now],
   );
+
+  const legacyVisible = useMemo(() => {
+    const visible = new Set<string>(dates);
+    return (data.legacy ?? []).filter((item) => visible.has(item.start.slice(0, 10))).length;
+  }, [data.legacy, dates]);
 
   const orphans = grids[0]?.orphanAppointments ?? [];
   const unknown = useMemo(
@@ -476,7 +504,9 @@ export function AgendaClient({
   const readOnly = !canWrite || failure !== null;
 
   const detail =
-    panel.kind === "detail" ? (
+    panel.kind === "legacy" ? (
+      <LegacyDetail item={panel.item} />
+    ) : panel.kind === "detail" ? (
       <AppointmentDetail
         appointment={panel.appointment}
         meta={data.meta}
@@ -539,7 +569,9 @@ export function AgendaClient({
         : "Editar cita"
       : panel.kind === "block"
         ? "Bloquear"
-        : "Cita";
+        : panel.kind === "legacy"
+          ? "Cita de Agenda Pro"
+          : "Cita";
 
   return (
     <div className={styles.frame}>
@@ -589,6 +621,7 @@ export function AgendaClient({
         unknown={unknown}
         moving={movingId !== null}
         onCancelMove={() => setMovingId(null)}
+        legacy={legacyVisible}
       />
 
       {data.providers.length === 0 ? (
@@ -602,14 +635,31 @@ export function AgendaClient({
           <div className={styles.rowMain}>
             <ResourceGrid
               days={grids}
-              meta={data.meta}
+              meta={gridMeta}
+              history={history}
+              readOnlyColumns={[LEGACY_LANE_ID]}
               today={today}
-              selectedId={panel.kind === "detail" ? panel.appointment.id : null}
+              selectedId={
+                panel.kind === "detail"
+                  ? panel.appointment.id
+                  : panel.kind === "legacy"
+                    ? panel.item.id
+                    : null
+              }
               movingId={movingId}
               pendingIds={pendingIds}
               readOnly={readOnly}
               onPickSlot={onPickSlot}
-              onPickAppointment={(appointment) => setPanel({ kind: "detail", appointment })}
+              onPickAppointment={(appointment) => {
+                // Un bloque de historial abre su detalle de solo lectura, nunca
+                // el de una cita de EA (que trae Editar, Mover y Cancelar).
+                if (isLegacyAgendaId(appointment.id)) {
+                  const item = legacyById[appointment.id];
+                  if (item) setPanel({ kind: "legacy", item });
+                  return;
+                }
+                setPanel({ kind: "detail", appointment });
+              }}
               onMove={onMove}
               onResize={onResize}
               onRevealHidden={(direction) =>
@@ -639,13 +689,13 @@ export function AgendaClient({
           open={panel.kind !== "none"}
           onClose={() => setPanel({ kind: "none" })}
           title={panelTitle}
-          dismissable={panel.kind === "detail"}
+          dismissable={panel.kind === "detail" || panel.kind === "legacy"}
         >
           {body}
         </Panel>
       ) : null}
 
-      <DaySheet days={grids} meta={data.meta} />
+      <DaySheet days={grids} meta={gridMeta} history={history} />
     </div>
   );
 }
@@ -660,17 +710,37 @@ function Notices({
   unknown,
   moving,
   onCancelMove,
+  legacy,
 }: {
   failure: string | null;
   orphans: number;
   unknown: readonly string[];
   moving: boolean;
   onCancelMove: () => void;
+  /** Cuántas citas del historial de Agenda Pro hay en los días visibles. */
+  legacy: number;
 }) {
-  if (!failure && orphans === 0 && unknown.length === 0 && !moving) return null;
+  if (!failure && orphans === 0 && unknown.length === 0 && !moving && legacy === 0) return null;
 
   return (
     <div className={styles.notices}>
+      {/* Dicho en texto y no solo con el atenuado: sin esta línea, alguien
+          que vea un bloque rayado va a intentar editarlo y no va a saber por
+          qué no puede. */}
+      {legacy > 0 ? (
+        <div className={styles.notice} role="status">
+          <span>
+            <strong>
+              {legacy === 1
+                ? "1 cita del historial de Agenda Pro"
+                : `${legacy} citas del historial de Agenda Pro`}
+            </strong>{" "}
+            en estos días. Se ven rayadas y son de solo lectura: no se editan, no se mueven y no
+            pasan por caja.
+          </span>
+        </div>
+      ) : null}
+
       {moving ? (
         <div className={styles.notice} role="status">
           <span style={{ flex: 1 }}>
@@ -795,6 +865,57 @@ function AppointmentDetail({
           </Button>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * El detalle de una cita de Agenda Pro. Sin un solo botón de acción, a
+ * propósito: no existe en EA, ya se cobró en su momento y su plata ya está en
+ * Actual Budget. Lo único que se puede hacer es mirarla.
+ */
+function LegacyDetail({ item }: { item: LegacyAgendaItem }) {
+  return (
+    <div className={styles.detail}>
+      <div className={styles.detailRows}>
+        <span className={styles.detailKey}>Origen</span>
+        <span className={styles.detailValue}>Historial de Agenda Pro · solo lectura</span>
+
+        <span className={styles.detailKey}>Cliente</span>
+        <span className={styles.detailValue}>{item.clientName ?? "Sin cliente"}</span>
+
+        {item.phone ? (
+          <>
+            <span className={styles.detailKey}>Teléfono</span>
+            <span className={styles.detailValue}>
+              <a href={`tel:${item.phone}`}>{formatPhoneCO(item.phone)}</a>
+            </span>
+          </>
+        ) : null}
+
+        <span className={styles.detailKey}>Servicio</span>
+        <span className={styles.detailValue}>{item.serviceName}</span>
+
+        <span className={styles.detailKey}>Quien atendió</span>
+        <span className={styles.detailValue}>{item.providerName ?? "Sin registrar"}</span>
+
+        <span className={styles.detailKey}>Cuándo</span>
+        <span className={styles.detailValue}>
+          {formatDateLong(item.start)} · {formatTimeRange(item.start, item.end)}
+          {item.durationDerived ? null : (
+            <>
+              {" "}
+              <em>(duración supuesta: Agenda Pro no guardó la hora de fin)</em>
+            </>
+          )}
+        </span>
+
+        <span className={styles.detailKey}>Estado</span>
+        <span className={styles.detailValue}>
+          {LEGACY_KIND_LABEL[item.kind]}
+          {item.status ? ` · «${item.status}» en Agenda Pro` : ""}
+        </span>
+      </div>
     </div>
   );
 }
