@@ -122,7 +122,9 @@ export async function POST(req: NextRequest) {
             appointmentId: result.appointmentId,
             // La clienta nunca se entera de que "cualquiera" fue una decisión
             // nuestra: ve un nombre.
-            provider: { id: result.providerId, name: result.providerName },
+            // Nombre de pila, como en el catálogo. El nombre completo queda para
+            // el aviso al celular del estudio, que es del equipo.
+            provider: { id: result.providerId, name: result.providerFirstName },
             start: result.start,
             end: result.end,
             whatsappConfirmation,
