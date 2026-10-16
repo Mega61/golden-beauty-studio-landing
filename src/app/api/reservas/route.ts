@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
   // has no idea what a honeypot is and shouldn't have to.
   const payload = {
     serviceId: body.serviceId,
+    thenServiceId: body.thenServiceId ?? null,
     date: body.date,
     time: body.time,
     providerId: body.providerId ?? null,

@@ -233,7 +233,7 @@
   "reservar": {
     "meta": {
       "title": "Reservar cita — Golden Beauty Studio",
-      "description": "Agenda tu cita en Golden Beauty Studio, Sabaneta. Elige el servicio, la técnica y la hora que te sirva."
+      "description": "Agenda tu cita en Golden Beauty Studio, Sabaneta. Elige el servicio, con quién y la hora que te sirva."
     },
     "eyebrow": "Reservar",
     "title": "Agenda tu cita",
@@ -251,13 +251,13 @@
     "provider": {
       "label": "¿Con quién?",
       "any": "Cualquiera",
-      "anyHint": "La primera con espacio"
+      "anyHint": "Quien tenga espacio primero"
     },
     "summary": {
       "title": "Tu cita",
       "empty": "Elige un servicio para empezar.",
       "with": "Con",
-      "anyone": "La primera disponible",
+      "anyone": "Quien esté disponible",
       "total": "Total",
       "pay": "Pagas en el estudio, en efectivo o por transferencia. Si aplica una promo, el descuento se hace al pagar."
     },
@@ -272,7 +272,7 @@
       "phone": "Celular",
       "phoneHint": "Aquí te confirmamos y te avisamos si algo cambia.",
       "phoneInvalid": "Revisa el número: un celular tiene 10 dígitos y empieza por 3.",
-      "notes": "Nota para la técnica",
+      "notes": "Nota para quien te atiende",
       "notesPlaceholder": "Un diseño que viste, una alergia, si vienes con alguien…",
       "addNote": "Agregar una nota",
       "remember": "Recordar mis datos en este dispositivo"
@@ -295,8 +295,9 @@
       "askFeet": "¿También pies?",
       "askHands": "¿También manos?",
       "none": "No, solo eso",
-      "hint": "En el mismo turno y con precio de combo.",
-      "saving": "Ahorras {amount}"
+      "hint": "Se agenda en la misma visita.",
+      "saving": "Ahorras {amount}",
+      "pairHint": "Dos servicios seguidos en la misma cita, sin esperas entre uno y otro."
     },
     "success": {
       "eyebrow": "Cita confirmada",
@@ -427,7 +428,7 @@
     ]
   },
   "tecnicas": {
-    "eyebrow": "Conoce las artistas",
+    "eyebrow": "Conoce al equipo",
     "title1": "La diferencia tiene",
     "title2_em": "nombre propio.",
     "team": [

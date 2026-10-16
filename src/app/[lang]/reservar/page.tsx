@@ -7,6 +7,7 @@ import Footer from "../_components/Footer";
 import ReservaFlow, { type Catalog, type ServiceCopy } from "./ReservaFlow";
 import { adminOrigin, bookingUrl } from "@/app/api/reservas/guards";
 import { getReviews } from "@/data/reviews";
+import { handsForFeet, serviceAreas } from "@/data/service-areas";
 
 /**
  * `/[lang]/reservar` — the booking flow.
@@ -167,6 +168,8 @@ export default async function ReservarPage({
               : null
           }
           copy={serviceCopy(dict.servicios.categories)}
+          areas={serviceAreas()}
+          handsForFeet={handsForFeet()}
           whatsappNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.trim() || null}
           mapsUrl={
             // Same shape as the footer's link: the documented Maps URL, pinned

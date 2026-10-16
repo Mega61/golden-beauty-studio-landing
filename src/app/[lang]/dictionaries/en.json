@@ -295,8 +295,9 @@
       "askFeet": "Feet too?",
       "askHands": "Hands too?",
       "none": "No, just that",
-      "hint": "Same visit, combo price.",
-      "saving": "You save {amount}"
+      "hint": "Booked in the same visit.",
+      "saving": "You save {amount}",
+      "pairHint": "Two services back to back in the same appointment, no wait in between."
     },
     "success": {
       "eyebrow": "Appointment confirmed",

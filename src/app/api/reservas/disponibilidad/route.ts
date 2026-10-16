@@ -32,9 +32,11 @@ export async function GET(req: NextRequest) {
 
   const params = req.nextUrl.searchParams;
   const query = new URLSearchParams();
-  // Only the three parameters the panel knows. Forwarding the whole query
+  // Only the parameters the panel knows. Forwarding the whole query
   // string would let a caller smuggle anything we later add to the sub-API.
-  for (const key of ["serviceId", "date", "providerId"]) {
+  // `thenServiceId`: the second half of a hands + feet pair, booked right
+  // after the first with the same professional.
+  for (const key of ["serviceId", "thenServiceId", "date", "providerId"]) {
     const value = params.get(key);
     if (value !== null && value !== "") query.set(key, value);
   }

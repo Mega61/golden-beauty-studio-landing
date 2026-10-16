@@ -76,7 +76,17 @@ type Slot = { time: string; start: string; end: string; providerIds: number[] };
  */
 type Combo = { serviceId: number; handsServiceId: number; feetServiceId: number };
 
-export type Catalog = { services: Service[]; providers: Provider[]; combos: Combo[] };
+export type Catalog = {
+  services: Service[];
+  providers: Provider[];
+  combos: Combo[];
+  /**
+   * The panel can book a pair without a combo as two appointments in a row.
+   * Older panels don't send it, and then only combos can be composed — a pair
+   * offered to a panel that can't chain would book the first half only.
+   */
+  chained?: boolean;
+};
 
 export type ServiceCopy = { name: string; desc: string; category: string; categoryId: string };
 
@@ -111,7 +121,7 @@ type Dict = {
   nextOpen: string;
   loadingSlots: string;
   pickDate: string;
-  combo: { askFeet: string; askHands: string; none: string; hint: string; saving: string };
+  combo: { askFeet: string; askHands: string; none: string; hint: string; saving: string; pairHint: string };
   trust: { reviews: string; ratingOnly: string; instant: string; pay: string; change: string };
   studio: { name: string; area: string; hours: string; address: string; directions: string; photoAlt: string };
   scarcity: { few: string; last: string };
@@ -178,6 +188,8 @@ export default function ReservaFlow({
   initialCatalog,
   rating,
   copy,
+  areas,
+  handsForFeet,
   whatsappNumber,
   mapsUrl,
 }: {
@@ -192,6 +204,10 @@ export default function ReservaFlow({
   /** Google rating, for the trust line. Null hides it. */
   rating: { value: number; count: number } | null;
   copy: Record<string, ServiceCopy>;
+  /** Price-list id → hands / feet. See `data/service-areas.ts`. */
+  areas: Record<string, "hands" | "feet">;
+  /** Price-list ids a feet service can be paired with. */
+  handsForFeet: string[];
   whatsappNumber: string | null;
   mapsUrl: string;
 }) {
@@ -206,6 +222,12 @@ export default function ReservaFlow({
   // "hands" under her finger when she adds the partner; the actual pair is
   // derived from `service`.
   const [firstPick, setFirstPick] = useState<number | null>(null);
+  /**
+   * The second half of a pair that has no combo: booked as its own
+   * appointment right after `service`, same professional. Null otherwise —
+   * a pair that *has* a combo is the combo service itself, in `service`.
+   */
+  const [addOn, setAddOn] = useState<Service | null>(null);
   const [providerId, setProviderId] = useState<number | null>(null);
   const [date, setDate] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[] | null>(null);
@@ -391,7 +413,7 @@ export default function ReservaFlow({
     ? baseId === composed.handsServiceId
       ? composed.feetServiceId
       : composed.handsServiceId
-    : null;
+    : (addOn?.id ?? null);
 
   const base = useMemo(
     () => catalog?.services.find((s) => s.id === baseId) ?? null,
@@ -406,9 +428,23 @@ export default function ReservaFlow({
         if (c.handsServiceId === id) ids.add(c.feetServiceId);
         else if (c.feetServiceId === id) ids.add(c.handsServiceId);
       }
+      // Without a combo, any hands service takes any feet service — and a feet
+      // service the simple hands ones — as a plain sum. Only when the panel
+      // can book two appointments in a row.
+      const self = catalog.services.find((s) => s.id === id);
+      const area = self?.slug ? areas[self.slug] : undefined;
+      if (catalog.chained && area) {
+        const wanted =
+          area === "hands"
+            ? (slug: string) => areas[slug] === "feet"
+            : (slug: string) => handsForFeet.includes(slug);
+        for (const s of catalog.services) {
+          if (s.id !== id && !s.isCombo && s.slug && wanted(s.slug)) ids.add(s.id);
+        }
+      }
       return catalog.services.filter((s) => ids.has(s.id));
     },
-    [catalog],
+    [catalog, areas, handsForFeet],
   );
 
   const partners = useMemo(() => partnersOf(baseId), [partnersOf, baseId]);
@@ -425,8 +461,10 @@ export default function ReservaFlow({
   };
 
   const baseIsFeet = useMemo(
-    () => (catalog?.combos ?? []).some((c) => c.feetServiceId === baseId),
-    [catalog, baseId],
+    () =>
+      (catalog?.combos ?? []).some((c) => c.feetServiceId === baseId) ||
+      (base?.slug ? areas[base.slug] === "feet" : false),
+    [catalog, baseId, base, areas],
   );
 
   /**
@@ -444,6 +482,24 @@ export default function ReservaFlow({
     return saving > 0 ? { price, saving } : null;
   }, [composed, service, catalog]);
 
+  /**
+   * What's being booked, as one visit: a service, a combo, or a pair. For a
+   * pair the price and the time are the plain sum — two appointments, one
+   * after the other — and everything on screen reads from here.
+   */
+  const visit: Service | null = service
+    ? addOn
+      ? {
+          ...service,
+          durationMin: service.durationMin + addOn.durationMin,
+          priceCOP: service.priceCOP + addOn.priceCOP,
+        }
+      : service
+    : null;
+  /** The availability key: the service, or "first+then" for a pair. */
+  const bookingKey: number | string | null = service ? (addOn ? `${service.id}+${addOn.id}` : service.id) : null;
+  const visitName = service ? (addOn ? `${nameOf(service)} + ${nameOf(addOn)}` : nameOf(service)) : null;
+
   const resetSlot = () => {
     setSlot(null);
     setSlots(null);
@@ -452,6 +508,7 @@ export default function ReservaFlow({
   /** Pick in step 1. Undoes any combo. Moves on by itself when there's nothing to add. */
   const chooseService = (s: Service) => {
     setService(s);
+    setAddOn(null);
     setFirstPick(s.id);
     setProviderId(null);
     resetSlot();
@@ -469,11 +526,15 @@ export default function ReservaFlow({
    */
   const choosePartner = (partner: Service | null) => {
     if (!catalog || baseId === null) return;
-    const next = partner === null ? base : (comboWith(partner) ?? base);
+    // A combo, if the pair has one; otherwise the plain sum, as two
+    // appointments in a row (`addOn`).
+    const combo = partner === null ? null : comboWith(partner);
+    const next = combo ?? base;
     setService(next);
+    setAddOn(partner !== null && combo === null ? partner : null);
     setProviderId(null);
     resetSlot();
-    if (next) prefetchFirstDay(next);
+    if (next) prefetchFirstDay(next, partner !== null && combo === null ? partner : null);
     advanceTimer.current = window.setTimeout(() => go("slot"), 260);
   };
 
@@ -501,8 +562,12 @@ export default function ReservaFlow({
 
   const providers = useMemo(
     () =>
-      service && catalog ? catalog.providers.filter((p) => p.serviceIds.includes(service.id)) : [],
-    [catalog, service],
+      service && catalog
+        ? catalog.providers.filter(
+            (p) => p.serviceIds.includes(service.id) && (!addOn || p.serviceIds.includes(addOn.id)),
+          )
+        : [],
+    [catalog, service, addOn],
   );
   const chosenProvider = providers.find((p) => p.id === providerId) ?? null;
 
@@ -580,15 +645,19 @@ export default function ReservaFlow({
   /** Free-time count per day already seen — state, because the strip renders it. */
   const [knownLoads, setKnownLoads] = useState<Record<string, number>>({});
 
-  const keyOf = (serviceId: number, day: string, provider: number | null) =>
+  // `serviceId` may be "17+15" for a pair: the times for a pair are not the
+  // times for its first half.
+  const keyOf = (serviceId: number | string, day: string, provider: number | null) =>
     `${serviceId}|${day}|${provider ?? "any"}`;
 
   const fetchSlots = useCallback(
-    (serviceId: number, day: string, provider: number | null): Promise<Slot[] | null> => {
+    (serviceId: number | string, day: string, provider: number | null): Promise<Slot[] | null> => {
       const key = keyOf(serviceId, day, provider);
       const running = inflight.current.get(key);
       if (running) return running;
-      const query = new URLSearchParams({ serviceId: String(serviceId), date: day });
+      const [first, then] = String(serviceId).split("+");
+      const query = new URLSearchParams({ serviceId: first, date: day });
+      if (then) query.set("thenServiceId", then);
       if (provider !== null) query.set("providerId", String(provider));
       const p = fetch(`/api/reservas/disponibilidad?${query}`)
         .then(async (res) => {
@@ -606,7 +675,7 @@ export default function ReservaFlow({
     [],
   );
 
-  const cachedSlots = (serviceId: number, day: string, provider: number | null) => {
+  const cachedSlots = (serviceId: number | string, day: string, provider: number | null) => {
     const hit = slotCache.current.get(keyOf(serviceId, day, provider));
     return hit && Date.now() - hit.at < SLOT_TTL_MS ? hit.slots : null;
   };
@@ -615,14 +684,14 @@ export default function ReservaFlow({
   useEffect(() => {
     if (!service || !date || step === "service") return;
     let alive = true;
-    const key = keyOf(service.id, date, providerId);
-    const hit = cachedSlots(service.id, date, providerId);
+    const key = keyOf(bookingKey!, date, providerId);
+    const hit = cachedSlots(bookingKey!, date, providerId);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- show what we already know
     setSlots(hit);
     // Just fetched (the prefetch a moment ago): no second trip for the same answer.
     const age = Date.now() - (slotCache.current.get(key)?.at ?? 0);
     if (hit && age < FRESH_MS) return;
-    void fetchSlots(service.id, date, providerId).then((fresh) => {
+    void fetchSlots(bookingKey!, date, providerId).then((fresh) => {
       if (!alive) return;
       if (fresh) setSlots(fresh);
       else if (!hit) {
@@ -635,7 +704,7 @@ export default function ReservaFlow({
     };
     // `step` only gates the first fetch; leaving step 2 must not refetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [service, date, providerId, dict.errors.unavailable, fetchSlots, step === "service"]);
+  }, [service, bookingKey, date, providerId, dict.errors.unavailable, fetchSlots, step === "service"]);
 
   // Ahead of time: the next two open days, once this one has answered.
   useEffect(() => {
@@ -643,7 +712,7 @@ export default function ReservaFlow({
     const ahead = days.filter((d) => d > date && openDays.has(d)).slice(0, 2);
     const run = () => {
       for (const d of ahead) {
-        if (!cachedSlots(service.id, d, providerId)) void fetchSlots(service.id, d, providerId);
+        if (!cachedSlots(bookingKey!, d, providerId)) void fetchSlots(bookingKey!, d, providerId);
       }
     };
     const idle = window.requestIdleCallback?.(run, { timeout: 1500 }) ?? window.setTimeout(run, 400);
@@ -652,23 +721,26 @@ export default function ReservaFlow({
       else window.clearTimeout(idle);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, service, date, providerId, slots, days, openDays, fetchSlots]);
+  }, [step, service, bookingKey, date, providerId, slots, days, openDays, fetchSlots]);
 
   /**
    * The first day anyone could do `svc`, fetched now — during the beat between
    * the tap and step 2 — so the times are usually there when it slides in.
    */
-  const prefetchFirstDay = (svc: Service) => {
+  const prefetchFirstDay = (svc: Service, then: Service | null = null) => {
     if (!catalog) return;
-    const who = catalog.providers.filter((p) => p.serviceIds.includes(svc.id)).map((p) => p.schedule);
+    const key = then ? `${svc.id}+${then.id}` : svc.id;
+    const who = catalog.providers
+      .filter((p) => p.serviceIds.includes(svc.id) && (!then || p.serviceIds.includes(then.id)))
+      .map((p) => p.schedule);
     const first = days.find((d) => isDayOpen(d, who));
-    if (first && !cachedSlots(svc.id, first, null)) void fetchSlots(svc.id, first, null);
+    if (first && !cachedSlots(key, first, null)) void fetchSlots(key, first, null);
   };
 
   /** What the strip knows about a day it has already seen: full, nearly full, or nothing yet. */
   const dayLoad = (d: string): "full" | "few" | null => {
     if (!service) return null;
-    const known = knownLoads[keyOf(service.id, d, providerId)];
+    const known = knownLoads[keyOf(bookingKey!, d, providerId)];
     if (known === undefined) return null;
     if (known === 0) return "full";
     return known <= FEW_SLOTS ? "few" : null;
@@ -683,9 +755,9 @@ export default function ReservaFlow({
     service
       ? {
           content_ids: [service.slug ?? String(service.id)],
-          content_name: nameOf(service),
+          content_name: visitName,
           content_type: "product",
-          value: service.priceCOP,
+          value: visit?.priceCOP ?? service.priceCOP,
           currency: "COP",
         }
       : {};
@@ -718,6 +790,8 @@ export default function ReservaFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           serviceId: service.id,
+          // The second half of a pair: the panel books it right after, same professional.
+          thenServiceId: addOn?.id ?? null,
           date,
           time: slot.time,
           providerId,
@@ -729,7 +803,7 @@ export default function ReservaFlow({
           empresa: honeypotRef.current?.value ?? "",
           // For the server's copy of the Meta event, so both count as one.
           eventId,
-          value: service.priceCOP,
+          value: visit?.priceCOP ?? service.priceCOP,
           serviceSlug: service.slug ?? null,
         }),
       });
@@ -763,14 +837,14 @@ export default function ReservaFlow({
         } catch {
           // Storage blocked: nothing to remember, nothing lost.
         }
-        trackEvent("booking_confirmed", { service: service.slug ?? service.id, value: service.priceCOP, currency: "COP" });
+        trackEvent("booking_confirmed", { service: service.slug ?? service.id, value: visit?.priceCOP ?? service.priceCOP, currency: "COP" });
         trackMeta("Schedule", metaParams(), eventId);
         setBooked({
           name: form.firstName.trim(),
-          service: nameOf(service),
+          service: visitName ?? nameOf(service),
           date,
           time: slot.time,
-          durationMin: service.durationMin,
+          durationMin: visit?.durationMin ?? service.durationMin,
           provider: body.booking.provider.name,
           appointmentId: String(body.booking.appointmentId ?? `${date}-${slot.time}`),
           whatsappSent: body.booking.whatsappConfirmation === "sending",
@@ -784,12 +858,12 @@ export default function ReservaFlow({
       // Someone else took it. Back to the times, freshly loaded, so she picks
       // from what's real now instead of re-submitting into the same wall.
       if (body.reason === "taken") {
-        slotCache.current.delete(keyOf(service.id, date, providerId));
+        slotCache.current.delete(keyOf(bookingKey!, date, providerId));
         setSlot(null);
         setSlots(null);
         // The times effect keys on service/day/technician, none of which
         // changed — so the reload is explicit, or step 2 would spin forever.
-        void fetchSlots(service.id, date, providerId).then((fresh) => setSlots(fresh ?? []));
+        void fetchSlots(bookingKey!, date, providerId).then((fresh) => setSlots(fresh ?? []));
         setStep("slot");
         window.history.replaceState({ gbsStep: "slot" }, "");
         setError(dict.errors.taken);
@@ -825,6 +899,7 @@ export default function ReservaFlow({
         onAgain={() => {
           setBooked(null);
           setService(null);
+          setAddOn(null);
           setFirstPick(null);
           setProviderId(null);
           setDate(null);
@@ -850,8 +925,8 @@ export default function ReservaFlow({
     <Summary
       dict={dict}
       lang={lang}
-      service={service}
-      serviceName={service ? nameOf(service) : null}
+      service={visit}
+      serviceName={visitName}
       partsSum={partsSum}
       provider={chosenProvider?.name ?? null}
       date={step !== "service" ? date : null}
@@ -998,11 +1073,14 @@ export default function ReservaFlow({
                                       <span>{nameOf(p)}</span>
                                       {/* What the visit becomes, not "+75 min": a
                                           combo is shorter and cheaper than its parts. */}
-                                      {comboWith(p) && (
-                                        <span className="whitespace-nowrap text-[13px] text-ink-mute">
-                                          {formatCOP(comboWith(p)!.priceCOP, lang)}
-                                        </span>
-                                      )}
+                                      {/* The total the visit becomes: the combo's own
+                                          price, or the plain sum when there's no combo. */}
+                                      <span className="whitespace-nowrap text-[13px] text-ink-mute">
+                                        {formatCOP(
+                                          comboWith(p)?.priceCOP ?? (base?.priceCOP ?? 0) + p.priceCOP,
+                                          lang,
+                                        )}
+                                      </span>
                                     </PillChoice>
                                   </li>
                                 ))}
@@ -1012,6 +1090,14 @@ export default function ReservaFlow({
                                   </PillChoice>
                                 </li>
                               </ul>
+                              {addOn && visit && (
+                                <p className="mt-4 font-sans text-sm">
+                                  <span className="font-semibold text-ink">
+                                    {formatCOP(visit.priceCOP, lang)} · {formatDuration(visit.durationMin, lang)}
+                                  </span>
+                                  <span className="mt-0.5 block text-[12.5px] text-ink-mute">{dict.combo.pairHint}</span>
+                                </p>
+                              )}
                               {composed && service && (
                                 <p className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 font-sans text-sm">
                                   {partsSum && (
@@ -1344,7 +1430,7 @@ export default function ReservaFlow({
                     <>
                       {dict.confirm}
                       <span className="text-cream/50">·</span>
-                      <span className="normal-case tracking-normal text-cream">{formatCOP(service.priceCOP, lang)}</span>
+                      <span className="normal-case tracking-normal text-cream">{formatCOP(visit?.priceCOP ?? service.priceCOP, lang)}</span>
                     </>
                   )}
                 </button>
@@ -1369,13 +1455,13 @@ export default function ReservaFlow({
           className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 px-5 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 shadow-[0_-12px_30px_-18px_rgba(28,23,20,0.35)] backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-[640px] items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-[18px] leading-tight text-ink">{nameOf(service)}</p>
+              <p className="truncate font-display text-[18px] leading-tight text-ink">{visitName}</p>
               <p className="truncate font-sans text-[12px] text-ink-mute">
                 {step === "slot" && date && slot
                   ? `${weekdayShort(date, lang)} ${Number(date.slice(8))} · ${formatTime(slot.time, lang)}`
-                  : formatDuration(service.durationMin, lang)}
+                  : formatDuration(visit?.durationMin ?? service.durationMin, lang)}
                 {" · "}
-                <span className="font-semibold text-ink">{formatCOP(service.priceCOP, lang)}</span>
+                <span className="font-semibold text-ink">{formatCOP(visit?.priceCOP ?? service.priceCOP, lang)}</span>
               </p>
             </div>
             <button
