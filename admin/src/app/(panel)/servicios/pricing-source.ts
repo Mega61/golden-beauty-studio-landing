@@ -3,6 +3,8 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { SHOWCASE_PRICING_SOURCE } from "@/data/showcase-pricing";
+
 import { parsePricingSource, type PricingEntry } from "./pricing-parse";
 
 /**
@@ -10,8 +12,9 @@ import { parsePricingSource, type PricingEntry } from "./pricing-parse";
  *
  * En el repositorio, `pricing.ts` está un nivel arriba de `admin/`. En el
  * contenedor **no está**: la imagen del panel copia `admin/` y nada más. Por eso
- * la ruta es configurable y la ausencia del archivo es un estado de pantalla,
- * no una excepción.
+ * la imagen lleva una copia textual, generada por `scripts/build-combo-map.mjs`
+ * de la landing (`@/data/showcase-pricing`), que se usa cuando no hay ni
+ * `PRICING_SOURCE_PATH` ni archivo al lado.
  *
  * ## Lo que no puede pasar
  *
@@ -92,11 +95,34 @@ export async function loadPricingCatalog(
     }
   }
 
-  return {
-    ok: false,
-    error:
-      `${lastError} La vitrina vive en la landing, fuera de la imagen del panel: ` +
-      "hay que montar el archivo y apuntar PRICING_SOURCE_PATH a él.",
-    tried,
-  };
+  // Una ruta configurada a mano y ausente es un error de configuración, y se
+  // dice: caer a la copia horneada escondería que alguien apuntó a otro lado.
+  if (env.PRICING_SOURCE_PATH?.trim()) {
+    return {
+      ok: false,
+      error: `${lastError} PRICING_SOURCE_PATH apunta a un archivo que no está.`,
+      tried,
+    };
+  }
+
+  // Sin configuración y sin la landing al lado —el contenedor—: la copia de
+  // `pricing.ts` que viaja en la imagen (`@/data/showcase-pricing`), el mismo
+  // texto leído por el mismo parser. Es generada y CI falla si quedó vieja, así
+  // que no es "una lista cualquiera": es la vitrina del commit desplegado.
+  try {
+    return {
+      ok: true,
+      entries: parsePricingSource(SHOWCASE_PRICING_SOURCE),
+      sourcePath: BAKED_SOURCE_LABEL,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      tried: [...tried, BAKED_SOURCE_LABEL],
+    };
+  }
 }
+
+/** Lo que la pantalla muestra como origen cuando se leyó la copia horneada. */
+export const BAKED_SOURCE_LABEL = "la copia horneada en la imagen (admin/src/data/showcase-pricing.ts)";

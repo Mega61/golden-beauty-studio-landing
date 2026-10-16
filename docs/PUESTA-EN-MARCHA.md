@@ -65,9 +65,18 @@ Botón **Merge** en GitHub. Lo que pasa solo, sin tocar nada:
    docker exec gbs-admin node scripts/estados.js
    docker exec gbs-admin node scripts/estados.js --aplicar
    ```
-2. **Servicios y combos publicados.** Panel → **Servicios**: que no quede ninguno "sin vincular".
-   Los combos que falten se crean desde ahí ("Crear"). Sin esto, la reserva no muestra nombres en
-   inglés ni ofrece combos.
+2. **El catálogo de servicios en EA.** Una EA recién instalada no tiene ninguno: este comando
+   crea los de la lista de precios (combos incluidos) con sus nombres de la landing, los vincula
+   y se los asigna a la profesional. En seco primero —muestra, por servicio, "crear", "ya
+   vinculado" o "bloqueado" con el motivo—, después de verdad:
+   ```bash
+   docker exec gbs-admin node scripts/catalogo.js
+   docker exec gbs-admin node scripts/catalogo.js --aplicar --asignar=4
+   ```
+   `4` es el id de Mariana en EA (varias profesionales: `--asignar=4,7`). Es idempotente: una
+   segunda corrida no hace nada, y si algo falló a mitad se vuelve a correr. "Diseño / decoración
+   por uña" sale **bloqueado** a propósito: no tiene duración propia, se cobra dentro de otra cita.
+   Al final, Panel → **Servicios** no debe mostrar nada "sin vincular" fuera de ése.
 3. **Plan de trabajo de cada profesional** (días y horas) en EA: es lo que apaga los días cerrados
    en la reserva.
 4. **Fijar la versión de EA** (`EA_VERSION=1.6.0` en el stack de la agenda). Ver `docs/DEPLOY.md`

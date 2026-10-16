@@ -9,6 +9,7 @@ import { createEaClient } from "@/lib/ea/client";
 import { requireCapability } from "@/lib/dal";
 import { forgetComboCompositions } from "@/lib/combo-source";
 
+import { createAndLinkService, linkExistingService } from "./catalog-writes";
 import { CREATE_BLOCKER_MESSAGE, createPayload, publishPayload } from "./diff";
 import { loadServicesView } from "./data";
 
@@ -183,43 +184,19 @@ export async function crearServicio(
 
   const { payload } = result;
 
-  let eaServiceId: number;
-  try {
-    const ea = createEaClient();
-    // Se manda el payload entero y no campo por campo: enumerarlos acá fue
-    // cómo `attendantsNumber` se quedó fuera y crear un servicio no funcionó
-    // nunca contra una EA de verdad. `createPayload()` es puro y está testeado;
-    // que decida él qué viaja.
-    const created = await ea.services.create(payload);
-    eaServiceId = created.id;
-  } catch (error) {
-    return { ok: false, message: describeWriteFailure(error) };
-  }
-
-  const at = new Date();
-  try {
-    const db = getDb();
-    await serviceMapRepository(db).link(pricingId, eaServiceId);
-    await serviceMapRepository(db).markPublished(pricingId, at);
-    // El mapa vitrina↔EA acaba de cambiar. Sin esto, el combo recién creado
-    // tardaría hasta un minuto en poder componerse desde la agenda — el tiempo
-    // exacto en que alguien concluye que no funciona.
-    forgetComboCompositions();
-    await auditLogRepository(db).append({
-      actorUserId: session.userId,
-      action: "catalogo.crear",
-      entity: "service_map",
-      entityId: pricingId,
-      after: { ea_service_id: eaServiceId, ...payload },
-      at,
-    });
-  } catch (error) {
+  const outcome = await createAndLinkService(pricingId, payload, {
+    actorUserId: session.userId,
+  });
+  if (!outcome.ok) {
+    if (outcome.stage === "ea") {
+      return { ok: false, message: describeWriteFailure(outcome.error) };
+    }
     return {
       ok: false,
       message:
-        `"${payload.name}" se creó en la agenda (id ${eaServiceId}) pero no se pudo vincular. ` +
+        `"${payload.name}" se creó en la agenda (id ${outcome.eaServiceId}) pero no se pudo vincular. ` +
         `Aparece abajo como "solo en la agenda" y se puede vincular desde ahí; no hay que borrarlo. ` +
-        describeWriteFailure(error),
+        describeWriteFailure(outcome.error),
     };
   }
 
@@ -248,17 +225,7 @@ export async function vincularServicio(
   }
 
   try {
-    const db = getDb();
-    await serviceMapRepository(db).link(pricingId, eaServiceId);
-    forgetComboCompositions();
-    await auditLogRepository(db).append({
-      actorUserId: session.userId,
-      action: "catalogo.vincular",
-      entity: "service_map",
-      entityId: pricingId,
-      after: { ea_service_id: eaServiceId },
-      at: new Date(),
-    });
+    await linkExistingService(pricingId, eaServiceId, { actorUserId: session.userId });
     revalidatePath("/servicios");
     return { ok: true, message: `"${pricingId}" quedó vinculado.` };
   } catch (error) {

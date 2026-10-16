@@ -805,13 +805,17 @@ componer porque a alguna de sus tres partes le falta publicarse. Si nunca se
 llena, el síntoma es que esas cuentas se saltan en la liquidación como
 `reparto-desconocido`.
 
-### `PRICING_SOURCE_PATH` — para el diff de Servicios, no para los combos
+### `PRICING_SOURCE_PATH` — ya no hace falta en la VM
 
-La pantalla de Servicios compara la vitrina contra el catálogo de EA, y para eso
-sí necesita leer `src/data/pricing.ts`, que no está en la imagen. Hay que montar
-el archivo en el contenedor y apuntarle `PRICING_SOURCE_PATH`; sin eso la
-pantalla entra en su estado de "no pude leer la vitrina" y **no se puede crear ni
-vincular ningún servicio** — que es el paso de arriba.
+La pantalla de Servicios (y `scripts/catalogo.js`) comparan la vitrina contra el catálogo
+de EA leyendo `src/data/pricing.ts`, que no está en la imagen. Por eso la imagen lleva una
+copia textual, `admin/src/data/showcase-pricing.ts`, horneada por
+`scripts/build-combo-map.mjs` y vigilada por CI: sin `PRICING_SOURCE_PATH` y sin el archivo
+al lado, se lee esa copia, con el mismo parser. La variable sigue sirviendo para apuntar a
+otro archivo (lo usa la suite E2E); si apunta a uno que no existe es un error, no la copia.
+
+Para el arranque en una EA vacía no hay que crear de a uno: `docker exec gbs-admin node
+scripts/catalogo.js` (ver `docs/PUESTA-EN-MARCHA.md` § 3).
 
 Lo que **no** depende de eso es agendar: un combo ya vinculado se compone aunque
 el archivo falte, porque su composición va horneada.

@@ -35,6 +35,7 @@ on:
       - "admin/**"
       - "src/data/pricing.ts"
       - "scripts/build-combo-map.mjs"
+      - "src/app/*/dictionaries/es.json"
       - "deploy/compose/ci-stack.yml"
       - "deploy/compose/dev-init/**"
       - ".github/workflows/admin-e2e.yml"
@@ -44,6 +45,7 @@ on:
       - "admin/**"
       - "src/data/pricing.ts"
       - "scripts/build-combo-map.mjs"
+      - "src/app/*/dictionaries/es.json"
       - "deploy/compose/ci-stack.yml"
       - "deploy/compose/dev-init/**"
       - ".github/workflows/admin-e2e.yml"
@@ -85,6 +87,12 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci --no-audit --no-fund
+
+      # Lo que se hornea desde la landing en `admin/src/data/` (combos, nombres,
+      # copia de la vitrina). En el PR y no solo al construir la imagen: un
+      # cambio de precios o de nombres sin regenerar se ve acá, donde es barato.
+      - name: Lo horneado desde la landing está al día
+        run: node ../scripts/build-combo-map.mjs --check
 
       # ── El entorno ────────────────────────────────────────────────────────
       - name: Levantar MySQL y Easy!Appointments
