@@ -1,6 +1,6 @@
 import "server-only";
 
-import { stationRepository } from "@/db/repositories";
+import { legacyAppointmentRepository, stationRepository } from "@/db/repositories";
 import { getDb } from "@/db/client";
 import type { GridProvider } from "@/lib/calendar-layout";
 import type { ServiceCapacity, StationSlot } from "@/lib/conflict";
@@ -29,6 +29,8 @@ import type {
 } from "@/components/calendar/types";
 import { loadComboCompositions } from "@/lib/combo-source";
 import type { ComboComposition } from "@/lib/combos";
+import { legacyStartToWallClock } from "../clientes/history";
+import { buildLegacyAgendaItems, type LegacyAgendaItem, type LegacyAgendaRow } from "./legacy";
 
 /**
  * Todo lo que la agenda le pide a EA y a `gbs_admin` para pintar un rango.
@@ -93,6 +95,12 @@ export type AgendaData = {
    * función sin explicación.
    */
   combosReason: string | null;
+  /**
+   * El historial de Agenda Pro de los días pedidos, de **solo lectura**. Ya
+   * viene sin las filas que se recrearon en EA y recortado por rol. Ver
+   * `legacy.ts`.
+   */
+  legacy: LegacyAgendaItem[];
   /** ISO. Lo muestra la barra: "actualizado hace 12 s". */
   fetchedAt: string;
 };
@@ -248,6 +256,25 @@ async function fetchFromEa(
         priceCOP: service.price,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "es")),
+    legacy: buildLegacyAgendaItems(await loadLegacyRows(window.from, window.till), {
+      providers: rawProviders.map((provider) => ({
+        id: provider.id,
+        firstName: provider.firstName,
+      })),
+      services: rawServices.map((service) => ({
+        name: service.name ?? "",
+        duration: service.duration,
+      })),
+      // Todas las del rango, también las de otras columnas: la deduplicación es
+      // por cliente y hora, no por quién la ve.
+      ea: withRelations.appointments.map((appointment) => ({
+        start: appointment.start,
+        phone: withRelations.meta[appointment.id]?.phone ?? null,
+        customerName: withRelations.meta[appointment.id]?.customer ?? null,
+      })),
+      ownProviderId: mine,
+      dates,
+    }),
     capacities: rawServices.map<ServiceCapacity>((service) => ({
       id: service.id,
       attendantsNumber: service.attendantsNumber,
@@ -264,6 +291,45 @@ async function fetchFromEa(
     combosReason: combos.reason,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Las filas de `legacy_appointment` del rango pedido.
+ *
+ * Se leen de `gbs_admin`, no de EA, así que no gastan el cupo de 100
+ * peticiones por IP que obliga a cachear las lecturas de EA: es una consulta
+ * indexada por `started_at` sobre una tabla que no cambia. Va en cada refresco
+ * igual que lo demás, para que el primer render y el polling sigan siendo un
+ * solo camino.
+ *
+ * **Su fallo no es el fallo de la agenda.** Si `gbs_admin` no responde, la
+ * agenda de hoy tiene que seguir funcionando: se registra y se devuelve vacío.
+ */
+async function loadLegacyRows(from: EaLocalDate, till: EaLocalDate): Promise<LegacyAgendaRow[]> {
+  try {
+    // Límites construidos con componentes locales: mysql2 corre con
+    // `timezone: "local"`, y `new Date("2026-09-01")` sería medianoche UTC.
+    const [fy, fm, fd] = from.split("-").map(Number);
+    const [ty, tm, td] = till.split("-").map(Number);
+    const rows = await legacyAppointmentRepository(getDb()).listByStartRange(
+      new Date(fy, fm - 1, fd),
+      new Date(ty, tm - 1, td + 1),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      sourceId: row.source_id,
+      // La inversa exacta de lo que hizo el driver; ver `legacyStartToWallClock`.
+      start: legacyStartToWallClock(row.started_at),
+      clientName: row.client_name,
+      phone: row.client_phone_e164,
+      serviceName: row.service_name,
+      providerName: row.provider_name,
+      status: row.status,
+    }));
+  } catch (error) {
+    console.error("[agenda] no se pudo leer el historial de Agenda Pro", error);
+    return [];
+  }
 }
 
 function fullName(first: string | null, last: string | null): string | null {

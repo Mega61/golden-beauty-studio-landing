@@ -121,9 +121,17 @@ export function ChartFrame({
   children,
   table,
   headerExtra,
+  scope,
 }: {
   title: string;
   decision: string;
+  /**
+   * Qué datos entran y cuáles no, en una línea. Hoy lo usa el historial de
+   * Agenda Pro: "Incluye el historial…" o "El historial no entra porque…". Va
+   * aparte de `note` porque no es una alerta: es el alcance de la cifra, y un
+   * reporte puede necesitar las dos cosas a la vez.
+   */
+  scope?: ReactNode;
   /** Con dos o más entradas se dibuja; con una o ninguna, no. */
   legend?: readonly LegendEntry[];
   note?: { tone?: "warn" | "info"; text: ReactNode };
@@ -143,6 +151,7 @@ export function ChartFrame({
 
       <div className={styles.frame} style={{ padding: "0.75rem 1rem 1rem" }}>
         <p className={styles.decision}>{decision}</p>
+        {scope ? <p className={styles.scope}>{scope}</p> : null}
 
         {note ? (
           <p

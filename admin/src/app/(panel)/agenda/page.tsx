@@ -83,6 +83,7 @@ export default async function AgendaPage({
                 combosReason: null,
                 capacities: [],
                 stations: result.stations,
+                legacy: [],
                 fetchedAt: new Date().toISOString(),
               }
         }

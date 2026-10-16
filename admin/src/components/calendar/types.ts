@@ -52,3 +52,22 @@ export type ServiceOption = {
    */
   priceCOP: number | null;
 };
+
+/**
+ * Un bloque de **historial** (Agenda Pro): se dibuja, no se edita.
+ *
+ * La grilla no sabe de Agenda Pro ni de `legacy_appointment`; solo sabe que
+ * hay ids de cita que son de solo lectura y cómo rotularlos. Quién los arma es
+ * `app/(panel)/agenda/legacy.ts`.
+ */
+export type HistoryBlock = {
+  /** La etiqueta corta del origen: "Agenda Pro". */
+  source: string;
+  /** El estado en la voz del panel ("Atendida", "No asistió"…). */
+  statusLabel: string;
+  /** El token de color del punto de estado. */
+  statusToken: "completada" | "no-asistio" | "cancelada" | "reservada";
+};
+
+/** Bloques de historial por id (sintético, negativo) de cita. */
+export type HistoryIndex = Readonly<Record<number, HistoryBlock>>;

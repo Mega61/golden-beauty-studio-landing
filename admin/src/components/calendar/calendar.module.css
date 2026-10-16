@@ -1214,3 +1214,50 @@
 .stretchBottom {
   bottom: 0;
 }
+
+/* --- Historial de Agenda Pro (solo lectura) -------------------------------
+   Citas de antes del corte, leídas de `legacy_appointment`. Atenuadas y sin
+   el tinte del servicio: tienen que leerse como pasado, no competir con las
+   citas vivas de EA. La etiqueta "Agenda Pro" va siempre en texto; el
+   atenuado solo no alcanza para decir de dónde vienen. */
+
+.eventHistory {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-cream),
+    var(--color-cream) 6px,
+    color-mix(in srgb, var(--color-ink) 4%, var(--color-cream)) 6px,
+    color-mix(in srgb, var(--color-ink) 4%, var(--color-cream)) 12px
+  );
+  border: 1px dashed color-mix(in srgb, var(--color-ink) 28%, transparent);
+  color: var(--color-ink-soft);
+}
+
+.eventHistory .eventTitle {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.historyTag {
+  display: inline-block;
+  margin-left: 0.3125rem;
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  color: var(--color-ink-soft);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: 0.0625rem;
+}
+
+/* El carril de quienes ya no están en EA. No ofrece huecos, y su encabezado lo
+   dice en cursiva para que no parezca una profesional más. */
+.colHistory {
+  background-color: color-mix(in srgb, var(--color-ink) 3%, transparent);
+}
+
+.provHeadHistory .provName {
+  font-style: italic;
+}

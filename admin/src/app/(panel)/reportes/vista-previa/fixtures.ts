@@ -28,6 +28,10 @@
  * - Un nombre de servicio largo, para ver el recorte de la etiqueta.
  * - Para los reportes de pauta: sábados por la tarde llenos, martes flojos, y
  *   una inversión en anuncios anotada para el mes (ver `demandRows()`).
+ * - **Historial de Agenda Pro** en los primeros días del mes (ver
+ *   `legacyRaw()`): ventas mezcladas con las del panel, una profesional que casa
+ *   por nombre de pila (Lina), una que ya no está (Kati), una cancelada, una
+ *   inasistencia, una reserva y una atendida **sin monto**.
  */
 
 import { parseEaLocalDate, parseEaLocalDateTime } from "@/lib/ea";
@@ -42,6 +46,7 @@ import type {
   ServiceRow,
 } from "../aggregate";
 import type { ReportData } from "../data";
+import { legacyReportRows, type LegacyRawRow } from "../legacy-blend";
 import { windowOverRange } from "../occupancy";
 import { eachDay, resolvePeriod, type Cadence } from "../period";
 
@@ -328,6 +333,42 @@ function history(month: string): AppointmentRow[] {
 }
 
 /**
+ * Lo que traería `legacy_appointment` para el mes: los días antes del corte.
+ * Pasa por `legacyReportRows()`, el mismo filtro que usa `data.ts`.
+ */
+function legacyRaw(month: string): LegacyRawRow[] {
+  const row = (
+    n: number,
+    day: string,
+    time: string,
+    service: string,
+    provider: string,
+    amount: number | null,
+    status: string,
+  ): LegacyRawRow => ({
+    sourceId: `AP-${month}-${n}`,
+    start: at(`${month}-${day} ${time}:00`),
+    serviceName: service,
+    providerName: provider,
+    amountCharged: amount,
+    status,
+    customerKey: `+57300222${String(n).padStart(4, "0")}`,
+    clientName: `Cliente histórico ${n}`,
+  });
+  return [
+    row(1, "01", "09:00", "Montaje con diseño completo", "Lina", 150_000, "Asiste"),
+    row(2, "01", "11:00", "Semipermanente manos", "Kati", 55_000, "Asiste"),
+    row(3, "02", "15:00", "Forrado", "Kati", 90_000, "Asiste"),
+    row(4, "02", "16:30", "Press-on", "Lina", null, "Asiste"),
+    row(5, "03", "10:00", "Combo manos y pies", "Kati", 95_000, "Asiste"),
+    row(6, "03", "14:00", "Semipermanente manos", "Lina", null, "No Asiste"),
+    row(7, "04", "09:30", "Forrado", "Kati", null, "Cancelado"),
+    row(8, "04", "17:00", "Retoque express", "lina", 40_000, "Asiste"),
+    row(9, "05", "18:00", "Semipermanente manos", "Kati", null, "Reservado"),
+  ];
+}
+
+/**
  * El mes completo, en la forma exacta que `loadReports()` devuelve.
  *
  * `now` se elige **dentro** de la ventana de retención de algunas cohortes y
@@ -379,6 +420,20 @@ export function previewData(cadence: Cadence, anchor: EaLocalDate): ReportData {
         attended: true,
       },
     ],
+    legacy: legacyReportRows(
+      legacyRaw(month),
+      { from: period.from, to: period.to },
+      inPeriod.map((row) => appointmentOf(row, month)),
+      PROVIDERS,
+    ),
+    // El mes anterior trae la mitad del historial: alcanza para que el delta
+    // de ventas no salga en cero.
+    previousLegacy: legacyReportRows(
+      legacyRaw(previousMonth.from.slice(0, 7)).slice(0, 4),
+      { from: previousMonth.from, to: previousMonth.to },
+      [],
+      PROVIDERS,
+    ),
     commissionEntries: COMMISSION,
     // La pauta del mes: Meta casi toda, algo de Google. Con las nuevas del
     // mes da un costo por clienta y un "ya recuperado" con cifras creíbles.

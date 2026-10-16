@@ -17,6 +17,8 @@
  * `lib/metrics.ts`.
  */
 
+import type { ReactNode } from "react";
+
 import { mapEaStatus } from "@/components/calendar";
 import { EmptyState, formatCOP, formatDuration } from "@/components/ui";
 import { stationHourOccupancy } from "@/lib/metrics";
@@ -25,7 +27,6 @@ import {
   chairHourReport,
   customersReport,
   dailyClose,
-  dailySeries,
   extrasReport,
   noShowReport,
   PAYMENT_LABEL,
@@ -47,6 +48,7 @@ import {
 import styles from "./charts.module.css";
 import { DataView } from "./DataView";
 import { loadReports } from "./data";
+import { legacyNoShowInputs, salesReport, salesSeries, salesTotal } from "./legacy-blend";
 import { occupancyByProvider, slotLabel, SLOTS, type SlotId } from "./occupancy";
 import { AcquisitionFrame, DemandFrame } from "./PautaReports";
 import { SERIES, statusColor } from "./palette";
@@ -68,6 +70,206 @@ function money(value: number | null | undefined): string {
   return value === null || value === undefined ? dash : formatCOP(value);
 }
 
+// ── Historial de Agenda Pro ─────────────────────────────────────────────────
+//
+// Dos frases, una para cada lado de la decisión de `legacy-blend.ts`. Se
+// muestran solo cuando el periodo **tiene** historial: después del corte serían
+// ruido en cada tarjeta, y antes del corte son justo lo que evita que alguien
+// lea un cero como "no hubo citas".
+
+/** "Incluye el historial de Agenda Pro: 85 citas, $ 4.250.000." */
+function legacyIncluded(data: Data): ReactNode {
+  if (data.legacy.length === 0) return undefined;
+  const amount = salesTotal([], data.legacy);
+  return (
+    <>
+      Incluye el historial de Agenda Pro: <strong>{data.legacy.length}</strong>{" "}
+      {data.legacy.length === 1 ? "cita" : "citas"},{" "}
+      {/* "$ 0" se leería como "no se vendió nada"; sin monto es "no se sabe". */}
+      {amount > 0 ? <strong>{formatCOP(amount)}</strong> : "sin monto registrado"}.
+    </>
+  );
+}
+
+/** "El historial de Agenda Pro no entra acá: <por qué>." */
+function legacyExcluded(data: Data, why: string): ReactNode {
+  if (data.legacy.length === 0) return undefined;
+  return <>El historial de Agenda Pro ({data.legacy.length} citas) no entra acá: {why}</>;
+}
+
+// ── Ventas y citas (las dos fuentes) ────────────────────────────────────────
+
+/**
+ * Las ventas del periodo con el historial de Agenda Pro adentro.
+ *
+ * Es la respuesta a "¿cuánto vendimos?" para cualquier periodo, antes o
+ * después del corte. Va en las tres cadencias porque es la cifra que se busca
+ * primero; los reportes de abajo responden cada uno su propia decisión.
+ */
+export function SalesFrames({ data }: { data: Data }) {
+  const sales = salesReport(
+    data.finance,
+    data.appointments,
+    data.legacy,
+    data.providers,
+    data.services,
+  );
+  const previous = salesTotal(data.previousFinance, data.previousLegacy);
+
+  const serviceAxis = axisTicks(
+    Math.max(0, ...sales.byService.map((row) => row.revenue)),
+    (value) => formatCOP(value),
+  );
+  const providerAxis = axisTicks(
+    Math.max(0, ...sales.byProvider.map((row) => row.revenue)),
+    (value) => formatCOP(value),
+  );
+
+  // La segunda línea de cada barra: cuántas y de dónde. Si todo es de Agenda
+  // Pro no se repite el monto, que ya está en la barra.
+  const partsNote = (revenue: number, legacyRevenue: number, count: number) => {
+    const citas = `${count} cita${count === 1 ? "" : "s"}`;
+    if (legacyRevenue === 0) return citas;
+    if (legacyRevenue === revenue) return `${citas} · Agenda Pro`;
+    return `${citas} · ${formatCOP(legacyRevenue)} de Agenda Pro`;
+  };
+
+  const unpricedNote =
+    sales.legacyUnpriced > 0
+      ? {
+          tone: "info" as const,
+          text: (
+            <>
+              <strong>
+                {sales.legacyUnpriced} cita{sales.legacyUnpriced === 1 ? "" : "s"} atendida
+                {sales.legacyUnpriced === 1 ? "" : "s"} de Agenda Pro sin monto
+              </strong>{" "}
+              — el export no traía lo cobrado. Cuentan como citas, no como $ 0: las ventas
+              son por lo menos esta cifra.
+            </>
+          ),
+        }
+      : undefined;
+
+  return (
+    <>
+      <ChartFrame
+        title="Ventas y citas del periodo"
+        decision="¿Cuánto vendimos y cuántas citas hubo? Lo cobrado en cuentas cerradas del panel más lo cobrado en las citas atendidas de Agenda Pro."
+        scope={legacyIncluded(data)}
+        note={unpricedNote}
+        table={
+          <DataView
+            caption="Ventas por servicio"
+            columns={[
+              { header: "Servicio", cell: (row) => row.name },
+              { header: "Citas", numeric: true, cell: (row) => row.count },
+              { header: "Ventas", numeric: true, cell: (row) => money(row.revenue) },
+              {
+                header: "De Agenda Pro",
+                numeric: true,
+                cell: (row) => (row.legacyCount === 0 ? dash : money(row.legacyRevenue)),
+              },
+            ]}
+            rowKey={(row) => row.key}
+            rows={sales.byService}
+          />
+        }
+      >
+        <TileRow>
+          <StatTile
+            delta={deltaAgainst(sales.total, previous)}
+            deltaNote="vs. el periodo anterior"
+            label="Ventas del periodo"
+            spark={salesSeries(data.finance, data.legacy, data.days)}
+            value={money(sales.total)}
+          />
+          <StatTile
+            label="Citas"
+            value={`${sales.appointments}`}
+            deltaNote={`${sales.attended} atendida${sales.attended === 1 ? "" : "s"}`}
+          />
+          {sales.legacyAppointments > 0 ? (
+            <StatTile
+              label="De Agenda Pro"
+              value={money(sales.legacyTotal)}
+              deltaNote={`${sales.legacyAppointments} cita${sales.legacyAppointments === 1 ? "" : "s"} del historial`}
+            />
+          ) : null}
+        </TileRow>
+
+        {sales.byService.length === 0 ? (
+          <EmptyState
+            icon="reportes"
+            title="Sin ventas en el periodo"
+            body="Ni cuentas cerradas en el panel ni citas cobradas en el historial de Agenda Pro. Prueba con otro periodo."
+          />
+        ) : (
+          <BarRows
+            axis={serviceAxis}
+            data={sales.byService.map((row) => ({
+              id: row.key,
+              name: row.name,
+              value: row.revenue,
+              display: money(row.revenue),
+              meta: partsNote(row.revenue, row.legacyRevenue, row.count),
+            }))}
+          />
+        )}
+      </ChartFrame>
+
+      <ChartFrame
+        title="Ventas por profesional"
+        decision="Quién vendió cuánto en el periodo. Para lo que se le paga a cada quien, la cifra que vale es la liquidación de Comisiones."
+        scope={
+          data.legacy.length > 0 ? (
+            <>
+              {legacyIncluded(data)} Quien atendió en Agenda Pro se cruza con el equipo
+              actual por nombre de pila; quien ya no está sale con su nombre de Agenda Pro.
+            </>
+          ) : undefined
+        }
+        table={
+          <DataView
+            caption="Ventas por profesional"
+            columns={[
+              { header: "Profesional", cell: (row) => row.name },
+              { header: "Citas", numeric: true, cell: (row) => row.count },
+              { header: "Ventas", numeric: true, cell: (row) => money(row.revenue) },
+              {
+                header: "De Agenda Pro",
+                numeric: true,
+                cell: (row) => (row.legacyCount === 0 ? dash : money(row.legacyRevenue)),
+              },
+            ]}
+            rowKey={(row) => row.key}
+            rows={sales.byProvider}
+          />
+        }
+      >
+        {sales.byProvider.length === 0 ? (
+          <EmptyState
+            icon="equipo"
+            title="Sin ventas en el periodo"
+            body="Cuando haya cuentas cerradas o citas cobradas de Agenda Pro, acá aparece el reparto por profesional."
+          />
+        ) : (
+          <BarRows
+            axis={providerAxis}
+            data={sales.byProvider.map((row) => ({
+              id: row.key,
+              name: row.name,
+              value: row.revenue,
+              display: money(row.revenue),
+              meta: partsNote(row.revenue, row.legacyRevenue, row.count),
+            }))}
+          />
+        )}
+      </ChartFrame>
+    </>
+  );
+}
+
 // ── Cadencia diaria ─────────────────────────────────────────────────────────
 
 export function DailyReports({ data }: { data: Data }) {
@@ -75,9 +277,14 @@ export function DailyReports({ data }: { data: Data }) {
   const previous = dailyClose(data.previousFinance, [], data.providers);
 
   return (
+    <>
     <ChartFrame
       title="Cierre del día"
       decision="¿Cuadra la caja? ¿Puedo cerrar? — el reparto por método tiene que coincidir con lo que hay en el cajón y en la cuenta."
+      scope={legacyExcluded(
+        data,
+        "esa caja se cerró en Agenda Pro y su plata ya está en Actual Budget. Sus ventas están en «Ventas y citas del periodo».",
+      )}
       legend={close.byMethod.map((row, index) => ({
         label: row.label,
         color: SERIES[index] ?? SERIES[0],
@@ -140,6 +347,8 @@ export function DailyReports({ data }: { data: Data }) {
         }))}
       />
     </ChartFrame>
+    <SalesFrames data={data} />
+    </>
   );
 }
 
@@ -179,9 +388,15 @@ export function FortnightReports({ data }: { data: Data }) {
 
   return (
     <>
+      <SalesFrames data={data} />
+
       <ChartFrame
         title="Liquidación de la quincena"
         decision="Cuánto se le paga a cada profesional. La cifra es la que congeló el motor de comisiones al liquidar; acá no se recalcula nada."
+        scope={legacyExcluded(
+          data,
+          "esas comisiones se liquidaron y pagaron por fuera del panel, y el motor solo liquida cuentas cerradas acá.",
+        )}
         note={
           liquidacion.rows.length === 0
             ? {
@@ -235,6 +450,10 @@ export function FortnightReports({ data }: { data: Data }) {
       <ChartFrame
         title="Variación de precio, por profesional y motivo"
         decision="Dónde se escapa la plata. Variación es lo cobrado por debajo del precio de lista, venga por descuento, por un total escrito a mano o por un renglón que resta."
+        scope={legacyExcluded(
+          data,
+          "Agenda Pro no exportó el precio de lista ni los renglones de cada cita, así que no hay contra qué medir la rebaja.",
+        )}
         note={
           variacion.withoutReason > 0
             ? {
@@ -310,7 +529,7 @@ export function MonthlyReports({
   const chair = chairHourReport(data.finance, data.services);
   const swaps = bookedVsPerformed(data.finance, data.services);
   const extras = extrasReport(data.finance, data.providers);
-  const noShows = noShowReport(data.appointments);
+  const noShows = noShowReport(data.appointments, legacyNoShowInputs(data.legacy));
 
   const visits = toVisits(data.visitHistory, data.legacyVisits);
   const clientas = customersReport(
@@ -357,13 +576,6 @@ export function MonthlyReports({
     perProvider,
   });
 
-  const revenue = data.finance
-    .filter((row) => row.closed && row.amountCharged !== null)
-    .reduce((total, row) => total + (row.amountCharged ?? 0), 0);
-  const previousRevenue = data.previousFinance
-    .filter((row) => row.closed && row.amountCharged !== null)
-    .reduce((total, row) => total + (row.amountCharged ?? 0), 0);
-
   const chairAxis = axisTicks(
     Math.max(0, ...chair.rows.map((row) => row.perHour ?? 0)),
     (value) => formatCOP(value),
@@ -375,10 +587,17 @@ export function MonthlyReports({
 
   return (
     <>
+      {/* --- Ventas y citas, con el historial de Agenda Pro ----------------- */}
+      <SalesFrames data={data} />
+
       {/* --- Rentabilidad por hora de silla ------------------------------- */}
       <ChartFrame
         title="Rentabilidad por hora de silla"
         decision="Qué empujar y qué re-tarifar. Es el que Agenda Pro no daba: un combo de $95.000 en 120 min rinde más por minuto que un montaje de $115.000 en 150."
+        scope={legacyExcluded(
+          data,
+          "se mide sobre cuentas cerradas en el panel, y Agenda Pro no guardó con qué servicio realizado ni cuántos minutos.",
+        )}
         note={
           chair.withoutDuration > 0
             ? {
@@ -417,14 +636,11 @@ export function MonthlyReports({
           />
         }
       >
+        {/* El "Ingreso del periodo" que vivía acá se mudó a «Ventas y citas del
+            periodo», que suma también el historial de Agenda Pro: dos cifras
+            de ingreso distintas en la misma pantalla serían una pregunta sin
+            respuesta. */}
         <TileRow>
-          <StatTile
-            delta={deltaAgainst(revenue, previousRevenue)}
-            deltaNote="vs. el periodo anterior"
-            label="Ingreso del periodo"
-            spark={dailySeries(data.finance, data.days)}
-            value={money(revenue)}
-          />
           <StatTile
             label="El servicio que más rinde"
             soft
@@ -465,6 +681,10 @@ export function MonthlyReports({
       <ChartFrame
         title="Ocupación por hora de puesto y por profesional"
         decision="¿Contrato a alguien? ¿Abro otro puesto? Con dos estaciones la capacidad del negocio son horas de puesto, no personas."
+        scope={legacyExcluded(
+          data,
+          "Agenda Pro no exportó la hora de fin de cada cita, y una ocupación con duraciones supuestas sería inventada.",
+        )}
         note={{
           tone: "info",
           text: (
@@ -554,6 +774,10 @@ export function MonthlyReports({
       <ChartFrame
         title="Servicio agendado vs. realizado"
         decision="Arreglar el menú o el flujo de reserva, no a quien atendió: la tasa de cambio es una señal de la vitrina, no un error de quien atendió."
+        scope={legacyExcluded(
+          data,
+          "Agenda Pro guardó un solo servicio por cita, sin distinguir el agendado del realizado.",
+        )}
         table={
           <DataView
             caption="Cambios de servicio más frecuentes"
@@ -611,6 +835,10 @@ export function MonthlyReports({
       <ChartFrame
         title="Adicionales: enganche por profesional"
         decision="Dónde entrenar y qué ofrecer por defecto. El monto va en la tabla y no en el mismo gráfico: son dos medidas de escala distinta, y un doble eje inventaría una correlación."
+        scope={legacyExcluded(
+          data,
+          "Agenda Pro no exportó los renglones de cada cita, así que no se sabe cuáles llevaron adicionales.",
+        )}
         table={
           <DataView
             caption="Enganche y monto de adicionales por profesional"
@@ -665,6 +893,14 @@ export function MonthlyReports({
       <ChartFrame
         title="Primera visita vs. regreso"
         decision="Cuánto invertir en captación vs. en volver a traer."
+        scope={
+          data.legacy.length > 0 ? (
+            <>
+              {legacyIncluded(data)} Además, toda la historia de Agenda Pro cuenta para
+              saber quién ya había venido antes.
+            </>
+          ) : undefined
+        }
         legend={[
           { label: "Primera visita", color: SERIES[0] },
           { label: "Regreso", color: SERIES[1] },
@@ -757,6 +993,7 @@ export function MonthlyReports({
       <ChartFrame
         title="Inasistencia por franja"
         decision="Si el recordatorio funciona, y si algún horario no vale la pena abrir."
+        scope={legacyIncluded(data)}
         legend={[
           { label: "No asistió", color: statusColor("no-asistio") },
           { label: "Cancelada", color: statusColor("cancelada") },

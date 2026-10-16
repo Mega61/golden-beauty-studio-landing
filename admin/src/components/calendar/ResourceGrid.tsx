@@ -17,7 +17,7 @@ import {
 } from "./geometry";
 import { serviceTint } from "./service-color";
 import { mapEaStatus } from "./status-map";
-import type { MetaIndex } from "./types";
+import type { HistoryBlock, HistoryIndex, MetaIndex } from "./types";
 
 /**
  * La grilla de recurso: columnas = profesionales, filas = tiempo.
@@ -91,6 +91,18 @@ export type ResourceGridProps = {
    * ahí: había que crear la cita para poder ver dónde crearla.
    */
   onRevealHidden: (direction: -1 | 1) => void;
+  /**
+   * Citas de **historial** (Agenda Pro), por id. Se dibujan atenuadas, con su
+   * etiqueta, sin arrastre ni manija; tocarlas llama a `onPickAppointment`
+   * igual, y la pantalla decide mostrar un detalle de solo lectura.
+   */
+  history?: HistoryIndex;
+  /**
+   * Columnas que no reciben citas nuevas ni movidas: el carril "Historial
+   * Agenda Pro". Sin huecos que tocar y sin `data-colkey`, así que un arrastre
+   * que pasa por encima no la puede tomar como destino.
+   */
+  readOnlyColumns?: readonly number[];
 };
 
 /** Alto de fila con ratón: 14 px por 15 minutos ≈ 670 px de jornada. */
@@ -150,6 +162,8 @@ export function ResourceGrid({
   onMove,
   onResize,
   onRevealHidden,
+  history,
+  readOnlyColumns,
 }: ResourceGridProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const [canDrag, setCanDrag] = useState(false);
@@ -259,9 +273,10 @@ export function ResourceGrid({
 
   const bodyHeight = columnHeight(days[0].rowCount, slotH);
   const hourHeight = (60 / range.slotMinutes) * slotH;
-  const columns = days.flatMap((day) =>
+  const allColumns = days.flatMap((day) =>
     day.columns.map((column) => ({ day, column, key: columnKey(day.date, column.providerId) })),
   );
+  const columns = allColumns;
 
   // Dónde arranca cada día dentro de la grilla, acumulando. No se multiplica el
   // índice del día por el número de columnas: los días comparten la lista de
@@ -285,6 +300,11 @@ export function ResourceGrid({
 
     const key = slot.dataset.colkey as ColumnKey;
     const minute = Number(slot.dataset.minute);
+    // El carril de historial no tiene huecos: las flechas lo saltan, o el foco
+    // se perdería en una columna sin nada que enfocar.
+    const columns = allColumns.filter(
+      (entry) => !(readOnlyColumns?.includes(entry.column.providerId) ?? false),
+    );
     const index = columns.findIndex((c) => c.key === key);
     if (index === -1) return;
 
@@ -363,12 +383,16 @@ export function ResourceGrid({
         {columns.map(({ column, key }) => (
           <div
             key={`head-${key}`}
-            className={styles.provHead}
+            className={`${styles.provHead}${
+              readOnlyColumns?.includes(column.providerId) ? ` ${styles.provHeadHistory}` : ""
+            }`}
             style={{ gridRow: 2 }}
             aria-current={selectedIsIn(column, selectedId) ? "true" : undefined}
           >
             <span className={styles.provName}>{column.providerName}</span>
-            <span className={styles.provMeta}>{windowLabel(column)}</span>
+            <span className={styles.provMeta}>
+              {readOnlyColumns?.includes(column.providerId) ? "Solo lectura" : windowLabel(column)}
+            </span>
           </div>
         ))}
 
@@ -425,13 +449,15 @@ export function ResourceGrid({
         </div>
 
         {columns.map(({ day, column, key }) => {
-          const isTarget = movingId !== null;
+          const historyColumn = readOnlyColumns?.includes(column.providerId) ?? false;
+          const isTarget = movingId !== null && !historyColumn;
           return (
             <div
               key={`col-${key}`}
-              data-colkey={key}
+              data-colkey={historyColumn ? undefined : key}
               className={[
                 styles.col,
+                historyColumn ? styles.colHistory : "",
                 isTarget ? styles.colTarget : "",
                 selectedIsIn(column, selectedId) ? styles.colSelected : "",
               ]
@@ -444,6 +470,7 @@ export function ResourceGrid({
                   panel y el motor de choques avisa que está bloqueado, que es
                   mejor que un hueco que no responde y no explica por qué. */}
               {!readOnly &&
+                !historyColumn &&
                 slotMinutes.map((minute) => (
                   <button
                     key={minute}
@@ -469,7 +496,19 @@ export function ResourceGrid({
                 <Band key={band.key} band={band} range={range} slotHeight={slotH} />
               ))}
 
-              {column.events.map((event) => (
+              {column.events.map((event) =>
+                history?.[event.appointment.id] ? (
+                  <HistoryEventBlock
+                    key={event.key}
+                    event={event}
+                    block={history[event.appointment.id]}
+                    meta={meta[event.appointment.id]}
+                    range={range}
+                    slotHeight={slotH}
+                    selected={event.appointment.id === selectedId}
+                    onPick={() => onPickAppointment(event.appointment)}
+                  />
+                ) : (
                 <EventBlock
                   key={event.key}
                   event={event}
@@ -496,7 +535,8 @@ export function ResourceGrid({
                     })
                   }
                 />
-              ))}
+                ),
+              )}
 
               {column.hiddenBefore > 0 ? (
                 <button
@@ -582,6 +622,79 @@ function Band({
           de un slot con texto encima es ilegible y tapa la cita de al lado. */}
       {label && box.height >= 20 ? <span className={styles.bandLabel}>{label}</span> : null}
     </div>
+  );
+}
+
+/**
+ * Un bloque del historial de Agenda Pro.
+ *
+ * Aparte de `EventBlock` y no como una bandera más de él, a propósito: este no
+ * tiene `onPointerDown`, ni manija de redimensionado, ni estado "moviendo". Que
+ * el gesto de arrastre no exista es más seguro que un `if` que lo apague.
+ * Atenuado y con la etiqueta del origen en la primera línea, para que nadie lo
+ * confunda con una cita viva.
+ */
+function HistoryEventBlock({
+  event,
+  block,
+  meta,
+  range,
+  slotHeight,
+  selected,
+  onPick,
+}: {
+  event: GridEvent;
+  block: HistoryBlock;
+  meta: MetaIndex[number] | undefined;
+  range: DayGrid["range"];
+  slotHeight: number;
+  selected: boolean;
+  onPick: () => void;
+}) {
+  const box = spanBox(
+    event.startMinute,
+    event.startMinute + event.renderHeightMinutes,
+    range,
+    slotHeight,
+  );
+  const lane = laneBox(event.offset, event.width);
+  const who = meta?.customer ?? "Sin cliente";
+  const what = meta?.service ?? "Sin servicio";
+  const time = formatTimeRange(event.appointment.start, event.appointment.end);
+  const label = `${block.source} · ${time} · ${who} · ${what} · ${block.statusLabel} · solo lectura`;
+
+  return (
+    <button
+      type="button"
+      className={[styles.event, styles.eventHistory, selected ? styles.eventSelected : ""]
+        .filter(Boolean)
+        .join(" ")}
+      style={
+        {
+          top: box.top,
+          height: box.height,
+          left: `${lane.leftPercent}%`,
+          width: `${lane.widthPercent}%`,
+          "--ev-dot": `var(--color-st-${block.statusToken}-dot)`,
+        } as React.CSSProperties
+      }
+      onClick={onPick}
+      aria-label={label}
+      title={label}
+      aria-pressed={selected || undefined}
+    >
+      <span className={styles.eventTime}>
+        <span className={styles.eventDot} aria-hidden />
+        {time}
+        <span className={styles.historyTag}>{block.source}</span>
+      </span>
+      {box.height >= TWO_LINE_MIN_PX ? <span className={styles.eventTitle}>{who}</span> : null}
+      {box.height >= THREE_LINE_MIN_PX ? (
+        <span className={styles.eventSub}>
+          {what} · {block.statusLabel}
+        </span>
+      ) : null}
+    </button>
   );
 }
 

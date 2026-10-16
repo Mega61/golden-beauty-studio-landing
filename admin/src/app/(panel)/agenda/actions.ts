@@ -26,6 +26,7 @@ import type { EaLocalDate, EaLocalDateTime } from "@/lib/ea/datetime";
 import { eaDatePart, parseEaLocalDateTime } from "@/lib/ea/datetime";
 import { planBlock, type BlockForm } from "./block-resource";
 import { searchCustomers } from "./data";
+import { isWritableAgendaTarget, LEGACY_READ_ONLY } from "./legacy";
 
 /**
  * Las escrituras de la agenda.
@@ -102,6 +103,14 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
   // Una técnica solo toca su columna. `owner` y `reception` pasan siempre.
   const session = await requireOwnProvider(input.providerId);
 
+  // El historial de Agenda Pro se dibuja con ids y columna negativos (ver
+  // `legacy.ts`) y es de solo lectura. La grilla no ofrece mover ni editar esos
+  // bloques; esto es la red por si un gesto se escapara: un id o una columna
+  // que no son de EA no llegan a la API.
+  if (!isWritableAgendaTarget(input.id, input.providerId)) {
+    return { status: "error", message: LEGACY_READ_ONLY };
+  }
+
   const start = safeLocal(input.start);
   const end = safeLocal(input.end);
   if (!start || !end) {
@@ -173,6 +182,9 @@ export async function setAppointmentStatus(
   status: string,
 ): Promise<WriteResult> {
   await requireOwnProvider(providerId);
+  if (!isWritableAgendaTarget(id, providerId)) {
+    return { status: "error", message: LEGACY_READ_ONLY };
+  }
 
   try {
     await createEaClient().appointments.update(id, { status });

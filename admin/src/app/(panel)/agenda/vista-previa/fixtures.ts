@@ -2,6 +2,7 @@ import { parseEaLocalDate, type EaLocalDate, type EaLocalDateTime } from "@/lib/
 import type { ConflictReport } from "@/lib/conflict";
 import type { Appointment, WorkingPlan } from "@/lib/ea/types";
 import type { AgendaData } from "../data";
+import { buildLegacyAgendaItems } from "../legacy";
 
 /**
  * Un día inventado para revisar la agenda con los ojos.
@@ -25,7 +26,11 @@ import type { AgendaData } from "../data";
  * - un **estado que el panel no reconoce**, que se dibuja punteado;
  * - un **bloqueo del estudio**, una **indisponibilidad** y un **descanso**;
  * - una cita de **quince minutos**, para ver si un bloque mínimo se puede tocar;
- * - una **excepción de plan** que le cambia el horario a una técnica.
+ * - una **excepción de plan** que le cambia el horario a una técnica;
+ * - **historial de Agenda Pro**: una cita en la columna de Lina (casa por nombre
+ *   de pila), una que no asistió en la de Daniela, dos de "Kati" —que ya no está
+ *   en EA— en el carril "Historial Agenda Pro", y una que **no** se dibuja
+ *   porque ya existe en EA (la de Luisa Pérez a las 11:00).
  */
 
 const PLAN = (start: string, end: string, breaks: Array<{ start: string; end: string }> = []) => ({
@@ -82,8 +87,38 @@ function appointment(
 
 export function previewData(today: EaLocalDate): AgendaData {
   const d = parseEaLocalDate(today);
+  const at = (time: string) => `${d} ${time}:00` as EaLocalDateTime;
+
+  // Pasa por el mismo `buildLegacyAgendaItems()` que `data.ts`, con los mismos
+  // descartes: la vista previa no puede mostrar una regla distinta de la real.
+  const legacy = buildLegacyAgendaItems(
+    [
+      { id: 1, sourceId: "AP-1", start: at("18:00"), clientName: "Mónica Arango", phone: "+573005550001", serviceName: "Semipermanente", providerName: "Lina", status: "Asiste" },
+      { id: 2, sourceId: "AP-2", start: at("09:00"), clientName: "Diana Ríos", phone: "+573005550002", serviceName: "Acrilicas esculpidas", providerName: "Kati", status: "Asiste" },
+      { id: 3, sourceId: "AP-3", start: at("13:00"), clientName: "Laura Gil", phone: null, serviceName: "Uñas en gel", providerName: "Kati", status: "Cancelado" },
+      { id: 4, sourceId: "AP-4", start: at("10:00"), clientName: "Sofía León", phone: "+573005550004", serviceName: "Spa de pies", providerName: "daniela", status: "No Asiste" },
+      // Ya recreada en EA (cita 14, mismo teléfono y misma hora): no se dibuja.
+      { id: 5, sourceId: "AP-5", start: at("11:00"), clientName: "Luisa Pérez", phone: "3001112235", serviceName: "Acrílicas esculpidas", providerName: "Marcela", status: "Reservado" },
+    ],
+    {
+      providers: [
+        { id: 1, firstName: "Lina" },
+        { id: 2, firstName: "Marcela" },
+        { id: 3, firstName: "Daniela" },
+      ],
+      services: [
+        { name: "Acrílicas esculpidas", duration: 150 },
+        { name: "Semipermanente", duration: 90 },
+        { name: "Spa de pies", duration: 120 },
+      ],
+      ea: [{ start: at("11:00"), phone: "+573001112235", customerName: "Luisa Pérez" }],
+      ownProviderId: null,
+      dates: [d],
+    },
+  );
 
   return {
+    legacy,
     providers: [
       {
         id: 1,

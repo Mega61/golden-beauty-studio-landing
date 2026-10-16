@@ -48,6 +48,18 @@
   max-width: 60ch;
 }
 
+/* El alcance de la cifra: qué fuentes entran. Más callado que la decisión y
+   que las notas, porque no pide nada; solo evita que alguien compare dos
+   números que no miden lo mismo. */
+.scope {
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+  font-style: italic;
+  line-height: 1rem;
+  margin: 0;
+  max-width: 60ch;
+}
+
 .figure {
   margin: 0;
   display: flex;

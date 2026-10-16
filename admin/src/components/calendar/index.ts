@@ -71,4 +71,11 @@ export {
   type ServiceTint,
 } from "./service-color";
 
-export type { AppointmentMeta, MetaIndex, ProviderOption, ServiceOption } from "./types";
+export type {
+  AppointmentMeta,
+  HistoryBlock,
+  HistoryIndex,
+  MetaIndex,
+  ProviderOption,
+  ServiceOption,
+} from "./types";
