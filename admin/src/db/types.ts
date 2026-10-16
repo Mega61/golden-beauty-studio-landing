@@ -687,6 +687,25 @@ export interface WaOptoutTable {
   created_at: CreatedAt;
 }
 
+/**
+ * Un navegador suscrito a Web Push (migración `022`). Una fila por
+ * dispositivo, no por persona. El `endpoint` es una capacidad —quien lo tiene
+ * y la llave VAPID le puede escribir a ese celular— y no sale nunca a un log.
+ */
+export interface PushSubscriptionTable {
+  id: Generated<number>;
+  user_id: AuthId;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  last_success_at: SqlDateTime | null;
+  failure_count: Generated<number>;
+  last_failure_at: SqlDateTime | null;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -713,6 +732,7 @@ export interface Database {
   job_run: JobRunTable;
   wa_message: WaMessageTable;
   wa_optout: WaOptoutTable;
+  push_subscription: PushSubscriptionTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -740,6 +760,8 @@ export type NewAppointmentPayment = Insertable<AppointmentPaymentTable>;
 export type WaMessage = Selectable<WaMessageTable>;
 export type NewWaMessage = Insertable<WaMessageTable>;
 export type WaMessageUpdate = Updateable<WaMessageTable>;
+
+export type PushSubscriptionRow = Selectable<PushSubscriptionTable>;
 
 export type WaOptout = Selectable<WaOptoutTable>;
 export type NewWaOptout = Insertable<WaOptoutTable>;

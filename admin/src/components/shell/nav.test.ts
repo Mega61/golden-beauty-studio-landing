@@ -49,7 +49,9 @@ describe("destinationsFor", () => {
 
   it("la técnica no ve caja, ni clientas, ni a las demás profesionales", () => {
     const ids = destinationsFor("staff").map((d) => d.id);
-    expect(ids).toEqual(["hoy", "agenda", "comisiones"]);
+    // Ajustes sí: instalar el panel en el celular le sirve a cualquiera. Lo
+    // que hay adentro lo recorta la pantalla por rol.
+    expect(ids).toEqual(["hoy", "agenda", "comisiones", "ajustes"]);
   });
 });
 
@@ -66,6 +68,7 @@ describe("bottomBarFor", () => {
       "comisiones",
       "servicios",
       "equipo",
+      "ajustes",
     ]);
   });
 
@@ -79,7 +82,7 @@ describe("bottomBarFor", () => {
     // Rellenar cinco casillas con un destino que el rol no puede abrir es una
     // simetría bonita que termina en una pantalla de "no autorizado".
     expect(bottomBarFor("staff").map((d) => d.id)).toEqual(["hoy", "agenda"]);
-    expect(overflowFor("staff").map((d) => d.id)).toEqual(["comisiones"]);
+    expect(overflowFor("staff").map((d) => d.id)).toEqual(["comisiones", "ajustes"]);
   });
 
   it("los cuatro respetan el orden declarado", () => {

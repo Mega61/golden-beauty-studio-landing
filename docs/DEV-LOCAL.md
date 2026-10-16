@@ -171,6 +171,7 @@ TICKET_STAFF_COBRA="true"
 > se recupera después con **Reintentar**, sin recalcular nada.
 | `TZ` | Bogotá. EA guarda hora local sin zona | Todo desfasado cinco horas, y se manifiesta como "los totales no cuadran" |
 | `TICKET_STAFF_COBRA` | Si la técnica registra también el método de pago | Solo cambia qué ve ella en "Cerrar servicio" |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Avisos push al celular cuando alguien reserva en la página. Opcionales. En local: `node -e 'console.log(require("web-push").generateVAPIDKeys())'` dentro de `admin/`, y `VAPID_SUBJECT="mailto:dev@goldenbeautystudio.com.co"` | Sin ellas, Ajustes no muestra el interruptor y nada más cambia. Para probar: `/admin/ajustes` → prender → "Mandarme un aviso de prueba". En Playwright headless solo funciona con contexto persistente (no incógnito) y el permiso `notifications` concedido |
 
 **Ninguna variable `NEXT_PUBLIC_*` en `admin/`.** Se hornean en el build, así que cada una obligaría a
 reconstruir la imagen por un cambio de configuración. Lo que el cliente necesita baja como props desde

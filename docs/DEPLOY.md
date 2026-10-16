@@ -340,6 +340,8 @@ En la misma pantalla, **Environment variables**. Ninguna de estas entra al repo;
 | `GOOGLE_WORKSPACE_DOMAIN` | `goldenbeautystudio.com.co` |
 | `TOTP_ENC_KEY` | `openssl rand -base64 32` |
 | `INGEST_URL` / `INGEST_SHARED_SECRET` | los del Strapi del CRM |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` (dentro de `admin/`), **una vez** — opcionales, ver abajo |
+| `VAPID_SUBJECT` | `mailto:` de un buzón del estudio que alguien lea |
 | `MYSQL_HOST` / `MYSQL_PORT` | `mysql-transversal` / `3306` (respaldo) |
 | `BACKUP_GBS_USER` / `BACKUP_GBS_PASSWORD` | `gbs_admin` y su contraseña |
 | `BACKUP_EA_USER` / `BACKUP_EA_PASSWORD` | `gbs_ea_ro` y su contraseña |
@@ -351,6 +353,25 @@ del rewrite de Vercel y el `Host` que le llega es el del origen, no el que la
 persona escribió. Derivarla del `Host` rompe los redirects de OAuth.
 
 La explicación de cada variable está en `docs/DEV-LOCAL.md` § Paso 4.
+
+**Las tres `VAPID_*` son los avisos al celular de reservas web, y son
+opcionales.** Sin ellas (o con alguna mal formada) Ajustes no muestra el
+interruptor y una reserva no intenta avisar a nadie; nada más cambia. Con
+ellas, cada reserva confirmada en `/reservar` manda una notificación push a los
+dispositivos de la dueña y de recepción que la hayan prendido en
+`/admin/ajustes`. Tres cosas que no son obvias:
+
+- **No se rotan a la ligera.** Cada suscripción queda atada a la llave pública
+  con la que se creó. Cambiar el par deja mudos todos los celulares hasta que
+  cada persona apague y vuelva a prender el aviso (el envío los poda solo tras
+  diez fallas seguidas). Se generan una vez y se guardan con los demás
+  secretos.
+- **No son `NEXT_PUBLIC_*`.** La pública le llega al navegador como prop de la
+  pantalla de Ajustes, leída en tiempo de ejecución, así que la imagen sigue
+  siendo la misma para cualquier par de llaves.
+- **El service worker no cachea nada.** `admin/public/sw.js` solo muestra el
+  aviso y abre la agenda al tocarlo; no tiene manejador de `fetch`, así que el
+  panel instalado nunca muestra una agenda vieja. Ver su cabecera.
 
 ### Lo primero que hay que mirar en el primer despliegue
 

@@ -38,7 +38,8 @@ export type IconName =
   | "deshacer"
   | "candado"
   | "reloj"
-  | "mensaje";
+  | "mensaje"
+  | "ajustes";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   // Hoy: el sol sobre el mesón. La pantalla que abre la recepción.
@@ -165,6 +166,15 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M4 5.5h16a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H9.5L5 20.5V17H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
       <path d="M7.5 10h9M7.5 13h6" />
+    </>
+  ),
+  // Ajustes: dos perillas sobre sus rieles. Una tuerca dentada a 20 px se
+  // vuelve una mancha; esto sigue leyéndose a ese tamaño.
+  ajustes: (
+    <>
+      <path d="M4 8h9M17 8h3M4 16h3M11 16h9" />
+      <circle cx="15" cy="8" r="2" />
+      <circle cx="9" cy="16" r="2" />
     </>
   ),
 };

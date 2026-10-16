@@ -173,6 +173,8 @@ describe("can — el alcance de una técnica", () => {
     "ea:avanzado",
     "recordatorios:enviar",
     "recordatorios:baja",
+    // El aviso de reserva web nombra clienta y técnica de cualquier columna.
+    "avisos:reservas-web",
   ];
 
   it.each(PROHIBIDAS)("staff NO alcanza %s", (capability) => {
@@ -215,6 +217,17 @@ describe("can — recepción y dueña", () => {
     expect(can("admin", "recordatorios:baja")).toBe(true);
   });
 
+  it("recepción y dueña reciben el aviso de reserva web; la técnica no", () => {
+    expect(can("owner", "avisos:reservas-web")).toBe(true);
+    expect(can("admin", "avisos:reservas-web")).toBe(true);
+    expect(can("staff", "avisos:reservas-web")).toBe(false);
+    // Va de la mano de ver la agenda completa: quien no la ve no recibe un
+    // pedazo de ella en la pantalla de bloqueo.
+    for (const role of ["owner", "admin", "staff"] as const) {
+      expect(can(role, "avisos:reservas-web")).toBe(can(role, "agenda:ver-todas"));
+    }
+  });
+
   it("la dueña alcanza todo", () => {
     const TODAS: Capability[] = [
       "cuenta:cerrar-propia",
@@ -234,6 +247,7 @@ describe("can — recepción y dueña", () => {
       "ea:avanzado",
       "recordatorios:enviar",
       "recordatorios:baja",
+      "avisos:reservas-web",
     ];
     for (const capability of TODAS) {
       expect(can("owner", capability)).toBe(true);

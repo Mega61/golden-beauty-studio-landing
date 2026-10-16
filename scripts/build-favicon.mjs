@@ -5,7 +5,8 @@
 //
 //   src/app/icon.png              → 256×256  (browser tab favicon, downscaled)
 //   admin/src/app/icon.png        → 256×256  (la pestaña del panel: el MISMO sello)
-//   admin/src/app/apple-icon.png  → 180×180
+//   admin/src/app/apple-icon.png  → 180×180  (fondo marfil: iOS pinta de negro lo transparente)
+//   admin/public/icons/icon-{192,512}.png, icon-512-maskable.png → el manifest del panel (PWA)
 //   src/app/apple-icon.png        → 180×180  (iOS home screen)
 //   public/icons/icon-192.png     → 192×192  (PWA manifest / Android)
 //   public/icons/icon-512.png     → 512×512  (PWA manifest / splash)
@@ -27,6 +28,9 @@ const PUBLIC = path.join(ROOT, "public");
 const APP_DIR = path.join(ROOT, "src", "app");
 const ADMIN_APP_DIR = path.join(ROOT, "admin", "src", "app");
 const ICONS_DIR = path.join(PUBLIC, "icons");
+// El panel se instala como app aparte (su manifest vive bajo `/admin`), y su
+// `public/` es el de `admin/`: la imagen de Docker no ve el de la landing.
+const ADMIN_ICONS_DIR = path.join(ROOT, "admin", "public", "icons");
 const OG_DIR = path.join(PUBLIC, "og");
 
 const ROUND_SVG = path.join(PUBLIC, "logos", "RoundLogoTextureBisel.svg");
@@ -61,8 +65,14 @@ async function buildSquare(srcBuf, size, bg, outPath) {
   // Raster the SVG at ~4× the target so sharp has headroom to downsample
   // cleanly without hitting its input-pixel limit.
   const density = Math.min(384, Math.max(96, size * 4));
-  await sharp(srcBuf, { density })
-    .resize(size, size, { fit: "contain", background: bg })
+  let img = sharp(srcBuf, { density }).resize(size, size, {
+    fit: "contain",
+    background: bg,
+  });
+  // Un fondo opaco tiene que ser opaco de verdad: `contain` solo rellena el
+  // margen, y las esquinas fuera del sello redondo seguirían transparentes.
+  if (bg.alpha === 1) img = img.flatten({ background: bg });
+  await img
     .png({ compressionLevel: 9, adaptiveFiltering: true })
     .toFile(outPath);
 }
@@ -94,6 +104,7 @@ async function buildWide(srcBuf, width, outPath) {
 
 async function main() {
   await fs.mkdir(ICONS_DIR, { recursive: true });
+  await fs.mkdir(ADMIN_ICONS_DIR, { recursive: true });
   await fs.mkdir(OG_DIR, { recursive: true });
 
   let built = 0;
@@ -115,7 +126,11 @@ async function main() {
       // `admin/`: el contexto de esa imagen es `admin/` y no alcanza ni las
       // fuentes de la marca ni `sharp`. Un solo origen, dos destinos.
       { out: path.join(ADMIN_APP_DIR, "icon.png"), size: 256, bg: TRANSPARENT },
-      { out: path.join(ADMIN_APP_DIR, "apple-icon.png"), size: 180, bg: TRANSPARENT },
+      // Marfil y no transparente: es el ícono del panel instalado en un
+      // iPhone, y iOS rellena la transparencia con negro.
+      { out: path.join(ADMIN_APP_DIR, "apple-icon.png"), size: 180, bg: IVORY },
+      { out: path.join(ADMIN_ICONS_DIR, "icon-192.png"), size: 192, bg: TRANSPARENT },
+      { out: path.join(ADMIN_ICONS_DIR, "icon-512.png"), size: 512, bg: TRANSPARENT },
     ];
     for (const { out, size, bg } of squares) {
       if (!(await needsRebuild(ROUND_SVG, out))) {
@@ -126,13 +141,17 @@ async function main() {
       built += 1;
       console.log(`[build-favicon] ${path.relative(ROOT, out)} (${size}×${size})`);
     }
-    const maskable = path.join(ICONS_DIR, "icon-512-maskable.png");
-    if (await needsRebuild(ROUND_SVG, maskable)) {
-      await buildMaskable(buf, 512, maskable);
-      built += 1;
-      console.log(`[build-favicon] ${path.relative(ROOT, maskable)} (512×512 maskable)`);
-    } else {
-      skipped += 1;
+    for (const maskable of [
+      path.join(ICONS_DIR, "icon-512-maskable.png"),
+      path.join(ADMIN_ICONS_DIR, "icon-512-maskable.png"),
+    ]) {
+      if (await needsRebuild(ROUND_SVG, maskable)) {
+        await buildMaskable(buf, 512, maskable);
+        built += 1;
+        console.log(`[build-favicon] ${path.relative(ROOT, maskable)} (512×512 maskable)`);
+      } else {
+        skipped += 1;
+      }
     }
   } else {
     console.warn(

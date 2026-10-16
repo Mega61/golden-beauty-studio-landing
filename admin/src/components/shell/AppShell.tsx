@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { InstallHint } from "../pwa/InstallHint";
 import { ReadOnlyBand } from "../ui/ReadOnlyBand";
 import { Wordmark } from "./Wordmark";
 import { SideNav } from "./SideNav";
@@ -94,6 +95,8 @@ export function AppShell({
         ) : null}
 
         <main className="ui-content" id="contenido" tabIndex={-1}>
+          {/* Solo en celular, una vez, y nunca dentro de la app instalada. */}
+          <InstallHint />
           {children}
         </main>
       </div>

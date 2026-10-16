@@ -242,6 +242,14 @@ export function isAllowedIdentity(
  * - `recordatorios:baja` — registrar que un número no quiere más recordatorios.
  *   Corta todos los avisos futuros de esa persona, incluidos los automáticos,
  *   así que es de quien atiende el WhatsApp del estudio y queda en bitácora.
+ * - `avisos:reservas-web` — recibir en el celular una notificación push cada
+ *   vez que alguien reserva desde la página. El aviso nombra a la clienta, el
+ *   servicio, la hora **y la técnica**: es un pedazo de la agenda de todo el
+ *   equipo. Por eso va con `agenda:ver-todas` y **no es de la técnica**: ella ve
+ *   su columna, no la de las demás, y un aviso en su pantalla de bloqueo con la
+ *   clienta de otra rompería ese alcance por la puerta de atrás. Si algún día
+ *   se quiere que la técnica sepa de *sus* reservas, es otra capacidad con su
+ *   propio filtro por `ea_provider_id`, no esta abierta a un rol más.
  */
 export type Capability =
   | "cuenta:cerrar-propia"
@@ -262,7 +270,8 @@ export type Capability =
   | "diagnostico:ver"
   | "ea:avanzado"
   | "recordatorios:enviar"
-  | "recordatorios:baja";
+  | "recordatorios:baja"
+  | "avisos:reservas-web";
 
 /**
  * Contexto que hace variar una fila de la matriz.
@@ -307,6 +316,7 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "ea:avanzado",
     "recordatorios:enviar",
     "recordatorios:baja",
+    "avisos:reservas-web",
   ]),
 
   // Recepción. Opera el día completo y cierra la caja, pero no corrige después
@@ -325,6 +335,9 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     // registra a quien pide no recibir más.
     "recordatorios:enviar",
     "recordatorios:baja",
+    // La reserva web llega sin que nadie la vea: recepción es quien confirma
+    // por WhatsApp y acomoda la agenda, así que es quien tiene que enterarse.
+    "avisos:reservas-web",
   ]),
 
   // La técnica. Su alcance es su propio día, sus propias cuentas y su propia

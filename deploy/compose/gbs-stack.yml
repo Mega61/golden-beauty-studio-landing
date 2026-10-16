@@ -35,6 +35,7 @@
 #   GOOGLE_CLIENT_ID          GOOGLE_CLIENT_SECRET   GOOGLE_WORKSPACE_DOMAIN
 #   TOTP_ENC_KEY
 #   INGEST_URL                INGEST_SHARED_SECRET
+#   VAPID_PUBLIC_KEY          VAPID_PRIVATE_KEY      VAPID_SUBJECT   (opcionales: avisos push)
 #   MYSQL_HOST                MYSQL_PORT             (respaldo)
 #   BACKUP_GBS_USER           BACKUP_GBS_PASSWORD    (respaldo, RW sobre gbs_admin)
 #   BACKUP_EA_USER            BACKUP_EA_PASSWORD     (respaldo, RO sobre easyappointments)
@@ -148,6 +149,13 @@ services:
 
       INGEST_URL: ${INGEST_URL}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
+
+      # Avisos push de reservas web. Opcionales: vacías, la función no aparece
+      # (ver `admin/src/lib/push/config.ts`). El `:-` evita el aviso de Compose
+      # por variable sin definir en un stack que todavía no las tiene.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
 
       # Dónde buscar `last-run.txt` y `last-status.txt`, que escribe
       # `db-backup`. Sin esta variable Diagnóstico muestra el respaldo como

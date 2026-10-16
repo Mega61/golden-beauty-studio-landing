@@ -19,6 +19,7 @@ import { commissionRunRepository } from "./commission-run";
 import { dayCloseRepository } from "./day-close";
 import { jobRunRepository } from "./job-run";
 import { legacyAppointmentRepository } from "./legacy-appointment";
+import { pushSubscriptionRepository } from "./push-subscription";
 import { serviceMapRepository } from "./service-map";
 import { staffTotpRepository } from "./staff-totp";
 import { stationRepository } from "./station";
@@ -40,6 +41,7 @@ export function repositories(db: Db) {
     dayCloses: dayCloseRepository(db),
     jobRuns: jobRunRepository(db),
     legacyAppointments: legacyAppointmentRepository(db),
+    pushSubscriptions: pushSubscriptionRepository(db),
     serviceMap: serviceMapRepository(db),
     staffTotp: staffTotpRepository(db),
     stations: stationRepository(db),
@@ -73,6 +75,8 @@ export {
 } from "./job-run";
 export type { JobRunInput } from "./job-run";
 export { legacyAppointmentRepository } from "./legacy-appointment";
+export { pushSubscriptionRepository } from "./push-subscription";
+export type { DeliverableSubscription, PushSubscriptionInput } from "./push-subscription";
 export { serviceMapRepository } from "./service-map";
 export { staffTotpRepository } from "./staff-totp";
 export { stationRepository } from "./station";

@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { createEaClient } from "@/lib/ea/client";
 import { isEaLocalDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
+import { notifyNewWebBooking } from "@/lib/push/send";
 import { createBooking } from "./data";
 
 /**
@@ -71,6 +73,22 @@ export async function POST(req: NextRequest) {
 
     switch (result.status) {
       case "ok":
+        // El aviso al celular de la dueña y de recepción va en `after()`:
+        // corre cuando la clienta ya tiene su 201. Un servicio de push lento o
+        // caído no puede demorar ni tumbar una reserva que ya existe en EA, y
+        // `notifyNewWebBooking` no lanza. El teléfono de la clienta **no**
+        // entra: el aviso se ve en una pantalla de bloqueo.
+        after(() =>
+          notifyNewWebBooking({
+            appointmentId: result.appointmentId,
+            customerFirstName: firstName,
+            customerLastName: lastName,
+            start: result.start,
+            providerName: result.providerName,
+            resolveServiceName: async () =>
+              (await createEaClient().services.get(serviceId)).name ?? null,
+          }),
+        );
         return NextResponse.json(
           {
             appointmentId: result.appointmentId,

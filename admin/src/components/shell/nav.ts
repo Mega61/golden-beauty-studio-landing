@@ -121,6 +121,16 @@ export const DESTINATIONS: readonly Destination[] = [
     roles: ONLY_OWNER,
   },
   {
+    id: "ajustes",
+    label: "Ajustes",
+    href: "/ajustes",
+    icon: "ajustes",
+    // De todas: instalar el panel en el celular sirve a cualquiera. Lo que hay
+    // adentro depende del rol —el aviso de reservas web es de dueña y
+    // recepción—, y eso lo decide la pantalla con `can()`, no este arreglo.
+    roles: ALL,
+  },
+  {
     id: "avanzado",
     // El único destino que NO es una pantalla del panel: abre la interfaz
     // propia de Easy!Appointments, para lo que el panel no reconstruye.
