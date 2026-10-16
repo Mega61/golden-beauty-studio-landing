@@ -75,7 +75,7 @@ describe("linkFor", () => {
     const link = linkFor(row(), null) as string;
     const url = new URL(link);
     expect(url.pathname).toBe("/573001234567");
-    expect(url.searchParams.get("text")).toContain("mañana viernes 16 de octubre");
+    expect(url.searchParams.get("text")).toContain("Mañana, viernes 16 de octubre");
   });
 
   it("recordada: al número al que se mandó, no al de la ficha de hoy", () => {

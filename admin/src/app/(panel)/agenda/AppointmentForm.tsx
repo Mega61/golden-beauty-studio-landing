@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox, Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { formatCOP, formatDuration, formatPhoneCO } from "@/components/ui/format";
 import { STATUS_IDS, STATUS_META } from "@/components/ui/status";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import {
   comboServiceIds,
   composeFrom,
@@ -538,8 +539,17 @@ function CustomerPicker({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Found[]>([]);
   const [creating, setCreating] = useState(false);
+  // El teléfono de la clienta elegida, para el botón de WhatsApp del chip.
+  // Vive acá y no en el borrador de la cita: es solo de pantalla, y al abrir
+  // una cita existente no se conoce — el chip queda sin botón, como antes.
+  const [pickedPhone, setPickedPhone] = useState<string | null>(null);
   const [, startSearch] = useTransition();
   const listId = useId();
+
+  const pick = (customer: Found | null) => {
+    setPickedPhone(customer?.phone ?? null);
+    onPick(customer);
+  };
 
   const trimmed = term.trim();
   // Se **deriva** en vez de guardarse: con la clienta ya elegida, o con menos de
@@ -577,6 +587,7 @@ function CustomerPicker({
         {() => (
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <span style={{ flex: 1, fontWeight: 600 }}>{chosen.name}</span>
+            <WhatsAppLink phone={pickedPhone} customerName={chosen.name} showNumber={false} />
             <Button
               size="sm"
               variant="ghost"
@@ -586,7 +597,7 @@ function CustomerPicker({
                 // volvía al alta —no al buscador— y con los campos vacíos,
                 // porque el término ya se había borrado.
                 setCreating(false);
-                onPick(null);
+                pick(null);
               }}
             >
               Cambiar
@@ -607,7 +618,7 @@ function CustomerPicker({
         {() => (
           <AltaRapida
             termino={trimmed}
-            onCreada={onPick}
+            onCreada={pick}
             onCancelar={() => setCreating(false)}
           />
         )}
@@ -637,7 +648,7 @@ function CustomerPicker({
                     className="ui-list__row"
                     data-interactive="true"
                     style={{ width: "100%", border: 0, background: "none", font: "inherit" }}
-                    onClick={() => onPick(found)}
+                    onClick={() => pick(found)}
                   >
                     <span className="ui-list__body">
                       <span className="ui-list__primary">{found.name}</span>

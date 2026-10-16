@@ -12,6 +12,7 @@ import {
   formatTimeRange,
   useToast,
 } from "@/components/ui";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import {
   CambioTag,
   TicketSheet,
@@ -305,6 +306,16 @@ function AppointmentCard({
           <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
             {appointment.bookedServiceName}
           </p>
+          {/* Para avisar que la técnica se atrasó o preguntar si ya viene,
+              sin salir de Hoy a buscar el número. */}
+          {appointment.customerPhone ? (
+            <div style={{ marginTop: "0.375rem" }}>
+              <WhatsAppLink
+                phone={appointment.customerPhone}
+                customerName={appointment.customerName}
+              />
+            </div>
+          ) : null}
         </div>
         {appointment.status === "" ? null : (
           <StatusPill status={appointment.status} size="sm" />

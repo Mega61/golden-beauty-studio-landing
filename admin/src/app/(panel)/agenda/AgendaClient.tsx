@@ -27,8 +27,9 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Panel, PanelInline } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { formatDateLong, formatPhoneCO, formatTimeRange } from "@/components/ui/format";
+import { formatDateLong, formatTimeRange } from "@/components/ui/format";
 import { useToast } from "@/components/ui/Toast";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import { buildDayGrid, type DayGrid } from "@/lib/calendar-layout";
 import type { ConflictReport } from "@/lib/conflict";
 import { addMinutes, eaDatePart, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea/datetime";
@@ -826,7 +827,9 @@ function AppointmentDetail({
           <>
             <span className={styles.detailKey}>Teléfono</span>
             <span className={styles.detailValue}>
-              <a href={`tel:${info.phone}`}>{formatPhoneCO(info.phone)}</a>
+              {/* El teléfono de EA llega como lo tecleó alguien: el componente
+                  lo normaliza antes de armar el `wa.me` y el `tel:`. */}
+              <WhatsAppLink phone={info.phone} customerName={info.customer} withCall />
             </span>
           </>
         ) : null}
@@ -888,7 +891,7 @@ function LegacyDetail({ item }: { item: LegacyAgendaItem }) {
           <>
             <span className={styles.detailKey}>Teléfono</span>
             <span className={styles.detailValue}>
-              <a href={`tel:${item.phone}`}>{formatPhoneCO(item.phone)}</a>
+              <WhatsAppLink phone={item.phone} customerName={item.clientName} withCall />
             </span>
           </>
         ) : null}

@@ -10,10 +10,10 @@ import {
   formatCOP,
   formatDateLong,
   formatDateShort,
-  formatPhoneCO,
   formatTime,
   type Column,
 } from "@/components/ui";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import type { PaymentMethod } from "@/db/types";
 
 import { CortesiaPorDefecto, EditarClienta, FusionarClienta } from "./AccionesClienta";
@@ -66,9 +66,7 @@ export function FichaClienta({
           <dl style={dlStyle}>
             <Dato etiqueta="Teléfono">
               {client.phone ? (
-                <a href={`tel:${client.phone}`} className="ui-num">
-                  {formatPhoneCO(client.phone)}
-                </a>
+                <WhatsAppLink phone={client.phone} customerName={client.name} withCall />
               ) : (
                 <span style={{ color: "var(--color-ink-soft)" }}>
                   Sin teléfono — esta ficha no se puede unificar con otras

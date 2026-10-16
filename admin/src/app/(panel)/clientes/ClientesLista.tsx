@@ -7,6 +7,7 @@ import {
   formatPhoneCO,
   type Column,
 } from "@/components/ui";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 
 import { NuevaClienta } from "./AccionesClienta";
 import { BuscadorClientas } from "./BuscadorClientas";
@@ -150,11 +151,13 @@ function clientColumns(): Array<Column<ResolvedClient>> {
       key: "telefono",
       header: "Teléfono",
       from: "md",
-      listSlot: "secondary",
+      // A la derecha y no en la segunda línea: la segunda línea es texto, y
+      // el teléfono acá es el botón para escribirle por WhatsApp.
+      listSlot: "trailing",
       text: (row) => (row.phone ? formatPhoneCO(row.phone) : "Sin teléfono"),
       render: (row) =>
         row.phone ? (
-          <span className="ui-num">{formatPhoneCO(row.phone)}</span>
+          <WhatsAppLink phone={row.phone} customerName={row.name} />
         ) : (
           // No es un vacío decorativo: sin teléfono esta clienta no se puede
           // deduplicar ni encontrar cuando vuelva a llamar.

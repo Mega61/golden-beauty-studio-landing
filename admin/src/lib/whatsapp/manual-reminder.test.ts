@@ -8,6 +8,7 @@ import {
   MANUAL_TEMPLATE,
   STUDIO_ADDRESS,
   buildReminderText,
+  clockTime,
   planManualReminders,
   presentableFirstName,
   reminderDayOf,
@@ -327,6 +328,17 @@ describe("spokenTime", () => {
   });
 });
 
+describe("clockTime", () => {
+  it.each([
+    ["2026-10-16 10:00:00", "10:00 a. m."],
+    ["2026-10-16 13:00:00", "1:00 p. m."],
+    ["2026-10-16 00:00:00", "12:00 a. m."],
+    ["2026-10-16 12:30:00", "12:30 p. m."],
+  ])("%s → %s", (start, expected) => {
+    expect(clockTime(wall(start))).toBe(expected);
+  });
+});
+
 describe("buildReminderText", () => {
   it("mañana: saludo, servicio, día con fecha, hora, dirección y cómo cambiarla", () => {
     const text = buildReminderText({
@@ -337,37 +349,43 @@ describe("buildReminderText", () => {
     });
     expect(text).toBe(
       [
-        "¡Hola, Laura! Te recordamos tu cita de Semipermanente manos mañana viernes 16 de octubre a las 10:00 a. m.",
+        "¡Hola, Laura! ✨",
         "",
-        "Te esperamos en Golden Beauty Studio: Calle 69 Sur #43a - 41, primer piso, Sabaneta.",
+        "Te recordamos tu cita de Semipermanente manos 💅",
+        "📅 Mañana, viernes 16 de octubre",
+        "🕒 10:00 a. m.",
+        "📍 Golden Beauty Studio — Calle 69 Sur #43a - 41, primer piso, Sabaneta",
         "",
-        "Si necesitas cambiarla, respóndenos por aquí.",
+        "Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍",
       ].join("\n"),
     );
   });
 
-  it("hoy: sin fecha, que se lee hoy", () => {
+  it("hoy: también con el día de la semana y la fecha, no solo \"hoy\"", () => {
     const text = buildReminderText({
       customerFirstName: "Ana",
       serviceName: "Pedicure",
       start: wall("2026-10-15 13:30:00"),
       day: "hoy",
     });
-    expect(text.split("\n")[0]).toBe(
-      "¡Hola, Ana! Te recordamos tu cita de Pedicure hoy a la 1:30 p. m.",
-    );
+    const lines = text.split("\n");
+    expect(lines[2]).toBe("Te recordamos tu cita de Pedicure 💅");
+    expect(lines[3]).toBe("📅 Hoy, jueves 15 de octubre");
+    expect(lines[4]).toBe("🕒 1:30 p. m.");
   });
 
-  it("sin nombre ni servicio sigue siendo una frase completa", () => {
+  it("sin nombre ni servicio sigue siendo un mensaje completo", () => {
     const text = buildReminderText({
       customerFirstName: "  ",
       serviceName: null,
       start: wall("2026-10-16 15:00:00"),
       day: "manana",
     });
-    expect(text.split("\n")[0]).toBe(
-      "¡Hola! Te recordamos tu cita mañana viernes 16 de octubre a las 3:00 p. m.",
-    );
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("¡Hola! ✨");
+    expect(lines[2]).toBe("Te recordamos tu cita 💅");
+    expect(lines[3]).toBe("📅 Mañana, viernes 16 de octubre");
+    expect(lines[4]).toBe("🕒 3:00 p. m.");
   });
 
   it("nunca lleva precio ni nada con forma de plata", () => {
@@ -389,10 +407,12 @@ describe("buildReminderText", () => {
     });
     expect(STUDIO_ADDRESS).toBe("Calle 69 Sur #43a - 41, primer piso, Sabaneta");
     expect(text).toContain(STUDIO_ADDRESS);
-    expect(text.endsWith("Si necesitas cambiarla, respóndenos por aquí.")).toBe(true);
+    expect(text.endsWith("Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍")).toBe(
+      true,
+    );
   });
 
-  it("la fecha de mañana se lee de la hora de pared, sin pasar por la zona del proceso", () => {
+  it("la fecha se lee de la hora de pared, sin pasar por la zona del proceso", () => {
     // 11 p. m. del viernes en Bogotá ya es sábado en UTC. El mensaje tiene que
     // decir viernes.
     const text = buildReminderText({
@@ -401,7 +421,7 @@ describe("buildReminderText", () => {
       start: wall("2026-10-16 23:00:00"),
       day: "manana",
     });
-    expect(text).toContain("mañana viernes 16 de octubre a las 11:00 p. m.");
+    expect(text).toContain("📅 Mañana, viernes 16 de octubre\n🕒 11:00 p. m.");
   });
 });
 
@@ -463,21 +483,31 @@ describe("buildConfirmationText", () => {
       serviceName: "Semipermanente manos",
       start: "2026-10-16 10:00:00" as never,
     });
-    expect(text.split("\n")[0]).toBe(
-      "¡Hola, Laura! ✨ Tu cita de Semipermanente manos quedó confirmada para el viernes 16 de octubre a las 10:00 a. m.",
+    expect(text).toBe(
+      [
+        "¡Hola, Laura! ✨",
+        "",
+        "Tu cita de Semipermanente manos quedó confirmada 💅",
+        "📅 Viernes 16 de octubre",
+        "🕒 10:00 a. m.",
+        "📍 Golden Beauty Studio — Calle 69 Sur #43a - 41, primer piso, Sabaneta",
+        "",
+        "Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍",
+      ].join("\n"),
     );
-    expect(text).toContain("Calle 69 Sur #43a - 41");
     expect(text).not.toMatch(/\$/);
   });
 
-  it("sin nombre ni servicio sigue siendo una frase", () => {
+  it("sin nombre ni servicio sigue siendo un mensaje", () => {
     const text = buildConfirmationText({
       customerFirstName: null,
       serviceName: null,
       start: "2026-10-16 13:30:00" as never,
     });
-    expect(text.split("\n")[0]).toBe(
-      "¡Hola! ✨ Tu cita quedó confirmada para el viernes 16 de octubre a la 1:30 p. m.",
-    );
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("¡Hola! ✨");
+    expect(lines[2]).toBe("Tu cita quedó confirmada 💅");
+    expect(lines[3]).toBe("📅 Viernes 16 de octubre");
+    expect(lines[4]).toBe("🕒 1:30 p. m.");
   });
 });

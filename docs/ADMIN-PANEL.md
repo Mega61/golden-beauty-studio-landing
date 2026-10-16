@@ -1159,6 +1159,19 @@ contenedor `admin`, que es el único que tiene la agenda, el scheduler y la base
 - **Qué se manda, y nada más:** confirmación al reservar desde la landing, recordatorio la tarde
   anterior, y aviso de cancelación. Promociones no — eso es categoría `marketing`, otra tarifa y otra
   conversación con el equipo.
+- **El texto manual y el de Meta son dos textos distintos, a propósito.** El de `wa.me`
+  (`buildReminderText` / `buildConfirmationText` en `lib/whatsapp/manual-reminder.ts`, plantilla
+  `manual-wa-me-v2`) lleva emojis y el día, la fecha y la hora en renglones propios —también "Hoy,
+  viernes 16 de octubre", no "hoy" a secas—. Las plantillas de la Cloud API
+  (`lib/whatsapp/template-params.ts`) siguen sobrias: tienen que coincidir letra por letra con lo
+  aprobado en Meta, y ponerles emojis exige cambiar las dos cosas a la vez y volver a pasar la
+  revisión. Ninguno de los dos lleva precio.
+- **Cada vista que muestra a una clienta trae su botón de WhatsApp** (`components/ui/WhatsAppLink`,
+  con la lógica pura en `phone-links.ts`): agenda (cita de EA y de Agenda Pro), el chip de la clienta
+  elegida en el formulario de cita, Clientes, la ficha y las tarjetas de Hoy. Normaliza el teléfono
+  con `normalizePhoneE164` antes de armar el `wa.me` o el `tel:` y, si no se puede, muestra el texto
+  sin enlace. Abre el chat solo con el saludo ("¡Hola, Laura! ✨"); no registra nada en `wa_message`,
+  porque no es un aviso.
 
 Fuera de esto, WhatsApp queda disponible para dos cosas que el plan ya menciona y que no se construyen
 todavía: el código de recuperación de acceso de una técnica que perdió el celular, y el winback que hoy
