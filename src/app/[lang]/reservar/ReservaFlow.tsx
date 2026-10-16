@@ -121,7 +121,15 @@ type Dict = {
   nextOpen: string;
   loadingSlots: string;
   pickDate: string;
-  combo: { askFeet: string; askHands: string; none: string; hint: string; saving: string; pairHint: string };
+  combo: {
+    askFeet: string;
+    askHands: string;
+    none: string;
+    hint: string;
+    saving: string;
+    pairHint: string;
+    badge: string;
+  };
   trust: { reviews: string; ratingOnly: string; instant: string; pay: string; change: string };
   studio: { name: string; area: string; hours: string; address: string; directions: string; photoAlt: string };
   scarcity: { few: string; last: string };
@@ -448,6 +456,18 @@ export default function ReservaFlow({
   );
 
   const partners = useMemo(() => partnersOf(baseId), [partnersOf, baseId]);
+
+  /** Add-on options grouped by category, in catalog order — same labels as step 1. */
+  const groupPartners = (list: Service[]): [string, Service[]][] => {
+    const out = new Map<string, Service[]>();
+    for (const p of list) {
+      const label = (p.slug && copy[p.slug]?.category) || p.category || "";
+      const bucket = out.get(label);
+      if (bucket) bucket.push(p);
+      else out.set(label, [p]);
+    }
+    return [...out.entries()];
+  };
 
   /** The combo service that `partner` would turn the current pick into. */
   const comboWith = (partner: Service): Service | null => {
@@ -1066,30 +1086,48 @@ export default function ReservaFlow({
                                 {baseIsFeet ? dict.combo.askHands : dict.combo.askFeet}
                               </p>
                               <p className="mt-0.5 font-sans text-[12.5px] text-ink-mute">{dict.combo.hint}</p>
-                              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                                {partners.map((p) => (
-                                  <li key={p.id}>
-                                    <PillChoice selected={partnerId === p.id} onClick={() => choosePartner(p)}>
-                                      <span>{nameOf(p)}</span>
-                                      {/* What the visit becomes, not "+75 min": a
-                                          combo is shorter and cheaper than its parts. */}
-                                      {/* The total the visit becomes: the combo's own
-                                          price, or the plain sum when there's no combo. */}
-                                      <span className="whitespace-nowrap text-[13px] text-ink-mute">
-                                        {formatCOP(
-                                          comboWith(p)?.priceCOP ?? (base?.priceCOP ?? 0) + p.priceCOP,
-                                          lang,
-                                        )}
-                                      </span>
-                                    </PillChoice>
-                                  </li>
-                                ))}
-                                <li>
-                                  <PillChoice selected={partnerId === null} onClick={() => choosePartner(null)}>
-                                    <span>{dict.combo.none}</span>
-                                  </PillChoice>
-                                </li>
-                              </ul>
+                              {/* "No, solo eso" first: it's the answer most of the
+                                  time, and it shouldn't be the last row of a long list.
+                                  With many options (feet first, then any hands
+                                  service) they're grouped by category, like step 1. */}
+                              <div className="mt-3">
+                                <PillChoice selected={partnerId === null} onClick={() => choosePartner(null)}>
+                                  <span>{dict.combo.none}</span>
+                                </PillChoice>
+                              </div>
+                              {groupPartners(partners).map(([label, group]) => (
+                                <div key={label || "_"} className="mt-3">
+                                  {label && partners.length > 4 && (
+                                    <p className="mb-1.5 font-sans text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-mute">
+                                      {label}
+                                    </p>
+                                  )}
+                                  <ul className="grid gap-2 sm:grid-cols-2">
+                                    {group.map((p) => {
+                                      const combo = comboWith(p);
+                                      return (
+                                        <li key={p.id}>
+                                          <PillChoice selected={partnerId === p.id} onClick={() => choosePartner(p)}>
+                                            <span className="flex min-w-0 items-center gap-2">
+                                              <span className="truncate">{nameOf(p)}</span>
+                                              {combo && (
+                                                <span className="shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-gold-deep">
+                                                  {dict.combo.badge}
+                                                </span>
+                                              )}
+                                            </span>
+                                            {/* The total the visit becomes: the combo's own
+                                                price, or the plain sum when there's no combo. */}
+                                            <span className="whitespace-nowrap text-[13px] text-ink-mute">
+                                              {formatCOP(combo?.priceCOP ?? (base?.priceCOP ?? 0) + p.priceCOP, lang)}
+                                            </span>
+                                          </PillChoice>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </div>
+                              ))}
                               {addOn && visit && (
                                 <p className="mt-4 font-sans text-sm">
                                   <span className="font-semibold text-ink">

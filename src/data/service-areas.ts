@@ -33,12 +33,11 @@ export function serviceAreas(): Record<string, ServiceArea> {
 }
 
 /**
- * What a feet service can be paired with: hands services from the "sencillos"
- * category. Someone booking feet first is usually booking a simple visit; a
- * sculpted set isn't something you add on after choosing a pedicure.
+ * What a feet service can be paired with: **any** hands service. Any work on
+ * the nails can go with work on the feet — a sculpted set plus a pedicure is
+ * as normal a visit as a semi plus a pedicure, whichever was picked first.
  */
 export function handsForFeet(): string[] {
-  const simple = pricing.find((c) => c.id === "sencillos");
-  const feet = new Set<string>(FEET_SERVICE_IDS);
-  return (simple?.items ?? []).map((i) => i.id).filter((id) => !feet.has(id));
+  const areas = serviceAreas();
+  return Object.keys(areas).filter((id) => areas[id] === "hands");
 }

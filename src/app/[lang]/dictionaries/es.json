@@ -297,7 +297,8 @@
       "none": "No, solo eso",
       "hint": "Se agenda en la misma visita.",
       "saving": "Ahorras {amount}",
-      "pairHint": "Dos servicios seguidos en la misma cita, sin esperas entre uno y otro."
+      "pairHint": "Dos servicios seguidos en la misma cita, sin esperas entre uno y otro.",
+      "badge": "Combo"
     },
     "success": {
       "eyebrow": "Cita confirmada",

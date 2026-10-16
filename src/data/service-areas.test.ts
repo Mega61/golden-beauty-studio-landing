@@ -19,10 +19,12 @@ describe("service areas", () => {
     expect(areas["semi-permanent-hands-feet"]).toBeUndefined();
   });
 
-  it("a feet service pairs with the simple hands services only", () => {
+  it("a feet service pairs with any hands service, from every category", () => {
     const hands = handsForFeet();
-    expect(hands).toContain("semi-permanent-hands");
+    for (const id of ["semi-permanent-hands", "acrylic-sculpted", "polygel-refill", "dipping"]) {
+      expect(hands).toContain(id);
+    }
     expect(hands).not.toContain("semi-permanent-feet");
-    expect(hands).not.toContain("acrylic-sculpted");
+    expect(hands).not.toContain("system-removal");
   });
 });
