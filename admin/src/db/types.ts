@@ -170,6 +170,8 @@ export interface AllowedUserTable {
   email: string;
   role: UserRole;
   ea_provider_id: number | null;
+  /** Migración 024. `dev:seed`, la suite E2E y la entrada de desarrollo. Ver `lib/test-accounts.ts`. */
+  is_test_account: Generated<number>;
   created_at: CreatedAt;
   updated_at: UpdatedAt;
 }

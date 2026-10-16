@@ -64,6 +64,7 @@ import { migration as m020 } from "./020-wa-message";
 import { migration as m021 } from "./021-wa-message-manual";
 import { migration as m022 } from "./022-push-subscription";
 import { migration as m023 } from "./023-ad-spend";
+import { migration as m024 } from "./024-allowed-user-test-account";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -89,6 +90,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m021,
   m022,
   m023,
+  m024,
 ];
 
 /**

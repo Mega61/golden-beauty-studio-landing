@@ -72,6 +72,11 @@ INGEST_SHARED_SECRET="ci"
 
 TZ="America/Bogota"
 TICKET_STAFF_COBRA="true"
+
+# La suite E2E entra con una cuenta de prueba (e2e@…) contra un build de
+# producción, donde esas cuentas no existen para la autenticación. Esta es la
+# única excepción, y vive solo acá: la VM nunca la tiene. Ver lib/test-accounts.ts.
+ALLOW_TEST_ACCOUNTS="1"
 NODE_ENV="development"
 EOF
 

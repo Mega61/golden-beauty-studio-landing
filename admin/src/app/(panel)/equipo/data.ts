@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getDb } from "@/db/client";
+import { showTestAccountsInTeam } from "@/lib/test-accounts";
 import { allowedUserRepository, staffTotpRepository } from "@/db/repositories";
 import type { AllowedUser } from "@/db/types";
 import {
@@ -114,7 +115,11 @@ function describeEaFailure(error: unknown): EquipoFailure {
 /** Las cuentas del panel, con su estado de enrolamiento. */
 async function loadPanelAccounts(): Promise<PanelAccount[]> {
   const db = getDb();
-  const allowlist = await allowedUserRepository(db).list();
+  // Las cuentas de prueba no trabajan en el estudio: fuera de Equipo siempre,
+  // salvo `SHOW_TEST_ACCOUNTS=1` en desarrollo. Ver `lib/test-accounts.ts`.
+  const allowlist = (await allowedUserRepository(db).list()).filter(
+    (entry) => entry.is_test_account === 0 || showTestAccountsInTeam(),
+  );
 
   // Un solo viaje por los `user` de Better Auth: la allowlist tiene tres o
   // cuatro filas, y un `IN` sobre correos es más barato que una consulta por

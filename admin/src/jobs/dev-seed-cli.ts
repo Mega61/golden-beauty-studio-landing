@@ -142,8 +142,9 @@ async function run(): Promise<void> {
 
     const allowed = allowedUserRepository(db);
     const enAllowlist = await allowed.findByEmail(email);
-    if (enAllowlist) await allowed.update(enAllowlist.id, { role: rol });
-    else await allowed.insert({ email, role: rol });
+    // Marcada como de prueba: fuera de Equipo, e inerte en producción.
+    if (enAllowlist) await allowed.update(enAllowlist.id, { role: rol, is_test_account: 1 });
+    else await allowed.insert({ email, role: rol, is_test_account: 1 });
 
     const secret = generateTotpSecret();
     await staffTotpRepository(db).enroll(userId, encryptTotpSecret(secret, key));

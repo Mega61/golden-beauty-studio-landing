@@ -5,7 +5,8 @@ import { Logotipo } from "@/components/shell/Wordmark";
 import { Button } from "@/components/ui";
 import { listTotpLoginCandidates, type TotpLoginCandidate } from "@/lib/auth";
 import { verifySession } from "@/lib/dal";
-import { entrarConWorkspace } from "./actions";
+import { DEV_LOGIN_ACCOUNTS, devLoginEnabled } from "@/lib/test-accounts";
+import { entrarComoDev, entrarConWorkspace } from "./actions";
 import { TotpForm } from "./TotpForm";
 
 /**
@@ -96,6 +97,35 @@ export default async function EntrarPage({
         >
           {mensaje}
         </p>
+      ) : null}
+
+      {/* Desarrollo con DEV_LOGIN=1: un toque y adentro, con el rol que se
+          quiera probar. En un build de producción esto no se renderiza y el
+          endpoint responde 404 — ver `lib/test-accounts.ts`. */}
+      {devLoginEnabled() ? (
+        <div
+          style={{
+            display: "grid",
+            gap: "0.5rem",
+            padding: "0.875rem",
+            borderRadius: "var(--radius-md)",
+            border: "1px dashed var(--hair)",
+          }}
+        >
+          <p style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+            Desarrollo · entrar sin código
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem" }}>
+            {(Object.keys(DEV_LOGIN_ACCOUNTS) as (keyof typeof DEV_LOGIN_ACCOUNTS)[]).map((role) => (
+              <form key={role} action={entrarComoDev}>
+                <input type="hidden" name="role" value={role} />
+                <Button type="submit" variant="secondary" block>
+                  {DEV_LOGIN_ACCOUNTS[role].label}
+                </Button>
+              </form>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       <form action={entrarConWorkspace}>

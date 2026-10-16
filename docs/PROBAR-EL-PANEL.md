@@ -89,6 +89,13 @@ npm run build:migrator && node .next/standalone/scripts/migrate.js
 
 ## 5. La cuenta para entrar
 
+**El camino corto: `DEV_LOGIN=1`.** Con esa línea en `admin/.env.local`, `/admin/entrar` muestra
+tres botones —Dueña, Recepción, Técnica— y un toque basta: sin código, sin app de autenticación.
+Crea sola la cuenta de prueba del rol. En un build de producción los botones no existen y el
+endpoint responde 404, aunque la variable esté puesta (`lib/test-accounts.ts`).
+
+Lo de abajo sigue sirviendo para probar el login por código de verdad:
+
 Acá está el truco que ahorra la media hora de Google Cloud:
 
 ```bash

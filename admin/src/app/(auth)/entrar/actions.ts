@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getAuth, LOGIN_PATH, panelUrl } from "@/lib/auth";
+import { devLoginEnabled, isDevLoginRole } from "@/lib/test-accounts";
 
 /**
  * Las dos entradas y la salida, como Server Actions.
@@ -74,6 +75,18 @@ export async function entrarConCodigo(
   // Fuera del `try`: `redirect()` funciona lanzando, y atraparlo acá lo
   // convertiría en "código inválido" justo cuando el código era correcto. Es el
   // error más fácil de cometer con Server Actions.
+  redirect(HOME_PATH);
+}
+
+/**
+ * Entrar sin código, como una de las tres cuentas de prueba. Solo en
+ * desarrollo con `DEV_LOGIN=1`; en cualquier otro caso el endpoint responde
+ * 404 y esto vuelve al login. Ver `lib/test-accounts.ts`.
+ */
+export async function entrarComoDev(formData: FormData): Promise<void> {
+  const role = formData.get("role");
+  if (!devLoginEnabled() || !isDevLoginRole(role)) redirect(LOGIN_PATH);
+  await getAuth().api.signInDev({ body: { role }, headers: await headers() });
   redirect(HOME_PATH);
 }
 
