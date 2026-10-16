@@ -43,9 +43,11 @@ export default async function ClientesPage({
   const params = await searchParams;
   const raw = params.q;
   const query = typeof raw === "string" ? raw : null;
+  const rawPage = Number(typeof params.pagina === "string" ? params.pagina : 1);
+  const page = Number.isInteger(rawPage) && rawPage > 0 && rawPage < 1000 ? rawPage : 1;
 
   const [result, canExport] = await Promise.all([
-    searchClients(query),
+    searchClients(query, page),
     sessionCan("clientes:exportar"),
   ]);
 

@@ -230,8 +230,14 @@
        el navegador pinte de oscuro los controles nativos. */
     color-scheme: light;
     /* Ningún scroll horizontal en la página. Lo único que scrollea de lado es
-       la grilla de la agenda, y lo hace dentro de su propio contenedor. */
-    overflow-x: hidden;
+       la grilla de la agenda, y lo hace dentro de su propio contenedor.
+
+       `clip`, no `hidden`: con `hidden` en <html> y en <body>, el <body> pasa
+       a ser su propio contenedor de scroll (overflow-y: auto implícito) y todo
+       lo `sticky` —barra lateral, barra superior, encabezados— se pegaba a un
+       <body> que nunca scrollea: se iba con la página. `clip` recorta igual y
+       no crea contenedor. */
+    overflow-x: clip;
   }
 
   body {
@@ -242,7 +248,7 @@
     background: var(--color-ivory);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   /* `tabular-nums` en todo número: precios, horas, totales, ids. Se pone en

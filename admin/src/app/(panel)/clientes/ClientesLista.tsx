@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Form from "next/form";
 
 import {
   DataTable,
@@ -10,6 +9,8 @@ import {
 } from "@/components/ui";
 
 import { NuevaClienta } from "./AccionesClienta";
+import { BuscadorClientas } from "./BuscadorClientas";
+import styles from "./clientes.module.css";
 import { clientHref, type ClientListResult } from "./data";
 import type { ResolvedClient } from "./identity";
 
@@ -34,8 +35,34 @@ export function ClientesLista({
 }) {
   const columns = clientColumns();
 
+  const from = (result.page - 1) * result.pageLength + 1;
+  const to = from + result.clients.length - 1;
+  const pageHref = (n: number) => {
+    const q = new URLSearchParams();
+    if (result.query) q.set("q", result.query);
+    if (n > 1) q.set("pagina", String(n));
+    const qs = q.toString();
+    return qs ? `/clientes?${qs}` : "/clientes";
+  };
+
   return (
     <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
+      <div className={styles.toolbar}>
+        <BuscadorClientas key={result.query ?? ""} initial={result.query ?? ""} />
+        {!result.failure ? (
+          <p className={styles.meta} aria-live="polite">
+            {result.query !== null
+              ? result.total === 1
+                ? "1 clienta"
+                : `${result.total ?? result.clients.length} clientas con «${result.query}»`
+              : "Las más recientes primero"}
+            {countMerged(result.clients) > 0
+              ? ` · ${countMerged(result.clients)} con más de una ficha en la agenda`
+              : ""}
+          </p>
+        ) : null}
+      </div>
+
       {result.failure ? (
         <ReadOnlyBand
           reason={result.failure.message}
@@ -43,77 +70,56 @@ export function ClientesLista({
         />
       ) : null}
 
-      <Form action="/clientes" style={{ display: "flex", gap: "0.5rem" }}>
-        <label className="ui-sr" htmlFor="q">
-          Buscar clienta por nombre, teléfono o correo
-        </label>
-        <input
-          id="q"
-          name="q"
-          type="search"
-          className="ui-input"
-          defaultValue={result.query ?? ""}
-          placeholder="Nombre, teléfono o correo"
-          autoComplete="off"
-          style={{ flex: 1, minWidth: 0 }}
-        />
-        <button type="submit" className="ui-btn ui-btn--primary">
-          Buscar
-        </button>
-      </Form>
-
       {/*
         El alta va **debajo del buscador** y plegada: casi siempre la clienta ya
         existe, y el primer gesto correcto es buscarla. Un formulario de alta
         arriba y desplegado invita a crear la duplicada que después hay que
         fusionar.
       */}
-      <NuevaClienta />
+      <div className={styles.actions}>
+        <NuevaClienta />
+        {canExport ? (
+          <Link className="ui-btn ui-btn--secondary ui-btn--sm" href="/clientes/exportar-meta">
+            Exportar para Meta
+          </Link>
+        ) : null}
+      </div>
 
-      {canExport ? (
-        <Link
-          className="ui-btn ui-btn--secondary ui-btn--sm"
-          href="/clientes/exportar-meta"
-          style={{ justifySelf: "start" }}
-        >
-          Exportar para Meta
-        </Link>
+      <div className={styles.table}>
+        <DataTable
+          columns={columns}
+          rows={result.clients}
+          rowKey={(row) => keyOf(row)}
+          caption="Clientas"
+          empty={emptyFor(result)}
+        />
+      </div>
+
+      {result.clients.length > 0 && (result.page > 1 || result.hasNext) ? (
+        <nav className={styles.pager} aria-label="Páginas de clientas">
+          {result.page > 1 ? (
+            <Link className="ui-btn ui-btn--secondary ui-btn--sm" href={pageHref(result.page - 1)}>
+              ← Anteriores
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className={styles.pagerRange}>
+            {from}–{to}
+            {result.total !== null ? ` de ${result.total}` : ""}
+          </span>
+          {result.hasNext ? (
+            <Link className="ui-btn ui-btn--secondary ui-btn--sm" href={pageHref(result.page + 1)}>
+              Siguientes →
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
       ) : null}
-
-      {result.query === null && !result.failure ? (
-        <p style={meta}>
-          Las {result.clients.length} clientas más recientes
-          {result.truncated ? ", de una lista más larga. Busca para encontrar el resto." : "."}
-        </p>
-      ) : null}
-
-      {result.clients.length > 0 ? (
-        <p style={meta}>
-          {result.clients.length === 1
-            ? "1 clienta"
-            : `${result.clients.length} clientas`}
-          {countMerged(result.clients) > 0
-            ? ` · ${countMerged(result.clients)} con más de una ficha en la agenda`
-            : ""}
-        </p>
-      ) : null}
-
-      <DataTable
-        columns={columns}
-        rows={result.clients}
-        rowKey={(row) => keyOf(row)}
-        caption="Clientas"
-        empty={emptyFor(result)}
-      />
     </div>
   );
 }
-
-const meta: React.CSSProperties = {
-  margin: 0,
-  fontSize: "var(--text-2xs)",
-  color: "var(--color-ink-soft)",
-};
 
 function keyOf(client: ResolvedClient): string {
   return client.key.kind === "tel"

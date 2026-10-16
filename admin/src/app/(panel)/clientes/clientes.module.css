@@ -1,0 +1,53 @@
+/* La barra de búsqueda se queda pegada debajo del título mientras se recorre
+   la lista: antes quedaba dos pantallas arriba y había que volver a subir para
+   buscar a la siguiente clienta. Sangra hasta los bordes del contenido para
+   que la lista pase por debajo sin asomarse por los costados. */
+.toolbar {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 15;
+  display: grid;
+  gap: 0.375rem;
+  margin: -0.875rem -0.75rem 0;
+  padding: 0.75rem 0.75rem 0.625rem;
+  background: var(--color-ivory);
+  border-bottom: 1px solid var(--hair);
+}
+@media (min-width: 48rem) {
+  .toolbar {
+    margin: -1.25rem -1.25rem 0;
+    padding: 1rem 1.25rem 0.75rem;
+  }
+}
+
+.meta {
+  margin: 0;
+  font-size: var(--text-2xs);
+  color: var(--color-ink-soft);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+/* El encabezado pegajoso de la tabla se tapaba con la barra de arriba. Las
+   columnas —nombre, teléfono, correo— se explican solas: sin pegar. */
+.table :global(.ui-table thead th) {
+  position: static;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
+}
+.pagerRange {
+  font-size: var(--text-2xs);
+  color: var(--color-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
