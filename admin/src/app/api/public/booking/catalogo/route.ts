@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { FIRST_VISIT_PERCENT } from "@/data/promo-rules";
 import { getDb } from "@/db/client";
 import { serviceMapRepository } from "@/db/repositories";
 import { loadComboCompositions } from "@/lib/combo-source";
@@ -8,6 +9,7 @@ import { createCachedEaClient } from "@/lib/ea/client";
 import { instantToEaDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
+import { dayPromosFor } from "@/lib/promos";
 import { publicSchedule } from "@/lib/public-schedule";
 
 /**
@@ -125,7 +127,18 @@ export async function GET() {
           // marca calculada en vez de dejar que la deduzca del nombre de la
           // categoría: "Combos" es texto que alguien puede renombrar en EA.
           isCombo: isCombo.has(s.id),
+          // Las promos del día de este servicio, para que la landing las pinte
+          // antes de que se elija fecha ("Miércoles $25.000"). Salen de las
+          // mismas reglas que aplica la cotización; un combo nunca trae.
+          // Solo las que de verdad bajan el precio de EA: tachar un precio
+          // que no ahorra nada sería publicidad falsa.
+          dayPromos: dayPromosFor(slugOf.get(s.id) ?? null)
+            .filter((p) => s.price !== null && p.promoCOP < s.price)
+            .map((p) => ({ slug: p.slug, label: p.label, weekday: p.weekday, promoCOP: p.promoCOP })),
         })),
+        // El 10% de primera visita. Va como dato y no escrito en la landing
+        // para que el número del texto sea el mismo que descuenta la cotización.
+        firstVisitPercent: FIRST_VISIT_PERCENT,
         // Este panel sabe agendar un par sin combo como dos citas seguidas
         // (`thenServiceId`). La landing solo ofrece esos pares si lo dice.
         chained: true,

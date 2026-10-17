@@ -193,7 +193,7 @@ export const PROMOS_DATA: PromosBySlug = {
         terms: [
           "The price applies to Press On appointments done on a Saturday.",
           "Cannot be combined with other promotions, including the 10% first-visit discount.",
-          "Online booking shows the regular price; the Saturday price is applied when you pay at the studio.",
+          "Book online for a Saturday and you already see the promo price; you pay at the studio.",
           "Per-nail designs are charged separately, per the price list.",
         ],
       },
@@ -233,7 +233,7 @@ export const PROMOS_DATA: PromosBySlug = {
         terms: [
           "The price applies to pedicures done on a Wednesday: classic or semi-permanent.",
           "Cannot be combined with other promotions, including the 10% first-visit discount.",
-          "Online booking shows the regular price; the Wednesday price is applied when you pay at the studio.",
+          "Book online for a Wednesday and you already see the promo price; you pay at the studio.",
           "Deep cleaning and designs are charged separately, per the price list.",
         ],
       },
@@ -274,8 +274,8 @@ export const PROMOS_DATA: PromosBySlug = {
         terms: [
           "New clients only, with no previous appointments at the studio.",
           "The 10% comes off the first appointment's service; add-ons are charged at the regular price.",
-          "Cannot be combined with other promotions, including Press On Saturday and Pedicure Wednesday.",
-          "Online booking shows the regular price; the discount is applied when you pay at the studio.",
+          "Cannot be combined with other promotions, including Press On Saturday and Pedicure Wednesday: if two apply, you get the one that saves you more.",
+          "When booking online, the 10% shows up as soon as you enter your mobile number; you pay at the studio.",
         ],
       },
     ],

@@ -195,7 +195,7 @@ export const PROMOS_DATA: PromosBySlug = {
         terms: [
           "El precio aplica a citas de Press On realizadas un sábado.",
           "No es acumulable con otras promociones, incluido el 10% de primera visita.",
-          "La reserva en línea muestra el precio regular; el precio de sábado se aplica al pagar en el estudio.",
+          "Al reservar en línea un sábado ya ves el precio de promo; se paga en el estudio.",
           "Diseños adicionales por uña se cobran aparte, según la lista de precios.",
         ],
       },
@@ -235,7 +235,7 @@ export const PROMOS_DATA: PromosBySlug = {
         terms: [
           "El precio aplica a servicios de pies realizados un miércoles: tradicional o semipermanente.",
           "No es acumulable con otras promociones, incluido el 10% de primera visita.",
-          "La reserva en línea muestra el precio regular; el precio de miércoles se aplica al pagar en el estudio.",
+          "Al reservar en línea un miércoles ya ves el precio de promo; se paga en el estudio.",
           "Limpieza profunda y diseños se cobran aparte, según la lista de precios.",
         ],
       },
@@ -276,8 +276,8 @@ export const PROMOS_DATA: PromosBySlug = {
         terms: [
           "Aplica solo en tu primera visita, sin citas previas en el estudio.",
           "El 10% se descuenta del servicio de la primera cita; los adicionales se cobran a precio regular.",
-          "No es acumulable con otras promociones, incluidos Sábado de Press y Miércoles de pies.",
-          "La reserva en línea muestra el precio regular; el descuento se aplica al pagar en el estudio.",
+          "No es acumulable con otras promociones, incluidos Sábado de Press y Miércoles de pies: si aplican dos, se queda la que más te ahorra.",
+          "Al reservar en línea, el 10% aparece en cuanto escribes tu celular; se paga en el estudio.",
         ],
       },
     ],
