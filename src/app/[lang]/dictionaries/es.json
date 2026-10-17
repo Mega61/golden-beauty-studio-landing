@@ -298,7 +298,7 @@
         "primera-visita": "{percent}% primera visita"
       },
       "chip": "{day} {price}",
-      "chipLabel": "Precio de promo los {day}: {price}",
+      "chipLabel": "Precio de promo cada {day}: {price}",
       "dayHint": "{label}: pagas {price} en vez de {was}.",
       "dayMark": "día de promo",
       "firstVisit": "¡Es tu primera visita! {percent}% de descuento",
