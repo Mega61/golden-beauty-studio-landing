@@ -139,6 +139,27 @@ describe("buildUnifiedHistory", () => {
     expect(summary.visits).toBe(1);
     expect(summary.cancellations).toBe(1);
     expect(summary.noShows).toBe(1);
+    // "1 de 2 citas": la cancelada y la futura no entran.
+    expect(summary.noShowRate).toBe(0.5);
+  });
+
+  it("una cita con la cuenta cerrada es visita aunque EA siga diciendo Reservada", () => {
+    // Hasta el 2026-10-16 cerrar la cuenta no marcaba nada en EA.
+    const { entries, summary } = buildUnifiedHistory(
+      [
+        ea({ id: 1, start: "2026-03-01 10:00:00", status: "Reservada", amountCharged: 90000 }),
+        ea({ id: 2, start: "2026-04-01 10:00:00", status: "Confirmada", amountCharged: 0 }),
+        ea({ id: 3, start: "2026-05-01 10:00:00", status: "Reservada" }),
+      ],
+      [],
+    );
+    expect(summary.visits).toBe(2);
+    expect(entries.find((entry) => entry.id === "ea-3")?.outcome).toBe("desconocido");
+    expect(summary.noShowRate).toBe(0);
+  });
+
+  it("sin ninguna cita marcada, la tasa es null y no 0 %", () => {
+    expect(buildUnifiedHistory([], []).summary.noShowRate).toBeNull();
   });
 
   it("una fila vieja sin estado cuenta como atendida: es historia que ya pasó", () => {

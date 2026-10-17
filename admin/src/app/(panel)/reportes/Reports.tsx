@@ -147,6 +147,31 @@ function CourtesyLine({ data }: { data: Data }) {
   );
 }
 
+// ── Inasistencia ────────────────────────────────────────────────────────────
+
+/**
+ * Las citas del periodo con la cuenta cerrada. Asistieron, diga lo que diga EA:
+ * hasta que cerrar la cuenta empezó a marcar `Completada`, ninguna lo decía.
+ */
+function closedIdsOf(data: Data): Set<number> {
+  return new Set(data.finance.filter((row) => row.closed).map((row) => row.eaAppointmentId));
+}
+
+/** El mismo `noShowReport` para el tile de arriba y para el reporte por franja. */
+function attendanceReport(data: Data) {
+  return noShowReport(data.appointments, legacyNoShowInputs(data.legacy), {
+    now: data.now,
+    closedIds: closedIdsOf(data),
+  });
+}
+
+/** "2 de 17 citas · 3 sin marcar". */
+function noShowNote(report: ReturnType<typeof noShowReport>): string {
+  const marked = report.attended + report.noShows;
+  const base = `${report.noShows} de ${marked} cita${marked === 1 ? "" : "s"}`;
+  return report.unmarked === 0 ? base : `${base} · ${report.unmarked} sin marcar`;
+}
+
 // ── Ventas y citas (las dos fuentes) ────────────────────────────────────────
 
 /**
@@ -157,6 +182,10 @@ function CourtesyLine({ data }: { data: Data }) {
  * primero; los reportes de abajo responden cada uno su propia decisión.
  */
 export function SalesFrames({ data }: { data: Data }) {
+  // La inasistencia va en los tiles de arriba, al lado de ventas y citas: la
+  // dueña la pidió como métrica esencial, y una métrica esencial no puede vivir
+  // solo al fondo del reporte mensual.
+  const inasistencia = attendanceReport(data);
   const sales = salesReport(
     data.finance,
     data.appointments,
@@ -245,6 +274,12 @@ export function SalesFrames({ data }: { data: Data }) {
             label="Citas"
             value={`${sales.appointments}`}
             deltaNote={`${sales.attended} atendida${sales.attended === 1 ? "" : "s"}`}
+          />
+          <StatTile
+            label="Inasistencia"
+            soft={inasistencia.rate === null}
+            value={formatRate(inasistencia.rate)}
+            deltaNote={noShowNote(inasistencia)}
           />
           {sales.legacyAppointments > 0 ? (
             <StatTile
@@ -734,9 +769,9 @@ export function MonthlyReports({
   const chair = chairHourReport(data.finance, data.services);
   const swaps = bookedVsPerformed(data.finance, data.services);
   const extras = extrasReport(data.finance, data.providers);
-  const noShows = noShowReport(data.appointments, legacyNoShowInputs(data.legacy));
+  const noShows = attendanceReport(data);
 
-  const visits = toVisits(data.visitHistory, data.legacyVisits);
+  const visits = toVisits(data.visitHistory, data.legacyVisits, closedIdsOf(data));
   const clientas = customersReport(
     visits.visits,
     visits.withoutKey,
@@ -1213,6 +1248,17 @@ export function MonthlyReports({
               de proxy: dice si la cita se espejó en Google, no de dónde vino. Fingir un
               origen sería peor que no mostrarlo, porque la decisión que habilita es apagar
               un canal de reserva.
+              {noShows.unmarked > 0 ? (
+                <>
+                  {" "}
+                  <strong>
+                    {noShows.unmarked} cita{noShows.unmarked === 1 ? "" : "s"} sin marcar
+                  </strong>{" "}
+                  —ya pasaron, siguen reservadas y no tienen cuenta— quedaron fuera de la
+                  tasa: no se sabe si vinieron. Se marcan con «Llegó» / «No asistió» en Hoy o
+                  en la agenda.
+                </>
+              ) : null}
               {noShows.unmapped.length > 0 ? (
                 <>
                   {" "}
@@ -1230,7 +1276,9 @@ export function MonthlyReports({
             columns={[
               { header: "Franja", cell: (row) => row.label },
               { header: "Citas", numeric: true, cell: (row) => row.scheduled },
+              { header: "Llegó", numeric: true, cell: (row) => row.attended },
               { header: "No asistió", numeric: true, cell: (row) => row.noShows },
+              { header: "Sin marcar", numeric: true, cell: (row) => row.unmarked },
               { header: "Canceladas", numeric: true, cell: (row) => row.cancelled },
               { header: "Tasa", numeric: true, cell: (row) => formatRate(row.rate) },
             ]}
@@ -1244,7 +1292,7 @@ export function MonthlyReports({
             label="Inasistencia del periodo"
             soft={noShows.rate === null}
             value={formatRate(noShows.rate)}
-            deltaNote={`${noShows.noShows} de ${noShows.scheduled} citas`}
+            deltaNote={noShowNote(noShows)}
           />
           <StatTile
             label="Canceladas"
@@ -1253,7 +1301,7 @@ export function MonthlyReports({
           />
         </TileRow>
 
-        {noShows.scheduled === 0 ? (
+        {noShows.scheduled + noShows.cancelled === 0 ? (
           <EmptyState
             icon="agenda"
             title="Sin citas en el periodo"
@@ -1264,7 +1312,7 @@ export function MonthlyReports({
             cells={slotIds.map((slot) => {
               const row = noShows.slots.find((entry) => entry.slot === slot);
               const empty: HeatCell = { value: null, display: dash };
-              if (row === undefined || row.scheduled === 0) return [empty, empty, empty];
+              if (row === undefined || row.scheduled + row.cancelled === 0) return [empty, empty, empty];
               return [
                 { value: row.noShows, display: `${row.noShows}` },
                 { value: row.cancelled, display: `${row.cancelled}` },

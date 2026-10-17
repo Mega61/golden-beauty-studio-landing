@@ -25,6 +25,8 @@ import {
   type TicketDraft,
   type TodayAppointment,
 } from "@/components/ticket";
+import { mapEaStatus } from "@/components/calendar/status-map";
+import { AttendanceControl } from "./AttendanceControl";
 
 /**
  * La lista del día y la orquestación de la cuenta.
@@ -217,6 +219,12 @@ export function TodayList({
           readOnly={readOnly}
           onOpen={() => open(appointment)}
           onRetry={() => void outbox.retry(appointment.eaAppointmentId)}
+          onAttendance={(outcome) => {
+            router.refresh();
+            // "Llegó" sin cuenta todavía: lo siguiente que la técnica va a hacer
+            // es cerrarla, así que la hoja se abre sola.
+            if (outcome.mark === "llego" && appointment.finance.closedAt === null) open(appointment);
+          }}
         />
       ))}
 
@@ -255,6 +263,7 @@ function AppointmentCard({
   readOnly,
   onOpen,
   onRetry,
+  onAttendance,
 }: {
   appointment: TodayAppointment;
   pending: PendingTicket | null;
@@ -263,6 +272,7 @@ function AppointmentCard({
   readOnly: boolean;
   onOpen: () => void;
   onRetry: () => void;
+  onAttendance: (outcome: { mark: "llego" | "no-asistio" | "deshacer" }) => void;
 }) {
   const { finance } = appointment;
   const cerrada = finance.closedAt !== null;
@@ -307,7 +317,7 @@ function AppointmentCard({
           </p>
         </div>
         {appointment.status === "" ? null : (
-          <StatusPill status={appointment.status} size="sm" />
+          <StatusPill status={mapEaStatus(appointment.status)} size="sm" />
         )}
       </header>
 
@@ -382,6 +392,15 @@ function AppointmentCard({
           </span>
         )}
       </div>
+
+      <AttendanceControl
+        eaAppointmentId={appointment.eaAppointmentId}
+        start={appointment.start}
+        status={appointment.status}
+        closed={cerrada}
+        readOnly={readOnly}
+        onMarked={onAttendance}
+      />
 
       <Button
         variant={cerrada || pending !== null ? "secondary" : "primary"}

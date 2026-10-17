@@ -761,7 +761,11 @@ se parte en encabezado + ítems:
 - **La cita de EA no se reescribe.** EA guarda la *reserva*; el panel guarda la *entrega*. Cambiarle
   `id_services` a la cita dispararía la notificación de "tu cita cambió" a la clienta y reescribiría el
   evento de Google por algo que ya pasó. La agenda del panel muestra el servicio realizado con una
-  marca de "cambió" una vez cerrada la cuenta.
+  marca de "cambió" una vez cerrada la cuenta. **La excepción es el estado** (2026-10-16): al cerrar,
+  la cita pasa a `Completada` con un `PUT` que lleva solo `{ status }` —`api_decode()` de EA mezcla
+  sobre la fila guardada—, porque historia, clienta nueva e inasistencia leen el estado de EA y sin
+  eso toda cita cobrada seguía "Reservada". Ver `lib/attendance.ts` y los botones "Llegó" /
+  "No asistió" de Hoy y la agenda.
 - **Precio congelado por renglón.** El servicio agendado ya tenía su snapshot desde el webhook; el
   servicio realizado y los adicionales se congelan al cerrar la cuenta — mismo día, así que no hay
   deriva posible. Cada renglón guarda el precio de lista que se usó, no solo el total.

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { mapEaStatus } from "@/components/calendar/status-map";
+
 import { eaStatusToken, freedTheChair, isCompletedStatus } from "./ea-status";
 
 describe("eaStatusToken", () => {
@@ -7,8 +9,9 @@ describe("eaStatusToken", () => {
     expect(eaStatusToken("Booked")).toBe("reservada");
     expect(eaStatusToken("Confirmed")).toBe("confirmada");
     expect(eaStatusToken("Cancelled")).toBe("cancelada");
-    // Los dos que EA no trae y el motor de comisiones necesita: sin inventar.
-    expect(eaStatusToken("Rescheduled")).toBe("desconocido");
+    // Reprogramar es una reserva que nadie confirmó todavía: la misma lectura
+    // que la agenda (`mapEaStatus`). Un borrador sigue sin inventarse.
+    expect(eaStatusToken("Rescheduled")).toBe("reservada");
     expect(eaStatusToken("Draft")).toBe("desconocido");
   });
 
@@ -18,6 +21,13 @@ describe("eaStatusToken", () => {
     expect(eaStatusToken("Completada")).toBe("completada");
     expect(eaStatusToken("Cancelada")).toBe("cancelada");
     expect(eaStatusToken("No asistió")).toBe("no-asistio");
+    expect(eaStatusToken("Reprogramada")).toBe("reservada");
+  });
+
+  it("dice lo mismo que la agenda para cualquier cadena", () => {
+    for (const raw of ["Reprogramada", "Rescheduled", "Draft", "No vino", "Finished", "", "xyz"]) {
+      expect(eaStatusToken(raw), raw).toBe(mapEaStatus(raw));
+    }
   });
 
   it("las dos listas conviven, porque renombrar en EA no migra las filas viejas", () => {
