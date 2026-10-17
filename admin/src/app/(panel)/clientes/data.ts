@@ -278,7 +278,20 @@ export async function loadHistoryByPhone(
   phone: E164,
   ea: EaClient = createEaClient(),
 ): Promise<{ history: UnifiedHistory; partial: boolean }> {
-  const legacy = await loadLegacyByPhone(phone);
+  // Acá un histórico ilegible no es "sin histórico": tomarlo por vacío haría
+  // nueva a una clienta de años y le regalaría el 10%. Se marca parcial.
+  let legacy: LegacyAppointment[];
+  try {
+    legacy = await getDb()
+      .selectFrom("legacy_appointment")
+      .selectAll()
+      .where("client_phone_e164", "=", phone)
+      .orderBy("started_at", "desc")
+      .execute();
+  } catch (error) {
+    console.error("[clientes] no se pudo leer el histórico", error);
+    return { history: buildUnifiedHistory([], []), partial: true };
+  }
   try {
     const customers = await findCustomers(ea, { kind: "tel", phone });
     const eaHistory = customers.length === 0 ? [] : await loadEaHistory(ea, customers.map((c) => c.id));
