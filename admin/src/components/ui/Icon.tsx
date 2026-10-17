@@ -39,6 +39,8 @@ export type IconName =
   | "candado"
   | "reloj"
   | "mensaje"
+  | "whatsapp"
+  | "llamar"
   | "ajustes"
   | "salir";
 
@@ -168,6 +170,19 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M4 5.5h16a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H9.5L5 20.5V17H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
       <path d="M7.5 10h9M7.5 13h6" />
     </>
+  ),
+  // WhatsApp: el globo redondo con la cola abajo a la izquierda y el auricular
+  // adentro. No es el logo de relleno —sería el único icono macizo del set—,
+  // sino el mismo trazo de 1.6 que el resto: se reconoce por la silueta.
+  whatsapp: (
+    <>
+      <path d="M4.6 16.3A8.5 8.5 0 1 1 7.8 19.4L3.5 20.5Z" />
+      <path d="M9.2 8.2c-.5 3.4 3.2 7.1 6.6 6.6l.8-1.6-2.1-1-.9.8a5 5 0 0 1-2.4-2.4l.8-.9-1-2.1Z" />
+    </>
+  ),
+  // Llamar: el auricular solo. Acompaña a WhatsApp donde ya había un `tel:`.
+  llamar: (
+    <path d="M5 4h3l1.5 4-2 1.2a11 11 0 0 0 5.3 5.3l1.2-2 4 1.5v3a2 2 0 0 1-2 2A14 14 0 0 1 3 6a2 2 0 0 1 2-2Z" />
   ),
   // Ajustes: dos perillas sobre sus rieles. Una tuerca dentada a 20 px se
   // vuelve una mancha; esto sigue leyéndose a ese tamaño.
