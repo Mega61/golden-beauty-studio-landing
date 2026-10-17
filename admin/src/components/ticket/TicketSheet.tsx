@@ -16,22 +16,28 @@ import {
   formatTimeRange,
 } from "@/components/ui";
 import type { Cop, PaymentMethod } from "@/db/types";
+import { composeFrom, findCombo, pairedServiceId, partnersFor, roleOf, type ComboComposition } from "@/lib/combos";
+import type { PromoQuote } from "@/lib/promos";
 import type { TicketPayment } from "@/lib/ticket";
 import { ExtrasChips } from "./ExtrasChips";
 import { CambioTag, ServicePicker } from "./ServicePicker";
-import type { TicketCatalog } from "./catalog";
+import { findService, type CatalogService, type TicketCatalog } from "./catalog";
 import {
+  MAX_ADDITIONAL_SERVICES,
   NOTE_CHIPS,
   PAYMENT_METHODS,
   VARIANCE_REASONS,
+  addService,
   appendNoteChip,
   bumpExtra,
+  mergeIntoCombo,
   priceDraft,
+  removeService,
   type TicketDraft,
   type TicketPricing,
 } from "./draft";
 import type { PendingTicket } from "./draft-store";
-import type { TodayAppointment } from "./types";
+import type { FirstVisitStatus, TodayAppointment } from "./types";
 
 /**
  * **Cerrar servicio** — la pantalla diseñada para un celular en una mano, entre
@@ -40,9 +46,12 @@ import type { TodayAppointment } from "./types";
  *
  * Los seis pasos del plan, en orden, cada uno una sección con su número:
  *
- * 1. ¿Qué se hizo? — el agendado ya viene elegido
+ * 1. ¿Qué se hizo? — el agendado ya viene elegido; "¿también pies?" lo vuelve
+ *    el combo, y "Agregar otro servicio" suma otro a su precio de lista
  * 2. Adicionales — chips con contador
- * 3. Total — grande, calculado; tocarlo lo hace editable y abre el motivo
+ * 3. Total — grande, calculado, con la promo que le toque como su propio
+ *    renglón (se quita y se vuelve a poner); tocarlo lo hace editable y abre el
+ *    motivo
  * 4. Observaciones — libres, con chips de arranque
  * 5. Cobro — método (si tiene permiso) y propina, aparte
  * 6. Guardar
@@ -85,6 +94,8 @@ export function TicketSheet({
   dirty,
   pending,
   storageBlocked = false,
+  combos = [],
+  firstVisitStatus = null,
   onDraftChange,
   onClose,
   onSave,
@@ -110,6 +121,13 @@ export function TicketSheet({
   pending: PendingTicket | null;
   /** El navegador no deja escribir en `localStorage`. Se avisa, no se esconde. */
   storageBlocked?: boolean;
+  /** Las composiciones de los combos, para "¿también pies?". Vacío = no se ofrece. */
+  combos?: readonly ComboComposition[];
+  /**
+   * Lo que dijo el historial sobre si es su primera visita. `pendiente` mientras
+   * se pregunta; `null` cuando no se preguntó (una cuenta ya guardada).
+   */
+  firstVisitStatus?: FirstVisitStatus | "pendiente" | null;
   onDraftChange: (next: TicketDraft) => void;
   onClose: () => void;
   onSave: () => void;
@@ -232,6 +250,22 @@ export function TicketSheet({
               se reescribe: EA guarda la reserva, el panel guarda lo que se hizo.
             </p>
           ) : null}
+
+          <ComboOffer
+            catalog={catalog}
+            combos={combos}
+            performedId={draft.performedServiceId}
+            disabled={bloqueado}
+            onChange={(performedServiceId) => patch({ performedServiceId })}
+          />
+
+          <ServiciosAgregados
+            catalog={catalog}
+            combos={combos}
+            draft={draft}
+            disabled={bloqueado}
+            onDraftChange={onDraftChange}
+          />
         </Paso>
 
         <Paso n={2} titulo="Adicionales">
@@ -300,6 +334,18 @@ export function TicketSheet({
             <CortesiaTotal subtotal={subtotal} />
           ) : (
             <>
+              <PromoBlock
+                available={pricingResult.availablePromo}
+                applied={pricingResult.promo}
+                applyPromo={draft.applyPromo}
+                overridden={draft.totalOverride !== null}
+                firstVisit={draft.firstVisit}
+                firstVisitStatus={firstVisitStatus}
+                disabled={bloqueado}
+                onApply={(applyPromo) => patch({ applyPromo })}
+                onFirstVisit={(firstVisit) => patch({ firstVisit })}
+              />
+
               <TotalBlock
                 subtotal={subtotal}
                 amountCharged={amountCharged}
@@ -324,7 +370,8 @@ export function TicketSheet({
                 <MotivoBlock
                   code={draft.varianceReasonCode}
                   text={draft.varianceReason}
-                  exigido={descuento > 0}
+                  // La promo ya explica su descuento: no se le pide motivo.
+                  exigido={descuento > 0 && pricingResult.varianceReasonCode !== "promo"}
                   disabled={bloqueado}
                   onCode={(varianceReasonCode) => patch({ varianceReasonCode })}
                   onText={(varianceReason) => patch({ varianceReason })}
@@ -616,10 +663,340 @@ function TotalBlock({
       >
         {amountCharged === null ? "—" : formatCOP(amountCharged)}
       </span>
-      <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
-        Toca para cambiarlo
+      <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)", textAlign: "right" }}>
+        {descuento > 0 && subtotal !== null ? (
+          <>
+            Lista <s className="ui-num">{formatCOP(subtotal)}</s> · toca para cambiarlo
+          </>
+        ) : (
+          "Toca para cambiarlo"
+        )}
       </span>
     </button>
+  );
+}
+
+/**
+ * "¿También pies?" — el par que es un combo se cobra **como el combo**.
+ *
+ * Es la misma composición que la agenda (`lib/combos.ts`): se elige la mitad
+ * que se hizo, la hoja ofrece la otra mitad que forma un combo, y al tocarla el
+ * servicio realizado pasa a ser el combo, con el precio que fijó la dueña. Solo
+ * se ofrece lo que existe: un par sin combo se agrega abajo, como otro servicio.
+ */
+function ComboOffer({
+  catalog,
+  combos,
+  performedId,
+  disabled,
+  onChange,
+}: {
+  catalog: TicketCatalog;
+  combos: readonly ComboComposition[];
+  performedId: number | null;
+  disabled: boolean;
+  onChange: (eaServiceId: number) => void;
+}) {
+  const { baseId, composed } = composeFrom(combos, performedId, null);
+
+  if (composed !== null) {
+    const hands = findService(catalog, composed.handsEaServiceId);
+    const feet = findService(catalog, composed.feetEaServiceId);
+    if (hands === null || feet === null) return null;
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem" }}>
+        <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+          Combo: <strong>{hands.name}</strong> + <strong>{feet.name}</strong>
+        </span>
+        <button
+          type="button"
+          className="ui-btn ui-btn--ghost"
+          disabled={disabled}
+          onClick={() => onChange(composed.handsEaServiceId)}
+        >
+          Solo {hands.name}
+        </button>
+      </div>
+    );
+  }
+
+  const partners = partnersFor(combos, baseId)
+    .map((id) => {
+      const partner = findService(catalog, id);
+      const combo = findCombo(combos, baseId, id);
+      const whole = combo === null ? null : findService(catalog, combo.eaServiceId);
+      return partner === null || whole === null ? null : { partner, whole };
+    })
+    .filter((p): p is { partner: CatalogService; whole: CatalogService } => p !== null);
+
+  if (partners.length === 0) return null;
+
+  return (
+    <fieldset style={{ margin: 0, padding: 0, border: 0, display: "grid", gap: "0.375rem" }}>
+      <legend
+        style={{
+          padding: 0,
+          fontSize: "var(--text-2xs)",
+          fontWeight: 600,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: "var(--color-ink-soft)",
+        }}
+      >
+        {roleOf(combos, baseId) === "feet" ? "¿También manos?" : "¿También pies?"}
+      </legend>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+        {partners.map(({ partner, whole }) => (
+          <button
+            key={partner.eaServiceId}
+            type="button"
+            className="ui-btn ui-btn--secondary"
+            disabled={disabled}
+            onClick={() => onChange(pairedServiceId(combos, baseId, partner.eaServiceId) ?? partner.eaServiceId)}
+          >
+            <Icon name="mas-signo" size={14} /> {partner.name}
+            {whole.listPrice === null ? "" : ` · combo ${formatCOP(whole.listPrice)}`}
+          </button>
+        ))}
+      </div>
+      <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+        Se cobra como el combo, con el precio de la dueña.
+      </p>
+    </fieldset>
+  );
+}
+
+/**
+ * **Agregar otro servicio**: lo que se hizo además del principal y no forma un
+ * combo publicado (rubber en manos + pies, mientras la dueña no le ponga precio
+ * al par). Cada uno va a su precio de lista y comisiona como el principal.
+ *
+ * Si el agregado **sí** forma un combo con el principal, se ofrece cobrarlo
+ * como el combo: es el precio que corresponde, y cobrar la suma sería cobrar de
+ * más.
+ */
+function ServiciosAgregados({
+  catalog,
+  combos,
+  draft,
+  disabled,
+  onDraftChange,
+}: {
+  catalog: TicketCatalog;
+  combos: readonly ComboComposition[];
+  draft: TicketDraft;
+  disabled: boolean;
+  onDraftChange: (next: TicketDraft) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const main = findService(catalog, draft.performedServiceId);
+
+  return (
+    <div style={{ display: "grid", gap: "0.5rem" }}>
+      {draft.additionalServices.map((id, index) => {
+        const service = findService(catalog, id);
+        const combo = findCombo(combos, draft.performedServiceId, id);
+        const whole = combo === null ? null : findService(catalog, combo.eaServiceId);
+        return (
+          <div
+            key={`${id}-${index}`}
+            style={{
+              display: "grid",
+              gap: "0.375rem",
+              padding: "0.5rem 0.75rem",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--hair-strong)",
+              background: "var(--color-paper)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 600 }}>
+                  + {service?.name ?? `Servicio #${id}`}
+                </span>
+                <span style={{ display: "block", fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+                  Otro servicio · a su precio de lista
+                </span>
+              </span>
+              <span className="ui-num">
+                {service?.listPrice == null ? "sin precio" : formatCOP(service.listPrice)}
+              </span>
+              <button
+                type="button"
+                className="ui-btn ui-btn--ghost"
+                disabled={disabled}
+                aria-label={`Quitar ${service?.name ?? "servicio"}`}
+                onClick={() => onDraftChange(removeService(draft, index))}
+              >
+                Quitar
+              </button>
+            </div>
+            {combo !== null && whole !== null ? (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem" }}>
+                <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+                  Con {main?.name ?? "el principal"} es el combo <strong>{whole.name}</strong>
+                  {whole.listPrice === null ? "" : ` (${formatCOP(whole.listPrice)})`}.
+                </span>
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--secondary"
+                  disabled={disabled}
+                  onClick={() => onDraftChange(mergeIntoCombo(draft, index, combo.eaServiceId))}
+                >
+                  Cobrar como combo
+                </button>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+
+      {adding ? (
+        <div style={{ display: "grid", gap: "0.375rem" }}>
+          <ServicePicker
+            catalog={catalog}
+            value={null}
+            bookedServiceId={null}
+            disabled={disabled}
+            defaultOpen
+            emptyLabel="Elige el otro servicio"
+            emptyHint="Se cobra a su precio de lista"
+            groupLabel="Otro servicio"
+            onChange={(eaServiceId) => {
+              onDraftChange(addService(draft, eaServiceId));
+              setAdding(false);
+            }}
+          />
+          <button
+            type="button"
+            className="ui-btn ui-btn--ghost"
+            disabled={disabled}
+            onClick={() => setAdding(false)}
+            style={{ justifySelf: "start" }}
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : draft.additionalServices.length < MAX_ADDITIONAL_SERVICES ? (
+        <button
+          type="button"
+          className="ui-btn ui-btn--ghost"
+          disabled={disabled}
+          onClick={() => setAdding(true)}
+          style={{ justifySelf: "start" }}
+        >
+          <Icon name="mas-signo" size={16} /> Agregar otro servicio
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * La promo, **como su propio renglón**: "Promo · Miércoles de pies −$15.000".
+ *
+ * El monto sale de `priceDraft()` —la misma cuenta que hará el servidor—, se
+ * recalcula solo cuando cambia el servicio o se agrega otro, y se puede quitar
+ * y volver a poner. Debajo, la casilla de primera visita: la marca el
+ * historial cuando se pudo leer, y si no, la técnica. Las promos no se acumulan;
+ * la hoja lo dice en vez de dejar que alguien espere las dos.
+ */
+function PromoBlock({
+  available,
+  applied,
+  applyPromo,
+  overridden,
+  firstVisit,
+  firstVisitStatus,
+  disabled,
+  onApply,
+  onFirstVisit,
+}: {
+  available: PromoQuote | null;
+  applied: PromoQuote | null;
+  applyPromo: boolean;
+  overridden: boolean;
+  firstVisit: boolean;
+  firstVisitStatus: FirstVisitStatus | "pendiente" | null;
+  disabled: boolean;
+  onApply: (on: boolean) => void;
+  onFirstVisit: (on: boolean) => void;
+}) {
+  const hint =
+    firstVisitStatus === "pendiente"
+      ? "Revisando el historial…"
+      : firstVisitStatus === "primera"
+        ? "Según el historial, es su primera vez en el estudio."
+        : firstVisitStatus === "recurrente"
+          ? "Según el historial, ya vino antes."
+          : firstVisitStatus === "desconocido"
+            ? "No se pudo revisar todo el historial: márcala solo si sabes que es su primera vez."
+            : "Márcala si es su primera vez en el estudio.";
+
+  return (
+    <div style={{ display: "grid", gap: "0.5rem" }}>
+      {applied !== null ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            padding: "0.5rem 0.75rem",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-gold-dark)",
+            background: "var(--color-gold-pale)",
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>Promo · {applied.label}</span>
+          <span className="ui-num" style={{ fontWeight: 600 }}>
+            −{formatCOP(applied.discount)}
+          </span>
+          <button
+            type="button"
+            className="ui-btn ui-btn--ghost"
+            disabled={disabled}
+            onClick={() => onApply(false)}
+          >
+            Quitar
+          </button>
+        </div>
+      ) : available !== null && !applyPromo ? (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
+            Le aplica <strong>{available.label}</strong> (−{formatCOP(available.discount)}).
+          </span>
+          <button
+            type="button"
+            className="ui-btn ui-btn--secondary"
+            disabled={disabled}
+            onClick={() => onApply(true)}
+          >
+            Aplicar promo
+          </button>
+        </div>
+      ) : available !== null && overridden ? (
+        <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+          La promo {available.label} (−{formatCOP(available.discount)}) no se suma a un total escrito a
+          mano. Vuelve al calculado para aplicarla.
+        </p>
+      ) : null}
+
+      <Checkbox
+        label={
+          <>
+            <strong>Primera visita</strong> — 10 % en los servicios
+          </>
+        }
+        hint={
+          firstVisit && available !== null && available.kind === "dia"
+            ? `${hint} No se acumula con la promo del día: queda la mayor.`
+            : hint
+        }
+        checked={firstVisit}
+        disabled={disabled}
+        onChange={(e) => onFirstVisit(e.target.checked)}
+      />
+    </div>
   );
 }
 

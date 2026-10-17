@@ -167,6 +167,9 @@ export function useTicketOutbox({
       payments: p.draft.payments,
       tip: p.draft.tip,
       houseCourtesy: p.draft.houseCourtesy,
+      additionalServiceIds: p.draft.additionalServices,
+      applyPromo: p.draft.applyPromo,
+      firstVisit: p.draft.firstVisit,
       clientRequestId: p.clientRequestId,
     });
     if (result.ok) savedRef.current?.(result);
