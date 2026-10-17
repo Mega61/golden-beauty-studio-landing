@@ -36,16 +36,27 @@ export function ServicePicker({
   value,
   bookedServiceId,
   disabled = false,
+  defaultOpen = false,
+  emptyLabel = "Elige el servicio",
+  emptyHint = "La cita de EA no traía servicio",
+  groupLabel = "Servicio realizado",
   onChange,
 }: {
   catalog: TicketCatalog;
   value: number | null;
   bookedServiceId: number | null;
   disabled?: boolean;
+  /** Abre ya desplegada: es el caso de "Agregar otro servicio", que se toca para elegir. */
+  defaultOpen?: boolean;
+  /** Lo que dice el botón sin nada elegido. */
+  emptyLabel?: string;
+  emptyHint?: string;
+  /** Nombre del grupo de radios para el lector de pantalla. */
+  groupLabel?: string;
   onChange: (eaServiceId: number) => void;
 }) {
   const groupId = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState("");
 
   const groups = useMemo(
@@ -95,7 +106,7 @@ export function ServicePicker({
               color: "var(--color-carbon)",
             }}
           >
-            {selected ? selected.name : "Elige el servicio"}
+            {selected ? selected.name : emptyLabel}
           </span>
           <span
             style={{
@@ -112,7 +123,7 @@ export function ServicePicker({
                 ]
                   .filter(Boolean)
                   .join(" · ")
-              : "La cita de EA no traía servicio"}
+              : emptyHint}
           </span>
         </span>
 
@@ -146,7 +157,7 @@ export function ServicePicker({
 
           <div
             role="radiogroup"
-            aria-label="Servicio realizado"
+            aria-label={groupLabel}
             // El tope de alto deja siempre visible el pie de la hoja: sin él,
             // elegir un servicio de la última categoría empuja el botón de
             // guardar fuera de la pantalla y parece que desapareció.

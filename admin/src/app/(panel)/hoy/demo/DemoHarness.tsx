@@ -110,6 +110,9 @@ export function DemoHarness() {
     const draft: TicketDraft = {
       ...input,
       houseCourtesy: input.houseCourtesy === true,
+      additionalServices: input.additionalServiceIds ?? [],
+      applyPromo: input.applyPromo === true,
+      firstVisit: input.firstVisit === true,
       version: DRAFT_VERSION,
       updatedAt: Date.now(),
     };

@@ -9,7 +9,8 @@ import { unmarkedAppointments } from "@/lib/attendance";
 import { instantToEaLocal } from "@/lib/ea";
 import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
-import { cerrarCuenta } from "./actions";
+import { loadComboCompositions } from "@/lib/combo-source";
+import { cerrarCuenta, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
 import { loadReminders } from "../recordatorios/data";
 import { TodayList } from "./TodayList";
@@ -63,7 +64,7 @@ export default async function HoyPage() {
   // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
   // que la pasada diaria no dependa de acordarse. Si la carga falla, el acceso
   // sale sin número —nunca tumba Hoy por un dato accesorio.
-  const [{ date, appointments, catalog, problems }, pendingReminders] = await Promise.all([
+  const [{ date, appointments, catalog, problems }, pendingReminders, comboSource] = await Promise.all([
     loadToday(session, { verTodas }),
     canRemind
       ? loadReminders()
@@ -72,6 +73,9 @@ export default async function HoyPage() {
           )
           .catch(() => null)
       : Promise.resolve(null),
+    // Para "¿también pies?" en la cuenta: el par que es un combo se cobra como
+    // el combo. Nunca lanza; sin composiciones la hoja simplemente no lo ofrece.
+    loadComboCompositions(),
   ]);
 
   const eaCaido = problems.find((p) => p.source === "ea") ?? null;
@@ -196,6 +200,8 @@ export default async function HoyPage() {
           canFixAfterClose={canFixAfterClose}
           readOnly={eaCaido !== null}
           action={cerrarCuenta}
+          combos={comboSource.combos}
+          checkFirstVisit={revisarPrimeraVisita}
         />
       </div>
     </AppShell>

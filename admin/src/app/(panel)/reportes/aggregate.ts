@@ -582,6 +582,7 @@ export const VARIANCE_REASONS: readonly VarianceReasonCode[] = [
   "cortesia",
   "correccion",
   "otro",
+  "promo",
 ];
 
 export const VARIANCE_LABEL: Record<VarianceReasonCode, string> = {
@@ -590,6 +591,10 @@ export const VARIANCE_LABEL: Record<VarianceReasonCode, string> = {
   cortesia: "Cortesía",
   correccion: "Corrección",
   otro: "Otro",
+  // La promo pactada (miércoles de pies, sábado de press-on, 10 % primera
+  // visita): plata que se dejó de cobrar a propósito, separada de la rebaja que
+  // alguien decidió en la silla.
+  promo: "Promo",
 };
 
 export type VarianceCell = {

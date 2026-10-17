@@ -18,8 +18,11 @@ import {
   draftFromFinance,
   emptyDraft,
   isDirty,
+  promoDateOf,
   useTicketOutbox,
   type CloseTicketAction,
+  type FirstVisitCheck,
+  type FirstVisitStatus,
   type PendingTicket,
   type TicketCatalog,
   type TicketDraft,
@@ -27,6 +30,7 @@ import {
 } from "@/components/ticket";
 import { mapEaStatus } from "@/components/calendar/status-map";
 import { AttendanceControl } from "./AttendanceControl";
+import type { ComboComposition } from "@/lib/combos";
 
 /**
  * La lista del día y la orquestación de la cuenta.
@@ -60,6 +64,8 @@ export function TodayList({
   canFixAfterClose,
   readOnly,
   action,
+  combos = [],
+  checkFirstVisit,
 }: {
   appointments: readonly TodayAppointment[];
   catalog: TicketCatalog;
@@ -73,6 +79,10 @@ export function TodayList({
   /** EA no responde: se puede mirar, no guardar. */
   readOnly: boolean;
   action: CloseTicketAction;
+  /** Los combos, para ofrecer "¿también pies?" al cerrar. */
+  combos?: readonly ComboComposition[];
+  /** La pregunta "¿es su primera visita?" (Server Action). Sin ella, no se pregunta. */
+  checkFirstVisit?: FirstVisitCheck;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -81,6 +91,12 @@ export function TodayList({
   const [draft, setDraft] = useState<TicketDraft | null>(null);
   const [baseline, setBaseline] = useState<TicketDraft | null>(null);
   const [saving, setSaving] = useState(false);
+  // Lo que dijo el historial de la cuenta abierta. Se pregunta al abrirla, no
+  // al cargar el día: son varias lecturas a EA por clienta.
+  const [firstVisit, setFirstVisit] = useState<{
+    id: number;
+    status: FirstVisitStatus | "pendiente";
+  } | null>(null);
 
   const outbox = useTicketOutbox({
     scope,
@@ -107,8 +123,10 @@ export function TodayList({
       // defecto" arranca con la casilla marcada — solo si quien abre la hoja la
       // puede otorgar. Una cuenta ya guardada manda lo que se guardó: la marca
       // de la ficha no reescribe una decisión que alguien ya tomó.
+      const nueva =
+        appointment.finance.financeId === null || appointment.finance.items.length === 0;
       const base =
-        appointment.finance.financeId === null || appointment.finance.items.length === 0
+        nueva
           ? emptyDraft(
               appointment.eaAppointmentId,
               appointment.bookedServiceId,
@@ -125,8 +143,31 @@ export function TodayList({
       setBaseline(base);
       setDraft(local ?? base);
       setOpenId(appointment.eaAppointmentId);
+      setFirstVisit(null);
+
+      // ¿Primera visita? Solo en una cuenta nueva: una ya guardada trae lo que
+      // se decidió al cerrarla. La respuesta llega después de abrir la hoja; si
+      // es "sí" y la casilla sigue como arrancó, se marca — en el borrador y en
+      // la línea base, porque no es un cambio que alguien hizo. Un borrador
+      // restaurado del celular no se toca: ahí la técnica ya decidió.
+      if (nueva && checkFirstVisit !== undefined && !readOnly) {
+        const id = appointment.eaAppointmentId;
+        setFirstVisit({ id, status: "pendiente" });
+        checkFirstVisit(id)
+          .catch((): FirstVisitStatus => "desconocido")
+          .then((status) => {
+            setFirstVisit((cur) => (cur?.id === id ? { id, status } : cur));
+            if (status !== "primera" || local !== null) return;
+            setDraft((d) =>
+              d !== null && d.eaAppointmentId === id && !d.firstVisit ? { ...d, firstVisit: true } : d,
+            );
+            setBaseline((b) =>
+              b !== null && b.eaAppointmentId === id ? { ...b, firstVisit: true } : b,
+            );
+          });
+      }
     },
-    [outbox, canGiveCourtesy],
+    [outbox, canGiveCourtesy, checkFirstVisit, readOnly],
   );
 
   const change = useCallback(
@@ -237,7 +278,10 @@ export function TodayList({
           pricing={{
             bookedServiceId: current.bookedServiceId,
             bookedSnapshot: current.finance.snapshot,
+            promoDate: promoDateOf(current.start),
           }}
+          combos={combos}
+          firstVisitStatus={firstVisit?.id === current.eaAppointmentId ? firstVisit.status : null}
           canCharge={canCharge}
           canGiveCourtesy={canGiveCourtesy}
           courtesyFromDefault={current.houseCourtesyDefault && current.finance.closedAt === null}

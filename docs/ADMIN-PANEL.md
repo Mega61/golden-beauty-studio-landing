@@ -775,6 +775,28 @@ se parte en encabezado + ítems:
 - **Invariante:** `Σ line_total − discount == amount_charged`. La propina va aparte y **nunca** entra a
   la base de comisión ni al ingreso del estudio. Vive en `lib/ticket.ts`, función pura, testeada.
 
+### Promos y segundo servicio al cerrar (2026-10-16)
+
+- **Las promos de la dueña se aplican al cerrar**, no al reservar (EA cobra la lista): miércoles de
+  pies, sábado de press-on y 10 % de primera visita, con las reglas de `lib/promos.ts`. No se
+  acumulan —gana la mayor, empate → la del día—; el 10 % es solo sobre servicios; un combo no lleva
+  la del día. La hoja la muestra como su propio renglón ("Promo · Miércoles de pies −$15.000"), se
+  recalcula al cambiar el servicio y se puede quitar. **El navegador no manda montos**: solo
+  `applyPromo` y `firstVisit`; `resolveDiscount()` (`components/ticket/draft.ts`) pone el descuento
+  con el catálogo del servidor y el día de la cita según EA. Se guarda en `discount` con
+  `variance_reason_code = 'promo'` (migración `027`) y la promo en `variance_reason`. Base de comisión:
+  lo cobrado, como cualquier descuento.
+- **Total escrito y cortesía.** Un total escrito igual al de la promo es la promo; distinto, es una
+  variación de la técnica con su motivo, y la promo no se suma debajo. La cortesía de la casa ignora
+  la promo.
+- **Primera visita.** La pregunta se contesta en `hoy/first-visit.ts` con el historial unificado, al
+  abrir la hoja; a la cuenta solo cruza un sí/no. Si el historial no se pudo leer entero no se marca
+  sola, y si la técnica la marca a mano el servidor la respeta (ya cobró con eso) y lo deja anotado en
+  `variance_reason` y en la bitácora.
+- **Otro servicio.** Un par sin combo publicado (rubber + pies) se cobra como dos renglones `servicio`,
+  el agregado a su lista de hoy; comisiona como el principal. Si el par es un combo, la hoja ofrece
+  cobrarlo como el combo.
+
 ### Independencia con rastro, no vigilancia
 
 La técnica pone el número. Para que eso sea sostenible, el sistema tiene que hacer visible la

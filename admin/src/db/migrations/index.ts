@@ -36,7 +36,8 @@
  * inversión mensual en anuncios del reporte de costo por clienta nueva), `025`
  * (`legacy_payment`, cómo se pagó cada venta del historial de Agenda Pro) y
  * `026` (cortesía de la casa: `appointment_finance.is_house_courtesy` y
- * `customer_setting`).
+ * `customer_setting`) y `027` (el motivo de variación `promo`, para las promos
+ * que la cuenta aplica sola al cerrarse).
  * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
  * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
  * detecta que alguien editó una migración ya aplicada.
@@ -70,6 +71,7 @@ import { migration as m023 } from "./023-ad-spend";
 import { migration as m024 } from "./024-allowed-user-test-account";
 import { migration as m025 } from "./025-legacy-payment";
 import { migration as m026 } from "./026-house-courtesy";
+import { migration as m027 } from "./027-variance-promo";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -98,6 +100,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m024,
   m025,
   m026,
+  m027,
 ];
 
 /**

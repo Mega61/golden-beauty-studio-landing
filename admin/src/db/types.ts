@@ -86,7 +86,13 @@ export type VarianceReasonCode =
   | "adicionales"
   | "cortesia"
   | "correccion"
-  | "otro";
+  | "otro"
+  /**
+   * La promo del día o el 10 % de primera visita (migración `027`). Solo lo
+   * pone el servidor al cerrar la cuenta, nunca la técnica: en
+   * `variance_reason` va cuál promo fue.
+   */
+  | "promo";
 
 export type CommissionAppliesTo = "principal" | "adicionales" | "ambos";
 

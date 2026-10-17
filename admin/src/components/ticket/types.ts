@@ -125,6 +125,24 @@ export type CloseTicketInput = {
    * ausente es **no**: la cuenta se cobra.
    */
   houseCourtesy?: boolean;
+  /**
+   * Servicios hechos además del principal (ids de EA). Opcional por la misma
+   * razón que la cortesía: un borrador encolado antes no lo trae, y ausente es
+   * ninguno.
+   */
+  additionalServiceIds?: readonly number[];
+  /**
+   * Aplicar la promo que le toque. **Solo la elección**: cuánto descuenta lo
+   * calcula el servidor con su catálogo y el día de la cita. Ausente es **no**:
+   * un borrador de antes de las promos se cobró sin ellas.
+   */
+  applyPromo?: boolean;
+  /**
+   * La hoja la cerró como primera visita (10 %): por el historial o porque la
+   * técnica lo marcó. El servidor no la reemplaza por lo que diga el historial
+   * —eso cambiaría un cobro que ya se hizo—; la usa, y anota si coincidía.
+   */
+  firstVisit?: boolean;
   /** Rastro del intento, para la bitácora. Ver `draft-store.ts`. */
   clientRequestId: string;
 };
@@ -156,3 +174,15 @@ export type CloseTicketResult =
 
 /** La firma que la hoja recibe como prop. La real es la Server Action. */
 export type CloseTicketAction = (input: CloseTicketInput) => Promise<CloseTicketResult>;
+
+/**
+ * Lo que dijo el historial sobre si es su primera visita (`hoy/first-visit.ts`).
+ * `desconocido` = no se pudo leer todo, y se trata como **no**: el 10 % no se
+ * pone solo sobre una duda.
+ *
+ * Es lo único del historial que llega a la cuenta: un sí/no, nunca un monto.
+ */
+export type FirstVisitStatus = "primera" | "recurrente" | "desconocido";
+
+/** La firma de la pregunta. La real es la Server Action `revisarPrimeraVisita`. */
+export type FirstVisitCheck = (eaAppointmentId: number) => Promise<FirstVisitStatus>;

@@ -8,12 +8,13 @@ import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
 import type { NewAppointmentFinanceItem } from "@/db/types";
 import { instantToEaLocal } from "@/lib/ea";
-import { createEaClient } from "@/lib/ea/client";
+import { createCachedEaClient, createEaClient } from "@/lib/ea/client";
 import { ForbiddenError, requireCapability, requireOwnProvider } from "@/lib/dal";
 import { can } from "@/lib/auth-policy";
 import {
   TicketError,
   assertPaymentsCoverCharge,
+  computeTicketTotals,
   ticketFromEnteredTotal,
   validateHouseCourtesyClose,
   validateTicketClose,
@@ -21,14 +22,21 @@ import {
 import { upsertAppointmentFinance } from "@/jobs/snapshot";
 import {
   DRAFT_VERSION,
+  FIRST_VISIT_SLUG,
+  MAX_ADDITIONAL_SERVICES,
   draftToItems,
   draftToPayments,
+  promoDateOf,
+  resolveDiscount,
+  type ResolvedDiscount,
   type TicketDraft,
+  type TicketPricing,
 } from "@/components/ticket/draft";
 import type { CloseTicketInput, CloseTicketResult } from "@/components/ticket/types";
 import type { PaymentMethod } from "@/db/types";
 import { marcarCompletadaAlCerrar } from "./attendance";
 import { loadCatalogForClose } from "./catalog-server";
+import { detectFirstVisit, type FirstVisitStatus } from "./first-visit";
 
 /**
  * **Cerrar la cuenta de una cita.** Es la única escritura de este paquete.
@@ -89,6 +97,21 @@ import { loadCatalogForClose } from "./catalog-server";
  * cortesía es de la dueña** (`cortesia:otorgar`): marcarla, mantenerla al
  * editar la cuenta, o quitarla. Una técnica que pudiera mantenerla podría
  * sumarle adicionales a una cuenta que nadie paga y cobrar comisión por ellos.
+ *
+ * ## Promos
+ *
+ * La hoja manda **si** aplicar la promo (`applyPromo`) y si la cerró como
+ * primera visita (`firstVisit`); nunca cuánto. El descuento lo vuelve a
+ * calcular `resolveDiscount()` —la misma función que pintó la hoja— con el
+ * catálogo de acá y el día de la cita según EA, y se guarda como el `discount`
+ * de la cuenta con el motivo `promo` (migración `027`) y la promo en
+ * `variance_reason`. La cortesía gana siempre: con la casilla no hay promo.
+ *
+ * La primera visita **no** se reemplaza por lo que diga el historial: la
+ * técnica cobró con lo que vio en la hoja, y cambiarlo acá movería un cobro que
+ * ya se hizo. Se revisa el historial igual y se anota si coincidía, para que
+ * un 10 % marcado a mano se vea como tal en la bitácora y en el reporte de
+ * variación.
  */
 
 const REASONS = ["cambio_servicio", "adicionales", "cortesia", "correccion", "otro"] as const;
@@ -118,6 +141,14 @@ const InputSchema = z.object({
   // Opcional: un borrador que quedó en la cola antes de esta versión no lo trae,
   // y ausente es **no** — la cuenta se cobra como siempre.
   houseCourtesy: z.boolean().optional(),
+  // Lo mismo con lo de las promos y los servicios agregados: ausente es no /
+  // ninguno, que es lo que la técnica vio en una hoja de antes.
+  additionalServiceIds: z
+    .array(z.number().int().positive())
+    .max(MAX_ADDITIONAL_SERVICES)
+    .optional(),
+  applyPromo: z.boolean().optional(),
+  firstVisit: z.boolean().optional(),
   clientRequestId: z.string().max(64),
 });
 
@@ -257,6 +288,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     version: DRAFT_VERSION,
     eaAppointmentId: data.eaAppointmentId,
     performedServiceId: data.performedServiceId,
+    additionalServices: data.additionalServiceIds ?? [],
     extras: data.extras,
     manual: data.manual,
     totalOverride: data.totalOverride,
@@ -266,33 +298,61 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     payments: data.payments,
     tip: data.tip,
     houseCourtesy,
+    applyPromo: data.applyPromo === true,
+    firstVisit: data.firstVisit === true,
     updatedAt: Date.now(),
   };
 
-  const { items } = draftToItems(draft, catalog, {
+  const pricing: TicketPricing = {
     bookedServiceId: existing.booked_service_id,
     bookedSnapshot: existing.service_price_snapshot,
-  });
+    // El día de la cita según EA, no el de hoy ni el que diga el navegador: la
+    // promo del miércoles es de la cita del miércoles.
+    promoDate: promoDateOf(appointment.start),
+  };
+
+  const { items } = draftToItems(draft, catalog, pricing);
 
   let totals;
+  let resolved: ResolvedDiscount | null = null;
   try {
-    totals = houseCourtesy
-      ? // La cortesía no tiene total escrito ni motivo que elegir: el total es
-        // cero y el motivo es ella misma. Lo que no puede traer (propina, pago)
-        // lo rechaza `lib/ticket.ts`, no esta función.
-        validateHouseCourtesyClose({ items, tip: data.tip, payments: data.payments })
-      : data.totalOverride === null
-        ? validateTicketClose({
-            items,
-            discount: 0,
-            tip: data.tip,
-            varianceReasonCode: data.varianceReasonCode,
-          })
-        : cerrarConTotalEscrito(items, data.totalOverride, data.tip, data.varianceReasonCode);
+    if (houseCourtesy) {
+      // La cortesía no tiene total escrito, ni motivo que elegir, ni promo: el
+      // total es cero y el motivo es ella misma. Lo que no puede traer
+      // (propina, pago) lo rechaza `lib/ticket.ts`, no esta función.
+      totals = validateHouseCourtesyClose({ items, tip: data.tip, payments: data.payments });
+    } else {
+      const subtotal = computeTicketTotals(items, 0, data.tip).subtotal;
+      resolved = resolveDiscount(draft, items, subtotal, pricing);
+      totals =
+        data.totalOverride === null
+          ? validateTicketClose({
+              items,
+              discount: resolved.discount,
+              tip: data.tip,
+              varianceReasonCode: resolved.varianceReasonCode,
+            })
+          : // `ticketFromEnteredTotal()` traduce "cobré esto" a un descuento,
+            // rechaza escribir de más y —con el motivo que se le pasa— exige
+            // uno si quedó por debajo de la lista. Antes el motivo no se le
+            // pasaba, y un total escrito por debajo de la lista se rechazaba
+            // aunque la técnica hubiera elegido el motivo.
+            ticketFromEnteredTotal(items, data.totalOverride, data.tip, {
+              varianceReasonCode: resolved.varianceReasonCode,
+            });
+    }
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof TicketError) return rechazo(error.message);
     throw error;
+  }
+
+  // El 10 % lo decidió la hoja; acá solo se anota si el historial estaba de
+  // acuerdo. Una sola consulta y solo cuando hace falta: EA corta a 100
+  // peticiones cada 120 s y todo el panel es una sola IP.
+  let firstVisitCheck: FirstVisitStatus | null = null;
+  if (resolved?.promo?.slug === FIRST_VISIT_SLUG) {
+    firstVisitCheck = await detectFirstVisit(ea, appointment);
   }
 
   // --- La escritura --------------------------------------------------------
@@ -331,8 +391,14 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
 
   // Una cortesía se registra con el motivo `cortesia` siempre, lo haya elegido
   // alguien o no: es lo que la agrupa en la bitácora y en Diagnóstico sin tener
-  // que leer la columna nueva. Sin texto libre — el motivo es la casilla.
-  const varianceReasonCode = houseCourtesy ? "cortesia" : data.varianceReasonCode;
+  // que leer la columna nueva. Sin texto libre — el motivo es la casilla. Una
+  // promo, con `promo` y cuál fue; el resto, con lo que eligió la técnica.
+  const varianceReasonCode = houseCourtesy ? "cortesia" : (resolved?.varianceReasonCode ?? null);
+  const varianceText = houseCourtesy
+    ? ""
+    : resolved?.promo
+      ? promoReasonText(resolved.promo.slug, firstVisitCheck)
+      : data.varianceReason;
 
   const patch = {
     performed_service_id: data.performedServiceId,
@@ -352,9 +418,9 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     // motivo huérfano no se puede agrupar en el reporte de variación, que es
     // para lo que existe.
     variance_reason:
-      houseCourtesy || varianceReasonCode === null || data.varianceReason.trim() === ""
+      houseCourtesy || varianceReasonCode === null || varianceText.trim() === ""
         ? null
-        : data.varianceReason,
+        : varianceText,
     closed_by: session.userId,
     closed_at: now,
   } as const;
@@ -388,7 +454,22 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
           })),
           closed_at: existing.closed_at,
         },
-        after: { ...patch, clientRequestId: data.clientRequestId },
+        after: {
+          ...patch,
+          clientRequestId: data.clientRequestId,
+          // Qué promo se aplicó y con qué datos, para que una cuenta con
+          // descuento automático se pueda explicar sin recalcular nada.
+          promo:
+            resolved?.promo == null
+              ? null
+              : {
+                  slug: resolved.promo.slug,
+                  discount: resolved.promo.discount,
+                  date: pricing.promoDate ?? null,
+                  firstVisitClaimed: draft.firstVisit,
+                  firstVisitHistory: firstVisitCheck,
+                },
+        },
         reason: varianceReasonCode,
         at: now,
       });
@@ -414,27 +495,45 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
 }
 
 /**
- * El total escrito a mano.
- *
- * `ticketFromEnteredTotal()` traduce "cobré esto" a un descuento y rechaza
- * escribir de más; `validateTicketClose()` es el que exige el motivo. Se
- * encadenan en vez de reimplementar la resta acá — la regla de que un descuento
- * sin motivo no se guarda tiene que valer también para esta rama, y una copia
- * es una copia que se olvida de actualizar.
+ * El texto que acompaña al motivo `promo`: cuál fue, y —si fue el 10 % de
+ * primera visita— si el historial lo respaldaba. `draftFromFinance()` lee el
+ * prefijo para reabrir la cuenta con la casilla puesta, así que el slug va
+ * siempre primero.
  */
-function cerrarConTotalEscrito(
-  items: ReturnType<typeof draftToItems>["items"],
-  enteredAmount: number,
-  tip: number,
-  varianceReasonCode: CloseTicketInput["varianceReasonCode"],
-) {
-  const conTotal = ticketFromEnteredTotal(items, enteredAmount, tip);
-  return validateTicketClose({
-    items,
-    discount: conTotal.discount,
-    tip,
-    varianceReasonCode,
-  });
+function promoReasonText(slug: string, firstVisitCheck: FirstVisitStatus | null): string {
+  if (slug !== FIRST_VISIT_SLUG || firstVisitCheck === null || firstVisitCheck === "primera") {
+    return slug;
+  }
+  return firstVisitCheck === "recurrente"
+    ? `${slug} · marcada a mano: el historial dice que ya vino`
+    : `${slug} · sin confirmar en el historial`;
+}
+
+/**
+ * **¿Es su primera visita?**, para la hoja que se acaba de abrir.
+ *
+ * Se pregunta al abrir la cuenta y no al cargar Hoy: revisar el historial de
+ * una clienta son varias lecturas a EA (una búsqueda por cada forma de escribir
+ * su teléfono, más sus citas), y hacerlo para todas las citas del día en cada
+ * recarga se comería el cupo de EA —100 peticiones cada 120 s para todo el
+ * panel—. Lectura con caché: no decide ninguna escritura, solo el valor inicial
+ * de una casilla que la técnica puede cambiar.
+ *
+ * Nunca lanza: cualquier duda es `desconocido`, que la hoja trata como no.
+ */
+export async function revisarPrimeraVisita(eaAppointmentId: number): Promise<FirstVisitStatus> {
+  if (!Number.isSafeInteger(eaAppointmentId) || eaAppointmentId <= 0) return "desconocido";
+
+  try {
+    await requireCapability("cuenta:cerrar-propia");
+    const ea = createCachedEaClient();
+    const appointment = await ea.appointments.get(eaAppointmentId);
+    await requireOwnProvider(appointment.providerId);
+    return await detectFirstVisit(ea, appointment);
+  } catch (error) {
+    unstable_rethrow(error);
+    return "desconocido";
+  }
 }
 
 /**

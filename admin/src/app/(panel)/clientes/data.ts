@@ -278,24 +278,16 @@ export async function loadHistoryByPhone(
   phone: E164,
   ea: EaClient = createEaClient(),
 ): Promise<{ history: UnifiedHistory; partial: boolean }> {
-  // Acá un histórico ilegible no es "sin histórico": tomarlo por vacío haría
-  // nueva a una clienta de años y le regalaría el 10%. Se marca parcial.
-  let legacy: LegacyAppointment[];
-  try {
-    legacy = await getDb()
-      .selectFrom("legacy_appointment")
-      .selectAll()
-      .where("client_phone_e164", "=", phone)
-      .orderBy("started_at", "desc")
-      .execute();
-  } catch (error) {
-    console.error("[clientes] no se pudo leer el histórico", error);
-    return { history: buildUnifiedHistory([], []), partial: true };
-  }
+  // A diferencia de la ficha, acá "no se pudo leer el histórico" no se puede
+  // confundir con "no tiene histórico": la cuenta de Hoy decide con esto si le
+  // ofrece el 10 % de primera visita, y una clienta de años con la base caída
+  // saldría como nueva.
+  const legacyRows = await tryLoadLegacyByPhone(phone);
+  const legacy = legacyRows ?? [];
   try {
     const customers = await findCustomers(ea, { kind: "tel", phone });
     const eaHistory = customers.length === 0 ? [] : await loadEaHistory(ea, customers.map((c) => c.id));
-    return { history: buildUnifiedHistory(eaHistory, legacy), partial: false };
+    return { history: buildUnifiedHistory(eaHistory, legacy), partial: legacyRows === null };
   } catch (error) {
     console.error("[clientes] historial por teléfono incompleto", error);
     return { history: buildUnifiedHistory([], legacy), partial: true };
@@ -406,6 +398,11 @@ async function loadEaHistory(
  */
 async function loadLegacyByPhone(phone: string | null): Promise<LegacyAppointment[]> {
   if (phone === null) return [];
+  return (await tryLoadLegacyByPhone(phone)) ?? [];
+}
+
+/** Lo mismo, pero `null` si la lectura falló —no `[]`—, para quien decide con eso. */
+async function tryLoadLegacyByPhone(phone: string): Promise<LegacyAppointment[] | null> {
   try {
     return await getDb()
       .selectFrom("legacy_appointment")
@@ -415,7 +412,7 @@ async function loadLegacyByPhone(phone: string | null): Promise<LegacyAppointmen
       .execute();
   } catch (error) {
     console.error("[clientes] no se pudo leer el histórico", error);
-    return [];
+    return null;
   }
 }
 
