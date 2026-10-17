@@ -259,7 +259,7 @@
       "with": "With",
       "anyone": "First available",
       "total": "Total",
-      "pay": "You pay at the studio, cash or bank transfer. Promo discounts are applied at checkout."
+      "pay": "You pay at the studio, cash or bank transfer. Any promo that applies is already taken off the total."
     },
     "continue": "Continue",
     "back": "Back",
@@ -291,6 +291,22 @@
     "nextOpen": "See the next day",
     "loadingSlots": "Finding times…",
     "pickDate": "Pick a day",
+    "promo": {
+      "labels": {
+        "sabado-press": "Press On Saturday",
+        "miercoles-pies": "Pedicure Wednesday",
+        "primera-visita": "{percent}% off first visit"
+      },
+      "chip": "{day} {price}",
+      "chipLabel": "Promo price on {day}s: {price}",
+      "dayHint": "{label}: you pay {price} instead of {was}.",
+      "dayMark": "promo day",
+      "firstVisit": "It's your first visit! {percent}% off",
+      "firstVisitLoses": "It's your first visit, but promos don't stack: we've kept the one that saves you more.",
+      "checking": "Checking your discounts…",
+      "payAtStudio": "Paid at the studio.",
+      "applied": "Promo: {label}"
+    },
     "combo": {
       "askFeet": "Feet too?",
       "askHands": "Hands too?",

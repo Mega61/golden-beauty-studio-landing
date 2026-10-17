@@ -4,10 +4,13 @@ import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import Link from "next/link";
 
-import { Icon, formatDateLong } from "@/components/ui";
+import { Icon, formatDateLong, formatTime } from "@/components/ui";
+import { unmarkedAppointments } from "@/lib/attendance";
+import { instantToEaLocal } from "@/lib/ea";
 import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
-import { cerrarCuenta } from "./actions";
+import { loadComboCompositions } from "@/lib/combo-source";
+import { cerrarCuenta, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
 import { loadReminders } from "../recordatorios/data";
 import { TodayList } from "./TodayList";
@@ -61,7 +64,7 @@ export default async function HoyPage() {
   // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
   // que la pasada diaria no dependa de acordarse. Si la carga falla, el acceso
   // sale sin número —nunca tumba Hoy por un dato accesorio.
-  const [{ date, appointments, catalog, problems }, pendingReminders] = await Promise.all([
+  const [{ date, appointments, catalog, problems }, pendingReminders, comboSource] = await Promise.all([
     loadToday(session, { verTodas }),
     canRemind
       ? loadReminders()
@@ -70,10 +73,28 @@ export default async function HoyPage() {
           )
           .catch(() => null)
       : Promise.resolve(null),
+    // Para "¿también pies?" en la cuenta: el par que es un combo se cobra como
+    // el combo. Nunca lanza; sin composiciones la hoja simplemente no lo ofrece.
+    loadComboCompositions(),
   ]);
 
   const eaCaido = problems.find((p) => p.source === "ea") ?? null;
   const dbCaida = problems.find((p) => p.source === "db") ?? null;
+
+  // Las citas que ya terminaron sin cuenta y sin marca. Es el recordatorio de
+  // fin de jornada: la inasistencia solo se puede medir sobre lo que alguien
+  // marcó, y lo que nadie marcó queda fuera de la tasa (`lib/attendance.ts`).
+  // Sin EA no hay estados que leer, así que no se dice nada.
+  const sinMarcar =
+    eaCaido === null
+      ? unmarkedAppointments(
+          appointments.map((appointment) => ({
+            ...appointment,
+            closed: appointment.finance.closedAt !== null,
+          })),
+          instantToEaLocal(new Date()),
+        )
+      : [];
 
   return (
     <AppShell
@@ -140,6 +161,35 @@ export default async function HoyPage() {
           </Link>
         ) : null}
 
+        {sinMarcar.length === 0 ? null : (
+          <div
+            role="status"
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-warn-tint)",
+              border: "1px solid var(--color-warn-line)",
+              color: "var(--color-warn-ink)",
+            }}
+          >
+            <Icon name="reloj" size={18} style={{ flex: "none", marginTop: 1 }} />
+            <span>
+              <strong>
+                {sinMarcar.length === 1
+                  ? "1 cita de hoy sin marcar"
+                  : `${sinMarcar.length} citas de hoy sin marcar`}
+              </strong>
+              {" — "}
+              {sinMarcar
+                .map((cita) => `${formatTime(cita.start)} ${cita.customerName}`)
+                .join(" · ")}
+              . Ya terminaron y no tienen cuenta: marca si llegó o no en su tarjeta.
+            </span>
+          </div>
+        )}
+
         <TodayList
           appointments={appointments}
           catalog={catalog}
@@ -150,6 +200,8 @@ export default async function HoyPage() {
           canFixAfterClose={canFixAfterClose}
           readOnly={eaCaido !== null}
           action={cerrarCuenta}
+          combos={comboSource.combos}
+          checkFirstVisit={revisarPrimeraVisita}
         />
       </div>
     </AppShell>

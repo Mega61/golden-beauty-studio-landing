@@ -21,6 +21,7 @@ import {
   normalizePhoneE164,
   phoneSearchVariants,
   type ClientKey,
+  type E164,
   type ResolvedClient,
 } from "./identity";
 
@@ -262,6 +263,72 @@ export async function loadClientProfile(key: ClientKey): Promise<ClientProfileRe
   };
 }
 
+/**
+ * El historial unificado (EA ∪ Agenda Pro) de un teléfono, sin el resto de la
+ * ficha. Lo usan quienes necesitan solo saber qué se hizo la clienta y si es
+ * nueva: el formulario de la agenda, la cuenta de Hoy y la cotización pública.
+ *
+ * Recibe el cliente de EA para que la ruta pública pase uno con caché
+ * (`createCachedEaClient`): son varias lecturas por consulta y EA corta a 100
+ * cada 120 s por IP. Una falla de EA no lanza: devuelve lo que haya con
+ * `partial: true`, y quien decide un descuento con eso debe tratarlo como
+ * "no se sabe" (no aplicar el 10% automático).
+ */
+export async function loadHistoryByPhone(
+  phone: E164,
+  ea: EaClient = createEaClient(),
+): Promise<{ history: UnifiedHistory; partial: boolean }> {
+  // A diferencia de la ficha, acá "no se pudo leer el histórico" no se puede
+  // confundir con "no tiene histórico": la cuenta de Hoy decide con esto si le
+  // ofrece el 10 % de primera visita, y una clienta de años con la base caída
+  // saldría como nueva.
+  const legacyRows = await tryLoadLegacyByPhone(phone);
+  const legacy = legacyRows ?? [];
+  try {
+    const customers = await findCustomers(ea, { kind: "tel", phone });
+    const eaHistory = customers.length === 0 ? [] : await loadEaHistory(ea, customers.map((c) => c.id));
+    return { history: buildUnifiedHistory(eaHistory, legacy), partial: legacyRows === null };
+  } catch (error) {
+    console.error("[clientes] historial por teléfono incompleto", error);
+    return { history: buildUnifiedHistory([], legacy), partial: true };
+  }
+}
+
+/**
+ * El historial de una ficha de EA, para cuando lo que se tiene es el id y no el
+ * teléfono: el formulario de cita elige clientas de la búsqueda de EA, y al
+ * editar una cita solo trae `customerId`.
+ *
+ * Con teléfono válido se va por `loadHistoryByPhone()`, que junta todas las
+ * fichas de la misma persona y el historial de Agenda Pro. Sin él, solo queda
+ * la mitad de EA de esa ficha: es lo que hay, y no se marca como parcial
+ * porque no faltó nada que se pudiera traer.
+ */
+export async function loadHistoryForCustomer(
+  eaCustomerId: number,
+  ea: EaClient = createEaClient(),
+): Promise<{ history: UnifiedHistory; partial: boolean }> {
+  let customer: Customer;
+  try {
+    customer = await ea.customers.get(eaCustomerId);
+  } catch (error) {
+    if (!(error instanceof EaApiError && error.kind === "not_found")) {
+      console.error("[clientes] no se pudo leer la ficha para el historial", error);
+    }
+    return { history: buildUnifiedHistory([], []), partial: true };
+  }
+
+  const phone = normalizePhoneE164(customer.phone);
+  if (phone !== null) return loadHistoryByPhone(phone, ea);
+
+  try {
+    return { history: buildUnifiedHistory(await loadEaHistory(ea, [customer.id]), []), partial: false };
+  } catch (error) {
+    console.error("[clientes] historial por ficha incompleto", error);
+    return { history: buildUnifiedHistory([], []), partial: true };
+  }
+}
+
 /** ¿Alguna de estas fichas es cortesía por defecto? Sin base, no. */
 async function loadHouseCourtesy(eaCustomerIds: readonly number[]): Promise<boolean> {
   if (eaCustomerIds.length === 0) return false;
@@ -327,31 +394,38 @@ async function loadEaHistory(
   const appointments = perCustomer.flat();
 
   const finance = appointmentFinanceRepository(getDb());
-  const amounts = await Promise.all(
+  const tickets = await Promise.all(
     appointments.map(async (appointment) => {
       try {
         const row = await finance.findByEaAppointmentId(appointment.id);
-        return row?.amount_charged ?? null;
+        return {
+          amountCharged: row?.amount_charged ?? null,
+          performedServiceId: row?.performed_service_id ?? null,
+        };
       } catch {
         // La plata que no se pudo leer se muestra como desconocida, no como
         // cero: `history.ts` marca el total como parcial y la ficha lo dice.
-        return null;
+        return { amountCharged: null, performedServiceId: null };
       }
     }),
   );
 
-  return appointments.map((appointment, index) => ({
-    appointment,
-    serviceName:
-      appointment.serviceId === null
-        ? null
-        : (serviceName.get(appointment.serviceId) ?? null),
-    providerName:
-      appointment.providerId === null
-        ? null
-        : (providerName.get(appointment.providerId) ?? null),
-    amountCharged: amounts[index],
-  }));
+  return appointments.map((appointment, index) => {
+    // Lo realizado manda sobre lo agendado: se reservó press-on y se hizo un
+    // forrado, y la próxima vez lo que toca es el retoque del forrado.
+    const performed = tickets[index].performedServiceId;
+    const shownServiceId = performed ?? appointment.serviceId;
+    return {
+      appointment,
+      serviceName: shownServiceId === null ? null : (serviceName.get(shownServiceId) ?? null),
+      performedServiceId: performed,
+      providerName:
+        appointment.providerId === null
+          ? null
+          : (providerName.get(appointment.providerId) ?? null),
+      amountCharged: tickets[index].amountCharged,
+    };
+  });
 }
 
 /**
@@ -366,6 +440,11 @@ async function loadEaHistory(
  */
 async function loadLegacyByPhone(phone: string | null): Promise<LegacyAppointment[]> {
   if (phone === null) return [];
+  return (await tryLoadLegacyByPhone(phone)) ?? [];
+}
+
+/** Lo mismo, pero `null` si la lectura falló —no `[]`—, para quien decide con eso. */
+async function tryLoadLegacyByPhone(phone: string): Promise<LegacyAppointment[] | null> {
   try {
     return await getDb()
       .selectFrom("legacy_appointment")
@@ -375,7 +454,7 @@ async function loadLegacyByPhone(phone: string | null): Promise<LegacyAppointmen
       .execute();
   } catch (error) {
     console.error("[clientes] no se pudo leer el histórico", error);
-    return [];
+    return null;
   }
 }
 

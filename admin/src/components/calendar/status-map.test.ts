@@ -26,6 +26,13 @@ describe("mapEaStatus", () => {
     }
   });
 
+  it("trae los alias que antes solo conocía la ficha de la clienta", () => {
+    expect(mapEaStatus("Finished")).toBe("completada");
+    expect(mapEaStatus("No vino")).toBe("no-asistio");
+    expect(mapEaStatus("No se presentó")).toBe("no-asistio");
+    expect(mapEaStatus("Reservado")).toBe("reservada");
+  });
+
   it("acepta las dos ortografías de cancelado", () => {
     expect(mapEaStatus("Canceled")).toBe("cancelada");
     expect(mapEaStatus("Cancelled")).toBe("cancelada");

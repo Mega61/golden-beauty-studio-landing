@@ -57,6 +57,7 @@ import {
   type Retention,
   type VisitRecord,
 } from "@/lib/metrics";
+import { attendanceOutcome, noShowRate, type AttendanceOutcome } from "@/lib/attendance";
 import { priceVariance, type TicketItemInput } from "@/lib/ticket";
 import type {
   Cop,
@@ -581,6 +582,7 @@ export const VARIANCE_REASONS: readonly VarianceReasonCode[] = [
   "cortesia",
   "correccion",
   "otro",
+  "promo",
 ];
 
 export const VARIANCE_LABEL: Record<VarianceReasonCode, string> = {
@@ -589,6 +591,10 @@ export const VARIANCE_LABEL: Record<VarianceReasonCode, string> = {
   cortesia: "Cortesía",
   correccion: "Corrección",
   otro: "Otro",
+  // La promo pactada (miércoles de pies, sábado de press-on, 10 % primera
+  // visita): plata que se dejó de cobrar a propósito, separada de la rebaja que
+  // alguien decidió en la silla.
+  promo: "Promo",
 };
 
 export type VarianceCell = {
@@ -759,18 +765,30 @@ export function customersReport(
 export type NoShowSlot = {
   slot: SlotId;
   label: string;
-  /** Citas de esa franja que llegaron a la fecha: el denominador. */
+  /**
+   * Citas de esa franja que llegaron a su hora **y no se cancelaron**:
+   * asistidas + inasistencias + sin marcar. Lo que la franja prometió.
+   */
   scheduled: number;
+  /** Completadas, o con la cuenta cerrada aunque EA siga diciendo "Reservada". */
+  attended: number;
   noShows: number;
+  /** Ya pasaron, siguen reservadas y no tienen cuenta: nadie dijo qué pasó. */
+  unmarked: number;
   cancelled: number;
-  /** `noShows / scheduled`. `null` si esa franja no tuvo citas. */
+  /**
+   * `noShows / (attended + noShows)`. `null` si en esa franja no hay ninguna
+   * marcada. Ver `noShowRate()` en `lib/attendance.ts`.
+   */
   rate: number | null;
 };
 
 export type NoShowReport = {
   slots: NoShowSlot[];
   scheduled: number;
+  attended: number;
   noShows: number;
+  unmarked: number;
   cancelled: number;
   rate: number | null;
   /**
@@ -805,6 +823,26 @@ export type NoShowReport = {
   originAvailable: false;
 };
 
+/**
+ * Inasistencia del periodo, total y por franja.
+ *
+ * ## El denominador, que es donde estaba el error
+ *
+ * Antes la tasa era `no asistió ÷ todas las citas del periodo`, con tres cosas
+ * mal metidas abajo: las **canceladas** (avisaron; la silla se liberó a
+ * tiempo), las **futuras** (un mes en curso divide por citas que todavía no
+ * pasaron) y las **atendidas que EA seguía llamando "Reservada"** porque cerrar
+ * la cuenta no marcaba nada. Hoy cada cita pasa por `attendanceOutcome()`:
+ *
+ * - **asistió** = `Completada`, o con la cuenta cerrada (`closedIds`).
+ * - **no asistió** = marcada así.
+ * - **sin marcar** = ya empezó, sigue reservada, sin cuenta. **Fuera de la
+ *   tasa** y contada aparte: no se sabe si vino, y ponerla de cualquier lado
+ *   inventa el número. La pantalla dice cuántas son.
+ * - **pendiente** (todavía no empieza) y **cancelada**: fuera.
+ *
+ * Tasa = no asistió ÷ (asistió + no asistió).
+ */
 export function noShowReport(
   appointments: readonly AppointmentRow[],
   /**
@@ -814,8 +852,15 @@ export function noShowReport(
    * sistema. Por defecto ninguna.
    */
   legacy: readonly { start: EaLocalDateTime; token: StatusToken }[] = [],
+  options: {
+    /** El corte entre lo que ya pasó y lo que no. Sin él, todo ya pasó. */
+    now?: EaLocalDateTime;
+    /** Citas de EA con la cuenta cerrada: asistieron, diga lo que diga EA. */
+    closedIds?: ReadonlySet<number>;
+  } = {},
 ): NoShowReport {
   const byToken = (row: AppointmentRow): StatusToken => mapEaStatus(row.status);
+  const started = (start: EaLocalDateTime) => options.now === undefined || start <= options.now;
 
   const unmapped: string[] = [];
   const seen = new Set<string>();
@@ -827,43 +872,53 @@ export function noShowReport(
     unmapped.push(label);
   }
 
-  // Una sola lista de `{ start, token }` para las dos fuentes. Lo desconocido
-  // de EA queda fuera del denominador, como siempre; el historial ya llega
-  // traducido y nunca es desconocido.
-  const countable: { start: EaLocalDateTime; token: StatusToken }[] = [
-    ...appointments
-      .map((row) => ({ start: row.start, token: byToken(row) }))
-      .filter((row) => row.token !== "desconocido"),
-    ...legacy,
+  // Una sola lista de `{ start, outcome }` para las dos fuentes. Lo desconocido
+  // de EA queda fuera, como siempre; el historial ya llega traducido y nunca es
+  // desconocido, ni tiene cuenta del panel.
+  const rows: { start: EaLocalDateTime; outcome: AttendanceOutcome }[] = [
+    ...appointments.map((row) => ({
+      start: row.start,
+      outcome: attendanceOutcome(byToken(row), {
+        closed: options.closedIds?.has(row.id) ?? false,
+        started: started(row.start),
+      }),
+    })),
+    ...legacy.map((row) => ({
+      start: row.start,
+      outcome: attendanceOutcome(row.token, { closed: false, started: started(row.start) }),
+    })),
   ];
+
+  const tally = (own: readonly { outcome: AttendanceOutcome }[]) => {
+    const count = (outcome: AttendanceOutcome) => own.filter((row) => row.outcome === outcome).length;
+    const attended = count("asistio");
+    const noShows = count("no-asistio");
+    const unmarked = count("sin-marcar");
+    return {
+      scheduled: attended + noShows + unmarked,
+      attended,
+      noShows,
+      unmarked,
+      cancelled: count("cancelada"),
+      rate: noShowRate(noShows, attended),
+    };
+  };
 
   const ids: SlotId[] = [...SLOTS.map((slot) => slot.id), "fuera"];
 
   const slots = ids
-    .map((slot): NoShowSlot => {
-      const own = countable.filter((row) => slotOf(row.start) === slot);
-      const noShows = own.filter((row) => row.token === "no-asistio").length;
-      return {
-        slot,
-        label: SLOTS.find((entry) => entry.id === slot)?.label ?? "Fuera de horario",
-        scheduled: own.length,
-        noShows,
-        cancelled: own.filter((row) => row.token === "cancelada").length,
-        rate: own.length === 0 ? null : noShows / own.length,
-      };
-    })
+    .map((slot): NoShowSlot => ({
+      slot,
+      label: SLOTS.find((entry) => entry.id === slot)?.label ?? "Fuera de horario",
+      ...tally(rows.filter((row) => slotOf(row.start) === slot)),
+    }))
     // La franja "fuera de horario" solo aparece si de verdad hubo algo ahí: una
     // fila vacía permanente enseña a ignorar la última fila de la tabla.
-    .filter((slot) => slot.slot !== "fuera" || slot.scheduled > 0);
-
-  const noShows = countable.filter((row) => row.token === "no-asistio").length;
+    .filter((slot) => slot.slot !== "fuera" || slot.scheduled + slot.cancelled > 0);
 
   return {
     slots,
-    scheduled: countable.length,
-    noShows,
-    cancelled: countable.filter((row) => row.token === "cancelada").length,
-    rate: countable.length === 0 ? null : noShows / countable.length,
+    ...tally(rows),
     unmapped,
     legacyCount: legacy.length,
     originAvailable: false,
@@ -893,6 +948,12 @@ export { legacyStatusKind, type LegacyStatusKind } from "@/lib/legacy-history";
 export function toVisits(
   appointments: readonly AppointmentRow[],
   legacy: readonly { customerKey: string | null; at: EaLocalDateTime; attended: boolean }[],
+  /**
+   * Citas de EA con la cuenta cerrada. Cuentan como atendidas aunque EA siga
+   * diciendo "Reservada": hasta que cerrar la cuenta empezó a marcar
+   * `Completada`, ninguna lo decía, y sin esto toda clienta salía nueva.
+   */
+  closedIds: ReadonlySet<number> = new Set(),
 ): { visits: VisitRecord[]; withoutKey: number } {
   const visits: VisitRecord[] = [];
   let withoutKey = 0;
@@ -906,9 +967,13 @@ export function toVisits(
     visits.push({
       customerKey: row.customerKey,
       at: row.start,
-      // Solo "completada" cuenta como atendida. `confirmada` y `reservada` son
-      // el futuro: una cita de la semana que viene no es una visita.
-      attended: token === "completada",
+      // Solo "completada" —o una cuenta cerrada— cuenta como atendida.
+      // `confirmada` y `reservada` sin cuenta son el futuro o algo que nadie
+      // marcó: una cita de la semana que viene no es una visita.
+      // La regla es la de la inasistencia, para que las dos pantallas no
+      // discutan: `attendanceOutcome()`.
+      attended:
+        attendanceOutcome(token, { closed: closedIds.has(row.id), started: true }) === "asistio",
     });
   }
 

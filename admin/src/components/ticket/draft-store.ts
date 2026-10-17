@@ -41,6 +41,7 @@
 import {
   DRAFT_VERSION,
   DRAFT_VERSION_SINGLE_METHOD,
+  MAX_ADDITIONAL_SERVICES,
   type TicketDraft,
 } from "./draft";
 import type { PaymentMethod, VarianceReasonCode } from "@/db/types";
@@ -233,6 +234,18 @@ export function parseDraft(raw: unknown): TicketDraft | null {
     raw.performedServiceId === null ? null : intOrNull(raw.performedServiceId);
   if (raw.performedServiceId !== null && performedServiceId === null) return null;
 
+  // Los servicios agregados: ids positivos, y nada más. Un borrador de antes
+  // no los trae y queda sin ninguno, que es lo que la técnica vio entonces.
+  const additionalServices: number[] = [];
+  if (Array.isArray(raw.additionalServices)) {
+    for (const value of raw.additionalServices) {
+      const id = intOrNull(value);
+      if (id === null || id <= 0) continue;
+      if (additionalServices.length >= MAX_ADDITIONAL_SERVICES) break;
+      additionalServices.push(id);
+    }
+  }
+
   if (!isRecord(raw.extras)) return null;
   const extras: Record<string, number> = {};
   for (const [key, value] of Object.entries(raw.extras)) {
@@ -285,6 +298,12 @@ export function parseDraft(raw: unknown): TicketDraft | null {
     // ausente es **no**: ante la duda se cobra. Solo `true` estricto la marca —
     // un `"true"` escrito a mano en la consola no regala un servicio.
     houseCourtesy: raw.houseCourtesy === true,
+    additionalServices,
+    // Igual que la cortesía: solo `true` estricto. Un borrador de antes de las
+    // promos no las trae, y aplicarlas al reenviarlo cambiaría el cobro de una
+    // cuenta que la técnica ya cobró sin ellas.
+    applyPromo: raw.applyPromo === true,
+    firstVisit: raw.firstVisit === true,
     updatedAt,
   };
 }

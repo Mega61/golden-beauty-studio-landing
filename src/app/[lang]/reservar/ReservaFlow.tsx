@@ -22,6 +22,14 @@ import {
   whatsappLink,
   type Schedule,
 } from "@/lib/booking";
+import {
+  dayPromoOn,
+  parseQuote,
+  promoHints,
+  visitPricing,
+  type DayPromo,
+  type ServerQuote,
+} from "@/lib/booking-promo";
 
 /**
  * The booking flow: service → day and time → details → confirmed.
@@ -63,6 +71,12 @@ type Service = {
   slug?: string | null;
   /** Reached by composing, not by picking: never listed in step 1. */
   isCombo?: boolean;
+  /**
+   * Las promos del día de este servicio ("Miércoles de pies"), de las mismas
+   * reglas que aplica el panel. Un panel viejo no las manda: sin ellas no se
+   * muestra ninguna promo, que es como funcionaba antes.
+   */
+  dayPromos?: DayPromo[];
 };
 type Provider = { id: number; name: string; serviceIds: number[]; schedule?: Schedule };
 type Slot = { time: string; start: string; end: string; providerIds: number[] };
@@ -86,6 +100,8 @@ export type Catalog = {
    * offered to a panel that can't chain would book the first half only.
    */
   chained?: boolean;
+  /** El 10% de primera visita, como dato del panel para que el texto diga el mismo número que descuenta. */
+  firstVisitPercent?: number;
 };
 
 export type ServiceCopy = { name: string; desc: string; category: string; categoryId: string };
@@ -121,6 +137,18 @@ type Dict = {
   nextOpen: string;
   loadingSlots: string;
   pickDate: string;
+  promo: {
+    labels: Record<string, string>;
+    chip: string;
+    chipLabel: string;
+    dayHint: string;
+    dayMark: string;
+    firstVisit: string;
+    firstVisitLoses: string;
+    checking: string;
+    payAtStudio: string;
+    applied: string;
+  };
   combo: {
     askFeet: string;
     askHands: string;
@@ -261,6 +289,8 @@ export default function ReservaFlow({
     whatsappSent: boolean;
     /** Last four digits, to say where it went without printing the number. */
     phoneTail: string;
+    /** La promo que se le mostró al reservar, ya en su idioma. Sin precio: eso se ve en el estudio. */
+    promo: string | null;
   } | null>(null);
 
   const topRef = useRef<HTMLDivElement>(null);
@@ -521,6 +551,61 @@ export default function ReservaFlow({
   const bookingKey: number | string | null = service ? (addOn ? `${service.id}+${addOn.id}` : service.id) : null;
   const visitName = service ? (addOn ? `${nameOf(service)} + ${nameOf(addOn)}` : nameOf(service)) : null;
 
+  /* ── Promos: la del día al elegir fecha, el 10% al escribir el celular ─── */
+  //
+  // La promo del día se calcula acá con el catálogo, en el mismo toque en que
+  // se elige el miércoles. El 10% de primera visita no se puede: depende del
+  // historial de la clienta, que solo tiene el panel. En cuanto ella escribe un
+  // celular válido en el paso 3 se le pide la cotización al panel, y desde ahí
+  // manda la cotización — es la misma función (`bestPromo`) que usa el cierre
+  // de la cuenta, así que la pantalla y la caja dicen el mismo número.
+  //
+  // En el paso 1 no hay fecha elegida todavía (aunque `date` recuerde una de
+  // antes): se muestra el precio de lista y las pistas de qué día baja.
+
+  const promoDate = step !== "service" ? date : null;
+  const visitLines = useMemo(
+    () => (service ? (addOn ? [service, addOn] : [service]) : []),
+    [service, addOn],
+  );
+  const dayPromo = useMemo(
+    () => (promoDate ? dayPromoOn(visitLines, promoDate) : null),
+    [visitLines, promoDate],
+  );
+  const [quote, setQuote] = useState<{ key: string; value: ServerQuote } | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  /** Una cotización por visita + celular: volver atrás y adelante no gasta el cupo del proxy. */
+  const quoteCache = useRef(new Map<string, ServerQuote>());
+  const phoneDigits = form.phone.replace(/[^\d+]/g, "");
+  const quoteKey =
+    service && promoDate ? `${service.id}|${addOn?.id ?? ""}|${promoDate}|${phoneDigits}` : null;
+  const activeQuote = quote && quote.key === quoteKey ? quote.value : null;
+
+  const pricing = visit ? visitPricing(visit.priceCOP, dayPromo, activeQuote) : null;
+  /** Lo que se le muestra y lo que se reporta como valor: con la promo ya descontada. */
+  const totalCOP = pricing?.total ?? visit?.priceCOP ?? 0;
+  const listCOP = activeQuote?.subtotal ?? visit?.priceCOP ?? 0;
+  const firstVisitPercent = catalog?.firstVisitPercent ?? 10;
+  const promoLabel = (slug: string) =>
+    fill(dict.promo.labels[slug] ?? slug, { percent: String(firstVisitPercent) });
+
+  /**
+   * Los renglones del recibo del paso 3: las dos mitades de un combo (con su
+   * descuento de combo aparte, como en el paso 1), las dos citas de un par, o
+   * el servicio solo.
+   */
+  const receiptLines = useMemo(() => {
+    if (!service) return [];
+    if (composed && partsSum && catalog) {
+      const halves = [composed.handsServiceId, composed.feetServiceId]
+        .map((id) => catalog.services.find((s) => s.id === id))
+        .filter((s): s is Service => s !== undefined);
+      if (halves.length === 2) return halves.map((s) => ({ name: nameOf(s), price: s.priceCOP }));
+    }
+    const parts = addOn ? [service, addOn] : [service];
+    return parts.map((s) => ({ name: nameOf(s), price: s.priceCOP }));
+  }, [service, addOn, composed, partsSum, catalog, nameOf]);
+
   const resetSlot = () => {
     setSlot(null);
     setSlots(null);
@@ -594,6 +679,11 @@ export default function ReservaFlow({
   const chosenProvider = providers.find((p) => p.id === providerId) ?? null;
 
   const days = useMemo(() => buildDays(today, DAYS_AHEAD), [today]);
+  /** Los días de la tira en que esta visita tiene promo, para marcarlos. */
+  const promoDays = useMemo(
+    () => new Set(visitLines.length === 0 ? [] : days.filter((d) => dayPromoOn(visitLines, d) !== null)),
+    [visitLines, days],
+  );
   const schedules = useMemo(
     () => (chosenProvider ? [chosenProvider.schedule] : providers.map((p) => p.schedule)),
     [chosenProvider, providers],
@@ -795,7 +885,9 @@ export default function ReservaFlow({
           content_ids: [service.slug ?? String(service.id)],
           content_name: visitName,
           content_type: "product",
-          value: visit?.priceCOP ?? service.priceCOP,
+          // Con la promo descontada: es lo que va a pagar, y lo que la pauta
+          // tiene que optimizar.
+          value: totalCOP,
           currency: "COP",
         }
       : {};
@@ -811,6 +903,51 @@ export default function ReservaFlow({
   const phoneOk = isPlausiblePhone(form.phone);
   const canSubmit =
     form.firstName.trim() !== "" && form.lastName.trim() !== "" && phoneOk && !sending;
+
+  // La cotización con el celular: solo en el paso 3, solo con un número que el
+  // panel va a aceptar, y con una pausa para no preguntar por cada dígito. Una
+  // falla no se le muestra a nadie: se queda la promo del día que ya se ve, y
+  // en el estudio se aplica lo que corresponda igual.
+  useEffect(() => {
+    if (step !== "details" || !service || !promoDate || !phoneOk || quoteKey === null) return;
+    const cached = quoteCache.current.get(quoteKey);
+    if (cached) {
+      setQuote({ key: quoteKey, value: cached });
+      return;
+    }
+    let alive = true;
+    const key = quoteKey;
+    const timer = window.setTimeout(() => {
+      setQuoting(true);
+      void fetch("/api/reservas/cotizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          serviceId: service.id,
+          thenServiceId: addOn?.id ?? null,
+          date: promoDate,
+          phone: form.phone,
+        }),
+      })
+        .then(async (res) => (res.ok ? parseQuote(await res.json()) : null))
+        .catch(() => null)
+        .then((value) => {
+          if (!value) return;
+          quoteCache.current.set(key, value);
+          if (alive) setQuote({ key, value });
+        })
+        .finally(() => {
+          if (alive) setQuoting(false);
+        });
+    }, 600);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+      setQuoting(false);
+    };
+    // `form.phone` va por `quoteKey` (sus dígitos): un espacio de más no recotiza.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, quoteKey, phoneOk]);
 
   async function submit() {
     if (!service || !slot || !date) return;
@@ -841,7 +978,7 @@ export default function ReservaFlow({
           empresa: honeypotRef.current?.value ?? "",
           // For the server's copy of the Meta event, so both count as one.
           eventId,
-          value: visit?.priceCOP ?? service.priceCOP,
+          value: totalCOP,
           serviceSlug: service.slug ?? null,
         }),
       });
@@ -875,7 +1012,7 @@ export default function ReservaFlow({
         } catch {
           // Storage blocked: nothing to remember, nothing lost.
         }
-        trackEvent("booking_confirmed", { service: service.slug ?? service.id, value: visit?.priceCOP ?? service.priceCOP, currency: "COP" });
+        trackEvent("booking_confirmed", { service: service.slug ?? service.id, value: totalCOP, currency: "COP" });
         trackMeta("Schedule", metaParams(), eventId);
         setBooked({
           name: form.firstName.trim(),
@@ -887,6 +1024,7 @@ export default function ReservaFlow({
           appointmentId: String(body.booking.appointmentId ?? `${date}-${slot.time}`),
           whatsappSent: body.booking.whatsappConfirmation === "sending",
           phoneTail: form.phone.replace(/\D/g, "").slice(-4),
+          promo: pricing?.promo ? promoLabel(pricing.promo.slug) : null,
         });
         window.history.replaceState({ gbsStep: "details" }, "");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -973,6 +1111,8 @@ export default function ReservaFlow({
       service={visit}
       serviceName={visitName}
       partsSum={partsSum}
+      promo={pricing?.promo ? { label: promoLabel(pricing.promo.slug), discount: pricing.promo.discount } : null}
+      total={totalCOP}
       provider={chosenProvider?.name ?? null}
       date={step !== "service" ? date : null}
       slot={step !== "service" ? slot : null}
@@ -1093,6 +1233,24 @@ export default function ReservaFlow({
                               <span aria-hidden className="text-ink/25">·</span>
                               <span className="font-semibold text-ink">{formatCOP(s.priceCOP, lang)}</span>
                             </span>
+                            {/* La promo del día, antes de elegir fecha: quien
+                                llegó por el afiche de los miércoles la reconoce
+                                acá, y quien no, se entera de que existe. */}
+                            {promoHints(s.priceCOP, s.dayPromos).map((p) => {
+                              const values = { day: weekdayName(p.weekday, lang), price: formatCOP(p.promoCOP, lang) };
+                              return (
+                                <span
+                                  key={`${p.slug}-${p.weekday}`}
+                                  className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-0.5 font-sans text-[11px] font-semibold tracking-wide text-gold-deep"
+                                >
+                                  <span aria-hidden>✦</span>
+                                  <span aria-hidden>{fill(dict.promo.chip, values)}</span>
+                                  <span className="sr-only">
+                                    {fill(dict.promo.chipLabel, { ...values, day: values.day.toLowerCase() })}
+                                  </span>
+                                </span>
+                              );
+                            })}
                           </m.button>
 
                           {/* The other half. Only when this forms a combo, and only
@@ -1248,6 +1406,7 @@ export default function ReservaFlow({
                   const open = openDays.has(d);
                   const load = open ? dayLoad(d) : null;
                   const selected = date === d;
+                  const promoDay = open && promoDays.has(d);
                   const label =
                     i === 0 ? dict.day.today : i === 1 ? dict.day.tomorrow : weekdayShort(d, lang);
                   return (
@@ -1263,8 +1422,8 @@ export default function ReservaFlow({
                         setError(null);
                       }}
                       aria-pressed={selected}
-                      aria-label={`${longDate(d, lang)}${open ? "" : ` — ${dict.day.closed}`}`}
-                      className={`flex w-[64px] shrink-0 snap-start flex-col items-center rounded-2xl border py-2.5 font-sans transition-all ${
+                      aria-label={`${longDate(d, lang)}${open ? "" : ` — ${dict.day.closed}`}${promoDay ? ` — ${dict.promo.dayMark}` : ""}`}
+                      className={`relative flex w-[64px] shrink-0 snap-start flex-col items-center rounded-2xl border py-2.5 font-sans transition-all ${
                         selected
                           ? "border-carbon bg-carbon text-cream shadow-[0_10px_24px_-12px_rgba(28,23,20,0.6)]"
                           : open
@@ -1272,6 +1431,16 @@ export default function ReservaFlow({
                             : "cursor-not-allowed border-transparent bg-transparent text-ink/25"
                       }`}
                     >
+                      {/* El día con promo para esta visita: una estrella, no un
+                          precio — en 64 px no cabe, y el precio aparece al tocarlo. */}
+                      {promoDay && (
+                        <span
+                          aria-hidden
+                          className={`absolute right-1.5 top-1 text-[10px] leading-none ${selected ? "text-gold-soft" : "text-gold"}`}
+                        >
+                          ✦
+                        </span>
+                      )}
                       <span
                         className={`text-[10px] font-semibold uppercase tracking-wider ${
                           selected ? "text-gold-soft" : open ? "text-ink-mute" : ""
@@ -1302,6 +1471,30 @@ export default function ReservaFlow({
                   );
                 })}
               </div>
+
+              {/* La promo del día elegido, dicha con números. */}
+              <AnimatePresence initial={false}>
+                {dayPromo && visit && (
+                  <m.p
+                    key={dayPromo.slug}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <span className="mt-1 flex items-start gap-2 rounded-2xl border border-gold/35 bg-gradient-to-br from-gold-pale/80 to-paper px-4 py-3 font-sans text-[13px] text-gold-deep">
+                      <span aria-hidden className="mt-px">✦</span>
+                      <span>
+                        {fill(dict.promo.dayHint, {
+                          label: promoLabel(dayPromo.slug),
+                          price: formatCOP(visit.priceCOP - dayPromo.discount, lang),
+                          was: formatCOP(visit.priceCOP, lang),
+                        })}
+                      </span>
+                    </span>
+                  </m.p>
+                )}
+              </AnimatePresence>
 
               <div className="mt-4 min-h-[180px]" aria-live="polite">
                 {date &&
@@ -1388,7 +1581,14 @@ export default function ReservaFlow({
                     {chosenProvider ? ` · ${chosenProvider.name}` : ""}
                   </p>
                 </div>
-                <AnimatedCOP value={visit?.priceCOP ?? service.priceCOP} lang={lang} className="shrink-0 font-display text-[20px]" />
+                <span className="flex shrink-0 flex-col items-end leading-none">
+                  {pricing?.promo && (
+                    <span className="mb-1 font-sans text-[11px] text-cream/50 line-through tabular-nums">
+                      {formatCOP(listCOP, lang)}
+                    </span>
+                  )}
+                  <AnimatedCOP value={totalCOP} lang={lang} className="font-display text-[20px]" />
+                </span>
               </div>
 
               <form
@@ -1498,6 +1698,60 @@ export default function ReservaFlow({
                   {dict.labels.remember}
                 </label>
 
+                {/* El recibo de la visita, con la promo que aplica. Reacciona
+                    al celular: si es su primera visita y el 10% le gana a la
+                    promo del día, cambia acá mismo. */}
+                <VisitBreakdown
+                  dict={dict}
+                  lang={lang}
+                  lines={receiptLines}
+                  discount={partsSum?.saving ?? 0}
+                  promo={
+                    pricing?.promo
+                      ? { label: promoLabel(pricing.promo.slug), discount: pricing.promo.discount }
+                      : null
+                  }
+                  total={totalCOP}
+                  durationMin={visit?.durationMin ?? service.durationMin}
+                  note={dict.promo.payAtStudio}
+                >
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {pricing?.promo?.slug === "primera-visita" ? (
+                      <m.p
+                        key="first"
+                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ type: "spring", stiffness: 380, damping: 24 }}
+                        className="mt-3 flex items-center gap-2 rounded-xl bg-gold/15 px-3 py-2 text-[13px] font-semibold text-gold-deep"
+                      >
+                        <span aria-hidden>✦</span>
+                        {fill(dict.promo.firstVisit, { percent: String(firstVisitPercent) })}
+                      </m.p>
+                    ) : pricing?.firstVisit === true && pricing.promo ? (
+                      <m.p
+                        key="loses"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="mt-2 text-[12px] leading-snug text-gold-deep"
+                      >
+                        {dict.promo.firstVisitLoses}
+                      </m.p>
+                    ) : quoting ? (
+                      <m.p
+                        key="checking"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="mt-2 flex items-center gap-2 text-[12px] text-ink-mute"
+                      >
+                        <Spinner /> {dict.promo.checking}
+                      </m.p>
+                    ) : null}
+                  </AnimatePresence>
+                </VisitBreakdown>
+
                 <button
                   type="submit"
                   disabled={sending}
@@ -1511,7 +1765,7 @@ export default function ReservaFlow({
                     <>
                       {dict.confirm}
                       <span className="text-cream/50">·</span>
-                      <span className="normal-case tracking-normal text-cream">{formatCOP(visit?.priceCOP ?? service.priceCOP, lang)}</span>
+                      <span className="normal-case tracking-normal text-cream">{formatCOP(totalCOP, lang)}</span>
                     </>
                   )}
                 </button>
@@ -1534,7 +1788,10 @@ export default function ReservaFlow({
                     ? `${longDate(date, lang)} · ${formatTime(slot.time, lang)}`
                     : formatDuration(visit?.durationMin ?? service.durationMin, lang)}
                   {" · "}
-                  <AnimatedCOP value={visit?.priceCOP ?? service.priceCOP} lang={lang} className="font-semibold text-ink" />
+                  {pricing?.promo && (
+                    <span className="mr-1.5 text-ink-mute line-through tabular-nums">{formatCOP(listCOP, lang)}</span>
+                  )}
+                  <AnimatedCOP value={totalCOP} lang={lang} className="font-semibold text-ink" />
                 </p>
               </div>
               <m.button
@@ -1569,7 +1826,10 @@ export default function ReservaFlow({
                   ? `${weekdayShort(date, lang)} ${Number(date.slice(8))} · ${formatTime(slot.time, lang)}`
                   : formatDuration(visit?.durationMin ?? service.durationMin, lang)}
                 {" · "}
-                <AnimatedCOP value={visit?.priceCOP ?? service.priceCOP} lang={lang} className="font-semibold text-ink" />
+                {pricing?.promo && (
+                    <span className="mr-1.5 text-ink-mute line-through tabular-nums">{formatCOP(listCOP, lang)}</span>
+                  )}
+                  <AnimatedCOP value={totalCOP} lang={lang} className="font-semibold text-ink" />
               </p>
             </div>
             <button
@@ -1640,23 +1900,31 @@ function AnimatedCOP({ value, lang, className }: { value: number; lang: Locale; 
  * combo discount as its own line, and the total. Shown under the add-on
  * question once one is picked — and it stays, because the person moves on
  * when they choose to, not when the screen decides.
+ *
+ * En el paso 3 es además el recibo con la promo: la del día o el 10% de
+ * primera visita, en su propio renglón, nunca las dos (no se acumulan).
  */
 function VisitBreakdown({
   dict,
   lang,
   lines,
   discount,
+  promo = null,
   total,
   durationMin,
   note,
+  children,
 }: {
   dict: Dict;
   lang: Locale;
   lines: { name: string; price: number }[];
   discount: number;
+  promo?: { label: string; discount: number } | null;
   total: number;
   durationMin: number;
   note: string;
+  /** Lo que va entre el total y la nota: el aviso de primera visita. */
+  children?: React.ReactNode;
 }) {
   return (
     <div className="mt-4 rounded-2xl border border-gold/25 bg-paper px-4 py-3.5 font-sans text-[13.5px]">
@@ -1686,6 +1954,22 @@ function VisitBreakdown({
             <span className="tabular-nums">− {formatCOP(discount, lang)}</span>
           </m.p>
         )}
+        {promo && (
+          <m.p
+            key={`promo-${promo.label}`}
+            initial={{ opacity: 0, scale: 0.92, height: 0 }}
+            animate={{ opacity: 1, scale: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: "spring", stiffness: 420, damping: 26 }}
+            className="flex items-baseline justify-between gap-3 py-0.5 font-semibold text-gold-deep"
+          >
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden>✦</span>
+              {promo.label}
+            </span>
+            <span className="tabular-nums">− {formatCOP(promo.discount, lang)}</span>
+          </m.p>
+        )}
       </AnimatePresence>
       <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-ink/10 pt-2.5">
         <span className="text-ink">
@@ -1694,6 +1978,7 @@ function VisitBreakdown({
         </span>
         <AnimatedCOP value={total} lang={lang} className="font-display text-[24px] leading-none text-ink" />
       </div>
+      {children}
       <p className="mt-1.5 text-[12px] leading-snug text-ink-mute">{note}</p>
     </div>
   );
@@ -1926,6 +2211,8 @@ function Summary({
   service,
   serviceName,
   partsSum,
+  promo,
+  total,
   provider,
   date,
   slot,
@@ -1936,6 +2223,10 @@ function Summary({
   service: Service | null;
   serviceName: string | null;
   partsSum: { price: number; saving: number } | null;
+  /** La promo que aplica, ya con su nombre en el idioma de la página. */
+  promo: { label: string; discount: number } | null;
+  /** Lo que va a pagar, con la promo descontada. */
+  total: number;
   provider: string | null;
   date: string | null;
   slot: Slot | null;
@@ -1973,15 +2264,36 @@ function Summary({
               {dict.summary.with} {provider ?? dict.summary.anyone.toLowerCase()}
             </Row>
           )}
+          <AnimatePresence initial={false}>
+            {promo && (
+              <m.div
+                key={promo.label}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex items-baseline justify-between gap-3 overflow-hidden py-3 font-semibold text-gold-deep"
+              >
+                <dt className="flex items-center gap-1.5">
+                  <span aria-hidden>✦</span>
+                  {promo.label}
+                </dt>
+                <dd className="tabular-nums">− {formatCOP(promo.discount, lang)}</dd>
+              </m.div>
+            )}
+          </AnimatePresence>
           <div className="flex items-baseline justify-between py-4">
             <dt className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-mute">
               {dict.summary.total}
             </dt>
             <dd className="text-right">
-              {partsSum && (
-                <span className="mr-2 text-ink-mute line-through">{formatCOP(partsSum.price, lang)}</span>
+              {/* Lo tachado es lo de antes de cualquier descuento: la suma de
+                  las mitades de un combo, o el precio de lista si hay promo. */}
+              {(partsSum || promo) && (
+                <span className="mr-2 text-ink-mute line-through">
+                  {formatCOP(partsSum ? partsSum.price : service.priceCOP, lang)}
+                </span>
               )}
-              <span className="font-display text-[24px] text-ink">{formatCOP(service.priceCOP, lang)}</span>
+              <AnimatedCOP value={total} lang={lang} className="font-display text-[24px] text-ink" />
             </dd>
           </div>
         </dl>
@@ -2038,6 +2350,7 @@ function Success({
     appointmentId: string;
     whatsappSent: boolean;
     phoneTail: string;
+    promo: string | null;
   };
   whatsappNumber: string | null;
   mapsUrl: string;
@@ -2128,6 +2441,16 @@ function Success({
             </p>
           </div>
         </div>
+        {/* La promo que vio al reservar, con nombre y sin precio: el número
+            exacto lo confirma la caja, y así esta pantalla —que se le muestra
+            a alguien o se le saca captura— no promete una cifra. */}
+        {booked.promo && (
+          <p className="flex items-center gap-2 border-t border-ink/10 px-6 py-3.5 font-sans text-[13px] font-semibold text-gold-deep">
+            <span aria-hidden>✦</span>
+            {fill(dict.promo.applied, { label: booked.promo })}
+            <span className="font-normal text-ink-mute">· {dict.promo.payAtStudio}</span>
+          </p>
+        )}
         <a
           href={mapsUrl}
           target="_blank"
@@ -2563,4 +2886,8 @@ function monthYear(iso: string, lang: Locale): string {
 }
 function longDate(iso: string, lang: Locale): string {
   return cap(display(iso, lang, { weekday: "long", day: "numeric", month: "long" }));
+}
+/** "Miércoles" / "Wednesday" de un número de día (0 = domingo). El 2026-10-11 fue domingo. */
+function weekdayName(weekday: number, lang: Locale): string {
+  return cap(display(`2026-10-${String(11 + weekday).padStart(2, "0")}`, lang, { weekday: "long" }));
 }

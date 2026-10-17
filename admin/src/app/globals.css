@@ -501,6 +501,25 @@
     width: 100%;
   }
 
+  /* --- Teléfono de clienta: WhatsApp + llamar (`WhatsAppLink`) ------------
+     `position` + `z-index` lo suben por encima del `::after` del enlace
+     estirado de las filas de lista; sin eso, tocar el botón abría la ficha. */
+  .ui-wa {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    vertical-align: middle;
+    max-width: 100%;
+  }
+  /* El verde de "ok" y no el de la marca de WhatsApp: el set es de un solo
+     alfabeto, y #25d366 sobre marfil no llega a 3:1. */
+  .ui-wa__glyph {
+    flex: none;
+    color: var(--color-ok-ink);
+  }
+
   /* --- Spinner ------------------------------------------------------------ */
   .ui-spinner {
     width: 1em;

@@ -69,8 +69,21 @@ export const EA_STATUS_MAP: Readonly<Record<string, StatusToken>> = {
   // exactamente lo mismo. Se aceptan porque el costo de no aceptarlas es una
   // agenda punteada, y el de aceptarlas es una línea.
   completed: "completada",
+  finished: "completada",
   "no-show": "no-asistio",
   noshow: "no-asistio",
+  "did-not-attend": "no-asistio",
+  // Variantes en español que no caen solas por género o por redacción. Venían
+  // de la tabla paralela que tenía la ficha de la clienta (`clientes/ea-status`),
+  // que hoy delega acá: con dos tablas, "Reprogramada" era `reservada` en la
+  // agenda y `desconocido` en la ficha, y la misma cita contaba distinto según
+  // la pantalla.
+  reservado: "reservada",
+  confirmado: "confirmada",
+  completado: "completada",
+  cancelado: "cancelada",
+  "no-vino": "no-asistio",
+  "no-se-presento": "no-asistio",
 };
 
 /**

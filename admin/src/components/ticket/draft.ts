@@ -36,6 +36,8 @@ import {
   type TicketTotals,
 } from "@/lib/ticket";
 import type { Cop, PaymentMethod, VarianceReasonCode } from "@/db/types";
+import { isEaLocalDate, type EaLocalDate } from "@/lib/ea/datetime";
+import { bestPromo, type PromoQuote } from "@/lib/promos";
 import { findService, type TicketCatalog } from "./catalog";
 
 /** Sube cuando la forma guardada deja de ser legible por el código nuevo. */
@@ -63,6 +65,18 @@ export type TicketDraft = {
   eaAppointmentId: number;
   /** `null` = todavía no se eligió ninguno (una cita de EA sin servicio). */
   performedServiceId: number | null;
+  /**
+   * Servicios hechos **además** del principal, cada uno a su precio de lista
+   * de hoy: "vino por rubber en manos y se hizo también pies". Ids de EA, en el
+   * orden en que se agregaron.
+   *
+   * Existe porque no todo par es un combo: el combo es un precio que fija la
+   * dueña, y mientras un par no lo tenga la única forma honesta de cobrarlo es
+   * cada mitad a su lista. Cuando el par **sí** es un combo, la hoja ofrece
+   * cambiar a él, que es lo que corresponde. Cada uno es un renglón `servicio`
+   * y comisiona igual que el principal (`bucketFor()` en `lib/commission.ts`).
+   */
+  additionalServices: readonly number[];
   /** `{ [eaServiceId]: cantidad }`. Sin la clave = cero, nunca se guarda un 0. */
   extras: Readonly<Record<string, number>>;
   /** El renglón fuera de catálogo. Uno por cuenta: más de uno no ha hecho falta. */
@@ -90,6 +104,24 @@ export type TicketDraft = {
    * (`cortesia`). Solo la dueña lo puede guardar.
    */
   houseCourtesy: boolean;
+  /**
+   * Aplicar la promo que le toque a la cuenta (`bestPromo()`). Prendido por
+   * defecto en una cuenta nueva; la técnica la puede quitar —y volver a poner—
+   * desde la hoja. **Es una elección, no un monto**: cuánto descuenta lo vuelve
+   * a calcular el servidor con su catálogo.
+   *
+   * Un borrador sin el campo (de antes de esta versión) es **no**: lo que la
+   * técnica vio y cobró entonces no traía promo, y aplicarla al reenviarlo
+   * cambiaría en silencio una plata que ya se recibió.
+   */
+  applyPromo: boolean;
+  /**
+   * Es su primera visita: le toca el 10 % en los servicios. Llega puesto por el
+   * historial cuando se pudo revisar, y la técnica lo puede cambiar — es la
+   * salida cuando el historial no responde. Lo que se guarda dice si coincidía
+   * con el historial (ver `hoy/actions.ts`).
+   */
+  firstVisit: boolean;
   /** Epoch ms de la última tecla. Sirve para ordenar y para depurar. */
   updatedAt: number;
 };
@@ -106,7 +138,20 @@ export type TicketDraft = {
 export type TicketPricing = {
   bookedServiceId: number | null;
   bookedSnapshot: Cop | null;
+  /**
+   * El día **de la cita**, que es el que decide la promo del día (un miércoles
+   * de pies es de la cita del miércoles, se cierre cuando se cierre).
+   * Ausente o `null` = sin promos: mejor no descontar que descontar sobre un
+   * día que no se sabe.
+   */
+  promoDate?: EaLocalDate | null;
 };
+
+/** El día de una hora de pared de EA (`"2026-10-14 10:00:00"` → `"2026-10-14"`). */
+export function promoDateOf(start: string | null | undefined): EaLocalDate | null {
+  const day = (start ?? "").slice(0, 10);
+  return isEaLocalDate(day) ? day : null;
+}
 
 export function emptyDraft(
   eaAppointmentId: number,
@@ -118,12 +163,18 @@ export function emptyDraft(
    * otorgarla—; acá solo se respeta.
    */
   houseCourtesy = false,
+  /**
+   * La promo arranca puesta: es lo que la clienta vio en el afiche, y quitarla
+   * es la excepción. `firstVisit` lo pone quien sabe del historial.
+   */
+  promo: { applyPromo?: boolean; firstVisit?: boolean } = {},
 ): TicketDraft {
   return {
     version: DRAFT_VERSION,
     eaAppointmentId,
     // Paso 1 del flujo: "viene con el servicio agendado ya elegido".
     performedServiceId: bookedServiceId,
+    additionalServices: [],
     extras: {},
     manual: null,
     totalOverride: null,
@@ -133,6 +184,8 @@ export function emptyDraft(
     payments: [],
     tip: 0,
     houseCourtesy,
+    applyPromo: promo.applyPromo ?? true,
+    firstVisit: promo.firstVisit ?? false,
     updatedAt: now,
   };
 }
@@ -175,8 +228,18 @@ export function draftFromFinance(
 ): TicketDraft {
   const extras: Record<string, number> = {};
   let manual: TicketDraft["manual"] = null;
+  const additionalServices: number[] = [];
+  const performedServiceId = finance.performedServiceId ?? bookedServiceId;
+  let mainSeen = false;
 
   for (const item of finance.items) {
+    // El primer renglón `servicio` que es el realizado es el principal; los
+    // demás son los que se agregaron. Sin esto, reabrir una cuenta con dos
+    // servicios y guardarla sin tocar nada borraría el segundo.
+    if (item.kind === "servicio" && item.eaServiceId !== null) {
+      if (!mainSeen && item.eaServiceId === performedServiceId) mainSeen = true;
+      else additionalServices.push(item.eaServiceId);
+    }
     if (item.kind === "adicional" && item.eaServiceId !== null) {
       extras[String(item.eaServiceId)] = (extras[String(item.eaServiceId)] ?? 0) + item.qty;
     }
@@ -194,20 +257,29 @@ export function draftFromFinance(
   // abrirla con el total escrito en cero y el motivo elegido dejaría a quien la
   // desmarca con una cuenta en $0 que ya no es cortesía.
   const cortesia = finance.houseCourtesy === true;
+  // Lo mismo con la promo: su descuento y su motivo los puso el servidor. Se
+  // reabre con la promo prendida y sin total escrito, para que la hoja la
+  // recalcule igual que al cerrarla. Una cuenta guardada **sin** promo se
+  // reabre sin ella aunque hoy le tocara: prenderla sola cambiaría el cobro de
+  // una cuenta que ya se cerró.
+  const promo = !cortesia && finance.varianceReasonCode === "promo";
 
   return {
     version: DRAFT_VERSION,
     eaAppointmentId,
-    performedServiceId: finance.performedServiceId ?? bookedServiceId,
+    performedServiceId,
+    additionalServices,
     extras,
     manual,
-    totalOverride: !cortesia && finance.discount > 0 ? finance.amountCharged : null,
-    varianceReasonCode: cortesia ? null : finance.varianceReasonCode,
-    varianceReason: cortesia ? "" : finance.varianceReason,
+    totalOverride: !cortesia && !promo && finance.discount > 0 ? finance.amountCharged : null,
+    varianceReasonCode: cortesia || promo ? null : finance.varianceReasonCode,
+    varianceReason: cortesia || promo ? "" : finance.varianceReason,
     notes: finance.serviceNotes,
     payments: finance.payments,
     tip: finance.tip,
     houseCourtesy: cortesia,
+    applyPromo: promo,
+    firstVisit: promo && finance.varianceReason.startsWith(FIRST_VISIT_SLUG),
     updatedAt: now,
   };
 }
@@ -241,6 +313,7 @@ export function draftToPayments(
 export function isDirty(draft: TicketDraft, baseline: TicketDraft): boolean {
   return (
     draft.performedServiceId !== baseline.performedServiceId ||
+    JSON.stringify(draft.additionalServices) !== JSON.stringify(baseline.additionalServices) ||
     JSON.stringify(draft.extras) !== JSON.stringify(baseline.extras) ||
     JSON.stringify(draft.manual) !== JSON.stringify(baseline.manual) ||
     draft.totalOverride !== baseline.totalOverride ||
@@ -249,7 +322,9 @@ export function isDirty(draft: TicketDraft, baseline: TicketDraft): boolean {
     draft.notes !== baseline.notes ||
     JSON.stringify(draft.payments) !== JSON.stringify(baseline.payments) ||
     draft.tip !== baseline.tip ||
-    draft.houseCourtesy !== baseline.houseCourtesy
+    draft.houseCourtesy !== baseline.houseCourtesy ||
+    draft.applyPromo !== baseline.applyPromo ||
+    draft.firstVisit !== baseline.firstVisit
   );
 }
 
@@ -302,7 +377,125 @@ export type DraftPricing = {
   totals: TicketTotals | null;
   /** Qué impide guardar. Vacío = se puede guardar. */
   errors: string[];
+  /** La promo que le toca a la cuenta, esté aplicada o no. `null` = ninguna. */
+  availablePromo: PromoQuote | null;
+  /** La promo aplicada: su descuento es exactamente el de la cuenta. */
+  promo: PromoQuote | null;
+  /** El motivo que se va a guardar: `promo` si la variación es la promo. */
+  varianceReasonCode: VarianceReasonCode | null;
 };
+
+// ---------------------------------------------------------------------------
+// Promos
+// ---------------------------------------------------------------------------
+
+/** El `slug` del 10 % de primera visita en `lib/promos.ts`. */
+export const FIRST_VISIT_SLUG = "primera-visita";
+
+/**
+ * La promo que le corresponde a estos renglones, el día de la cita.
+ *
+ * Un renglón `manual` no entra: está fuera del catálogo y no tiene un id de
+ * vitrina con el que emparejar una promo del día, y el 10 % de primera visita
+ * es "en los servicios". Cada renglón va con su total (`qty × precio`), que es
+ * el precio congelado cuando el servicio es el agendado — la promo rebaja lo
+ * que de verdad se iba a cobrar, no la lista de hoy.
+ */
+export function promoForItems(
+  items: readonly TicketItemInput[],
+  pricing: TicketPricing,
+  firstVisit: boolean,
+): PromoQuote | null {
+  const date = pricing.promoDate ?? null;
+  if (date === null) return null;
+
+  const lines = items.flatMap((item, index) =>
+    item.kind === "manual"
+      ? []
+      : [
+          {
+            key: String(index),
+            pricingId: item.pricingId ?? null,
+            listPrice: item.qty * item.unitPriceSnapshot,
+            kind: item.kind,
+          },
+        ],
+  );
+
+  return bestPromo({ lines, date, isFirstVisit: firstVisit });
+}
+
+/** El descuento de la cuenta y el motivo con que se guarda. */
+export type ResolvedDiscount = {
+  /**
+   * `subtotal − lo cobrado`. **Puede ser negativo** solo cuando el total
+   * escrito supera el subtotal, que es un error que cada llamador reporta con
+   * sus palabras (`ticketFromEnteredTotal()` en el servidor).
+   */
+  discount: Cop;
+  availablePromo: PromoQuote | null;
+  promo: PromoQuote | null;
+  varianceReasonCode: VarianceReasonCode | null;
+  varianceReason: string;
+};
+
+/**
+ * **Cuánto se descuenta y por qué.** La misma función en la hoja y en la
+ * Server Action, como `draftToItems()`: lo que se ve y lo que se guarda no
+ * pueden divergir.
+ *
+ * - **Sin total escrito**: el descuento es la promo, si está prendida y le toca
+ *   alguna. El motivo es `promo` y no se le pide nada a la técnica: la
+ *   variación ya está explicada.
+ * - **Con total escrito**: manda la cifra, como siempre. Si coincide con el
+ *   total con promo, es la promo (tocar el total y no cambiarlo no es una
+ *   rebaja nueva). Si no, es una variación de la técnica y lleva **su** motivo
+ *   — la compuerta de `validateTicketClose()` lo exige igual que antes. La
+ *   promo no se suma por debajo de un total escrito: la cifra escrita es lo que
+ *   se cobró, y dos descuentos encima de ella serían cobrar algo que nadie dijo.
+ * - **Cortesía de la casa**: no hay promo. La cortesía ya es el 100 %.
+ *
+ * Las promos no se acumulan entre sí (gana la mayor, `bestPromo()`), y tampoco
+ * con un descuento escrito a mano.
+ *
+ * `promo` nunca sale del borrador: un borrador manipulado que lo traiga como
+ * motivo se trata como sin motivo, porque ese código solo lo puede poner este
+ * cálculo.
+ */
+export function resolveDiscount(
+  draft: TicketDraft,
+  items: readonly TicketItemInput[],
+  subtotal: Cop,
+  pricing: TicketPricing,
+): ResolvedDiscount {
+  const availablePromo = draft.houseCourtesy
+    ? null
+    : promoForItems(items, pricing, draft.firstVisit);
+  const wanted = draft.applyPromo ? availablePromo : null;
+
+  const discount =
+    draft.totalOverride === null ? (wanted?.discount ?? 0) : subtotal - draft.totalOverride;
+
+  if (wanted !== null && discount === wanted.discount) {
+    return {
+      discount,
+      availablePromo,
+      promo: wanted,
+      varianceReasonCode: "promo",
+      varianceReason: wanted.slug,
+    };
+  }
+
+  const ownCode = draft.varianceReasonCode === "promo" ? null : draft.varianceReasonCode;
+
+  return {
+    discount,
+    availablePromo,
+    promo: null,
+    varianceReasonCode: ownCode,
+    varianceReason: ownCode === null ? "" : draft.varianceReason,
+  };
+}
 
 function messageOf(error: unknown): string {
   if (error instanceof TicketError) return error.message;
@@ -316,8 +509,9 @@ function messageOf(error: unknown): string {
 /**
  * El borrador convertido en los renglones que `lib/ticket.ts` sabe valorar.
  *
- * Orden fijo y no casual: **servicio realizado, adicionales en el orden del
- * catálogo, manual al final.** El prorrateo del descuento reparte el peso del
+ * Orden fijo y no casual: **servicio realizado, los servicios agregados en el
+ * orden en que se agregaron, adicionales en el orden del catálogo, manual al
+ * final.** El prorrateo del descuento reparte el peso del
  * residuo de forma determinista, y "determinista" exige que la lista llegue
  * siempre igual — el repositorio de A2 documenta lo mismo del lado de la base.
  *
@@ -357,6 +551,40 @@ export function draftToItems(
       pricingId: performed.pricingId,
       qty: 1,
       unitPriceSnapshot: price ?? 0,
+    });
+  }
+
+  // Los servicios agregados van **a la lista de hoy**, nunca al congelado: el
+  // congelado es el precio del servicio que se reservó, y éstos no se
+  // reservaron. Un adicional colado acá (la lista de la hoja no los ofrece) no
+  // se cobra como servicio: se marca.
+  for (const id of draft.additionalServices) {
+    const service = findService(catalog, id);
+
+    if (service === null || service.isExtra) {
+      flags.push({
+        label: `Servicio #${id}`,
+        message:
+          service === null
+            ? "Ya no está en el catálogo de EA. No se cobró; revisa la cuenta."
+            : "Es un adicional, no un servicio. Agrégalo en Adicionales.",
+      });
+      continue;
+    }
+
+    if (service.listPrice === null) {
+      flags.push({
+        label: service.name,
+        message: "EA no tiene precio para este servicio. Escribe el total a mano.",
+      });
+    }
+
+    items.push({
+      kind: "servicio",
+      eaServiceId: service.eaServiceId,
+      pricingId: service.pricingId,
+      qty: 1,
+      unitPriceSnapshot: service.listPrice ?? 0,
     });
   }
 
@@ -443,7 +671,16 @@ export function priceDraft(
       }
     }
 
-    return { items, flags, subtotal: courtesy?.subtotal ?? null, totals: courtesy, errors };
+    return {
+      items,
+      flags,
+      subtotal: courtesy?.subtotal ?? null,
+      totals: courtesy,
+      errors,
+      availablePromo: null,
+      promo: null,
+      varianceReasonCode: "cortesia",
+    };
   }
 
   let base: TicketTotals | null = null;
@@ -451,24 +688,32 @@ export function priceDraft(
   try {
     base = computeTicketTotals(items, 0, Math.max(draft.tip, 0));
   } catch (error) {
-    return { items, flags, subtotal: null, totals: null, errors: [messageOf(error)] };
+    return {
+      items,
+      flags,
+      subtotal: null,
+      totals: null,
+      errors: [messageOf(error)],
+      availablePromo: null,
+      promo: null,
+      varianceReasonCode: null,
+    };
   }
 
   const subtotal = base.subtotal;
-  let discount = 0;
+  const resolved = resolveDiscount(draft, items, subtotal, pricing);
+  let discount = resolved.discount;
 
-  if (draft.totalOverride !== null) {
-    discount = subtotal - draft.totalOverride;
-    if (discount < 0) {
-      // El mensaje lo escribe B1 y no este archivo: `ticketFromEnteredTotal()`
-      // es quien decide que cobrar de más va como renglón, y repetir la frase
-      // acá sería una segunda versión de la regla esperando a divergir.
-      errors.push(
-        `El total ingresado (${draft.totalOverride}) supera el subtotal (${subtotal}). ` +
-          "Cobrar de más va como un renglón, no como un total suelto.",
-      );
-      discount = 0;
-    }
+  // Solo un total escrito puede dejar el descuento negativo: la promo nunca.
+  if (discount < 0) {
+    // El mensaje lo escribe B1 y no este archivo: `ticketFromEnteredTotal()`
+    // es quien decide que cobrar de más va como renglón, y repetir la frase
+    // acá sería una segunda versión de la regla esperando a divergir.
+    errors.push(
+      `El total ingresado (${draft.totalOverride}) supera el subtotal (${subtotal}). ` +
+        "Cobrar de más va como un renglón, no como un total suelto.",
+    );
+    discount = 0;
   }
 
   let totals: TicketTotals | null = null;
@@ -485,15 +730,60 @@ export function priceDraft(
         items,
         discount,
         tip: Math.max(draft.tip, 0),
-        varianceReasonCode: draft.varianceReasonCode,
-        varianceReason: draft.varianceReason,
+        varianceReasonCode: resolved.varianceReasonCode,
+        varianceReason: resolved.varianceReason,
       });
     } catch (error) {
       errors.push(messageOf(error));
     }
   }
 
-  return { items, flags, subtotal, totals, errors };
+  return {
+    items,
+    flags,
+    subtotal,
+    totals,
+    errors,
+    availablePromo: resolved.availablePromo,
+    promo: resolved.promo,
+    varianceReasonCode: resolved.varianceReasonCode,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Servicios agregados
+// ---------------------------------------------------------------------------
+
+/** Cuántos servicios se pueden agregar al principal. Más es un dedo pegado. */
+export const MAX_ADDITIONAL_SERVICES = 4;
+
+/** Agrega un servicio hecho además del principal. */
+export function addService(draft: TicketDraft, eaServiceId: number, now = Date.now()): TicketDraft {
+  if (draft.additionalServices.length >= MAX_ADDITIONAL_SERVICES) return draft;
+  return { ...draft, additionalServices: [...draft.additionalServices, eaServiceId], updatedAt: now };
+}
+
+/** Quita el servicio agregado en la posición `index`. */
+export function removeService(draft: TicketDraft, index: number, now = Date.now()): TicketDraft {
+  return {
+    ...draft,
+    additionalServices: draft.additionalServices.filter((_, i) => i !== index),
+    updatedAt: now,
+  };
+}
+
+/**
+ * Cobrar dos servicios como **el combo** que forman: el principal pasa a ser el
+ * combo y el agregado sale de la cuenta. El precio es el del combo, que fija la
+ * dueña; acá no se suma nada.
+ */
+export function mergeIntoCombo(
+  draft: TicketDraft,
+  index: number,
+  comboEaServiceId: number,
+  now = Date.now(),
+): TicketDraft {
+  return { ...removeService(draft, index, now), performedServiceId: comboEaServiceId };
 }
 
 // ---------------------------------------------------------------------------

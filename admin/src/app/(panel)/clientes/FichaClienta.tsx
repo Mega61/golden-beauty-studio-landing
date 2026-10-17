@@ -10,10 +10,10 @@ import {
   formatCOP,
   formatDateLong,
   formatDateShort,
-  formatPhoneCO,
   formatTime,
   type Column,
 } from "@/components/ui";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import type { PaymentMethod } from "@/db/types";
 
 import { CortesiaPorDefecto, EditarClienta, FusionarClienta } from "./AccionesClienta";
@@ -66,9 +66,7 @@ export function FichaClienta({
           <dl style={dlStyle}>
             <Dato etiqueta="Teléfono">
               {client.phone ? (
-                <a href={`tel:${client.phone}`} className="ui-num">
-                  {formatPhoneCO(client.phone)}
-                </a>
+                <WhatsAppLink phone={client.phone} customerName={client.name} withCall />
               ) : (
                 <span style={{ color: "var(--color-ink-soft)" }}>
                   Sin teléfono — esta ficha no se puede unificar con otras
@@ -219,8 +217,25 @@ function Resumen({ profile }: { profile: ClientProfile }) {
       />
       <Kpi
         etiqueta="No asistió"
-        valor={String(summary.noShows)}
-        nota={summary.cancellations > 0 ? `${summary.cancellations} canceladas` : undefined}
+        // "2 de 9 citas": de las que tenía que cumplir —las que vino más las que
+        // faltó—, a cuántas no llegó. Un conteo suelto no dice si es mucho.
+        valor={
+          summary.noShowRate === null
+            ? String(summary.noShows)
+            : `${summary.noShows} de ${summary.visits + summary.noShows} citas`
+        }
+        nota={
+          [
+            summary.noShowRate === null || summary.noShows === 0
+              ? null
+              : `${Math.round(summary.noShowRate * 100)} % de inasistencia`,
+            summary.cancellations > 0
+              ? `${summary.cancellations} cancelada${summary.cancellations === 1 ? "" : "s"}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
+        }
       />
     </div>
   );

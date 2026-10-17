@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox, Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { formatCOP, formatDuration, formatPhoneCO } from "@/components/ui/format";
 import { STATUS_IDS, STATUS_META } from "@/components/ui/status";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import {
   comboServiceIds,
   composeFrom,
@@ -22,6 +23,7 @@ import type { ConflictReport } from "@/lib/conflict";
 import { crearClienta } from "../clientes/actions";
 import { splitTermino } from "./customer-name";
 import { findCustomers } from "./actions";
+import { ClientContextCard } from "./ClientContextCard";
 
 /**
  * El formulario de la cita: crear, mover, editar.
@@ -44,6 +46,10 @@ import { findCustomers } from "./actions";
  *   pies?" con lo que lo acompaña. Al resolver el par, la cita **es** el combo,
  *   con su precio y su duración propios, y la suma de las dos mitades se muestra
  *   tachada al lado para que el descuento se vea. Ver `lib/combos.ts`.
+ * - **Al elegir la clienta aparece su historial corto** (`ClientContextCard`):
+ *   las últimas citas, si es nueva, si suele faltar, y un botón con el servicio
+ *   que toca —el retoque del sistema que trae puesto, o repetir—. Un toque, nunca
+ *   automático. Ver `lib/service-suggestion.ts`.
  * - **El horario de la profesional se puede ignorar a propósito**, con una
  *   casilla. No tapa nada más: un choque con otra cita o con los puestos sigue
  *   avisando, porque eso no es política de horario sino una silla que no existe.
@@ -244,6 +250,9 @@ export function AppointmentForm({
     });
   };
 
+  /** Lo que el selector ofrece, para que la sugerencia nunca apunte fuera de él. */
+  const bookableIds = useMemo(() => new Set(services.map((s) => s.id)), [services]);
+
   const length = minutesBetweenTimes(draft.startTime, draft.endTime);
   const incomplete = draft.customerId === null || draft.serviceId === null || length <= 0;
 
@@ -278,6 +287,16 @@ export function AppointmentForm({
             customerName: customer?.name ?? null,
           }))
         }
+      />
+
+      {/* Qué se hizo la última vez y qué toca ahora. Al crear y al editar: al
+          reagendar también se pregunta "¿esto era el retoque de qué?". */}
+      <ClientContextCard
+        customerId={draft.customerId}
+        excludeAppointmentId={draft.id}
+        selectedServiceId={draft.serviceId}
+        bookableServiceIds={bookableIds}
+        onPickService={pickService}
       />
 
       <Field label="Servicio" required>
@@ -538,8 +557,17 @@ function CustomerPicker({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Found[]>([]);
   const [creating, setCreating] = useState(false);
+  // El teléfono de la clienta elegida, para el botón de WhatsApp del chip.
+  // Vive acá y no en el borrador de la cita: es solo de pantalla, y al abrir
+  // una cita existente no se conoce — el chip queda sin botón, como antes.
+  const [pickedPhone, setPickedPhone] = useState<string | null>(null);
   const [, startSearch] = useTransition();
   const listId = useId();
+
+  const pick = (customer: Found | null) => {
+    setPickedPhone(customer?.phone ?? null);
+    onPick(customer);
+  };
 
   const trimmed = term.trim();
   // Se **deriva** en vez de guardarse: con la clienta ya elegida, o con menos de
@@ -577,6 +605,7 @@ function CustomerPicker({
         {() => (
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <span style={{ flex: 1, fontWeight: 600 }}>{chosen.name}</span>
+            <WhatsAppLink phone={pickedPhone} customerName={chosen.name} showNumber={false} />
             <Button
               size="sm"
               variant="ghost"
@@ -586,7 +615,7 @@ function CustomerPicker({
                 // volvía al alta —no al buscador— y con los campos vacíos,
                 // porque el término ya se había borrado.
                 setCreating(false);
-                onPick(null);
+                pick(null);
               }}
             >
               Cambiar
@@ -607,7 +636,7 @@ function CustomerPicker({
         {() => (
           <AltaRapida
             termino={trimmed}
-            onCreada={onPick}
+            onCreada={pick}
             onCancelar={() => setCreating(false)}
           />
         )}
@@ -637,7 +666,7 @@ function CustomerPicker({
                     className="ui-list__row"
                     data-interactive="true"
                     style={{ width: "100%", border: 0, background: "none", font: "inherit" }}
-                    onClick={() => onPick(found)}
+                    onClick={() => pick(found)}
                   >
                     <span className="ui-list__body">
                       <span className="ui-list__primary">{found.name}</span>

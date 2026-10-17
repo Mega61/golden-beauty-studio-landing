@@ -30,8 +30,13 @@ import type { WaMessageChannel, WaMessageKind, WaMessageStatus } from "@/db/type
 import { isSendableStatus } from "@/jobs/reminders";
 import { eaDatePart, eaLocalToInstant, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea";
 
-/** La "plantilla" de una fila manual. Versionada: si el texto cambia, sube. */
-export const MANUAL_TEMPLATE = "manual-wa-me-v1";
+/**
+ * La "plantilla" de una fila manual. Versionada: si el texto cambia, sube.
+ *
+ * `v2`: el texto con emojis y el día y la hora en renglones propios. Las filas
+ * viejas siguen diciendo `v1`, que es lo que de verdad se mandó entonces.
+ */
+export const MANUAL_TEMPLATE = "manual-wa-me-v2";
 
 /** La dirección que va en el mensaje. Una sola, escrita una sola vez. */
 export const STUDIO_ADDRESS = "Calle 69 Sur #43a - 41, primer piso, Sabaneta";
@@ -217,32 +222,84 @@ export function presentableFirstName(raw: string | null | undefined): string | n
 }
 
 /**
- * `"2026-10-16 10:00:00"` → `"a las 10:00 a. m."`; la una es `"a la 1:00 p. m."`.
+ * `"2026-10-16 10:00:00"` → `"10:00 a. m."`. La hora sola, para el renglón 🕒.
  *
  * Siempre con minutos (`10:00` y no `10`): en un mensaje que la clienta lee
- * suelto, "10 a. m." se parece demasiado a un número cualquiera. El "a la" de
- * la una no es un detalle: "a las 1" es el error que delata a una plantilla.
+ * suelto, "10 a. m." se parece demasiado a un número cualquiera.
  */
-export function spokenTime(start: EaLocalDateTime): string {
+export function clockTime(start: EaLocalDateTime): string {
   const wall = parseWallClock(start);
   if (wall === null) return "";
   const h12 = wall.hh % 12 === 0 ? 12 : wall.hh % 12;
   const meridiem = wall.hh < 12 ? "a. m." : "p. m.";
-  const article = h12 === 1 ? "a la" : "a las";
-  return `${article} ${h12}:${String(wall.mm).padStart(2, "0")} ${meridiem}`;
+  return `${h12}:${String(wall.mm).padStart(2, "0")} ${meridiem}`;
 }
 
 /**
- * El mensaje. Corto, cálido, sin precio y sin emojis.
+ * `"2026-10-16 10:00:00"` → `"a las 10:00 a. m."`; la una es `"a la 1:00 p. m."`.
+ *
+ * Es la hora dentro de una frase, la que usan las plantillas de Meta. El "a
+ * la" de la una no es un detalle: "a las 1" es el error que delata a una
+ * plantilla.
+ */
+export function spokenTime(start: EaLocalDateTime): string {
+  const clock = clockTime(start);
+  if (clock === "") return "";
+  const article = clock.startsWith("1:") ? "a la" : "a las";
+  return `${article} ${clock}`;
+}
+
+/** `"viernes 16 de octubre"` → `"Viernes 16 de octubre"`, para abrir un renglón. */
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * El cuerpo común a los dos mensajes: qué, cuándo, dónde, y cómo cambiarla.
+ *
+ * **Un dato por renglón, con su emoji adelante.** La clienta lo lee en la
+ * vista previa de la notificación o de un vistazo antes de salir: el día y la
+ * hora tienen que encontrarse sin leer la frase entera. Por eso van solos y
+ * no metidos en una oración, y por eso son pocos emojis —uno por renglón y el
+ * saludo—: más que eso se lee como publicidad, y esto es un aviso.
  *
  * **Nunca lleva precio**: el precio de la reserva no es necesariamente el que
  * se cobra (adicionales, promos que se aplican al pagar), y un número en el
- * recordatorio es un número que la clienta va a reclamar en caja.
+ * mensaje es un número que la clienta va a reclamar en caja.
+ */
+function composeMessage(input: {
+  customerFirstName: string | null;
+  headline: string;
+  dateLine: string;
+  start: EaLocalDateTime;
+}): string {
+  const name = presentableFirstName(input.customerFirstName);
+  const greeting = name === null ? "¡Hola! ✨" : `¡Hola, ${name}! ✨`;
+
+  return [
+    greeting,
+    "",
+    `${input.headline} 💅`,
+    `📅 ${input.dateLine}`,
+    `🕒 ${clockTime(input.start)}`,
+    `📍 Golden Beauty Studio — ${STUDIO_ADDRESS}`,
+    "",
+    "Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍",
+  ].join("\n");
+}
+
+/** `" de Semipermanente manos"`, o nada si la cita no tiene servicio. */
+function serviceSuffix(serviceName: string | null): string {
+  return serviceName?.trim() ? ` de ${serviceName.trim()}` : "";
+}
+
+/**
+ * El recordatorio.
  *
- * El día va explícito en mañana ("mañana viernes 16 de octubre") porque el
- * mensaje se lee horas después de mandado, a veces pasada la medianoche, y
- * "mañana" a secas deja de ser cierto. Hoy no lo necesita: el aviso de hoy se
- * lee hoy.
+ * **El día va siempre con su fecha, también hoy** ("Hoy, viernes 16 de
+ * octubre"). El mensaje se lee horas después de mandado, a veces pasada la
+ * medianoche, y "mañana" o "hoy" a secas dejan de ser ciertos; la fecha es lo
+ * que la clienta puede comprobar sin preguntar.
  */
 export function buildReminderText(input: {
   customerFirstName: string | null;
@@ -250,24 +307,13 @@ export function buildReminderText(input: {
   start: EaLocalDateTime;
   day: ManualReminderDay;
 }): string {
-  const name = presentableFirstName(input.customerFirstName);
-  const greeting = name === null ? "¡Hola!" : `¡Hola, ${name}!`;
-
-  const service = input.serviceName?.trim() ? ` de ${input.serviceName.trim()}` : "";
-  const when =
-    input.day === "hoy" ? "hoy" : `mañana ${formatDateLong(input.start)}`;
-
-  // La hora termina en "a. m." / "p. m.": ese punto ya cierra la frase, y
-  // agregarle otro deja un ".." que se ve como un error de tipeo.
-  const first = `${greeting} Te recordamos tu cita${service} ${when} ${spokenTime(input.start)}`;
-
-  return [
-    first.endsWith(".") ? first : `${first}.`,
-    "",
-    `Te esperamos en Golden Beauty Studio: ${STUDIO_ADDRESS}.`,
-    "",
-    "Si necesitas cambiarla, respóndenos por aquí.",
-  ].join("\n");
+  const relative = input.day === "hoy" ? "Hoy" : "Mañana";
+  return composeMessage({
+    customerFirstName: input.customerFirstName,
+    headline: `Te recordamos tu cita${serviceSuffix(input.serviceName)}`,
+    dateLine: `${relative}, ${formatDateLong(input.start)}`,
+    start: input.start,
+  });
 }
 
 /**
@@ -276,25 +322,20 @@ export function buildReminderText(input: {
  * Lo manda la dueña o recepción con un toque desde el aviso del celular
  * ("Escribirle por WhatsApp"): la clienta recibe la confirmación por el chat
  * del estudio, que es por donde va a escribir si necesita cambiarla. Mismas
- * reglas que el recordatorio: nombre presentable, hora hablada, sin precio.
+ * reglas y misma forma que el recordatorio, para que los dos se reconozcan
+ * como del mismo estudio.
  */
 export function buildConfirmationText(input: {
   customerFirstName: string | null;
   serviceName: string | null;
   start: EaLocalDateTime;
 }): string {
-  const name = presentableFirstName(input.customerFirstName);
-  const greeting = name === null ? "¡Hola!" : `¡Hola, ${name}!`;
-  const service = input.serviceName?.trim() ? ` de ${input.serviceName.trim()}` : "";
-  const first = `${greeting} ✨ Tu cita${service} quedó confirmada para el ${formatDateLong(input.start)} ${spokenTime(input.start)}`;
-
-  return [
-    first.endsWith(".") ? first : `${first}.`,
-    "",
-    `Te esperamos en Golden Beauty Studio: ${STUDIO_ADDRESS}.`,
-    "",
-    "Si necesitas cambiarla, respóndenos por aquí.",
-  ].join("\n");
+  return composeMessage({
+    customerFirstName: input.customerFirstName,
+    headline: `Tu cita${serviceSuffix(input.serviceName)} quedó confirmada`,
+    dateLine: capitalize(formatDateLong(input.start)),
+    start: input.start,
+  });
 }
 
 // ── El enlace ───────────────────────────────────────────────────────────────
@@ -309,13 +350,19 @@ export function buildConfirmationText(input: {
 const E164_RE = /^\+[1-9]\d{6,14}$/;
 
 /**
- * `https://wa.me/573001234567?text=…`, o `null` si el número no es E.164.
+ * `https://api.whatsapp.com/send?phone=573001234567&text=…`, o `null` si el
+ * número no es E.164.
  *
- * `wa.me` quiere los dígitos **sin** el `+`, y el texto codificado entero: el
- * `#` de la dirección sin codificar cortaría el mensaje ahí, porque el
- * navegador lo toma como el inicio del fragmento.
+ * **No `wa.me`**: cuando el enlace se abre en el navegador en vez de saltar
+ * directo a la app, la redirección de `wa.me` cambia cada emoji del mensaje
+ * por "�" (verificado 2026-10-16, móvil y escritorio). `api.whatsapp.com/send`
+ * los conserva y en el celular abre la app igual.
+ *
+ * Los dígitos van **sin** el `+`, y el texto codificado entero: el `#` sin
+ * codificar cortaría el mensaje ahí, porque el navegador lo toma como el
+ * inicio del fragmento.
  */
 export function waMeLink(phoneE164: string, text: string): string | null {
   if (!E164_RE.test(phoneE164)) return null;
-  return `https://wa.me/${phoneE164.slice(1)}?text=${encodeURIComponent(text)}`;
+  return `https://api.whatsapp.com/send?phone=${phoneE164.slice(1)}&text=${encodeURIComponent(text)}`;
 }

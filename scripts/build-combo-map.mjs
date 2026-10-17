@@ -6,6 +6,8 @@
 //   - admin/src/data/service-names.ts — the client-facing Spanish name of every
 //     price-list item and the label of every category (from es.json). It is the
 //     name `scripts/catalogo.js` gives each service it creates in EA.
+//   - admin/src/data/promo-rules.ts — src/data/promo-rules.ts verbatim, so the
+//     panel applies the same promo numbers the posters advertise.
 //   - admin/src/data/showcase-pricing.ts — the text of src/data/pricing.ts
 //     itself, verbatim, so the panel's own parser (`pricing-parse.ts`) reads the
 //     same bytes in the container that it reads from the repo in development.
@@ -54,6 +56,8 @@ const ES_JSON = path.join(ROOT, "src", "app", "[lang]", "dictionaries", "es.json
 const OUT = path.join(ROOT, "admin", "src", "data", "combo-composition.ts");
 const NAMES_OUT = path.join(ROOT, "admin", "src", "data", "service-names.ts");
 const SHOWCASE_OUT = path.join(ROOT, "admin", "src", "data", "showcase-pricing.ts");
+const PROMO_RULES_TS = path.join(ROOT, "src", "data", "promo-rules.ts");
+const PROMO_RULES_OUT = path.join(ROOT, "admin", "src", "data", "promo-rules.ts");
 
 const CHECK = process.argv.includes("--check");
 
@@ -263,6 +267,17 @@ export const SHOWCASE_PRICING_SOURCE: string = ${JSON.stringify(source)};
 `;
 }
 
+function renderPromoRules(source) {
+  if (/^\s*import\s/m.test(source)) {
+    throw new Error("src/data/promo-rules.ts no puede importar nada: se copia tal cual al panel.");
+  }
+  return `// GENERADO POR \`npm run build-combo-map\` EN LA LANDING. No editar a mano:
+// es el texto de \`src/data/promo-rules.ts\`, copiado tal cual, y CI falla si
+// quedó desactualizado.
+
+${source}`;
+}
+
 /** Writes `next` to `file`, or under `--check` reports whether it is stale. */
 async function emit(file, next, label) {
   const current = await fs.readFile(file, "utf8").catch(() => null);
@@ -347,6 +362,11 @@ async function main() {
     await emit(OUT, render(entries), `${entries.length} combos`),
     await emit(NAMES_OUT, renderNames(names), `${names.names.length} nombres`),
     await emit(SHOWCASE_OUT, renderShowcase(source), "copia de pricing.ts"),
+    await emit(
+      PROMO_RULES_OUT,
+      renderPromoRules(await fs.readFile(PROMO_RULES_TS, "utf8")),
+      "reglas de promos",
+    ),
   ];
   if (results.includes(false)) process.exit(1);
 }

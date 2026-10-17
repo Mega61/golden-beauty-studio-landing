@@ -29,6 +29,8 @@ import type { Appointment, EaLocalDateTime } from "@/lib/ea";
 import { compareEaLocal, parseEaLocalDateTime } from "@/lib/ea";
 import type { LegacyAppointment, PaymentMethod } from "@/db/types";
 
+import { attendanceOutcome, noShowRate } from "@/lib/attendance";
+
 import { eaStatusToken } from "./ea-status";
 
 /** De qué mitad de la historia salió este renglón. */
@@ -48,8 +50,20 @@ export type HistoryEntry = {
   source: HistorySource;
   /** Hora de pared. La única forma comparable entre las dos mitades. */
   start: EaLocalDateTime;
-  /** Lo que se prestó, con el nombre que tenga en cada mitad. */
+  /**
+   * Lo que se prestó, con el nombre que tenga en cada mitad. En EA es el
+   * servicio **realizado** cuando la cuenta se cerró, y el agendado si no: lo
+   * agendado no es lo realizado, y "¿qué se hizo la última vez?" pregunta por
+   * lo segundo.
+   */
   serviceName: string;
+  /**
+   * El id de EA de ese mismo servicio (realizado, o agendado sin cuenta).
+   * `null` en el historial de Agenda Pro, que solo trae el nombre en texto.
+   * Lo usa la sugerencia del formulario de cita para no tener que adivinar por
+   * nombre lo que EA ya sabe.
+   */
+  serviceId: number | null;
   providerName: string | null;
   /** El `status` tal cual lo guarda su origen. Se muestra sin traducir. */
   rawStatus: string | null;
@@ -93,6 +107,12 @@ export type HistorySummary = {
   visits: number;
   cancellations: number;
   noShows: number;
+  /**
+   * `noShows ÷ (visitas + noShows)`: de las citas que tenía que cumplir, a
+   * cuántas faltó. Las canceladas y las que nadie marcó no entran. `null` sin
+   * ninguna.
+   */
+  noShowRate: number | null;
   /** Suma de lo cobrado en las visitas con monto conocido, sin cortesías. */
   totalSpent: number;
   /**
@@ -120,7 +140,13 @@ export type UnifiedHistory = {
  */
 export type EaHistoryInput = {
   appointment: Appointment;
+  /** El nombre del servicio realizado si lo hay; si no, el del agendado. */
   serviceName: string | null;
+  /**
+   * `appointment_finance.performed_service_id`: lo que se hizo de verdad al
+   * cerrar la cuenta. Ausente o `null` = no hay cuenta, vale lo agendado.
+   */
+  performedServiceId?: number | null;
   providerName: string | null;
   /** `appointment_finance.amount_charged`, o `null` si la cuenta no se cerró. */
   amountCharged: number | null;
@@ -144,15 +170,23 @@ export function legacyStartToWallClock(value: Date): EaLocalDateTime {
 /**
  * El desenlace de una cita de EA.
  *
- * Solo `completada` cuenta como atendida. Una cita `confirmada` de la semana que
- * viene todavía no es una visita, y contarla inflaría el historial de la
- * clienta con algo que no pasó.
+ * Atendida es `completada` **o con la cuenta cerrada** (`amountCharged` no
+ * nulo, cortesías incluidas: cobran cero, no `null`). Hasta el 2026-10-16
+ * cerrar la cuenta no marcaba nada en EA, y sin esto esas visitas salían como
+ * "desconocido". La regla es la de la inasistencia de Reportes,
+ * `attendanceOutcome()`, para que la ficha y el reporte no discutan.
+ *
+ * Una cita `confirmada` de la semana que viene todavía no es una visita, y
+ * contarla inflaría el historial de la clienta con algo que no pasó.
  */
-function eaOutcome(rawStatus: string): HistoryOutcome {
-  const token = eaStatusToken(rawStatus);
-  if (token === "completada") return "atendida";
-  if (token === "cancelada") return "cancelada";
-  if (token === "no-asistio") return "no-asistio";
+function eaOutcome(rawStatus: string, amountCharged: number | null): HistoryOutcome {
+  const outcome = attendanceOutcome(eaStatusToken(rawStatus), {
+    closed: amountCharged !== null,
+    started: true,
+  });
+  if (outcome === "asistio") return "atendida";
+  if (outcome === "cancelada") return "cancelada";
+  if (outcome === "no-asistio") return "no-asistio";
   return "desconocido";
 }
 
@@ -210,9 +244,10 @@ export function buildUnifiedHistory(
       source: "ea",
       start: row.appointment.start,
       serviceName: row.serviceName?.trim() || "Servicio sin nombre",
+      serviceId: row.performedServiceId ?? row.appointment.serviceId ?? null,
       providerName: row.providerName?.trim() || null,
       rawStatus,
-      outcome: eaOutcome(rawStatus),
+      outcome: eaOutcome(rawStatus, row.amountCharged),
       amountCharged: row.amountCharged,
       paymentMethods: [],
       courtesy: false,
@@ -226,6 +261,7 @@ export function buildUnifiedHistory(
       source: "legacy",
       start: legacyStartToWallClock(row.started_at),
       serviceName: row.service_name.trim() || "Servicio sin nombre",
+      serviceId: null,
       providerName: row.provider_name?.trim() || null,
       rawStatus: row.status,
       outcome: legacyOutcome(row.status),
@@ -278,9 +314,40 @@ function summarize(entries: readonly HistoryEntry[]): HistorySummary {
     visits,
     cancellations,
     noShows,
+    noShowRate: noShowRate(noShows, visits),
     totalSpent,
     totalIsPartial,
     firstVisit,
     lastVisit,
   };
+}
+
+/**
+ * ¿La clienta llegó alguna vez antes de `asOf`? Lo contrario es **primera
+ * visita**, la que lleva el 10% (`lib/promos.ts`).
+ *
+ * Cuenta como visita lo atendido, igual que `summarize()`, **más** una cita de
+ * EA con la cuenta cerrada (`amountCharged !== null`) aunque su estado no diga
+ * Completada: hasta el 2026-10-16 cerrar la cuenta no marcaba la cita en EA, y
+ * esas clientas sí estuvieron en la silla. Una inasistencia o una cancelación
+ * no cuentan: quien reservó y no llegó sigue siendo nueva.
+ *
+ * Solo decide un sí/no. Ningún monto del historial de Agenda Pro sale de acá
+ * hacia la cuenta, que es lo que protege `legacy-history.money-paths.test.ts`.
+ */
+export function hasVisitedBefore(entries: readonly HistoryEntry[], asOf: EaLocalDateTime): boolean {
+  return entries.some((entry) => entry.start < asOf && countsAsVisit(entry));
+}
+
+/**
+ * ¿Este renglón es una vez que la clienta se sentó en la silla? El criterio de
+ * `hasVisitedBefore()`, suelto para que "su última visita" del formulario de
+ * cita cuente igual que el 10% de primera visita: si uno dice "nueva" y el otro
+ * muestra una visita, alguien deja de creerle a los dos.
+ */
+export function countsAsVisit(entry: HistoryEntry): boolean {
+  return (
+    entry.outcome === "atendida" ||
+    (entry.source === "ea" && entry.amountCharged !== null && entry.outcome === "desconocido")
+  );
 }

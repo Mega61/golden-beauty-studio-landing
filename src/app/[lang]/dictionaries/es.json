@@ -259,7 +259,7 @@
       "with": "Con",
       "anyone": "Quien esté disponible",
       "total": "Total",
-      "pay": "Pagas en el estudio, en efectivo o por transferencia. Si aplica una promo, el descuento se hace al pagar."
+      "pay": "Pagas en el estudio, en efectivo o por transferencia. Si aplica una promo, ya está descontada en el total."
     },
     "continue": "Continuar",
     "back": "Atrás",
@@ -291,6 +291,22 @@
     "nextOpen": "Ver el siguiente día",
     "loadingSlots": "Buscando horas…",
     "pickDate": "Elige un día",
+    "promo": {
+      "labels": {
+        "sabado-press": "Sábado de Press",
+        "miercoles-pies": "Miércoles de pies",
+        "primera-visita": "{percent}% primera visita"
+      },
+      "chip": "{day} {price}",
+      "chipLabel": "Precio de promo cada {day}: {price}",
+      "dayHint": "{label}: pagas {price} en vez de {was}.",
+      "dayMark": "día de promo",
+      "firstVisit": "¡Es tu primera visita! {percent}% de descuento",
+      "firstVisitLoses": "Es tu primera visita, pero las promos no se acumulan: te dejamos la que más te ahorra.",
+      "checking": "Revisando tus descuentos…",
+      "payAtStudio": "Se paga en el estudio.",
+      "applied": "Promo: {label}"
+    },
     "combo": {
       "askFeet": "¿También pies?",
       "askHands": "¿También manos?",

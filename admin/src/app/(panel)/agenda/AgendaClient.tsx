@@ -27,13 +27,16 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Panel, PanelInline } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { formatDateLong, formatPhoneCO, formatTimeRange } from "@/components/ui/format";
+import { formatDateLong, formatTimeRange } from "@/components/ui/format";
 import { useToast } from "@/components/ui/Toast";
+import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import { buildDayGrid, type DayGrid } from "@/lib/calendar-layout";
 import type { ConflictReport } from "@/lib/conflict";
 import { addMinutes, eaDatePart, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea/datetime";
 import type { Appointment } from "@/lib/ea/types";
 import { cancelAppointment, saveAppointment, saveBlock } from "./actions";
+import { AttendanceControl } from "../hoy/AttendanceControl";
+import { mapEaStatus } from "@/components/calendar/status-map";
 import { AppointmentForm, type AppointmentDraft } from "./AppointmentForm";
 import { BlockForm } from "./BlockForm";
 import type { BlockForm as BlockFormValues } from "./block-resource";
@@ -523,6 +526,13 @@ export function AgendaClient({
           setPanel({ kind: "form", draft: draftFrom(panel.appointment, data.meta) });
         }}
         onCancelAppointment={() => doCancel(panel.appointment)}
+        onAttendance={(status) => {
+          // EA ya lo aceptó: la grilla y el panel se ponen al día sin esperar
+          // al sondeo de 30 s.
+          applyLocal(panel.appointment.id, { status });
+          setPanel({ kind: "detail", appointment: { ...panel.appointment, status } });
+          void refresh();
+        }}
       />
     ) : null;
 
@@ -805,6 +815,7 @@ function AppointmentDetail({
   onMove,
   onEdit,
   onCancelAppointment,
+  onAttendance,
 }: {
   appointment: Appointment;
   meta: AgendaData["meta"];
@@ -813,6 +824,7 @@ function AppointmentDetail({
   onMove: () => void;
   onEdit: () => void;
   onCancelAppointment: () => void;
+  onAttendance: (eaStatus: string) => void;
 }) {
   const info = meta[appointment.id];
 
@@ -826,7 +838,9 @@ function AppointmentDetail({
           <>
             <span className={styles.detailKey}>Teléfono</span>
             <span className={styles.detailValue}>
-              <a href={`tel:${info.phone}`}>{formatPhoneCO(info.phone)}</a>
+              {/* El teléfono de EA llega como lo tecleó alguien: el componente
+                  lo normaliza antes de armar el `wa.me` y el `tel:`. */}
+              <WhatsAppLink phone={info.phone} customerName={info.customer} withCall />
             </span>
           </>
         ) : null}
@@ -841,7 +855,7 @@ function AppointmentDetail({
 
         <span className={styles.detailKey}>Estado</span>
         <span className={styles.detailValue}>
-          <StatusPill status={appointment.status} size="sm" />
+          <StatusPill status={mapEaStatus(appointment.status)} size="sm" />
         </span>
 
         {appointment.notes ? (
@@ -851,6 +865,17 @@ function AppointmentDetail({
           </>
         ) : null}
       </div>
+
+      {/* La agenda no lee la plata: `closed` desconocido. Si la cuenta está
+          cerrada, la acción lo sabe y no deja deshacer ni acusar. */}
+      <AttendanceControl
+        eaAppointmentId={appointment.id}
+        start={appointment.start}
+        status={appointment.status}
+        closed={null}
+        readOnly={readOnly}
+        onMarked={({ eaStatus }) => onAttendance(eaStatus)}
+      />
 
       {!readOnly ? (
         <div className={styles.formRow}>
@@ -888,7 +913,7 @@ function LegacyDetail({ item }: { item: LegacyAgendaItem }) {
           <>
             <span className={styles.detailKey}>Teléfono</span>
             <span className={styles.detailValue}>
-              <a href={`tel:${item.phone}`}>{formatPhoneCO(item.phone)}</a>
+              <WhatsAppLink phone={item.phone} customerName={item.clientName} withCall />
             </span>
           </>
         ) : null}

@@ -761,7 +761,11 @@ se parte en encabezado + ítems:
 - **La cita de EA no se reescribe.** EA guarda la *reserva*; el panel guarda la *entrega*. Cambiarle
   `id_services` a la cita dispararía la notificación de "tu cita cambió" a la clienta y reescribiría el
   evento de Google por algo que ya pasó. La agenda del panel muestra el servicio realizado con una
-  marca de "cambió" una vez cerrada la cuenta.
+  marca de "cambió" una vez cerrada la cuenta. **La excepción es el estado** (2026-10-16): al cerrar,
+  la cita pasa a `Completada` con un `PUT` que lleva solo `{ status }` —`api_decode()` de EA mezcla
+  sobre la fila guardada—, porque historia, clienta nueva e inasistencia leen el estado de EA y sin
+  eso toda cita cobrada seguía "Reservada". Ver `lib/attendance.ts` y los botones "Llegó" /
+  "No asistió" de Hoy y la agenda.
 - **Precio congelado por renglón.** El servicio agendado ya tenía su snapshot desde el webhook; el
   servicio realizado y los adicionales se congelan al cerrar la cuenta — mismo día, así que no hay
   deriva posible. Cada renglón guarda el precio de lista que se usó, no solo el total.
@@ -770,6 +774,28 @@ se parte en encabezado + ítems:
   `manual` existe para lo que no está en el catálogo, y exige nota.
 - **Invariante:** `Σ line_total − discount == amount_charged`. La propina va aparte y **nunca** entra a
   la base de comisión ni al ingreso del estudio. Vive en `lib/ticket.ts`, función pura, testeada.
+
+### Promos y segundo servicio al cerrar (2026-10-16)
+
+- **Las promos de la dueña se aplican al cerrar**, no al reservar (EA cobra la lista): miércoles de
+  pies, sábado de press-on y 10 % de primera visita, con las reglas de `lib/promos.ts`. No se
+  acumulan —gana la mayor, empate → la del día—; el 10 % es solo sobre servicios; un combo no lleva
+  la del día. La hoja la muestra como su propio renglón ("Promo · Miércoles de pies −$15.000"), se
+  recalcula al cambiar el servicio y se puede quitar. **El navegador no manda montos**: solo
+  `applyPromo` y `firstVisit`; `resolveDiscount()` (`components/ticket/draft.ts`) pone el descuento
+  con el catálogo del servidor y el día de la cita según EA. Se guarda en `discount` con
+  `variance_reason_code = 'promo'` (migración `027`) y la promo en `variance_reason`. Base de comisión:
+  lo cobrado, como cualquier descuento.
+- **Total escrito y cortesía.** Un total escrito igual al de la promo es la promo; distinto, es una
+  variación de la técnica con su motivo, y la promo no se suma debajo. La cortesía de la casa ignora
+  la promo.
+- **Primera visita.** La pregunta se contesta en `hoy/first-visit.ts` con el historial unificado, al
+  abrir la hoja; a la cuenta solo cruza un sí/no. Si el historial no se pudo leer entero no se marca
+  sola, y si la técnica la marca a mano el servidor la respeta (ya cobró con eso) y lo deja anotado en
+  `variance_reason` y en la bitácora.
+- **Otro servicio.** Un par sin combo publicado (rubber + pies) se cobra como dos renglones `servicio`,
+  el agregado a su lista de hoy; comisiona como el principal. Si el par es un combo, la hoja ofrece
+  cobrarlo como el combo.
 
 ### Independencia con rastro, no vigilancia
 
@@ -1159,6 +1185,19 @@ contenedor `admin`, que es el único que tiene la agenda, el scheduler y la base
 - **Qué se manda, y nada más:** confirmación al reservar desde la landing, recordatorio la tarde
   anterior, y aviso de cancelación. Promociones no — eso es categoría `marketing`, otra tarifa y otra
   conversación con el equipo.
+- **El texto manual y el de Meta son dos textos distintos, a propósito.** El de `wa.me`
+  (`buildReminderText` / `buildConfirmationText` en `lib/whatsapp/manual-reminder.ts`, plantilla
+  `manual-wa-me-v2`) lleva emojis y el día, la fecha y la hora en renglones propios —también "Hoy,
+  viernes 16 de octubre", no "hoy" a secas—. Las plantillas de la Cloud API
+  (`lib/whatsapp/template-params.ts`) siguen sobrias: tienen que coincidir letra por letra con lo
+  aprobado en Meta, y ponerles emojis exige cambiar las dos cosas a la vez y volver a pasar la
+  revisión. Ninguno de los dos lleva precio.
+- **Cada vista que muestra a una clienta trae su botón de WhatsApp** (`components/ui/WhatsAppLink`,
+  con la lógica pura en `phone-links.ts`): agenda (cita de EA y de Agenda Pro), el chip de la clienta
+  elegida en el formulario de cita, Clientes, la ficha y las tarjetas de Hoy. Normaliza el teléfono
+  con `normalizePhoneE164` antes de armar el `wa.me` o el `tel:` y, si no se puede, muestra el texto
+  sin enlace. Abre el chat solo con el saludo ("¡Hola, Laura! ✨"); no registra nada en `wa_message`,
+  porque no es un aviso.
 
 Fuera de esto, WhatsApp queda disponible para dos cosas que el plan ya menciona y que no se construyen
 todavía: el código de recuperación de acceso de una técnica que perdió el celular, y el winback que hoy
