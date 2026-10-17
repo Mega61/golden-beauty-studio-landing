@@ -47,13 +47,13 @@ export function fail(reason: GuardReason, status: number, extra?: Record<string,
 const hits = new Map<string, number[]>();
 
 /**
- * One counter **per route**, not per IP. The three routes used to share one,
+ * One counter **per route**, not per IP. The routes used to share one,
  * each checking it against its own cap — so a client who loaded the catalog
  * and looked at four days had spent the confirm route's five before pressing
  * "Confirmar", and her booking came back 429. The bucket is what keeps reads
  * from spending the write's allowance.
  */
-export type RateBucket = "catalogo" | "disponibilidad" | "reservar";
+export type RateBucket = "catalogo" | "disponibilidad" | "reservar" | "cotizar";
 
 export function rateLimited(ip: string, max: number, bucket: RateBucket): boolean {
   const now = Date.now();
