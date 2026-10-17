@@ -74,13 +74,13 @@ describe("linkFor", () => {
   it("pendiente: al número de la ficha, con el texto del día", () => {
     const link = linkFor(row(), null) as string;
     const url = new URL(link);
-    expect(url.pathname).toBe("/573001234567");
+    expect(url.searchParams.get("phone")).toBe("573001234567");
     expect(url.searchParams.get("text")).toContain("Mañana, viernes 16 de octubre");
   });
 
   it("recordada: al número al que se mandó, no al de la ficha de hoy", () => {
     const link = linkFor(row({ state: "recordada" }), "+573110000000") as string;
-    expect(new URL(link).pathname).toBe("/573110000000");
+    expect(new URL(link).searchParams.get("phone")).toBe("573110000000");
   });
 
   it("sin enlace en los demás estados, aunque haya número", () => {
@@ -97,7 +97,7 @@ describe("linkFor", () => {
 describe("fallo del envío automático", () => {
   it("tiene enlace de wa.me al número de la ficha, para mandarlo a mano", () => {
     const link = linkFor(row({ state: "fallo-automatico" }), null) as string;
-    expect(new URL(link).pathname).toBe("/573001234567");
+    expect(new URL(link).searchParams.get("phone")).toBe("573001234567");
   });
 });
 

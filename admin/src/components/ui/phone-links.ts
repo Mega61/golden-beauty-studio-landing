@@ -27,7 +27,7 @@ export type PhoneLinks = {
   e164: string;
   /** `"+57 300 123 4567"`, para la pantalla. */
   display: string;
-  /** `https://wa.me/573001234567?text=…`, con el saludo ya escrito. */
+  /** `https://api.whatsapp.com/send?phone=573001234567&text=…`, con el saludo ya escrito. */
   whatsapp: string;
   /** `tel:+573001234567`: con indicativo, para que marque igual desde cualquier celular. */
   tel: string;

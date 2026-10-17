@@ -350,13 +350,19 @@ export function buildConfirmationText(input: {
 const E164_RE = /^\+[1-9]\d{6,14}$/;
 
 /**
- * `https://wa.me/573001234567?text=…`, o `null` si el número no es E.164.
+ * `https://api.whatsapp.com/send?phone=573001234567&text=…`, o `null` si el
+ * número no es E.164.
  *
- * `wa.me` quiere los dígitos **sin** el `+`, y el texto codificado entero: el
- * `#` de la dirección sin codificar cortaría el mensaje ahí, porque el
- * navegador lo toma como el inicio del fragmento.
+ * **No `wa.me`**: cuando el enlace se abre en el navegador en vez de saltar
+ * directo a la app, la redirección de `wa.me` cambia cada emoji del mensaje
+ * por "�" (verificado 2026-10-16, móvil y escritorio). `api.whatsapp.com/send`
+ * los conserva y en el celular abre la app igual.
+ *
+ * Los dígitos van **sin** el `+`, y el texto codificado entero: el `#` sin
+ * codificar cortaría el mensaje ahí, porque el navegador lo toma como el
+ * inicio del fragmento.
  */
 export function waMeLink(phoneE164: string, text: string): string | null {
   if (!E164_RE.test(phoneE164)) return null;
-  return `https://wa.me/${phoneE164.slice(1)}?text=${encodeURIComponent(text)}`;
+  return `https://api.whatsapp.com/send?phone=${phoneE164.slice(1)}&text=${encodeURIComponent(text)}`;
 }

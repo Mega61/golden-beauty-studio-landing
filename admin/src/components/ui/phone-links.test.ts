@@ -24,9 +24,9 @@ describe("phoneLinks", () => {
     expect(links?.tel).toBe("tel:+573001234567");
 
     const url = new URL(links?.whatsapp as string);
-    expect(url.host).toBe("wa.me");
-    // wa.me quiere los dígitos sin el +.
-    expect(url.pathname).toBe("/573001234567");
+    expect(url.host).toBe("api.whatsapp.com");
+    // Los dígitos van sin el +.
+    expect(url.searchParams.get("phone")).toBe("573001234567");
     expect(url.searchParams.get("text")).toBe("¡Hola, Laura! ✨");
   });
 
@@ -37,7 +37,7 @@ describe("phoneLinks", () => {
     ["0057 3001234567", "/573001234567"],
     ["+1 305 555 0123", "/13055550123"],
   ])("%j → wa.me%s", (raw, path) => {
-    expect(new URL(phoneLinks(raw)?.whatsapp as string).pathname).toBe(path);
+    expect(new URL(phoneLinks(raw)?.whatsapp as string).searchParams.get("phone")).toBe(path.slice(1));
   });
 
   it("un número de otro país se pinta tal cual, sin forzarle el formato colombiano", () => {

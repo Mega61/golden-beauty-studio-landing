@@ -431,7 +431,7 @@ describe("waMeLink", () => {
   it("los dígitos sin el +, y el texto codificado entero", () => {
     const link = waMeLink("+573001234567", "Hola, Ana!\nCalle 69 Sur #43a - 41 & más?");
     expect(link).toBe(
-      "https://wa.me/573001234567?text=Hola%2C%20Ana!%0ACalle%2069%20Sur%20%2343a%20-%2041%20%26%20m%C3%A1s%3F",
+      "https://api.whatsapp.com/send?phone=573001234567&text=Hola%2C%20Ana!%0ACalle%2069%20Sur%20%2343a%20-%2041%20%26%20m%C3%A1s%3F",
     );
   });
 
@@ -445,13 +445,13 @@ describe("waMeLink", () => {
     const link = waMeLink("+573001234567", text) as string;
     const url = new URL(link);
     expect(url.hash).toBe("");
-    expect(url.host).toBe("wa.me");
-    expect(url.pathname).toBe("/573001234567");
+    expect(url.host).toBe("api.whatsapp.com");
+    expect(url.searchParams.get("phone")).toBe("573001234567");
     expect(url.searchParams.get("text")).toBe(text);
   });
 
   it("funciona con números de otros países", () => {
-    expect(waMeLink("+14155550123", "x")).toBe("https://wa.me/14155550123?text=x");
+    expect(waMeLink("+14155550123", "x")).toBe("https://api.whatsapp.com/send?phone=14155550123&text=x");
   });
 
   it.each([
