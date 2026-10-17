@@ -23,6 +23,7 @@ import type { ConflictReport } from "@/lib/conflict";
 import { crearClienta } from "../clientes/actions";
 import { splitTermino } from "./customer-name";
 import { findCustomers } from "./actions";
+import { ClientContextCard } from "./ClientContextCard";
 
 /**
  * El formulario de la cita: crear, mover, editar.
@@ -45,6 +46,10 @@ import { findCustomers } from "./actions";
  *   pies?" con lo que lo acompaña. Al resolver el par, la cita **es** el combo,
  *   con su precio y su duración propios, y la suma de las dos mitades se muestra
  *   tachada al lado para que el descuento se vea. Ver `lib/combos.ts`.
+ * - **Al elegir la clienta aparece su historial corto** (`ClientContextCard`):
+ *   las últimas citas, si es nueva, si suele faltar, y un botón con el servicio
+ *   que toca —el retoque del sistema que trae puesto, o repetir—. Un toque, nunca
+ *   automático. Ver `lib/service-suggestion.ts`.
  * - **El horario de la profesional se puede ignorar a propósito**, con una
  *   casilla. No tapa nada más: un choque con otra cita o con los puestos sigue
  *   avisando, porque eso no es política de horario sino una silla que no existe.
@@ -245,6 +250,9 @@ export function AppointmentForm({
     });
   };
 
+  /** Lo que el selector ofrece, para que la sugerencia nunca apunte fuera de él. */
+  const bookableIds = useMemo(() => new Set(services.map((s) => s.id)), [services]);
+
   const length = minutesBetweenTimes(draft.startTime, draft.endTime);
   const incomplete = draft.customerId === null || draft.serviceId === null || length <= 0;
 
@@ -279,6 +287,16 @@ export function AppointmentForm({
             customerName: customer?.name ?? null,
           }))
         }
+      />
+
+      {/* Qué se hizo la última vez y qué toca ahora. Al crear y al editar: al
+          reagendar también se pregunta "¿esto era el retoque de qué?". */}
+      <ClientContextCard
+        customerId={draft.customerId}
+        excludeAppointmentId={draft.id}
+        selectedServiceId={draft.serviceId}
+        bookableServiceIds={bookableIds}
+        onPickService={pickService}
       />
 
       <Field label="Servicio" required>
