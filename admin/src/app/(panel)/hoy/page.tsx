@@ -4,7 +4,9 @@ import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import Link from "next/link";
 
-import { Icon, formatDateLong } from "@/components/ui";
+import { Icon, formatDateLong, formatTime } from "@/components/ui";
+import { unmarkedAppointments } from "@/lib/attendance";
+import { instantToEaLocal } from "@/lib/ea";
 import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
 import { cerrarCuenta } from "./actions";
@@ -75,6 +77,21 @@ export default async function HoyPage() {
   const eaCaido = problems.find((p) => p.source === "ea") ?? null;
   const dbCaida = problems.find((p) => p.source === "db") ?? null;
 
+  // Las citas que ya terminaron sin cuenta y sin marca. Es el recordatorio de
+  // fin de jornada: la inasistencia solo se puede medir sobre lo que alguien
+  // marcó, y lo que nadie marcó queda fuera de la tasa (`lib/attendance.ts`).
+  // Sin EA no hay estados que leer, así que no se dice nada.
+  const sinMarcar =
+    eaCaido === null
+      ? unmarkedAppointments(
+          appointments.map((appointment) => ({
+            ...appointment,
+            closed: appointment.finance.closedAt !== null,
+          })),
+          instantToEaLocal(new Date()),
+        )
+      : [];
+
   return (
     <AppShell
       role={shellRole(session.role)}
@@ -139,6 +156,35 @@ export default async function HoyPage() {
                   : `Recordatorios: ${pendingReminders} pendientes`}
           </Link>
         ) : null}
+
+        {sinMarcar.length === 0 ? null : (
+          <div
+            role="status"
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-warn-tint)",
+              border: "1px solid var(--color-warn-line)",
+              color: "var(--color-warn-ink)",
+            }}
+          >
+            <Icon name="reloj" size={18} style={{ flex: "none", marginTop: 1 }} />
+            <span>
+              <strong>
+                {sinMarcar.length === 1
+                  ? "1 cita de hoy sin marcar"
+                  : `${sinMarcar.length} citas de hoy sin marcar`}
+              </strong>
+              {" — "}
+              {sinMarcar
+                .map((cita) => `${formatTime(cita.start)} ${cita.customerName}`)
+                .join(" · ")}
+              . Ya terminaron y no tienen cuenta: marca si llegó o no en su tarjeta.
+            </span>
+          </div>
+        )}
 
         <TodayList
           appointments={appointments}

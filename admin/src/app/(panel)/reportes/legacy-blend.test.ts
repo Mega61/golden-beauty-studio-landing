@@ -230,10 +230,12 @@ describe("inasistencia con historial", () => {
       PROVIDERS,
     );
     const report = noShowReport([appointment()], legacyNoShowInputs(legacy));
-    expect(report.scheduled).toBe(4);
+    // La cancelada avisó: cuenta aparte y no entra al denominador.
+    expect(report.scheduled).toBe(3);
+    expect(report.attended).toBe(2);
     expect(report.noShows).toBe(1);
     expect(report.cancelled).toBe(1);
-    expect(report.rate).toBe(0.25);
+    expect(report.rate).toBeCloseTo(1 / 3, 6);
     expect(report.legacyCount).toBe(3);
   });
 

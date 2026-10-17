@@ -219,8 +219,25 @@ function Resumen({ profile }: { profile: ClientProfile }) {
       />
       <Kpi
         etiqueta="No asistió"
-        valor={String(summary.noShows)}
-        nota={summary.cancellations > 0 ? `${summary.cancellations} canceladas` : undefined}
+        // "2 de 9 citas": de las que tenía que cumplir —las que vino más las que
+        // faltó—, a cuántas no llegó. Un conteo suelto no dice si es mucho.
+        valor={
+          summary.noShowRate === null
+            ? String(summary.noShows)
+            : `${summary.noShows} de ${summary.visits + summary.noShows} citas`
+        }
+        nota={
+          [
+            summary.noShowRate === null || summary.noShows === 0
+              ? null
+              : `${Math.round(summary.noShowRate * 100)} % de inasistencia`,
+            summary.cancellations > 0
+              ? `${summary.cancellations} cancelada${summary.cancellations === 1 ? "" : "s"}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
+        }
       />
     </div>
   );

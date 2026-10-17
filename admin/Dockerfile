@@ -102,6 +102,12 @@ RUN npm run build:catalogo
 # defecto, como `importar.js`. Solo para pantalla: nunca va a ingest.
 RUN npm run build:historial-pagos
 
+# Marca `Completada` en EA las citas con la cuenta cerrada que siguen
+# reservadas (antes de 2026-10-16 cerrar la cuenta no marcaba nada).
+# `scripts/asistencia.js`, a mano, una vez; en seco por defecto, `--aplicar`
+# para escribir. El reconcile nocturno corre lo mismo sobre la última semana.
+RUN npm run build:asistencia
+
 # `public/` puede no existir todavía (hoy no existe). Crearlo acá hace que el
 # `COPY` de abajo funcione igual, en vez de romper el build el día que alguien
 # borre el último archivo estático — o el día que agregue el primero.

@@ -27,6 +27,7 @@ import {
 } from "@/components/ticket/draft";
 import type { CloseTicketInput, CloseTicketResult } from "@/components/ticket/types";
 import type { PaymentMethod } from "@/db/types";
+import { marcarCompletadaAlCerrar } from "./attendance";
 import { loadCatalogForClose } from "./catalog-server";
 
 /**
@@ -62,12 +63,23 @@ import { loadCatalogForClose } from "./catalog-server";
  *
  * ## Las observaciones no viajan a EA
  *
- * **Este archivo no le escribe nada a Easy!Appointments.** Ni las notas, ni el
- * servicio realizado. Las notas de una cita en EA se copian a la `description`
- * del evento de Google, que está compartido en solo lectura a un correo
- * personal: una observación interna sobre una clienta no puede terminar ahí. Y
- * reescribir `id_services` dispararía la notificación de "tu cita cambió" por
- * algo que ya pasó. EA guarda la reserva; el panel guarda la entrega.
+ * **A Easy!Appointments no se le escriben ni las notas ni el servicio
+ * realizado.** Las notas de una cita en EA se copian a la `description` del
+ * evento de Google, que está compartido en solo lectura a un correo personal:
+ * una observación interna sobre una clienta no puede terminar ahí. Y reescribir
+ * `id_services` dispararía la notificación de "tu cita cambió" por algo que ya
+ * pasó. EA guarda la reserva; el panel guarda la entrega.
+ *
+ * **La única excepción es el estado**, y es solo el estado: después de guardar,
+ * la cita pasa a `Completada` (`marcarCompletadaAlCerrar()` en `attendance.ts`,
+ * un `PUT` con `{ status }` y nada más). Sin eso una cita atendida y cobrada se
+ * quedaba `Reservada` en EA para siempre, y la historia y la inasistencia
+ * —que leen el estado de EA— contaban a cada clienta como nueva y dividían la
+ * tasa por citas que nadie sabía cómo terminaron. Es mejor esfuerzo: si EA no
+ * contesta, la cuenta igual queda guardada y la reconciliación nocturna lo
+ * reintenta. El `PUT` sí sincroniza el evento de Google (cuyo contenido no
+ * cambia), y EA avisa por correo "la cita cambió" a la clienta si tiene correo
+ * y a la técnica si tiene sus notificaciones de EA prendidas.
  *
  * ## Cortesía de la casa
  *
@@ -386,6 +398,8 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     console.error("[hoy] no se pudo guardar la cuenta", error);
     return masTarde("No se pudo guardar. Queda pendiente y se reintenta solo.");
   }
+
+  await marcarCompletadaAlCerrar(ea, appointment);
 
   revalidatePath("/hoy");
 

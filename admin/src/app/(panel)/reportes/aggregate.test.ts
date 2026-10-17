@@ -716,6 +716,81 @@ describe("noShowReport", () => {
   it("un periodo vacío da `null`, no 0 %", () => {
     expect(noShowReport([]).rate).toBeNull();
   });
+
+  it("las canceladas no entran al denominador: avisaron y la silla se liberó", () => {
+    const result = noShowReport([
+      appointment({ id: 1, status: "Cancelada" }),
+      appointment({ id: 2, status: "Cancelada" }),
+      appointment({ id: 3, status: "No asistió" }),
+      appointment({ id: 4, status: "Completada" }),
+    ]);
+    expect(result.rate).toBe(0.5);
+    expect(result.scheduled).toBe(2);
+    expect(result.cancelled).toBe(2);
+  });
+
+  it("una cuenta cerrada es asistencia aunque EA siga diciendo Reservada", () => {
+    // Antes de 2026-10-16 cerrar la cuenta no marcaba nada en EA: sin esto,
+    // cada cita cobrada contaba como "sin marcar".
+    const result = noShowReport(
+      [
+        appointment({ id: 1, status: "Reservada" }),
+        appointment({ id: 2, status: "Confirmada" }),
+        appointment({ id: 3, status: "No asistió" }),
+      ],
+      [],
+      { closedIds: new Set([1, 2]) },
+    );
+    expect(result.attended).toBe(2);
+    expect(result.unmarked).toBe(0);
+    expect(result.rate).toBeCloseTo(1 / 3, 6);
+  });
+
+  it("lo que ya pasó sin marca ni cuenta queda fuera de la tasa y se cuenta aparte", () => {
+    const result = noShowReport(
+      [
+        appointment({ id: 1, status: "Reservada", start: at("2026-08-31 09:00:00") }),
+        appointment({ id: 2, status: "No asistió", start: at("2026-08-31 10:00:00") }),
+        appointment({ id: 3, status: "Completada", start: at("2026-08-31 11:00:00") }),
+      ],
+      [],
+      { now: at("2026-08-31 18:00:00") },
+    );
+    expect(result.unmarked).toBe(1);
+    expect(result.scheduled).toBe(3);
+    expect(result.rate).toBe(0.5);
+  });
+
+  it("lo que todavía no empieza no cuenta para nada", () => {
+    // Un mes en curso no puede dividir por las citas de la semana que viene.
+    const result = noShowReport(
+      [
+        appointment({ id: 1, status: "Reservada", start: at("2026-09-20 09:00:00") }),
+        appointment({ id: 2, status: "No asistió", start: at("2026-08-31 10:00:00") }),
+      ],
+      [],
+      { now: at("2026-09-01 08:00:00") },
+    );
+    expect(result.scheduled).toBe(1);
+    expect(result.unmarked).toBe(0);
+    expect(result.rate).toBe(1);
+  });
+});
+
+describe("toVisits con cuentas cerradas", () => {
+  it("una cuenta cerrada es visita aunque EA diga Reservada", () => {
+    const { visits } = toVisits(
+      [appointment({ id: 1, status: "Reservada" }), appointment({ id: 2, status: "Reservada" })],
+      [],
+      new Set([1]),
+    );
+    expect(visits.map((visit) => visit.attended)).toEqual([true, false]);
+  });
+
+  it("una cancelada con cuenta no es visita", () => {
+    const { visits } = toVisits([appointment({ id: 1, status: "Cancelada" })], [], new Set([1]));
+    expect(visits[0]?.attended).toBe(false);
+  });
 });
 
 // ── Auxiliares ──────────────────────────────────────────────────────────────

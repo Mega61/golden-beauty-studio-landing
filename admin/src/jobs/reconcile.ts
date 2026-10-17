@@ -14,6 +14,8 @@ import {
 
 import { syncComboTable, type ComboSyncResult } from "@/lib/combo-source";
 
+import { runAttendanceBackfill, summarizeAttendanceBackfill } from "./attendance-backfill";
+
 import {
   createServicePriceCache,
   upsertAppointmentFinance,
@@ -377,13 +379,55 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<Reconc
   const ea = createEaClient(eaConfigFromEnv(env));
 
   try {
-    return await runReconcile({
+    const report = await runReconcile({
       db,
       ea,
       lookbackDays: positiveIntFromEnv(env.RECONCILE_LOOKBACK_DAYS),
       lookaheadDays: positiveIntFromEnv(env.RECONCILE_LOOKAHEAD_DAYS),
     });
+    await catchUpAttendance(db, ea, report.from, env);
+    return report;
   } finally {
     await db.destroy();
+  }
+}
+
+/**
+ * La asistencia que el cierre de cuenta no alcanzó a escribir.
+ *
+ * **Es la única escritura a EA de la noche, y vive afuera de `runReconcile()` a
+ * propósito**: el tipo `ReconcileEaClient` dice que el barrido no escribe en EA
+ * y eso se mantiene. Esto corre después, con el cliente completo, sobre la
+ * misma ventana hacia atrás y nunca hacia adelante: una cuenta cerrada que
+ * sigue `Reservada` es un `PUT` que falló al cerrar (EA caído, un 429), y
+ * `jobs/attendance-backfill.ts` la pasa a `Completada`.
+ *
+ * Mejor esfuerzo, como los combos: un fallo acá no tumba la noche ni el código
+ * de salida. Con tope de 40 escrituras, para no comerse el cupo de EA de un
+ * golpe. `RECONCILE_ASISTENCIA=0` lo apaga (por ejemplo, si algún día las
+ * clientas tienen correo y no se quiere que EA les avise).
+ */
+async function catchUpAttendance(
+  db: Db,
+  ea: EaClient,
+  from: EaLocalDate,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
+  if (env.RECONCILE_ASISTENCIA === "0") return;
+  try {
+    const report = await runAttendanceBackfill({
+      db,
+      ea,
+      from,
+      till: instantToEaDate(new Date()),
+      apply: true,
+      maxWrites: 40,
+    });
+    console.log(`reconcile: ${summarizeAttendanceBackfill(report)}`);
+  } catch (error) {
+    console.error(
+      "reconcile: no se pudo poner al día la asistencia. El barrido sí corrió.",
+      error,
+    );
   }
 }

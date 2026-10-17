@@ -29,6 +29,8 @@ import type { Appointment, EaLocalDateTime } from "@/lib/ea";
 import { compareEaLocal, parseEaLocalDateTime } from "@/lib/ea";
 import type { LegacyAppointment, PaymentMethod } from "@/db/types";
 
+import { attendanceOutcome, noShowRate } from "@/lib/attendance";
+
 import { eaStatusToken } from "./ea-status";
 
 /** De qué mitad de la historia salió este renglón. */
@@ -93,6 +95,12 @@ export type HistorySummary = {
   visits: number;
   cancellations: number;
   noShows: number;
+  /**
+   * `noShows ÷ (visitas + noShows)`: de las citas que tenía que cumplir, a
+   * cuántas faltó. Las canceladas y las que nadie marcó no entran. `null` sin
+   * ninguna.
+   */
+  noShowRate: number | null;
   /** Suma de lo cobrado en las visitas con monto conocido, sin cortesías. */
   totalSpent: number;
   /**
@@ -144,15 +152,23 @@ export function legacyStartToWallClock(value: Date): EaLocalDateTime {
 /**
  * El desenlace de una cita de EA.
  *
- * Solo `completada` cuenta como atendida. Una cita `confirmada` de la semana que
- * viene todavía no es una visita, y contarla inflaría el historial de la
- * clienta con algo que no pasó.
+ * Atendida es `completada` **o con la cuenta cerrada** (`amountCharged` no
+ * nulo, cortesías incluidas: cobran cero, no `null`). Hasta el 2026-10-16
+ * cerrar la cuenta no marcaba nada en EA, y sin esto esas visitas salían como
+ * "desconocido". La regla es la de la inasistencia de Reportes,
+ * `attendanceOutcome()`, para que la ficha y el reporte no discutan.
+ *
+ * Una cita `confirmada` de la semana que viene todavía no es una visita, y
+ * contarla inflaría el historial de la clienta con algo que no pasó.
  */
-function eaOutcome(rawStatus: string): HistoryOutcome {
-  const token = eaStatusToken(rawStatus);
-  if (token === "completada") return "atendida";
-  if (token === "cancelada") return "cancelada";
-  if (token === "no-asistio") return "no-asistio";
+function eaOutcome(rawStatus: string, amountCharged: number | null): HistoryOutcome {
+  const outcome = attendanceOutcome(eaStatusToken(rawStatus), {
+    closed: amountCharged !== null,
+    started: true,
+  });
+  if (outcome === "asistio") return "atendida";
+  if (outcome === "cancelada") return "cancelada";
+  if (outcome === "no-asistio") return "no-asistio";
   return "desconocido";
 }
 
@@ -212,7 +228,7 @@ export function buildUnifiedHistory(
       serviceName: row.serviceName?.trim() || "Servicio sin nombre",
       providerName: row.providerName?.trim() || null,
       rawStatus,
-      outcome: eaOutcome(rawStatus),
+      outcome: eaOutcome(rawStatus, row.amountCharged),
       amountCharged: row.amountCharged,
       paymentMethods: [],
       courtesy: false,
@@ -278,6 +294,7 @@ function summarize(entries: readonly HistoryEntry[]): HistorySummary {
     visits,
     cancellations,
     noShows,
+    noShowRate: noShowRate(noShows, visits),
     totalSpent,
     totalIsPartial,
     firstVisit,
