@@ -255,6 +255,7 @@ export function TicketSheet({
             catalog={catalog}
             combos={combos}
             performedId={draft.performedServiceId}
+            bookedId={appointment.bookedServiceId}
             disabled={bloqueado}
             onChange={(performedServiceId) => patch({ performedServiceId })}
           />
@@ -688,12 +689,15 @@ function ComboOffer({
   catalog,
   combos,
   performedId,
+  bookedId,
   disabled,
   onChange,
 }: {
   catalog: TicketCatalog;
   combos: readonly ComboComposition[];
   performedId: number | null;
+  /** El servicio agendado: deshacer el combo vuelve a él si es una de sus mitades. */
+  bookedId: number | null;
   disabled: boolean;
   onChange: (eaServiceId: number) => void;
 }) {
@@ -703,6 +707,10 @@ function ComboOffer({
     const hands = findService(catalog, composed.handsEaServiceId);
     const feet = findService(catalog, composed.feetEaServiceId);
     if (hands === null || feet === null) return null;
+    // Deshacer el combo vuelve a la mitad que se agendó: una cita de pies a la
+    // que se le sumaron manos vuelve a pies, no a manos. Si se agendó otra cosa
+    // (el combo mismo, otro servicio), queda la mitad de manos.
+    const solo = bookedId === feet.eaServiceId ? feet : hands;
     return (
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem" }}>
         <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
@@ -712,9 +720,9 @@ function ComboOffer({
           type="button"
           className="ui-btn ui-btn--ghost"
           disabled={disabled}
-          onClick={() => onChange(composed.handsEaServiceId)}
+          onClick={() => onChange(solo.eaServiceId)}
         >
-          Solo {hands.name}
+          Solo {solo.name}
         </button>
       </div>
     );
