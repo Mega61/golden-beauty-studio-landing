@@ -779,8 +779,8 @@ se parte en encabezado + ítems:
 
 - **Las promos de la dueña se aplican al cerrar**, no al reservar (EA cobra la lista): miércoles de
   pies, sábado de press-on y 10 % de primera visita, con las reglas de `lib/promos.ts`. No se
-  acumulan —gana la mayor, empate → la del día—; el 10 % es solo sobre servicios; un combo no lleva
-  la del día. La hoja la muestra como su propio renglón ("Promo · Miércoles de pies −$15.000"), se
+  acumulan —gana la mayor, empate → la del día—; el 10 % es solo sobre servicios; un combo en día de
+  promo paga lo menor entre su precio y sus mitades con la promo puesta, sin sumar las dos rebajas. La hoja la muestra como su propio renglón ("Promo · Miércoles de pies −$15.000"), se
   recalcula al cambiar el servicio y se puede quitar. **El navegador no manda montos**: solo
   `applyPromo` y `firstVisit`; `resolveDiscount()` (`components/ticket/draft.ts`) pone el descuento
   con el catálogo del servidor y el día de la cita según EA. Se guarda en `discount` con

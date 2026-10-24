@@ -52,7 +52,10 @@ describe("composedOf en la vitrina", () => {
     }
   });
 
-  it("un combo cuesta menos que sus dos mitades, que es el punto del combo", () => {
+  // Nunca más caro que reservar las dos mitades. Igual sí: varios combos de la
+  // dueña (tradicional manos + pies, limpiezas) existen para que la visita sea
+  // una sola cita, no por el ahorro, y ahí no se tacha nada.
+  it("un combo nunca cuesta más que sus dos mitades", () => {
     const priceOf = new Map(
       pricing.flatMap((cat) => cat.items.map((it) => [it.id, it.priceCOP] as const)),
     );
@@ -60,7 +63,7 @@ describe("composedOf en la vitrina", () => {
     for (const item of combos) {
       const suma =
         priceOf.get(item.composedOf!.hands)! + priceOf.get(item.composedOf!.feet)!;
-      expect(item.priceCOP, `${item.id} debería costar menos que ${suma}`).toBeLessThan(suma);
+      expect(item.priceCOP, `${item.id} no debería costar más que ${suma}`).toBeLessThanOrEqual(suma);
     }
   });
 

@@ -36,7 +36,8 @@ import { parseDraft } from "./draft-store";
  *   la técnica cierra la cuenta, y se recalculan si cambia lo que se hizo.
  * - Primera visita: 10 % en los servicios, nunca en los adicionales.
  * - No se acumulan: gana el descuento mayor (empate → la del día).
- * - Un combo no lleva promo del día (ya trae su descuento), sí el 10 %.
+ * - Un combo en día de promo paga lo menor entre el combo y sus mitades con la
+ *   promo puesta; nunca las dos rebajas juntas. El 10 % va sobre el combo.
  * - La comisión del 40 % va sobre lo cobrado con promo: un descuento normal.
  * - Un par que no es combo (rubber + pies) se cobra como dos servicios, cada
  *   uno a su lista; si el par sí es un combo, se ofrece cobrarlo como el combo.
@@ -78,7 +79,7 @@ const CATALOGO: TicketCatalog = {
       eaServiceId: COMBO_SEMI,
       name: "Semipermanente manos + pies",
       listPrice: 100_000,
-      pricingId: "semi-permanent-hands-semi-permanent-feet",
+      pricingId: "semi-permanent-hands-feet",
       categoryName: "Combos",
     }),
     service({
@@ -212,13 +213,20 @@ describe("priceDraft — 10 % primera visita", () => {
     expect(r.totals?.amountCharged).toBe(94_500);
   });
 
-  it("un combo no lleva la promo del día, pero sí el 10 %", () => {
+  it("un combo en miércoles cobra sus mitades con la promo si sale menos, sin sumarle el 10 %", () => {
+    // Combo $100.000 vs semi manos $50.000 + semi pies en promo $40.000 = $90.000.
     const miercoles = priceDraft(borrador(COMBO_SEMI), CATALOGO, el(MIERCOLES));
-    expect(miercoles.availablePromo).toBeNull();
-    expect(miercoles.totals?.amountCharged).toBe(100_000);
+    expect(miercoles.promo).toMatchObject({ slug: "miercoles-pies", discount: 10_000 });
+    expect(miercoles.totals?.amountCharged).toBe(90_000);
 
+    // Primera visita el mismo día: 10 % = $10.000, empate → la del día, una sola.
     const nueva = priceDraft(borrador(COMBO_SEMI, { firstVisit: true }), CATALOGO, el(MIERCOLES));
-    expect(nueva.promo).toMatchObject({ slug: "primera-visita", discount: 10_000 });
+    expect(nueva.promo).toMatchObject({ slug: "miercoles-pies", discount: 10_000 });
+    expect(nueva.totals?.amountCharged).toBe(90_000);
+
+    // Otro día, el 10 % sobre el combo.
+    const jueves = priceDraft(borrador(COMBO_SEMI, { firstVisit: true }), CATALOGO, el(JUEVES));
+    expect(jueves.promo).toMatchObject({ slug: "primera-visita", discount: 10_000 });
   });
 
   it("sin la casilla no hay 10 %", () => {

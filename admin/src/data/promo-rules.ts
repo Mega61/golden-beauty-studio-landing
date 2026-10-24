@@ -12,7 +12,9 @@
 //
 // - `weekday`: día de la cita en que aplica, 0 = domingo … 6 = sábado.
 // - `regularId`: id de `src/data/pricing.ts` del servicio que se rebaja. Un
-//   combo no aparece acá: ya trae su propio descuento.
+//   combo no aparece acá: en día de promo paga lo menor entre su precio y sus
+//   dos mitades con la promo puesta (`admin/src/lib/promos.ts`), sin sumar
+//   las dos rebajas.
 // - Las promos **no se acumulan**: si aplican varias, gana el descuento mayor.
 
 export const PROMO_RULES = {

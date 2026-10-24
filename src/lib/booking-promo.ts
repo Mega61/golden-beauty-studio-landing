@@ -10,8 +10,9 @@ import { weekdayOf } from "./booking";
  * mismo toque en que se elige el miércoles, sin esperar una ida y vuelta. En
  * cuanto llega la cotización del panel, manda la cotización.
  *
- * Mismas reglas que el panel: no se acumulan, gana el descuento mayor, y un
- * combo nunca trae promo del día (el catálogo no le manda ninguna).
+ * Mismas reglas que el panel: no se acumulan y gana el descuento mayor. Un combo
+ * trae como promo del día lo que cuestan sus mitades con la promo puesta (lo
+ * calcula el panel en el catálogo), así que acá es un renglón más.
  */
 
 /** Una promo del día de un servicio, tal como la manda el catálogo. */
