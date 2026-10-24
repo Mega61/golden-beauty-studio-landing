@@ -24,6 +24,8 @@ import {
   type ManualReminderState,
 } from "@/lib/whatsapp/manual-reminder";
 
+import { withPlannedServiceNames } from "@/lib/planned-services";
+import { groupVisits, visitServiceName } from "@/lib/visits";
 import { readableSendError } from "@/lib/whatsapp/cloud-api";
 import { whatsappConfigured } from "@/lib/whatsapp/config";
 
@@ -83,22 +85,26 @@ export function nextEaDate(date: EaLocalDate): EaLocalDate {
   return eaDatePart(addMinutes(parseEaLocalDateTime(`${date} 12:00:00`), 24 * 60));
 }
 
-/** "Recordada por Lina a las 9:12 a. m.", con fecha si no fue hoy. */
+/**
+ * "Recordada por Lina a las 9:12 a. m.", con fecha si no fue hoy. Las
+ * confirmaciones dicen "Confirmada".
+ */
 export function sentLabelOf(
   existing: Pick<ExistingReminder, "channel" | "sentAt" | "sentByName">,
   today: EaLocalDate,
+  verb: "Recordada" | "Confirmada" = "Recordada",
 ): string {
   const who =
     existing.channel === "manual"
       ? `por ${existing.sentByName ?? "alguien del equipo"}`
       : "automáticamente";
-  if (existing.sentAt === null) return `Recordada ${who}`;
+  if (existing.sentAt === null) return `${verb} ${who}`;
   const local = instantToEaLocal(existing.sentAt);
   const when =
     eaDatePart(local) === today
       ? `a las ${formatTime(local)}`
       : `el ${formatDateShort(local)} a las ${formatTime(local)}`;
-  return `Recordada ${who} ${when}`;
+  return `${verb} ${who} ${when}`;
 }
 
 /**
@@ -177,17 +183,43 @@ export async function loadReminders(now: Date = new Date()): Promise<RemindersDa
         listDayAppointments(ea, { date, providerId: null, with: ["service", "customer"] }),
       ),
     );
-    appointments = days.flat().map(({ appointment, service, customer }) => ({
-      eaAppointmentId: appointment.id,
-      start: appointment.start,
-      status: appointment.status,
-      phoneE164: normalizePhoneE164(customer?.phone ?? null),
-      customerFirstName: customer?.firstName ?? null,
-      customerName:
-        [customer?.firstName, customer?.lastName].filter(Boolean).join(" ").trim() ||
-        "Sin cliente",
-      serviceName: service?.name ?? null,
-    }));
+    // Una visita, un recordatorio (`lib/visits.ts`): manos + pies sin combo son
+    // dos citas pegadas, y el aviso va en la primera nombrando las dos — igual
+    // que el emisor automático. Sin esto, recepción veía dos filas y la clienta
+    // recibía dos mensajes.
+    // "+ pies" en la misma cita (migración `028`): el mensaje nombra los dos.
+    const raw = await withPlannedServiceNames(ea, days.flat());
+    const visits = groupVisits(
+      raw.map(({ appointment, service }) => ({
+        id: appointment.id,
+        customerId: appointment.customerId,
+        providerId: appointment.providerId,
+        start: appointment.start,
+        end: appointment.end,
+        serviceName: service?.name ?? null,
+      })),
+    );
+    const continuation = new Set<number>();
+    const visitName = new Map<number, string | null>();
+    for (const parts of visits.values()) {
+      if (parts.length < 2) continue;
+      for (const part of parts.slice(1)) continuation.add(part.id);
+      visitName.set(parts[0].id, visitServiceName(parts.map((p) => p.serviceName)));
+    }
+
+    appointments = raw
+      .filter(({ appointment }) => !continuation.has(appointment.id))
+      .map(({ appointment, service, customer }) => ({
+        eaAppointmentId: appointment.id,
+        start: appointment.start,
+        status: appointment.status,
+        phoneE164: normalizePhoneE164(customer?.phone ?? null),
+        customerFirstName: customer?.firstName ?? null,
+        customerName:
+          [customer?.firstName, customer?.lastName].filter(Boolean).join(" ").trim() ||
+          "Sin cliente",
+        serviceName: visitName.get(appointment.id) ?? service?.name ?? null,
+      }));
   } catch (error) {
     problems.push({ source: "ea", message: messageOf(error) });
     return { today, tomorrow, rows: [], problems, automatic: whatsappConfigured() };

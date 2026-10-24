@@ -72,6 +72,7 @@ import { migration as m024 } from "./024-allowed-user-test-account";
 import { migration as m025 } from "./025-legacy-payment";
 import { migration as m026 } from "./026-house-courtesy";
 import { migration as m027 } from "./027-variance-promo";
+import { migration as m028 } from "./028-appointment-planned-service";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -101,6 +102,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m025,
   m026,
   m027,
+  m028,
 ];
 
 /**
@@ -136,6 +138,7 @@ export const EXPECTED_TABLES: readonly string[] = [
   "push_subscription",
   "ad_spend",
   "customer_setting",
+  "appointment_planned_service",
   // Infraestructura
   "schema_migration",
 ];

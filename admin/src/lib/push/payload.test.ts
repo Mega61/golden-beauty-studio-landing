@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildNewBookingPayload,
+  buildOwnBookingPayload,
   relativeDayLabel,
   shortCustomerName,
   type NewBookingNotice,
@@ -107,5 +108,33 @@ describe("relativeDayLabel", () => {
   });
   it("un día pasado no es «hoy» ni «mañana»", () => {
     expect(relativeDayLabel("2026-10-14", "2026-10-15")).toBe("mié 14 oct");
+  });
+});
+
+describe("buildOwnBookingPayload", () => {
+  const notice = {
+    appointmentId: 144,
+    serviceName: "Esculpidas en acrílico y Semipermanente pies",
+    customerFirstName: "Laura María",
+    customerLastName: "Martínez",
+    start: "2026-10-25 10:00:00",
+    // De contrabando: el tipo no lo admite, y el aviso no puede llevarlo.
+    phone: "+573001234567",
+  } as Parameters<typeof buildOwnBookingPayload>[0];
+
+  it("dice qué, quién y cuándo, y abre la agenda en ese día", () => {
+    const payload = buildOwnBookingPayload(notice, "2026-10-24", "/admin");
+    expect(payload.title).toBe("Nueva cita en tu agenda ✨");
+    expect(payload.body).toBe("Esculpidas en acrílico y Semipermanente pies\nLaura María M. · mañana 10 a. m.");
+    expect(payload.url).toBe("/admin/agenda?dia=2026-10-25");
+    expect(payload.tag).toBe("reserva-144");
+  });
+
+  it("sin teléfono, sin precio, y sin el botón de WhatsApp del estudio", () => {
+    const payload = buildOwnBookingPayload(notice, "2026-10-24", "/admin");
+    const all = JSON.stringify(payload);
+    expect(all).not.toContain("3001234567");
+    expect(all).not.toMatch(/\$\s?\d/);
+    expect(payload.confirmUrl).toBeUndefined();
   });
 });

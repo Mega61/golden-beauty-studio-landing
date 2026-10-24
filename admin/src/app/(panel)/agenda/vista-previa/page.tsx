@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import { ConflictReview } from "@/components/calendar";
-import { parseAnchor, parseRangeMode } from "@/components/calendar";
+import { parseAgendaView, parseAnchor, parseRangeMode } from "@/components/calendar";
 import { instantToEaDate } from "@/lib/ea/datetime";
 import { AgendaClient } from "../AgendaClient";
 import { previewConflicts, previewData } from "./fixtures";
@@ -41,7 +41,7 @@ function parseRole(value: string | undefined): Role {
 export default async function VistaPreviaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ rol?: string; rango?: string; dia?: string }>;
+  searchParams: Promise<{ rol?: string; rango?: string; dia?: string; vista?: string }>;
 }) {
   if (process.env.NODE_ENV === "production") notFound();
 
@@ -59,6 +59,7 @@ export default async function VistaPreviaPage({
       <AgendaClient
         initial={data}
         mode={mode}
+        view={parseAgendaView(params.vista)}
         anchor={anchor}
         today={today}
         eaFailure={null}
@@ -67,6 +68,7 @@ export default async function VistaPreviaPage({
         // Prendida para poder revisar la casilla de confirmación por WhatsApp.
         // La acción vuelve a mirar la configuración real antes de mandar nada.
         whatsappConfirmation
+        canConfirmByHand={false}
       />
 
       {/* Lo único que la vista previa no puede producir sola: el reporte de

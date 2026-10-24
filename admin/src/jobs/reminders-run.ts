@@ -1,6 +1,7 @@
 import "server-only";
 
 import { normalizePhoneE164 } from "@/app/(panel)/clientes/identity";
+import { withPlannedServiceNames } from "@/lib/planned-services";
 import { groupVisits, visitServiceName, type VisitPart } from "@/lib/visits";
 import {
   createDb,
@@ -214,7 +215,8 @@ export async function runReminders(deps: RunRemindersDeps): Promise<RemindersRep
       ),
     )
   ).flat();
-  const appointments = toRunnerAppointments(rows);
+  // Una cita con "+ pies" (migración `028`) se nombra entera en el mensaje.
+  const appointments = toRunnerAppointments(await withPlannedServiceNames(deps.ea, rows, deps.db));
 
   const repo = repositories(deps.db).waMessages;
   const ids = [...appointments.keys()];

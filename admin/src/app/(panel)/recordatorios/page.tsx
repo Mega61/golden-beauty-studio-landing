@@ -6,7 +6,9 @@ import { Icon, formatDateLong } from "@/components/ui";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
 
-import { enviarRecordatorio, registrarBaja } from "./actions";
+import { enviarConfirmacion, enviarRecordatorio, registrarBaja } from "./actions";
+import { ConfirmacionesLista } from "./ConfirmacionesLista";
+import { loadConfirmations } from "./confirmations-data";
 import { loadReminders } from "./data";
 import { RecordatoriosLista } from "./RecordatoriosLista";
 
@@ -23,6 +25,11 @@ import { RecordatoriosLista } from "./RecordatoriosLista";
  * la pantalla de cerrar cuentas. Esto es trabajo de mostrador con otro ritmo
  * —una pasada en la mañana para mañana, otra al mediodía para lo que queda de
  * hoy— y en Hoy hay un acceso con el conteo de pendientes.
+ *
+ * Arriba van las **reservas nuevas** (`ConfirmacionesLista`): lo que se agendó
+ * en la última semana, por la página o desde la agenda, con su botón para
+ * confirmarle a la clienta. Mismo mecanismo que el recordatorio —la fila en
+ * `wa_message` antes del enlace— con `kind = confirmacion`.
  */
 
 export const metadata: Metadata = {
@@ -39,21 +46,23 @@ function navRole(role: UserRole): Role {
 
 export default async function RecordatoriosPage() {
   const session = await requireCapability("recordatorios:enviar");
-  const [data, canOptOut] = await Promise.all([
+  const [data, confirmations, canOptOut] = await Promise.all([
     loadReminders(),
+    loadConfirmations(),
     sessionCan("recordatorios:baja"),
   ]);
 
-  const eaCaido = data.problems.find((p) => p.source === "ea") ?? null;
-  const dbCaida = data.problems.find((p) => p.source === "db") ?? null;
+  const problems = [...data.problems, ...confirmations.problems];
+  const eaCaido = problems.find((p) => p.source === "ea") ?? null;
+  const dbCaida = problems.find((p) => p.source === "db") ?? null;
 
   return (
     <AppShell role={navRole(session.role)} title="Recordatorios">
       <div style={{ display: "grid", gap: "1rem" }}>
         <p style={{ margin: 0, color: "var(--color-ink-soft)", maxWidth: "40rem" }}>
           {data.automatic
-            ? "Los recordatorios salen solos por WhatsApp 24 horas y 2 horas antes de cada cita. Acá ves si llegaron. El botón sirve para los que el envío automático no pudo mandar; si lo usas antes, el automático ya no lo repite."
-            : "Cada botón abre WhatsApp con el mensaje listo. Revisa que salga desde el WhatsApp del estudio y dale enviar allá."}
+            ? "Las confirmaciones salen solas al reservar, y los recordatorios 24 horas y 2 horas antes de cada cita. Acá ves si llegaron. El botón sirve para los que el envío automático no pudo mandar; si lo usas antes, el automático ya no lo repite."
+            : "Confirma cada reserva nueva y recuerda las citas de hoy y mañana. Cada botón abre WhatsApp con el mensaje listo: revisa que salga desde el WhatsApp del estudio y dale enviar allá."}
         </p>
 
         {eaCaido === null && dbCaida === null ? null : (
@@ -76,6 +85,14 @@ export default async function RecordatoriosPage() {
                 : "No se pudo leer la base del panel. No se puede registrar ningún aviso, así que los botones quedan apagados hasta que vuelva."}
             </span>
           </div>
+        )}
+
+        {eaCaido !== null ? null : (
+          <ConfirmacionesLista
+            rows={confirmations.rows}
+            readOnly={dbCaida !== null}
+            send={enviarConfirmacion}
+          />
         )}
 
         {eaCaido !== null ? null : (

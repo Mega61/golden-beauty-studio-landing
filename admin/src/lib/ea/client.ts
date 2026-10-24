@@ -980,5 +980,65 @@ export async function listDayAppointments(
   );
 }
 
+/**
+ * Las citas **agendadas** desde `since` (por `book_datetime`), de la más nueva
+ * a la más vieja, con sus relaciones.
+ *
+ * Es lo que lista "Reservas nuevas" en Recordatorios: la confirmación se manda
+ * cuando alguien reserva, no cuando se acerca la cita, así que el filtro de
+ * fecha de EA (`from`/`till`, que mira el inicio) no sirve. EA sí ordena por
+ * cualquier campo de la API, y `sort=-book` trae primero lo último que se
+ * agendó: se pide de a una página hasta que aparece una reserva más vieja que
+ * `since`. Verificado contra el EA local (2026-10-24).
+ *
+ * Mismo criterio de paginación que `listDayAppointments()`: si las páginas se
+ * agotan sin llegar a `since`, se lanza en vez de devolver media lista.
+ */
+export async function listRecentlyBooked(
+  ea: Pick<EaClient, "raw">,
+  query: {
+    since: EaLocalDateTime;
+    with?: readonly string[];
+    maxPages?: number;
+    pageLength?: number;
+  },
+): Promise<AppointmentWithRelations[]> {
+  const maxPages = query.maxPages ?? 5;
+  const pageLength = query.pageLength ?? DAY_PAGE_LENGTH;
+  const out: AppointmentWithRelations[] = [];
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const params = buildListParams({ with: query.with, sort: ["-book"] });
+    params.set("page", String(page));
+    params.set("length", String(pageLength));
+
+    const payload = await ea.raw({ method: "GET", path: "appointments", params });
+    if (!Array.isArray(payload)) {
+      throw new Error("EA devolvió algo que no es una lista de citas");
+    }
+
+    let reachedOlder = false;
+    for (const raw of payload) {
+      const decoded = decodeAppointmentWithRelations(raw as ApiShape);
+      const booked = decoded.appointment.bookedAt;
+      // Sin fecha de reserva (filas importadas a mano) no se puede ubicar: se
+      // salta en vez de cortar la lista, porque el orden de EA las deja al final.
+      if (booked === null) continue;
+      if (booked < query.since) {
+        reachedOlder = true;
+        break;
+      }
+      out.push(decoded);
+    }
+
+    if (reachedOlder || payload.length < pageLength) return out;
+  }
+
+  throw new Error(
+    `Las reservas desde ${query.since} superaron ${maxPages} páginas de ${pageLength}. ` +
+      "Se aborta en vez de devolver media lista.",
+  );
+}
+
 /** Reexportado para que quien registre un log pueda tachar el token. */
 export { scrubSecret };

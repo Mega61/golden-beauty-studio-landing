@@ -7,6 +7,7 @@ import {
   isAllowedIdentity,
   normalizeEmail,
   ownsProvider,
+  receivesBookingPush,
   type AllowedIdentity,
   type Capability,
 } from "./auth-policy";
@@ -241,6 +242,8 @@ describe("can — recepción y dueña", () => {
     expect(can("owner", "avisos:reservas-web")).toBe(true);
     expect(can("admin", "avisos:reservas-web")).toBe(true);
     expect(can("staff", "avisos:reservas-web")).toBe(false);
+    // Lo suyo sí: el aviso de su columna (el filtro va en el envío).
+    expect(can("staff", "avisos:mis-citas")).toBe(true);
     // Va de la mano de ver la agenda completa: quien no la ve no recibe un
     // pedazo de ella en la pantalla de bloqueo.
     for (const role of ["owner", "admin", "staff"] as const) {
@@ -268,6 +271,7 @@ describe("can — recepción y dueña", () => {
       "recordatorios:enviar",
       "recordatorios:baja",
       "avisos:reservas-web",
+      "avisos:mis-citas",
       "pauta:registrar",
       "clientes:exportar",
       "cortesia:otorgar",
@@ -297,5 +301,23 @@ describe("ownsProvider", () => {
   it("recepción y dueña alcanzan cualquiera", () => {
     expect(ownsProvider("admin", null, 7)).toBe(true);
     expect(ownsProvider("owner", null, 7)).toBe(true);
+  });
+});
+
+describe("receivesBookingPush — quién ve el interruptor de avisos", () => {
+  it("una técnica sin columna no recibe nada; con columna, lo suyo", () => {
+    expect(receivesBookingPush("staff", null)).toBe(false);
+    expect(receivesBookingPush("staff", 4)).toBe(true);
+  });
+
+  it("dueña y recepción reciben las reservas web, tengan o no columna", () => {
+    expect(receivesBookingPush("owner", null)).toBe(true);
+    expect(receivesBookingPush("admin", null)).toBe(true);
+    expect(receivesBookingPush("admin", 4)).toBe(true);
+  });
+
+  it("los tres roles tienen avisos:mis-citas; solo dueña y recepción, avisos:reservas-web", () => {
+    expect(can("staff", "avisos:mis-citas")).toBe(true);
+    expect(can("staff", "avisos:reservas-web")).toBe(false);
   });
 });

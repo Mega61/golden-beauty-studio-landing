@@ -223,6 +223,7 @@ export function previewData(today: EaLocalDate): AgendaData {
     // se llega a él eligiendo sus dos mitades. Ver `lib/combos.ts`.
     combos: [{ eaServiceId: 5, handsEaServiceId: 2, feetEaServiceId: 4 }],
     combosReason: null,
+    planned: {},
 
     capacities: [
       { id: 1, attendantsNumber: 1, category: null },

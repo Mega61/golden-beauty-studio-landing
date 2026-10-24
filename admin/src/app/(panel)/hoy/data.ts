@@ -22,6 +22,7 @@ import {
 } from "@/lib/ea/client";
 import type { TicketCatalog } from "@/components/ticket/catalog";
 import type { TicketFinanceView, TodayAppointment } from "@/components/ticket/types";
+import { loadPlannedServices } from "@/lib/planned-services";
 import type { PanelSession } from "@/lib/dal";
 import { loadCatalogForClose } from "./catalog-server";
 
@@ -227,6 +228,12 @@ export async function loadToday(
     // Qué clientas del día son cortesía de la casa por defecto. Una consulta para
     // todas. Si falla, la casilla simplemente no llega pre-marcada: es una
     // comodidad, y la dueña la marca a mano igual. Nunca tumba Hoy.
+    // Lo que se agendó además del principal (manos + pies sin combo, en una
+    // sola cita). Igual que la cortesía: si falla, la hoja abre solo con el
+    // servicio agendado y se agrega a mano.
+    const planned = await loadPlannedServices(citas.map(({ appointment }) => appointment.id));
+    const catalogName = new Map(catalog.services.map((s) => [s.eaServiceId, s.name]));
+
     let courtesyIds = new Set<number>();
     if (db !== null) {
       try {
@@ -256,7 +263,13 @@ export async function loadToday(
           eaProviderId: appointment.providerId,
           providerName: personName(provider, "Sin asignar"),
           bookedServiceId: appointment.serviceId,
-          bookedServiceName: service?.name ?? "Sin servicio",
+          bookedServiceName: [
+            service?.name ?? "Sin servicio",
+            ...(planned.get(appointment.id) ?? []).map(
+              (id) => catalogName.get(id) ?? `Servicio ${id}`,
+            ),
+          ].join(" + "),
+          plannedServiceIds: planned.get(appointment.id) ?? [],
           finance: viewFor(finance),
         };
       })

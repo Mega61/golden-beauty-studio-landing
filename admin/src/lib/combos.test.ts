@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addToBooking,
+  bookingMinutes,
   comboServiceIds,
+  MAX_PLANNED_EXTRAS,
+  removeFromBooking,
   composeFrom,
   findCombo,
   pairedServiceId,
@@ -253,5 +257,65 @@ describe("componer y descomponer es reversible", () => {
       expect(partnerId).toBe(combo.feetEaServiceId);
       expect(pairedServiceId(COMBOS, baseId, null)).toBe(combo.handsEaServiceId);
     }
+  });
+});
+
+describe("un par que no es combo", () => {
+  it("sumar la otra mitad de un combo convierte la cita en el combo", () => {
+    // Por este camino también se cobra el combo, no las dos mitades sueltas.
+    expect(addToBooking(COMBOS, { serviceId: 10, extras: [] }, 20)).toEqual({
+      serviceId: 90,
+      extras: [],
+    });
+    // Empezando por los pies, igual.
+    expect(addToBooking(COMBOS, { serviceId: 20, extras: [] }, 11)).toEqual({
+      serviceId: 91,
+      extras: [],
+    });
+  });
+
+  it("un par sin combo queda como adicional", () => {
+    expect(addToBooking(COMBOS, { serviceId: 30, extras: [] }, 20)).toEqual({
+      serviceId: 30,
+      extras: [20],
+    });
+  });
+
+  it("una cita que ya es combo no se vuelve a componer", () => {
+    expect(addToBooking(COMBOS, { serviceId: 90, extras: [] }, 20)).toEqual({
+      serviceId: 90,
+      extras: [20],
+    });
+  });
+
+  it("sin principal, lo que se suma pasa a ser el principal", () => {
+    expect(addToBooking(COMBOS, { serviceId: null, extras: [] }, 30)).toEqual({
+      serviceId: 30,
+      extras: [],
+    });
+  });
+
+  it("respeta el tope de la hoja de la cuenta", () => {
+    const full = { serviceId: 30, extras: Array.from({ length: MAX_PLANNED_EXTRAS }, () => 20) };
+    expect(addToBooking(COMBOS, full, 11)).toBe(full);
+  });
+
+  it("quitar un adicional deja los demás en su orden", () => {
+    expect(removeFromBooking({ serviceId: 30, extras: [20, 11, 10] }, 1)).toEqual({
+      serviceId: 30,
+      extras: [20, 10],
+    });
+  });
+
+  it("la duración de un par sin combo es la suma", () => {
+    // 150 + 75. Un par sin combo no tiene duración pactada por la dueña.
+    expect(bookingMinutes(SERVICES, { serviceId: 30, extras: [20] })).toBe(225);
+    expect(bookingMinutes(SERVICES, { serviceId: null, extras: [] })).toBeNull();
+  });
+
+  it("sin principal todavía, cuenta solo los adicionales; uno sin duración suma cero", () => {
+    expect(bookingMinutes(SERVICES, { serviceId: null, extras: [20] })).toBe(75);
+    expect(bookingMinutes(SERVICES, { serviceId: 30, extras: [999] })).toBe(150);
+    expect(bookingMinutes(SERVICES, { serviceId: 999, extras: [] })).toBeNull();
   });
 });

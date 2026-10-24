@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { getDb } from "@/db/client";
-import { stationRepository } from "@/db/repositories";
+import { appointmentPlannedServiceRepository, stationRepository } from "@/db/repositories";
 
 import type { GridProvider } from "@/lib/calendar-layout";
+import { MAX_PLANNED_EXTRAS } from "@/lib/combos";
 import {
   allowingOutsideHours,
   checkConflicts,
@@ -18,6 +19,7 @@ import {
 import { requireOwnProvider, requireSession } from "@/lib/dal";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
+import { notifyPanelBooking } from "@/lib/push/send";
 import { whatsappConfigured } from "@/lib/whatsapp/config";
 import { sendAppointmentConfirmation } from "@/lib/whatsapp/confirmation";
 import { EaApiError } from "@/lib/ea/errors";
@@ -56,7 +58,10 @@ import { isWritableAgendaTarget, LEGACY_READ_ONLY } from "./legacy";
 // ---------------------------------------------------------------------------
 
 export type WriteResult =
-  | { status: "ok"; appointmentId?: number }
+  | {
+      status: "ok";
+      appointmentId?: number;
+    }
   /** Hay choques y no se mandó `force`. La UI muestra el reporte y reofrece. */
   | { status: "conflict"; report: ConflictReport }
   | { status: "error"; message: string };
@@ -88,6 +93,13 @@ export type AppointmentWrite = {
    * editar o mover, y sin configuración de Meta.
    */
   sendWhatsappConfirmation?: boolean;
+  /**
+   * Los servicios que se suman al principal en **la misma cita** (el "+ pies"
+   * de un par que no es combo). EA guarda el principal y el rango entero; estos
+   * van a `appointment_planned_service` (migración `028`). Ausente = no se
+   * tocan (mover o estirar desde la grilla no los manda); `[]` = se quitan.
+   */
+  extraServiceIds?: number[];
 };
 
 // ---------------------------------------------------------------------------
@@ -119,8 +131,12 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
     return { status: "error", message: "Las horas de la cita no son válidas." };
   }
 
+  const extraIds =
+    input.extraServiceIds === undefined ? undefined : cleanExtras(input.extraServiceIds);
+
   try {
     const client = createEaClient();
+
     const raw = await evaluate(client, {
       id: input.id ?? null,
       providerId: input.providerId,
@@ -152,6 +168,32 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
         ? await client.appointments.create(body)
         : await client.appointments.update(input.id, body);
 
+    // Los adicionales, después de EA. Al **crear**, si no se pueden guardar se
+    // borra la cita: una clienta que pidió manos + pies y quedó agendada solo
+    // con manos se entera en el estudio, que es el peor lugar para enterarse.
+    // Al editar la cita ya existía y se deja; se dice qué faltó.
+    if (extraIds !== undefined) {
+      try {
+        await appointmentPlannedServiceRepository(getDb()).replace(saved.id, extraIds);
+      } catch (error) {
+        console.error("[agenda] no se pudieron guardar los servicios adicionales", error);
+        revalidatePath("/agenda");
+        if (input.id === undefined) {
+          await client.appointments.remove(saved.id).catch((cleanup: unknown) => {
+            console.error("[agenda] no se pudo deshacer la cita sin adicionales", saved.id, cleanup);
+          });
+          return {
+            status: "error",
+            message: "No se pudieron guardar los servicios adicionales; la cita no quedó agendada.",
+          };
+        }
+        return {
+          status: "error",
+          message: "La cita se guardó, pero no los servicios adicionales. Intenta de nuevo.",
+        };
+      }
+    }
+
     // La confirmación sale después de responder, como en la reserva pública:
     // Meta lento o caído no puede demorar ni tumbar una cita que ya existe en
     // EA. Queda en la bitácora a nombre de quien creó la cita.
@@ -161,6 +203,20 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
         sendAppointmentConfirmation(appointmentId, { actorUserId: session.userId }).then(
           () => undefined,
         ),
+      );
+    }
+
+    // La profesional de la columna se entera en el celular, salvo que se la
+    // haya agendado ella misma (`avisos:mis-citas`). Después de responder y
+    // sin poder tumbar nada, como la confirmación.
+    if (input.id === undefined) {
+      const appointmentId = saved.id;
+      after(() =>
+        notifyPanelBooking({
+          appointmentId,
+          providerId: input.providerId,
+          actorUserId: session.userId,
+        }),
       );
     }
 
@@ -413,6 +469,13 @@ function nearby(span: { start: string; end: string }, days: readonly EaLocalDate
 // ---------------------------------------------------------------------------
 // Utilidades
 // ---------------------------------------------------------------------------
+
+/** Ids de servicio válidos, con el mismo tope que la hoja de la cuenta. */
+function cleanExtras(ids: readonly unknown[]): number[] {
+  return ids
+    .filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0)
+    .slice(0, MAX_PLANNED_EXTRAS);
+}
 
 function safeLocal(value: string): EaLocalDateTime | null {
   try {

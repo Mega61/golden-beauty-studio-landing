@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 
 /**
  * Toasts, con Deshacer.
@@ -44,7 +44,15 @@ export type ToastInput = {
   duration?: number;
   undo?: {
     label?: string;
-    /** Revierte la escritura que ya ocurrió. */
+    /**
+     * El ícono del botón. Por defecto el de deshacer; otro cuando el botón del
+     * aviso es la acción que sigue ("Confirmar por WhatsApp" tras crear una cita).
+     */
+    icon?: IconName;
+    /**
+     * Revierte la escritura que ya ocurrió, o hace la acción que sigue. Se llama
+     * **sincrónicamente** dentro del clic, así que puede abrir una pestaña.
+     */
     onUndo: () => void | Promise<void>;
   };
 };
@@ -151,7 +159,7 @@ function ToastRow({
             onDismiss();
           }}
         >
-          <Icon name="deshacer" size={14} style={{ verticalAlign: "-2px" }} />{" "}
+          <Icon name={item.undo.icon ?? "deshacer"} size={14} style={{ verticalAlign: "-2px" }} />{" "}
           {item.undo.label ?? "Deshacer"}
         </button>
       ) : null}

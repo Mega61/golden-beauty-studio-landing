@@ -9,6 +9,7 @@ import {
   RANGE_MODE_LABEL,
   RANGE_MODES,
   shiftAnchor,
+  type AgendaView,
   type RangeMode,
 } from "./range";
 
@@ -24,6 +25,9 @@ import {
  * celular un `?rango=semana` compartido desde el escritorio ve la semana, con
  * scroll. Una URL que deja de funcionar según el aparato es peor que un control
  * que no está.
+ *
+ * **En Lista los rangos se ven siempre**, también en el celular: una semana en
+ * lista cabe en 390 px, y es justo para lo que existe la lista.
  */
 export function RangeBar({
   mode,
@@ -31,9 +35,14 @@ export function RangeBar({
   today,
   onMode,
   onAnchor,
+  view = "grilla",
+  onView,
   actions,
 }: {
   mode: RangeMode;
+  /** Grilla o lista. Sin `onView`, el selector no aparece. */
+  view?: AgendaView;
+  onView?: (view: AgendaView) => void;
   anchor: EaLocalDate;
   today: EaLocalDate;
   onMode: (mode: RangeMode) => void;
@@ -90,7 +99,28 @@ export function RangeBar({
         </span>
       </span>
 
-      <div className={styles.modes} role="radiogroup" aria-label="Rango de la agenda">
+      {onView ? (
+        <div className={styles.views} role="radiogroup" aria-label="Vista de la agenda">
+          {(["grilla", "lista"] as const).map((value) => (
+            <label key={value} className={styles.mode}>
+              <input
+                type="radio"
+                name="vista"
+                value={value}
+                checked={view === value}
+                onChange={() => onView(value)}
+              />
+              {value === "grilla" ? "Grilla" : "Lista"}
+            </label>
+          ))}
+        </div>
+      ) : null}
+
+      <div
+        className={`${styles.modes}${view === "lista" ? ` ${styles.modesAlways}` : ""}`}
+        role="radiogroup"
+        aria-label="Rango de la agenda"
+      >
         {RANGE_MODES.map((value) => (
           <label
             key={value}

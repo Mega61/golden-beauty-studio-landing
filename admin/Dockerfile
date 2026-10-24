@@ -108,6 +108,11 @@ RUN npm run build:historial-pagos
 # para escribir. El reconcile nocturno corre lo mismo sobre la última semana.
 RUN npm run build:asistencia
 
+# Junta en una sola cita las visitas de manos + pies que quedaron como dos
+# citas pegadas (antes de la migración `028`). `scripts/juntar-visitas.js`, a
+# mano, una vez; en seco por defecto, `--aplicar` para escribir.
+RUN npm run build:juntar-visitas
+
 # `public/` puede no existir todavía (hoy no existe). Crearlo acá hace que el
 # `COPY` de abajo funcione igual, en vez de romper el build el día que alguien
 # borre el último archivo estático — o el día que agregue el primero.

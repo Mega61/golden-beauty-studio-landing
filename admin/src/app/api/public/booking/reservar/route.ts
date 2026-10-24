@@ -99,6 +99,8 @@ export async function POST(req: NextRequest) {
             customerLastName: lastName,
             start: result.start,
             providerName: result.providerName,
+            // Su profesional recibe "Nueva cita en tu agenda" (`avisos:mis-citas`).
+            providerId: result.providerId,
             // Un par se anuncia como una sola reserva: "Semipermanente manos y
             // Semipermanente pies".
             resolveServiceName: async () => {

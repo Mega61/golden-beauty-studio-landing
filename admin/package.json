@@ -19,6 +19,7 @@
     "build:catalogo": "esbuild src/jobs/catalog-setup-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/catalogo.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
     "build:historial-pagos": "esbuild src/jobs/legacy-payments-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/historial-pagos.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
     "build:asistencia": "esbuild src/jobs/attendance-backfill-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/asistencia.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
+    "build:juntar-visitas": "esbuild src/jobs/merge-visits-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/standalone/scripts/juntar-visitas.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning",
     "dev:seed": "esbuild src/jobs/dev-seed-cli.ts --bundle --platform=node --target=node22 --format=cjs --outfile=.next/dev-seed.js --alias:server-only=next/dist/compiled/server-only/empty.js --log-level=warning && node --env-file=.env.local .next/dev-seed.js",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",

@@ -7,18 +7,15 @@ import { Button, ButtonLink, EmptyState, Icon, StatusPill, useToast } from "@/co
 
 import type { OptoutResult, SendReminderResult } from "./actions";
 import type { ReminderView } from "./data";
+import { openWhatsappAfter } from "./open-whatsapp";
 
 /**
  * La lista de recordatorios, en dos bloques: lo que falta hoy y mañana.
  *
- * ## Cómo se abre WhatsApp sin que el navegador lo bloquee
- *
- * El enlace sale del servidor **después** de registrar el aviso (ver
- * `actions.ts`), y un `window.open` hecho después de un `await` ya no cuenta
- * como gesto de la usuaria: Safari en iPhone lo bloquea en silencio. Así que
- * la pestaña se abre vacía en el mismo toque y se le pone la dirección cuando
- * llega. Si el navegador la bloqueó igual, la fila queda en "Recordada" con
- * su botón "Abrir de nuevo", que es un enlace normal.
+ * WhatsApp se abre con `openWhatsappAfter()`: el enlace llega después de
+ * registrar el aviso, y la pestaña tiene que abrirse en el mismo toque. Si el
+ * navegador la bloqueó igual, la fila queda en "Recordada" con su botón "Abrir
+ * de nuevo", que es un enlace normal.
  */
 export function RecordatoriosLista({
   rows,
@@ -47,31 +44,25 @@ export function RecordatoriosLista({
   const manana = rows.filter((r) => r.day === "manana");
 
   async function onSend(row: ReminderView) {
-    // En el mismo toque, antes de cualquier `await`. Se corta el `opener`
-    // para que la pestaña de WhatsApp no tenga una referencia al panel.
-    const tab = window.open("", "_blank");
-    if (tab) tab.opener = null;
-
     setBusy(row.eaAppointmentId);
     try {
-      const result = await send({ eaAppointmentId: row.eaAppointmentId });
+      const { result, opened } = await openWhatsappAfter(() =>
+        send({ eaAppointmentId: row.eaAppointmentId }),
+      );
       if (!result.ok) {
-        tab?.close();
         toast({ message: result.message, tone: "error", duration: 0 });
         return;
       }
-      if (tab) tab.location.href = result.url;
       toast({
         message: result.already
           ? `Ya estaba recordada. ${result.sentLabel}.`
-          : tab
+          : opened
             ? "Aviso registrado. Dale enviar en WhatsApp."
             : "Aviso registrado. El navegador no abrió WhatsApp: usa «Abrir de nuevo».",
-        tone: tab ? "ok" : "warn",
+        tone: opened ? "ok" : "warn",
       });
       router.refresh();
     } catch {
-      tab?.close();
       toast({ message: "No se pudo conectar con el panel. Intenta de nuevo.", tone: "error" });
     } finally {
       setBusy(null);
