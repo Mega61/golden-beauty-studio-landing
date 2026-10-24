@@ -786,6 +786,17 @@ export interface CustomerSettingTable {
   updated_at: UpdatedAt;
 }
 
+/**
+ * Los servicios de una cita además del principal (migración `028`): el "+ pies"
+ * de un par que no es combo. No lleva plata — la cuenta pone el precio al cerrar.
+ */
+export interface AppointmentPlannedServiceTable {
+  ea_appointment_id: number;
+  position: number;
+  ea_service_id: number;
+  created_at: Generated<Date>;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -816,6 +827,7 @@ export interface Database {
   push_subscription: PushSubscriptionTable;
   ad_spend: AdSpendTable;
   customer_setting: CustomerSettingTable;
+  appointment_planned_service: AppointmentPlannedServiceTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;

@@ -249,7 +249,14 @@ export function isAllowedIdentity(
  *   su columna, no la de las demás, y un aviso en su pantalla de bloqueo con la
  *   clienta de otra rompería ese alcance por la puerta de atrás. Si algún día
  *   se quiere que la técnica sepa de *sus* reservas, es otra capacidad con su
- *   propio filtro por `ea_provider_id`, no esta abierta a un rol más.
+ *   propio filtro por `ea_provider_id`, no esta abierta a un rol más — y es
+ *   `avisos:mis-citas`.
+ * - `avisos:mis-citas` — recibir en el celular un aviso cuando agendan una
+ *   cita **en la columna propia**: por la página o desde el panel, salvo la que
+ *   una misma se agenda. Lo tienen los tres roles, pero solo llega a quien
+ *   tiene `ea_provider_id`, y el filtro va en el envío (`lib/push/send.ts`):
+ *   una cita de la columna 4 avisa a quien es la 4 y a nadie más. Es como la
+ *   técnica se entera de lo suyo sin ver la agenda de las demás.
  * - `pauta:registrar` — anotar cuánto se invirtió en anuncios en un mes (la
  *   tabla `ad_spend`, migración `023`). Es la cifra que convierte "clientas
  *   nuevas" en "costo por clienta nueva", y es plata que solo la dueña sabe y
@@ -290,6 +297,7 @@ export type Capability =
   | "recordatorios:enviar"
   | "recordatorios:baja"
   | "avisos:reservas-web"
+  | "avisos:mis-citas"
   | "pauta:registrar"
   | "clientes:exportar"
   | "cortesia:otorgar";
@@ -338,6 +346,7 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "recordatorios:enviar",
     "recordatorios:baja",
     "avisos:reservas-web",
+    "avisos:mis-citas",
     "pauta:registrar",
     "clientes:exportar",
     "cortesia:otorgar",
@@ -362,6 +371,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     // La reserva web llega sin que nadie la vea: recepción es quien confirma
     // por WhatsApp y acomoda la agenda, así que es quien tiene que enterarse.
     "avisos:reservas-web",
+    // Si recepción también atiende (tiene columna), se entera de lo suyo.
+    "avisos:mis-citas",
   ]),
 
   // La técnica. Su alcance es su propio día, sus propias cuentas y su propia
@@ -370,6 +381,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
   staff: new Set<Capability>([
     "cuenta:cerrar-propia",
     "liquidacion:ver-propia",
+    // Solo de su columna: el filtro por `ea_provider_id` va en el envío.
+    "avisos:mis-citas",
   ]),
 };
 
@@ -389,6 +402,19 @@ export function can(
     return ctx.staffCobra === true;
   }
   return MATRIX[role].has(capability);
+}
+
+/**
+ * ¿Hay algún aviso push que le pueda llegar a esta persona?
+ *
+ * `avisos:reservas-web` le llega a quien lo tiene; `avisos:mis-citas` solo a
+ * quien tiene columna (`ea_provider_id`). Sin ninguno de los dos, Ajustes no
+ * ofrece el interruptor: un aviso que nunca va a llegar es peor que no tenerlo.
+ */
+export function receivesBookingPush(role: UserRole, eaProviderId: number | null): boolean {
+  return (
+    can(role, "avisos:reservas-web") || (can(role, "avisos:mis-citas") && eaProviderId !== null)
+  );
 }
 
 /**

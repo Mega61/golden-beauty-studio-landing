@@ -46,6 +46,7 @@ const TODAS: Capability[] = [
   "recordatorios:enviar",
   "recordatorios:baja",
   "avisos:reservas-web",
+  "avisos:mis-citas",
   "pauta:registrar",
   "clientes:exportar",
   "cortesia:otorgar",
@@ -87,6 +88,8 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // Reservas de la página (push): recepción confirma y acomoda la agenda,
     // así que es quien tiene que enterarse en el momento.
     "avisos:reservas-web": true,
+    // Lo de su propia columna, si atiende: el filtro por `ea_provider_id` es del envío.
+    "avisos:mis-citas": true,
     // Recepción **ve** el costo por clienta nueva (es un reporte), pero no
     // escribe la inversión en anuncios: es plata y decisión de la dueña.
     "pauta:registrar": false,
@@ -121,6 +124,9 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // El aviso nombra clienta y técnica de cualquier columna: es agenda de
     // todo el equipo, que la técnica no ve.
     "avisos:reservas-web": false,
+    // Pero sí lo de **su** columna: el envío filtra por su `ea_provider_id`,
+    // así que nunca le llega la clienta de otra.
+    "avisos:mis-citas": true,
     "pauta:registrar": false,
     "clientes:exportar": false,
     // La técnica no regala servicios: una cortesía le paga comisión sobre un

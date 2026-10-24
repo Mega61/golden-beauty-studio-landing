@@ -10,7 +10,7 @@ import {
 describe("getPriceCOP", () => {
   it("finds an item in any category", () => {
     expect(getPriceCOP("acrylic-sculpted")).toBe(115000);
-    expect(getPriceCOP("semi-permanent-hands-feet")).toBe(95000);
+    expect(getPriceCOP("semi-permanent-hands-feet")).toBe(100000);
     expect(getPriceCOP("system-removal")).toBe(20000);
   });
 

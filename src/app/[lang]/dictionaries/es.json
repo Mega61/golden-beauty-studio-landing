@@ -196,6 +196,54 @@
           "semi-permanent-hands-traditional-feet": {
             "name": "Semipermanente manos + tradicional pies",
             "desc": "Esmalte gel manos + esmalte tradicional pies"
+          },
+          "rubber-base-leveling-hands-semi-feet": {
+            "name": "Nivelación base rubber + semi pies",
+            "desc": "Base rubber en manos + esmalte gel en pies"
+          },
+          "rubber-base-leveling-hands-traditional-feet": {
+            "name": "Nivelación base rubber + tradicional pies",
+            "desc": "Base rubber en manos + esmalte tradicional en pies"
+          },
+          "press-on-hands-semi-feet": {
+            "name": "Press on + semi pies",
+            "desc": "Uñas press on + esmalte gel en pies"
+          },
+          "press-on-hands-traditional-feet": {
+            "name": "Press on + tradicional pies",
+            "desc": "Uñas press on + esmalte tradicional en pies"
+          },
+          "dipping-hands-semi-feet": {
+            "name": "Dipping + semi pies",
+            "desc": "Dipping en manos + esmalte gel en pies"
+          },
+          "dipping-hands-traditional-feet": {
+            "name": "Dipping + tradicional pies",
+            "desc": "Dipping en manos + esmalte tradicional en pies"
+          },
+          "builder-gel-dual-hands-semi-feet": {
+            "name": "Dual system builder gel + semi pies",
+            "desc": "Dual system builder gel en manos + esmalte gel en pies"
+          },
+          "builder-gel-overlay-hands-traditional-feet": {
+            "name": "Forrado builder gel manos + tradicional pies",
+            "desc": "Forrado en uña natural + esmalte tradicional en pies"
+          },
+          "polygel-sculpted-hands-feet-cleanup": {
+            "name": "Esculpidas polygel + limpieza pies",
+            "desc": "Esculpidas en polygel + limpieza de pies sin esmalte"
+          },
+          "traditional-hands-feet": {
+            "name": "Tradicional manos + pies",
+            "desc": "Esmalte tradicional en manos y pies"
+          },
+          "hands-cleanup-semi-feet": {
+            "name": "Limpieza manos + semi pies",
+            "desc": "Limpieza de manos sin esmalte + esmalte gel en pies"
+          },
+          "hands-feet-cleanup": {
+            "name": "Limpieza manos + pies",
+            "desc": "Limpieza de manos y pies, sin esmalte"
           }
         }
       },

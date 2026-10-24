@@ -5,6 +5,8 @@ import {
   phoneSearchVariants,
   type E164,
 } from "@/app/(panel)/clientes/identity";
+import { getDb } from "@/db/client";
+import { appointmentPlannedServiceRepository } from "@/db/repositories";
 import { createEaClient, eaConfigFromEnv, type EaClient } from "@/lib/ea/client";
 import type { EaLocalDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
@@ -34,8 +36,9 @@ import { loadAvailability, loadPairAvailability } from "../availability/data";
 export type BookingRequest = {
   serviceId: number;
   /**
-   * La segunda mitad de un par sin combo: otra cita, justo después de la
-   * primera y con la misma persona. Ver `lib/visits.ts`.
+   * La segunda mitad de un par sin combo (manos + pies). Va en **la misma
+   * cita**: EA guarda el principal y el rango entero, y esto queda como
+   * servicio adicional (migración `028`). Una reserva, un bloque.
    */
   thenServiceId?: number | null;
   date: EaLocalDate;
@@ -53,8 +56,6 @@ export type BookingResult =
   | {
       status: "ok";
       appointmentId: number;
-      /** La segunda cita de un par; `null` si fue un solo servicio. */
-      secondAppointmentId: number | null;
       /** A quién le tocó. La confirmación la nombra. */
       providerId: number;
       providerName: string;
@@ -128,9 +129,12 @@ export async function createBooking(
 
   const customer = await resolveCustomer(client, phone, input);
 
+  // Un par sin combo es **una** cita que dura lo que duran los dos: el hueco ya
+  // se verificó para el par entero (`loadPairAvailability`), así que el rango
+  // es el del slot completo y no solo el de la primera mitad.
   const appointment = await client.appointments.create({
     start: slot.start,
-    end: slot.splitAt ?? slot.end,
+    end: slot.end,
     customerId: customer.id,
     providerId,
     serviceId: input.serviceId,
@@ -138,28 +142,18 @@ export async function createBooking(
     notes: input.notes?.trim() || null,
   });
 
-  // La segunda mitad del par. Si no se puede crear, la primera se borra: una
-  // persona que pidió manos + pies y quedó solo con manos se entera en el
-  // estudio, que es el peor lugar para enterarse. Mejor un "esa hora se acaba
-  // de ocupar" y que elija otra.
-  let secondAppointmentId: number | null = null;
-  if (input.thenServiceId && slot.splitAt) {
+  // La segunda mitad queda como adicional de la misma cita. Si no se puede
+  // guardar, la cita se borra: una persona que pidió manos + pies y quedó solo
+  // con manos se entera en el estudio, que es el peor lugar para enterarse.
+  if (input.thenServiceId) {
     try {
-      const second = await client.appointments.create({
-        start: slot.splitAt,
-        end: slot.end,
-        customerId: customer.id,
-        providerId,
-        serviceId: input.thenServiceId,
-        status: "Reservada",
-        notes: "Sigue de la cita anterior (misma visita).",
-      });
-      secondAppointmentId = second.id;
+      await appointmentPlannedServiceRepository(getDb()).replace(appointment.id, [
+        input.thenServiceId,
+      ]);
     } catch (error) {
       await client.appointments.remove(appointment.id).catch((cleanup: unknown) => {
-        console.error("[reservar] no se pudo deshacer la primera mitad del par", appointment.id, cleanup);
+        console.error("[reservar] no se pudo deshacer la cita sin su segundo servicio", appointment.id, cleanup);
       });
-      if (error instanceof EaApiError && !error.isTransient) return { status: "taken" };
       throw error;
     }
   }
@@ -169,7 +163,6 @@ export async function createBooking(
   return {
     status: "ok",
     appointmentId: appointment.id,
-    secondAppointmentId,
     providerId,
     providerName: fullName(provider.firstName, provider.lastName) ?? `Profesional ${providerId}`,
     providerFirstName: (provider.firstName ?? "").trim() || `Profesional ${providerId}`,

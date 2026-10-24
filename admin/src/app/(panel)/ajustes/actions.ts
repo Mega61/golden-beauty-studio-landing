@@ -6,7 +6,8 @@ import { z } from "zod";
 
 import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
-import { ForbiddenError, requireCapability, requireSession } from "@/lib/dal";
+import { receivesBookingPush } from "@/lib/auth-policy";
+import { requireSession } from "@/lib/dal";
 import { sendTestPush, vapidConfig } from "@/lib/push/send";
 
 /**
@@ -55,6 +56,16 @@ async function userAgent(): Promise<string | null> {
   return ua ? ua.slice(0, 300) : null;
 }
 
+/**
+ * La sesión, si a esta persona le puede llegar algún aviso: el de reservas web
+ * (dueña y recepción) o el de su propia columna (`avisos:mis-citas`, quien
+ * tiene `ea_provider_id`). Sin sesión, `requireSession` manda a entrar.
+ */
+async function requirePushSession() {
+  const session = await requireSession();
+  return receivesBookingPush(session.role, session.eaProviderId) ? session : null;
+}
+
 export async function activarAvisos(input: unknown): Promise<PushActionResult> {
   if (vapidConfig() === null) {
     return { ok: false, message: "Los avisos no están configurados en este servidor." };
@@ -62,16 +73,8 @@ export async function activarAvisos(input: unknown): Promise<PushActionResult> {
   const parsed = SubscriptionSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "El navegador mandó una suscripción inválida." };
 
-  let session;
-  try {
-    session = await requireCapability("avisos:reservas-web");
-  } catch (error) {
-    unstable_rethrow(error);
-    if (error instanceof ForbiddenError) {
-      return { ok: false, message: "Tu rol no recibe avisos de reservas." };
-    }
-    return { ok: false, message: "No se pudo verificar la sesión." };
-  }
+  const session = await requirePushSession();
+  if (session === null) return { ok: false, message: "Tu cuenta no recibe avisos de reservas." };
 
   const ua = await userAgent();
   try {
@@ -149,13 +152,8 @@ export async function probarAviso(input: unknown): Promise<PushActionResult> {
   const parsed = EndpointSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Falta el dispositivo." };
 
-  let session;
-  try {
-    session = await requireCapability("avisos:reservas-web");
-  } catch (error) {
-    unstable_rethrow(error);
-    return { ok: false, message: "Tu rol no recibe avisos de reservas." };
-  }
+  const session = await requirePushSession();
+  if (session === null) return { ok: false, message: "Tu cuenta no recibe avisos de reservas." };
 
   try {
     const sub = await repositories(getDb()).pushSubscriptions.findForUser(

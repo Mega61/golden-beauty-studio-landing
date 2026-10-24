@@ -65,7 +65,7 @@ test.describe("el catálogo público", () => {
 
     for (const s of body.services) {
       expect(Object.keys(s).sort()).toEqual(
-        ["category", "durationMin", "id", "isCombo", "name", "priceCOP", "slug"].sort(),
+        ["category", "dayPromos", "durationMin", "id", "isCombo", "name", "priceCOP", "slug"].sort(),
       );
     }
 

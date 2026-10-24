@@ -20,8 +20,13 @@ export type {
 export { ConflictReview } from "./ConflictReview";
 export { DaySheet } from "./DaySheet";
 export { RangeBar } from "./RangeBar";
+export { AgendaList } from "./AgendaList";
+export { buildAgendaList, type AgendaListDay, type AgendaListRow } from "./agenda-list";
 
 export {
+  AGENDA_VIEWS,
+  parseAgendaView,
+  type AgendaView,
   addDays,
   datesFor,
   fetchWindow,

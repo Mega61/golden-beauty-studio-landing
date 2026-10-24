@@ -11,12 +11,16 @@ import { formatCOP, formatDuration, formatPhoneCO } from "@/components/ui/format
 import { STATUS_IDS, STATUS_META } from "@/components/ui/status";
 import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import {
+  addToBooking,
+  bookingMinutes,
   comboServiceIds,
   composeFrom,
   pairedServiceId,
   partnersFor,
   quoteCombo,
+  removeFromBooking,
   roleOf,
+  MAX_PLANNED_EXTRAS,
   type ComboComposition,
 } from "@/lib/combos";
 import type { ConflictReport } from "@/lib/conflict";
@@ -46,6 +50,11 @@ import { ClientContextCard } from "./ClientContextCard";
  *   pies?" con lo que lo acompaña. Al resolver el par, la cita **es** el combo,
  *   con su precio y su duración propios, y la suma de las dos mitades se muestra
  *   tachada al lado para que el descuento se vea. Ver `lib/combos.ts`.
+ * - **Manos y pies que no son combo también van en una sola cita.** "Agregar
+ *   otro servicio" suma cualquiera: si con el principal forma un combo, la cita
+ *   pasa a ser el combo; si no, queda como adicional de **la misma cita** —un
+ *   bloque, una cuenta— que dura lo que duran los dos, y la hoja de la cuenta
+ *   lo trae ya agregado (migración `028`).
  * - **Al elegir la clienta aparece su historial corto** (`ClientContextCard`):
  *   las últimas citas, si es nueva, si suele faltar, y un botón con el servicio
  *   que toca —el retoque del sistema que trae puesto, o repetir—. Un toque, nunca
@@ -88,6 +97,11 @@ export type AppointmentDraft = {
    * `allowOutsideHours`: sobrevive al ida y vuelta del reporte de choques.
    */
   sendWhatsappConfirmation: boolean;
+  /**
+   * Lo que se suma al servicio principal en la misma cita y no es combo
+   * ("Esculpidas en acrílico" + "Semipermanente pies"). Ver `addToBooking()`.
+   */
+  extraServiceIds: number[];
 };
 
 export type AppointmentFormProps = {
@@ -203,17 +217,29 @@ export function AppointmentForm({
 
   const baseRole = roleOf(combos, baseId);
 
+  /**
+   * El fin, desde el inicio y todo lo agendado: el principal (o el combo, con
+   * su duración propia) más los adicionales. Sin ninguna duración conocida, se
+   * deja el fin que había.
+   */
+  const withServices = (
+    current: AppointmentDraft,
+    serviceId: number | null,
+    extraServiceIds: number[],
+  ): AppointmentDraft => {
+    const minutes = bookingMinutes(parts, { serviceId, extras: extraServiceIds });
+    return {
+      ...current,
+      serviceId,
+      extraServiceIds,
+      endTime: minutes ? addMinutesToTime(current.startTime, minutes) : current.endTime,
+    };
+  };
+
   /** Al elegir servicio, el fin se recalcula con su duración. */
   const pickService = (id: number | null) => {
-    const chosen = services.find((s) => s.id === id) ?? null;
     setFirstPick(id);
-    setDraft((current) => ({
-      ...current,
-      serviceId: id,
-      endTime: chosen?.duration
-        ? addMinutesToTime(current.startTime, chosen.duration)
-        : current.endTime,
-    }));
+    setDraft((current) => withServices(current, id, current.extraServiceIds));
   };
 
   /**
@@ -228,14 +254,29 @@ export function AppointmentForm({
    */
   const pickPartner = (id: number | null) => {
     const next = pairedServiceId(combos, baseId, id);
-    const chosen = services.find((s) => s.id === next) ?? null;
-    setDraft((current) => ({
-      ...current,
-      serviceId: next,
-      endTime: chosen?.duration
-        ? addMinutesToTime(current.startTime, chosen.duration)
-        : current.endTime,
-    }));
+    setDraft((current) => withServices(current, next, current.extraServiceIds));
+  };
+
+  /** "Agregar otro servicio": combo si el par lo es, adicional si no. */
+  const addExtra = (id: number) => {
+    setDraft((current) => {
+      const next = addToBooking(
+        combos,
+        { serviceId: current.serviceId, extras: current.extraServiceIds },
+        id,
+      );
+      return withServices(current, next.serviceId, next.extras);
+    });
+  };
+
+  const removeExtra = (index: number) => {
+    setDraft((current) => {
+      const next = removeFromBooking(
+        { serviceId: current.serviceId, extras: current.extraServiceIds },
+        index,
+      );
+      return withServices(current, next.serviceId, next.extras);
+    });
   };
 
   /** Al correr el inicio, el fin se corre igual: la duración es lo que se pactó. */
@@ -373,6 +414,17 @@ export function AppointmentForm({
           lo que no se puede es llegar a ellos eligiendo sus mitades. Se dice, en
           vez de que la función desaparezca sin explicación. */}
       {combosReason ? <p className={styles.formPreview}>{combosReason}</p> : null}
+
+      {draft.serviceId !== null ? (
+        <ExtraServices
+          extras={draft.extraServiceIds}
+          services={services}
+          pickable={pickable}
+          canAdd={draft.extraServiceIds.length < MAX_PLANNED_EXTRAS}
+          onAdd={addExtra}
+          onRemove={removeExtra}
+        />
+      ) : null}
 
       <Field label="Profesional" required>
         {(wired) => (
@@ -529,6 +581,109 @@ export function AppointmentForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Otro servicio en el mismo turno
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo que se suma al servicio principal en la misma cita: la lista de lo
+ * agregado y un selector para agregar más.
+ *
+ * El selector arranca cerrado detrás de un botón: la mayoría de las citas son de
+ * un solo servicio, y un segundo `<select>` siempre visible se lee como "falta
+ * llenar esto".
+ */
+function ExtraServices({
+  extras,
+  services,
+  pickable,
+  canAdd,
+  onAdd,
+  onRemove,
+}: {
+  extras: readonly number[];
+  services: readonly ServiceOption[];
+  pickable: readonly ServiceOption[];
+  canAdd: boolean;
+  onAdd: (id: number) => void;
+  onRemove: (index: number) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const byId = new Map(services.map((s) => [s.id, s]));
+
+  return (
+    <div style={{ display: "grid", gap: "0.375rem" }}>
+      {extras.length > 0 ? (
+        <ul className="ui-list" aria-label="Servicios adicionales">
+          {extras.map((id, index) => {
+            const extra = byId.get(id);
+            return (
+              <li key={`${id}-${index}`} className="ui-list__row">
+                <span className="ui-list__body">
+                  <span className="ui-list__primary">+ {extra?.name ?? `Servicio ${id}`}</span>
+                  <span className="ui-list__secondary">
+                    {[
+                      extra?.duration ? formatDuration(extra.duration) : null,
+                      extra?.priceCOP !== null && extra?.priceCOP !== undefined
+                        ? formatCOP(extra.priceCOP)
+                        : null,
+                      "se cobra en la misma cuenta",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Quitar ${extra?.name ?? "servicio"}`}
+                  onClick={() => onRemove(index)}
+                >
+                  Quitar
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {adding ? (
+        <Field
+          label="Otro servicio en la misma cita"
+          hint="Si con el principal forma un combo, la cita pasa a ser el combo."
+        >
+          {(wired) => (
+            <Select
+              {...wired}
+              autoFocus
+              value=""
+              onChange={(e) => {
+                if (e.target.value === "") return;
+                onAdd(Number(e.target.value));
+                setAdding(false);
+              }}
+            >
+              <option value="">Elige un servicio…</option>
+              {pickable.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                  {option.duration ? ` · ${formatDuration(option.duration)}` : ""}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      ) : canAdd ? (
+        <div>
+          <Button size="sm" onClick={() => setAdding(true)}>
+            + Agregar otro servicio
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

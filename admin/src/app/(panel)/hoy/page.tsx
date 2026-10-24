@@ -12,6 +12,7 @@ import type { UserRole } from "@/db/types";
 import { loadComboCompositions } from "@/lib/combo-source";
 import { cerrarCuenta, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
+import { loadConfirmations, pendingConfirmations } from "../recordatorios/confirmations-data";
 import { loadReminders } from "../recordatorios/data";
 import { TodayList } from "./TodayList";
 
@@ -66,10 +67,17 @@ export default async function HoyPage() {
   // sale sin número —nunca tumba Hoy por un dato accesorio.
   const [{ date, appointments, catalog, problems }, pendingReminders, comboSource] = await Promise.all([
     loadToday(session, { verTodas }),
+    // Recordatorios **y** reservas nuevas por confirmar: los dos son mensajes
+    // que salen del mismo botón de la misma pantalla.
     canRemind
-      ? loadReminders()
-          .then((r) =>
+      ? Promise.all([
+          loadReminders().then((r) =>
             r.problems.length > 0 ? null : r.rows.filter((row) => row.state === "pendiente").length,
+          ),
+          loadConfirmations().then(pendingConfirmations),
+        ])
+          .then(([reminders, confirmations]) =>
+            reminders === null || confirmations === null ? null : reminders + confirmations,
           )
           .catch(() => null)
       : Promise.resolve(null),
@@ -152,12 +160,12 @@ export default async function HoyPage() {
           >
             <Icon name="mensaje" size={18} />
             {pendingReminders === null
-              ? "Recordatorios por WhatsApp"
+              ? "Confirmaciones y recordatorios"
               : pendingReminders === 0
-                ? "Recordatorios: nada pendiente"
+                ? "WhatsApp: nada pendiente"
                 : pendingReminders === 1
-                  ? "Recordatorios: 1 pendiente"
-                  : `Recordatorios: ${pendingReminders} pendientes`}
+                  ? "WhatsApp: 1 mensaje pendiente"
+                  : `WhatsApp: ${pendingReminders} mensajes pendientes`}
           </Link>
         ) : null}
 

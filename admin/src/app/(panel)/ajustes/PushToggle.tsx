@@ -62,11 +62,14 @@ function standalone(): boolean {
 
 export function PushToggle({
   vapidPublicKey,
+  onlyOwn = false,
   activate,
   deactivate,
   test,
 }: {
   vapidPublicKey: string;
+  /** La técnica: solo le llegan las citas de su columna. Cambia el texto. */
+  onlyOwn?: boolean;
   activate: (sub: unknown) => Promise<PushActionResult>;
   deactivate: (input: { endpoint: string }) => Promise<PushActionResult>;
   test: (input: { endpoint: string }) => Promise<PushActionResult>;
@@ -209,8 +212,12 @@ export function PushToggle({
   return (
     <div style={{ display: "grid", gap: "0.75rem" }}>
       <Checkbox
-        label="Avisarme cuando alguien reserve en la página"
-        hint="Solo en este dispositivo. El aviso dice el servicio, el nombre, el día y la hora, y con quién. Nunca el teléfono de quien reserva."
+        label={onlyOwn ? "Avisarme cuando me agenden una cita" : "Avisarme cuando alguien reserve en la página"}
+        hint={
+          onlyOwn
+            ? "Solo en este dispositivo, y solo tus citas. El aviso dice el servicio, el nombre, el día y la hora. Nunca el teléfono de la clienta."
+            : "Solo en este dispositivo. El aviso dice el servicio, el nombre, el día y la hora, y con quién. Nunca el teléfono de quien reserva."
+        }
         checked={state === "prendido"}
         disabled={busy || state === "bloqueado"}
         onChange={(e) => void onChange(e.currentTarget.checked)}

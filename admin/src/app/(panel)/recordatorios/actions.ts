@@ -9,13 +9,14 @@ import { repositories } from "@/db/repositories";
 import { REMINDER_RULES, scheduledFor } from "@/jobs/reminders";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { eaLocalToInstant, instantToEaDate } from "@/lib/ea";
-import { loadAppointmentForMessage } from "@/lib/whatsapp/load-appointment";
+import { loadAppointmentForTemplate } from "@/lib/whatsapp/load-appointment";
 import {
   MANUAL_TEMPLATE,
   planManualReminders,
   type ManualReminderAppointment,
 } from "@/lib/whatsapp/manual-reminder";
 
+import { registerManualConfirmation, type ManualConfirmationResult } from "./confirmation-send";
 import { linkFor, nextEaDate, sentLabelOf } from "./data";
 
 /**
@@ -61,8 +62,14 @@ const STATE_MESSAGE = {
   "no-enviada": "Ya hay un registro de este aviso que dice que no salió. Revísalo con administración.",
 } as const;
 
-/** La cita, reducida a lo que deciden las funciones puras. Leída de EA. */
-const loadAppointment = loadAppointmentForMessage;
+/**
+ * La cita, reducida a lo que deciden las funciones puras. Leída de EA.
+ *
+ * Con la visita resuelta (`lib/visits.ts`): si es la primera de un manos + pies
+ * sin combo, `serviceName` ya nombra las dos, y `continuation` marca la segunda,
+ * que no lleva aviso propio.
+ */
+const loadAppointment = loadAppointmentForTemplate;
 
 export async function enviarRecordatorio(input: {
   eaAppointmentId: number;
@@ -84,7 +91,14 @@ export async function enviarRecordatorio(input: {
 
   let appointment: ManualReminderAppointment;
   try {
-    appointment = await loadAppointment(eaAppointmentId);
+    const loaded = await loadAppointment(eaAppointmentId);
+    if (loaded.continuation) {
+      return {
+        ok: false,
+        message: "Esta cita sigue a otra de la misma visita: el recordatorio va con la primera.",
+      };
+    }
+    appointment = loaded;
   } catch (error) {
     unstable_rethrow(error);
     console.error("[recordatorios] no se pudo leer la cita", error);
@@ -247,6 +261,38 @@ export async function enviarRecordatorio(input: {
       message: "No se pudo registrar el aviso, así que no se abrió WhatsApp. Intenta de nuevo.",
     };
   }
+}
+
+/**
+ * Registrar una confirmación de reserva mandada a mano y devolver el enlace.
+ *
+ * La llaman "Reservas nuevas" y la agenda (el detalle de la cita y el aviso de
+ * "Cita creada"). Lo que decide vive en `confirmation-send.ts`, que comparte
+ * con `/confirmar/[id]`.
+ */
+export async function enviarConfirmacion(input: {
+  eaAppointmentId: number;
+}): Promise<ManualConfirmationResult> {
+  const parsed = InputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Falta la cita." };
+
+  let session;
+  try {
+    session = await requireCapability("recordatorios:enviar");
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ForbiddenError) {
+      return { ok: false, message: "Tu rol no manda mensajes por WhatsApp." };
+    }
+    return { ok: false, message: "No se pudo verificar la sesión." };
+  }
+
+  const result = await registerManualConfirmation(parsed.data.eaAppointmentId, {
+    userId: session.userId,
+    name: session.name,
+  });
+  if (result.ok && !result.already) revalidatePath("/recordatorios");
+  return result;
 }
 
 /**

@@ -11,11 +11,14 @@ import {
 } from "react";
 
 import {
+  AgendaList,
   DaySheet,
   RangeBar,
   ResourceGrid,
+  buildAgendaList,
   datesFor,
   visibleWindow,
+  type AgendaView,
   type MovePick,
   type RangeMode,
   type ResizePick,
@@ -35,6 +38,8 @@ import type { ConflictReport } from "@/lib/conflict";
 import { addMinutes, eaDatePart, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea/datetime";
 import type { Appointment } from "@/lib/ea/types";
 import { cancelAppointment, saveAppointment, saveBlock } from "./actions";
+import { enviarConfirmacion } from "../recordatorios/actions";
+import { openWhatsappAfter } from "../recordatorios/open-whatsapp";
 import { AttendanceControl } from "../hoy/AttendanceControl";
 import { mapEaStatus } from "@/components/calendar/status-map";
 import { AppointmentForm, type AppointmentDraft } from "./AppointmentForm";
@@ -77,6 +82,8 @@ import {
 export type AgendaClientProps = {
   initial: AgendaData;
   mode: RangeMode;
+  /** Grilla o lista (`?vista=lista`). */
+  view: AgendaView;
   anchor: EaLocalDate;
   today: EaLocalDate;
   /** `null` si EA respondió. Con texto, la pantalla está en solo lectura. */
@@ -86,6 +93,12 @@ export type AgendaClientProps = {
   canWrite: boolean;
   /** ¿Está prendida la confirmación por WhatsApp (Cloud API)? */
   whatsappConfirmation: boolean;
+  /**
+   * ¿Puede quien mira mandar la confirmación a mano (`recordatorios:enviar`)?
+   * Con eso aparece "Confirmar por WhatsApp" en el aviso de cita creada y en
+   * el detalle de la cita.
+   */
+  canConfirmByHand: boolean;
 };
 
 /** Cada cuánto se vuelve a pedir el rango visible. */
@@ -105,16 +118,23 @@ type PanelState =
 export function AgendaClient({
   initial,
   mode: initialMode,
+  view: initialView,
   anchor: initialAnchor,
   today,
   eaFailure,
   ownProviderId,
   canWrite,
   whatsappConfirmation,
+  canConfirmByHand,
 }: AgendaClientProps) {
   const { toast } = useToast();
 
   const [mode, setMode] = useState<RangeMode>(initialMode);
+  const [view, setView] = useState<AgendaView>(initialView);
+  // Si al pasar a Lista el rango era Día, la lista se abre en la semana —una
+  // lista de un día es la grilla con otra forma— y al volver a la grilla se
+  // devuelve el Día. Solo si fue la lista quien lo cambió.
+  const [weekForList, setWeekForList] = useState(false);
   const [anchor, setAnchor] = useState<EaLocalDate>(initialAnchor);
   const [data, setData] = useState<AgendaData>(initial);
   const [failure, setFailure] = useState<string | null>(eaFailure);
@@ -217,8 +237,24 @@ export function AgendaClient({
     const url = new URL(window.location.href);
     url.searchParams.set("rango", mode);
     url.searchParams.set("dia", anchor);
+    if (view === "lista") url.searchParams.set("vista", "lista");
+    else url.searchParams.delete("vista");
     window.history.replaceState(null, "", url.toString());
-  }, [mode, anchor]);
+  }, [mode, anchor, view]);
+
+  const changeView = (next: AgendaView) => {
+    if (next === view) return;
+    if (next === "lista" && mode === "dia") {
+      setMode("semana");
+      setWeekForList(true);
+    } else if (next === "grilla" && weekForList && mode === "semana") {
+      setMode("dia");
+      setWeekForList(false);
+    } else {
+      setWeekForList(false);
+    }
+    setView(next);
+  };
 
   // ── La grilla ────────────────────────────────────────────────────────────
 
@@ -259,6 +295,29 @@ export function AgendaClient({
         });
       }),
     [dates, window_, data, now],
+  );
+
+  // La lista lee lo mismo que la grilla —citas de EA más el historial de Agenda
+  // Pro como citas sintéticas— pero sin la ventana de horas: en una lista no hay
+  // "antes de las 8" que esconder.
+  const listDays = useMemo(
+    () =>
+      buildAgendaList(
+        dates,
+        new Map(
+          dates.map((date) => {
+            const legacy = legacyLayerForDay(data.legacy ?? [], data.providers, date);
+            return [
+              date,
+              {
+                providers: legacy.providers,
+                appointments: [...data.appointments, ...legacy.appointments],
+              },
+            ];
+          }),
+        ),
+      ),
+    [dates, data],
   );
 
   const legacyVisible = useMemo(() => {
@@ -417,11 +476,38 @@ export function AgendaClient({
           // turno, no una preferencia que se quede pegada al formulario.
           allowOutsideHours: false,
           sendWhatsappConfirmation: true,
+          extraServiceIds: [],
         },
       });
     },
     [data.appointments, movingId, onMove],
   );
+
+  /**
+   * Confirmarle a la clienta por WhatsApp, a mano. Queda registrada igual que
+   * desde Recordatorios (`registerManualConfirmation`), así "Reservas nuevas" la
+   * muestra confirmada. Tiene que llamarse dentro del clic: abre la pestaña.
+   */
+  const confirmByWhatsapp = (appointmentId: number) => {
+    openWhatsappAfter(() => enviarConfirmacion({ eaAppointmentId: appointmentId }))
+      .then(({ result, opened }) => {
+        if (!result.ok) {
+          toast({ message: result.message, tone: "error", duration: 0 });
+          return;
+        }
+        toast({
+          message: result.already
+            ? `Ya estaba confirmada. ${result.sentLabel}.`
+            : opened
+              ? "Confirmación registrada. Dale enviar en WhatsApp."
+              : "Confirmación registrada, pero el navegador no abrió WhatsApp. Ábrela desde Recordatorios.",
+          tone: opened || result.already ? "ok" : "warn",
+        });
+      })
+      .catch(() => {
+        toast({ message: "No se pudo conectar con el panel. Intenta de nuevo.", tone: "error" });
+      });
+  };
 
   const submitAppointment = (draft: AppointmentDraft, force: boolean) => {
     setFormError(null);
@@ -438,13 +524,31 @@ export function AgendaClient({
         allowOutsideHours: draft.allowOutsideHours,
         sendWhatsappConfirmation:
           whatsappConfirmation && draft.id === undefined && draft.sendWhatsappConfirmation,
+        extraServiceIds: draft.extraServiceIds,
         force,
       });
 
       if (result.status === "ok") {
         setPanel({ kind: "none" });
         setReport(null);
-        toast({ message: draft.id ? "Cita guardada." : "Cita creada.", tone: "ok" });
+        // Una cita nueva se confirma a la clienta. Si la Cloud API ya la mandó
+        // sola, no se ofrece; si no, el botón del aviso la abre en WhatsApp.
+        const autoSent = whatsappConfirmation && draft.sendWhatsappConfirmation;
+        const createdId = result.appointmentId;
+        if (draft.id === undefined && canConfirmByHand && !autoSent && createdId !== undefined) {
+          toast({
+            message: "Cita creada.",
+            tone: "ok",
+            duration: 15_000,
+            undo: {
+              label: "Confirmar por WhatsApp",
+              icon: "mensaje",
+              onUndo: () => confirmByWhatsapp(createdId),
+            },
+          });
+        } else {
+          toast({ message: draft.id ? "Cita guardada." : "Cita creada.", tone: "ok" });
+        }
         void refresh();
         return;
       }
@@ -506,6 +610,20 @@ export function AgendaClient({
 
   const readOnly = !canWrite || failure !== null;
 
+  const pickAppointment = (appointment: Appointment) => {
+    // Un bloque de historial abre su detalle de solo lectura, nunca el de una
+    // cita de EA (que trae Editar, Mover y Cancelar).
+    if (isLegacyAgendaId(appointment.id)) {
+      const item = legacyById[appointment.id];
+      if (item) setPanel({ kind: "legacy", item });
+      return;
+    }
+    setPanel({ kind: "detail", appointment });
+  };
+
+  const selectedId =
+    panel.kind === "detail" ? panel.appointment.id : panel.kind === "legacy" ? panel.item.id : null;
+
   const detail =
     panel.kind === "legacy" ? (
       <LegacyDetail item={panel.item} />
@@ -523,9 +641,17 @@ export function AgendaClient({
         onEdit={() => {
           setReport(null);
           setFormError(null);
-          setPanel({ kind: "form", draft: draftFrom(panel.appointment, data.meta) });
+          setPanel({
+            kind: "form",
+            draft: draftFrom(panel.appointment, data.meta, data.planned),
+          });
         }}
         onCancelAppointment={() => doCancel(panel.appointment)}
+        onConfirmByWhatsapp={
+          canConfirmByHand && !readOnly
+            ? () => confirmByWhatsapp(panel.appointment.id)
+            : null
+        }
         onAttendance={(status) => {
           // EA ya lo aceptó: la grilla y el panel se ponen al día sin esperar
           // al sondeo de 30 s.
@@ -589,8 +715,13 @@ export function AgendaClient({
         mode={mode}
         anchor={anchor}
         today={today}
-        onMode={setMode}
+        onMode={(next) => {
+          setMode(next);
+          setWeekForList(false);
+        }}
         onAnchor={setAnchor}
+        view={view}
+        onView={changeView}
         actions={
           <>
             <span className={styles.barSpacer} />
@@ -614,7 +745,9 @@ export function AgendaClient({
               onClick={() =>
                 onPickSlot({
                   providerId: data.providers[0]?.id ?? 0,
-                  date: dates[0],
+                  // Con varios días a la vista, la cita nueva arranca hoy si hoy
+                  // está entre ellos: en Semana, el lunes casi nunca es el día.
+                  date: dates.includes(today) ? today : dates[0],
                   minute: window_.startMinute,
                 })
               }
@@ -643,43 +776,39 @@ export function AgendaClient({
       ) : (
         <div className={styles.row}>
           <div className={styles.rowMain}>
-            <ResourceGrid
-              days={grids}
-              meta={gridMeta}
-              history={history}
-              readOnlyColumns={[LEGACY_LANE_ID]}
-              today={today}
-              selectedId={
-                panel.kind === "detail"
-                  ? panel.appointment.id
-                  : panel.kind === "legacy"
-                    ? panel.item.id
-                    : null
-              }
-              movingId={movingId}
-              pendingIds={pendingIds}
-              readOnly={readOnly}
-              onPickSlot={onPickSlot}
-              onPickAppointment={(appointment) => {
-                // Un bloque de historial abre su detalle de solo lectura, nunca
-                // el de una cita de EA (que trae Editar, Mover y Cancelar).
-                if (isLegacyAgendaId(appointment.id)) {
-                  const item = legacyById[appointment.id];
-                  if (item) setPanel({ kind: "legacy", item });
-                  return;
+            {view === "lista" ? (
+              <AgendaList
+                days={listDays}
+                meta={gridMeta}
+                history={history}
+                today={today}
+                selectedId={selectedId}
+                onPickAppointment={pickAppointment}
+              />
+            ) : (
+              <ResourceGrid
+                days={grids}
+                meta={gridMeta}
+                history={history}
+                readOnlyColumns={[LEGACY_LANE_ID]}
+                today={today}
+                selectedId={selectedId}
+                movingId={movingId}
+                pendingIds={pendingIds}
+                readOnly={readOnly}
+                onPickSlot={onPickSlot}
+                onPickAppointment={pickAppointment}
+                onMove={onMove}
+                onResize={onResize}
+                onRevealHidden={(direction) =>
+                  setExpand((current) =>
+                    direction === -1
+                      ? { ...current, before: current.before + 1 }
+                      : { ...current, after: current.after + 1 },
+                  )
                 }
-                setPanel({ kind: "detail", appointment });
-              }}
-              onMove={onMove}
-              onResize={onResize}
-              onRevealHidden={(direction) =>
-                setExpand((current) =>
-                  direction === -1
-                    ? { ...current, before: current.before + 1 }
-                    : { ...current, after: current.after + 1 },
-                )
-              }
-            />
+              />
+            )}
           </div>
 
           {/* ≥1440: el panel vive al lado y no tapa la grilla. Es la diferencia
@@ -816,6 +945,7 @@ function AppointmentDetail({
   onEdit,
   onCancelAppointment,
   onAttendance,
+  onConfirmByWhatsapp,
 }: {
   appointment: Appointment;
   meta: AgendaData["meta"];
@@ -825,6 +955,8 @@ function AppointmentDetail({
   onEdit: () => void;
   onCancelAppointment: () => void;
   onAttendance: (eaStatus: string) => void;
+  /** `null` = quien mira no manda mensajes por WhatsApp. */
+  onConfirmByWhatsapp: (() => void) | null;
 }) {
   const info = meta[appointment.id];
 
@@ -876,6 +1008,12 @@ function AppointmentDetail({
         readOnly={readOnly}
         onMarked={({ eaStatus }) => onAttendance(eaStatus)}
       />
+
+      {onConfirmByWhatsapp ? (
+        <Button icon="mensaje" onClick={onConfirmByWhatsapp} block>
+          Confirmar por WhatsApp
+        </Button>
+      ) : null}
 
       {!readOnly ? (
         <div className={styles.formRow}>
@@ -1011,7 +1149,11 @@ function formKey(draft: AppointmentDraft): string {
     : `nueva-${draft.providerId}-${draft.date}-${draft.startTime}`;
 }
 
-function draftFrom(appointment: Appointment, meta: AgendaData["meta"]): AppointmentDraft {
+function draftFrom(
+  appointment: Appointment,
+  meta: AgendaData["meta"],
+  planned: AgendaData["planned"] | undefined,
+): AppointmentDraft {
   return {
     id: appointment.id,
     providerId: appointment.providerId ?? 0,
@@ -1025,5 +1167,6 @@ function draftFrom(appointment: Appointment, meta: AgendaData["meta"]): Appointm
     status: appointment.status,
     allowOutsideHours: false,
     sendWhatsappConfirmation: false,
+    extraServiceIds: planned?.[appointment.id] ?? [],
   };
 }

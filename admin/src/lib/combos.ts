@@ -256,3 +256,76 @@ export function pairedServiceId(
 function sum(a: number | null, b: number | null): number | null {
   return a === null || b === null ? null : a + b;
 }
+
+// ---------------------------------------------------------------------------
+// Un par que no es combo
+// ---------------------------------------------------------------------------
+
+/**
+ * Cuántos servicios se pueden sumar a una cita, además del principal. El mismo
+ * tope que la hoja de la cuenta (`MAX_ADDITIONAL_SERVICES`), que es quien los
+ * va a cobrar.
+ */
+export const MAX_PLANNED_EXTRAS = 4;
+
+/** Lo que la cita va a guardar: el servicio de EA y los que se le suman. */
+export type BookingServices = {
+  serviceId: number | null;
+  extras: number[];
+};
+
+/**
+ * Sumar un servicio a la cita.
+ *
+ * Solo cinco pares de manos y pies son combo; el resto —esculpidas + pies,
+ * tradicional manos + tradicional pies— también se agenda junto, como una sola
+ * cita, y se cobra como dos servicios en la misma cuenta. Esto decide cuál de las dos cosas es:
+ *
+ * - Si lo que se suma forma un combo con el servicio principal (y la cita
+ *   todavía no es un combo), la cita **pasa a ser el combo**, igual que con
+ *   "¿También pies?". Nunca se agendan sueltas dos mitades que tienen combo: el
+ *   combo es más barato y más corto, y cobrarlas sueltas sería cobrar de más.
+ * - Si no, queda como adicional de la misma cita (migración `028`), que dura lo
+ *   que duran los dos.
+ *
+ * Sin servicio principal, lo que se suma pasa a ser el principal.
+ */
+export function addToBooking(
+  combos: readonly ComboComposition[],
+  current: BookingServices,
+  addedId: number,
+): BookingServices {
+  if (current.serviceId === null) return { serviceId: addedId, extras: current.extras };
+  if (current.extras.length >= MAX_PLANNED_EXTRAS) return current;
+
+  const alreadyCombo = combos.some((c) => c.eaServiceId === current.serviceId);
+  const combo = alreadyCombo ? null : findCombo(combos, current.serviceId, addedId);
+  if (combo) return { serviceId: combo.eaServiceId, extras: current.extras };
+
+  return { serviceId: current.serviceId, extras: [...current.extras, addedId] };
+}
+
+/** Quita el adicional en la posición `index`. */
+export function removeFromBooking(current: BookingServices, index: number): BookingServices {
+  return { serviceId: current.serviceId, extras: current.extras.filter((_, i) => i !== index) };
+}
+
+/**
+ * Cuánto dura la cita: el principal más los adicionales.
+ *
+ * Acá sí se suma, y no contradice la regla de los combos: un par **sin** combo
+ * no tiene una duración pactada por la dueña, así que lo honesto es la suma. Un
+ * servicio sin duración en EA cuenta cero en vez de inventar una; `null` solo
+ * si no hay nada que medir.
+ */
+export function bookingMinutes(
+  services: readonly ComboPart[],
+  booking: BookingServices,
+): number | null {
+  const byId = new Map(services.map((s) => [s.id, s]));
+  const ids = booking.serviceId === null ? booking.extras : [booking.serviceId, ...booking.extras];
+  const known = ids
+    .map((id) => byId.get(id)?.durationMin ?? null)
+    .filter((m): m is number => m !== null);
+  return known.length === 0 ? null : known.reduce((a, b) => a + b, 0);
+}

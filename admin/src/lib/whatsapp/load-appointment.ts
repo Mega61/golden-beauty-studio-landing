@@ -3,6 +3,7 @@ import "server-only";
 import { normalizePhoneE164 } from "@/app/(panel)/clientes/identity";
 import { createEaClient } from "@/lib/ea/client";
 
+import { loadPlannedServices, namesWithExtras } from "@/lib/planned-services";
 import { groupVisits, visitServiceName } from "@/lib/visits";
 
 import type { ManualReminderAppointment } from "./manual-reminder";
@@ -29,8 +30,31 @@ export async function loadAppointmentForMessage(
     customerFirstName: customer?.firstName ?? null,
     customerName:
       [customer?.firstName, customer?.lastName].filter(Boolean).join(" ").trim() || "Sin clienta",
-    serviceName: service?.name ?? null,
+    serviceName: await withExtras(ea, appointment.id, service?.name ?? null),
   };
+}
+
+/**
+ * El nombre del servicio de la cita, con lo que lleva además del principal:
+ * "Esculpidas en acrílico y Semipermanente pies" (migración `028`). Sin
+ * adicionales, o sin base, el del principal.
+ */
+async function withExtras(
+  ea: ReturnType<typeof createEaClient>,
+  eaAppointmentId: number,
+  mainName: string | null,
+): Promise<string | null> {
+  const extras = (await loadPlannedServices([eaAppointmentId])).get(eaAppointmentId) ?? [];
+  if (extras.length === 0) return mainName;
+  const names = await Promise.all(
+    extras.map((id) =>
+      ea.services
+        .get(id)
+        .then((s) => s.name ?? null)
+        .catch(() => null),
+    ),
+  );
+  return namesWithExtras(mainName, extras, (id) => names[extras.indexOf(id)] ?? null);
 }
 
 /** Lo que necesitan las plantillas de la Cloud API, además de lo del recordatorio manual. */
@@ -76,7 +100,9 @@ export async function loadAppointmentForTemplate(
   );
   const chain = [...visits.values()].find((parts) => parts.some((p) => p.id === appointment.id));
   const continuation = chain !== undefined && chain[0].id !== appointment.id;
-  let serviceName = service?.name ?? null;
+  // Una cita con adicionales (manos + pies en una sola cita) los nombra todos.
+  let serviceName = await withExtras(ea, appointment.id, service?.name ?? null);
+  // Citas viejas: manos + pies como dos citas pegadas (antes de la `028`).
   if (chain && chain.length > 1 && !continuation) {
     const services = await Promise.all(
       chain.map((part) => {

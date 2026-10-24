@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import { Card, CardHead } from "@/components/ui";
 import type { UserRole } from "@/db/types";
-import { can } from "@/lib/auth-policy";
+import { can, receivesBookingPush } from "@/lib/auth-policy";
 import { requireSession } from "@/lib/dal";
 import { vapidConfig } from "@/lib/push/send";
 
@@ -14,10 +14,11 @@ import { PushToggle } from "./PushToggle";
 /**
  * **Ajustes** — lo que es de este dispositivo y no del estudio.
  *
- * Hoy son dos cosas: cómo instalar el panel en el celular, y el aviso de
- * reservas web. La primera es de todas; la segunda solo se dibuja para quien
- * alcanza `avisos:reservas-web` (dueña y recepción) **y** si el servidor tiene
- * llaves VAPID. Sin llaves la sección no aparece: un interruptor que no puede
+ * Hoy son dos cosas: cómo instalar el panel en el celular, y los avisos de
+ * reservas. La primera es de todas; la segunda se dibuja para quien le puede
+ * llegar alguno —el de reservas web (dueña y recepción) o el de su propia
+ * columna (la técnica, `avisos:mis-citas`)— **y** si el servidor tiene llaves
+ * VAPID. Sin llaves la sección no aparece: un interruptor que no puede
  * funcionar es peor que no tenerlo.
  */
 
@@ -35,7 +36,9 @@ function navRole(role: UserRole): Role {
 export default async function AjustesPage() {
   const session = await requireSession();
   const vapid = vapidConfig();
-  const showPush = vapid !== null && can(session.role, "avisos:reservas-web");
+  const showPush = vapid !== null && receivesBookingPush(session.role, session.eaProviderId);
+  // La técnica recibe solo lo de su columna; la pantalla lo dice así.
+  const onlyOwn = !can(session.role, "avisos:reservas-web");
 
   return (
     <AppShell role={navRole(session.role)} title="Ajustes">
@@ -45,10 +48,14 @@ export default async function AjustesPage() {
             <CardHead title="Avisos de reservas" />
             <div style={{ padding: "1rem", display: "grid", gap: "0.75rem" }}>
               <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
-                Cuando alguien reserva desde la página te llega una notificación al momento, y al
-                tocarla se abre la agenda en ese día.
+                {onlyOwn
+                  ? "Cuando te agendan una cita —por la página o desde el panel— te llega una notificación al momento, y al tocarla se abre la agenda en ese día."
+                  : session.eaProviderId !== null
+                    ? "Cuando alguien reserva desde la página te llega una notificación al momento, y también cuando te agendan una cita a ti desde el panel. Al tocarla se abre la agenda en ese día."
+                    : "Cuando alguien reserva desde la página te llega una notificación al momento, y al tocarla se abre la agenda en ese día."}
               </p>
               <PushToggle
+                onlyOwn={onlyOwn}
                 vapidPublicKey={vapid.publicKey}
                 activate={activarAvisos}
                 deactivate={desactivarAvisos}

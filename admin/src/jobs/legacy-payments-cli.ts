@@ -97,6 +97,16 @@ async function run(): Promise<void> {
   const aplicar = argv.includes("--aplicar");
   const paths = argv.filter((arg) => !arg.startsWith("--"));
   const correctionsPath = argv.find((arg) => arg.startsWith("--correcciones="))?.slice("--correcciones=".length);
+  // `--desde=AAAA-MM-DD`: solo los pagos de esa fecha en adelante. La escritura
+  // converge a lo que dicen los archivos, así que pasar un tramo viejo sin el
+  // archivo de correcciones desharía las correcciones de ese tramo; con esto se
+  // puede sumar lo nuevo sin tocar lo ya corregido.
+  const desde = argv.find((arg) => arg.startsWith("--desde="))?.slice("--desde=".length);
+  if (desde !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(desde)) {
+    console.error(`historial-pagos: --desde espera AAAA-MM-DD, no "${desde}".`);
+    process.exitCode = 1;
+    return;
+  }
 
   if (paths.length === 0) {
     console.error(
@@ -107,7 +117,16 @@ async function run(): Promise<void> {
   }
 
   try {
-    const parsed = parsePaymentSheets(readSheets(collectFiles(paths)));
+    const all = parsePaymentSheets(readSheets(collectFiles(paths)));
+    const parsed =
+      desde === undefined
+        ? all
+        : { ...all, payments: all.payments.filter((payment) => payment.paidAt.slice(0, 10) >= desde) };
+    if (desde !== undefined) {
+      console.log(
+        `historial-pagos: --desde=${desde} — ${parsed.payments.length} de ${all.payments.length} pago(s).`,
+      );
+    }
 
     let corrections: Corrections = new Map();
     if (correctionsPath !== undefined) {

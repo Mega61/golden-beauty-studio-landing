@@ -141,3 +141,46 @@ export function buildNewBookingPayload(
     confirmUrl: `${base}/confirmar/${notice.appointmentId}`,
   };
 }
+
+/**
+ * "Nueva cita en tu agenda": el aviso de la profesional, por una cita **de su
+ * columna** (`avisos:mis-citas`).
+ *
+ * Mismas reglas que el de reserva web —sin teléfono, sin precio, apellido en
+ * inicial— y dos diferencias:
+ *
+ * - **No dice con quién**: es ella.
+ * - **No trae "Escribirle por WhatsApp"**: confirmarle a la clienta es del
+ *   WhatsApp del estudio (`recordatorios:enviar`), no del celular de la
+ *   técnica, que es a donde la clienta respondería.
+ *
+ * El `tag` es el mismo que el del aviso general (`reserva-<id>`): si la dueña
+ * atiende y recibe los dos en el mismo celular, el segundo reemplaza al
+ * primero en vez de sumarse.
+ */
+export function buildOwnBookingPayload(
+  notice: Omit<NewBookingNotice, "providerName">,
+  today: string,
+  basePath: string,
+): PushPayload {
+  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/.exec(notice.start);
+  const date = m?.[1] ?? null;
+  const when =
+    m === null
+      ? ""
+      : `${relativeDayLabel(m[1], today)} ${formatHour12(Number(m[2]), Number(m[3]))}`;
+
+  const service = clean(notice.serviceName ?? "", 60) || "servicio";
+  const who = shortCustomerName(notice.customerFirstName, notice.customerLastName);
+  const detail = [who, when].filter(Boolean).join(" · ");
+
+  const base = basePath.replace(/\/+$/, "");
+  const agenda = `${base}/agenda`;
+  const what = service.charAt(0).toLocaleUpperCase("es-CO") + service.slice(1);
+  return {
+    title: clean("Nueva cita en tu agenda ✨", MAX_TITLE),
+    body: `${what}\n${clean(detail, MAX_BODY - what.length - 1)}`,
+    url: date === null ? agenda : `${agenda}?dia=${date}`,
+    tag: `reserva-${notice.appointmentId}`,
+  };
+}

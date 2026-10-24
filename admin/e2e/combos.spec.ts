@@ -274,6 +274,89 @@ test.describe("componer un combo desde la agenda", () => {
   });
 });
 
+test.describe("manos + pies que no son combo, desde la agenda", () => {
+  // Esculpidas no tiene combo con ningún pie. Antes, la agenda no tenía cómo
+  // sumarle los pies: el formulario solo ofrecía la otra mitad de un combo, y
+  // la dueña dejó de usar la agenda por eso.
+  const ESCULPIDAS = { pricingId: "acrylic-sculpted", nombre: "E2E Esculpidas en acrílico" };
+
+  test("se agenda como UNA cita, con los pies de adicional", async ({ panel }) => {
+    // La dueña lo pidió así: una reserva, un bloque en la agenda, una cuenta.
+    // Antes eran dos citas pegadas, y eso eran dos "Llegó" y dos cuentas.
+    const nombres = await publicarPiezas(panel);
+    await panel.goto("/admin/servicios");
+    const campo = panel.getByLabel(new RegExp(`${ESCULPIDAS.pricingId} aparece en la agenda`));
+    if ((await campo.count()) > 0) {
+      await campo.fill(ESCULPIDAS.nombre);
+      await campo.locator("xpath=following-sibling::button[1]").click();
+      await expect(aviso(panel)).toContainText("quedó creado en la agenda", { timeout: 20_000 });
+    }
+    // Por id y no por nombre: el cliente de MySQL del contenedor devuelve la
+    // "í" de "acrílico" rota, y el nombre no coincidiría con el de la pantalla.
+    const idDe = (pricingId: string) => {
+      const id = queryOne(`SELECT ea_service_id FROM service_map WHERE pricing_id = '${pricingId}'`);
+      if (!id) throw new Error(`${pricingId} no quedó vinculado`);
+      return id;
+    };
+    const MANOS = idDe(ESCULPIDAS.pricingId);
+    const PIES = idDe("semi-permanent-feet");
+
+    const marca = `CboPar${Date.now().toString().slice(-6)}`;
+    const antes = contarCitasEnEa();
+
+    await panel.goto("/admin/agenda");
+    await panel.getByRole("button", { name: /nueva cita/i }).click();
+
+    await panel.getByRole("textbox", { name: /^Cliente/ }).fill(`${marca} Test`);
+    await panel.getByRole("button", { name: /crear «/i }).click();
+    await panel.getByRole("textbox", { name: /^Nombre\b/ }).fill(marca);
+    await panel.getByRole("textbox", { name: /^Apellido\b/ }).fill("Test");
+    await panel.getByRole("textbox", { name: /^Teléfono/ }).fill(phoneNuevo());
+    await panel.getByRole("button", { name: /crear y usar/i }).click();
+    await expect(panel.getByRole("button", { name: /cambiar/i })).toBeVisible();
+
+    // Casi cuatro horas no caben entre las franjas de la primera profesional
+    // (ver `caja.spec.ts`): esta va con la segunda, a las 00:30.
+    await panel.getByRole("combobox", { name: /^Profesional/ }).selectOption({ index: 1 });
+    await panel.getByLabel(/^Empieza/).fill("00:30");
+    await panel.getByRole("combobox", { name: /^Servicio/ }).selectOption(MANOS);
+    await panel.getByRole("button", { name: /agregar otro servicio/i }).click();
+    await panel.getByLabel(/otro servicio en la misma cita/i).selectOption(PIES);
+
+    // El fin cubre los dos: 150 + 75 minutos.
+    await expect(panel.getByLabel(/^Termina/)).toHaveValue("04:15");
+
+    await panel.getByRole("checkbox", { name: /fuera del horario/i }).check();
+    await panel.getByRole("button", { name: /^crear cita$/i }).click();
+
+    await expect(panel.getByText("Cita creada.")).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(contarCitasEnEa, { timeout: 15_000, message: "EA no recibió la cita" })
+      .toBe(antes + 1);
+
+    // Una sola cita en EA, con el servicio principal y el rango entero…
+    const fila = queryEa(
+      `SELECT CONCAT(a.id, '|', a.id_services, '|', TIME(a.start_datetime), '|', TIME(a.end_datetime))
+         FROM ea_appointments a
+         JOIN ea_users c ON c.id = a.id_users_customer
+        WHERE c.first_name = '${marca}'`,
+    );
+    const [idCita, ...resto] = (fila ?? "").split("|");
+    expect(resto.join("|")).toBe(`${MANOS}|00:30:00|04:15:00`);
+
+    // …y los pies como adicional de esa misma cita.
+    expect(
+      queryOne(`SELECT GROUP_CONCAT(ea_service_id) FROM appointment_planned_service WHERE ea_appointment_id = ${idCita}`),
+    ).toBe(PIES);
+
+    // En Hoy es una tarjeta que nombra los dos, y su cuenta los cobra juntos.
+    await panel.goto("/admin/hoy");
+    await expect(panel.getByText(`+ ${nombres["semi-permanent-feet"]}`).first()).toBeVisible();
+
+    queryOne(`DELETE FROM appointment_planned_service WHERE ea_appointment_id = ${idCita}`);
+  });
+});
+
 /** Lo que la vitrina afirma y este archivo da por cierto. Falla ruidoso si cambia. */
 test("los números de la vitrina siguen siendo los que este archivo supone", () => {
   expect(SUMA).toBe(105_000);

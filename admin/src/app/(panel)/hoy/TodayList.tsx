@@ -15,6 +15,7 @@ import {
 import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import {
   CambioTag,
+  MAX_ADDITIONAL_SERVICES,
   TicketSheet,
   draftFromFinance,
   emptyDraft,
@@ -126,14 +127,22 @@ export function TodayList({
       // de la ficha no reescribe una decisión que alguien ya tomó.
       const nueva =
         appointment.finance.financeId === null || appointment.finance.items.length === 0;
+      // Lo que se agendó además del principal entra ya puesto: la técnica no
+      // tiene que acordarse de que la clienta también venía por los pies.
       const base =
         nueva
-          ? emptyDraft(
-              appointment.eaAppointmentId,
-              appointment.bookedServiceId,
-              Date.now(),
-              canGiveCourtesy && appointment.houseCourtesyDefault,
-            )
+          ? {
+              ...emptyDraft(
+                appointment.eaAppointmentId,
+                appointment.bookedServiceId,
+                Date.now(),
+                canGiveCourtesy && appointment.houseCourtesyDefault,
+              ),
+              additionalServices: (appointment.plannedServiceIds ?? []).slice(
+                0,
+                MAX_ADDITIONAL_SERVICES,
+              ),
+            }
           : guardado;
 
       // Lo que quedó escrito en el celular gana sobre lo que hay en la base:

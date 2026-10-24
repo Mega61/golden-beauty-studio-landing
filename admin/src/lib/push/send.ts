@@ -5,11 +5,17 @@ import webpush from "web-push";
 import { getDb } from "@/db/client";
 import { allowedUserRepository, repositories } from "@/db/repositories";
 import type { DeliverableSubscription } from "@/db/repositories";
-import { can, findAllowedEntry } from "@/lib/auth-policy";
 import { instantToEaDate } from "@/lib/ea";
+import { loadAppointmentForMessage } from "@/lib/whatsapp/load-appointment";
 
 import { PANEL_BASE_PATH, parseVapidEnv, type VapidConfig } from "./config";
-import { buildNewBookingPayload, type NewBookingNotice, type PushPayload } from "./payload";
+import {
+  buildNewBookingPayload,
+  buildOwnBookingPayload,
+  type NewBookingNotice,
+  type PushPayload,
+} from "./payload";
+import { bookingRecipients } from "./recipients";
 import { classifyPushError, classifyPushStatus, planPrune, type PushOutcome } from "./prune";
 
 /**
@@ -94,31 +100,35 @@ async function deliver(
 }
 
 /**
- * Las suscripciones cuya dueña **hoy** alcanza el aviso.
+ * Quién recibe qué por una cita nueva (`recipients.ts`).
  *
- * El rol se vuelve a leer de `allowed_user` en cada envío, con la misma
- * normalización que el DAL. Quien salió de Equipo deja de recibir nombres de
- * clientas en el aviso siguiente, aunque su fila siga en la tabla.
+ * El rol y la columna se vuelven a leer de `allowed_user` en cada envío, con
+ * la misma normalización que el DAL. Quien salió de Equipo deja de recibir
+ * nombres de clientas en el aviso siguiente, aunque su fila siga en la tabla.
  */
-async function eligibleSubscriptions(): Promise<DeliverableSubscription[]> {
+async function recipientsFor(input: {
+  providerId: number | null;
+  source: "web" | "panel";
+  actorUserId?: string | null;
+}): Promise<{ general: DeliverableSubscription[]; own: DeliverableSubscription[] }> {
   const db = getDb();
-  const [subs, allowlist] = await Promise.all([
+  const [subscriptions, allowlist] = await Promise.all([
     repositories(db).pushSubscriptions.listDeliverable(),
     allowedUserRepository(db).list(),
   ]);
-  return subs.filter((s) => {
-    const entry = findAllowedEntry(s.email, allowlist);
-    return entry !== null && can(entry.role, "avisos:reservas-web");
-  });
+  return bookingRecipients({ subscriptions, allowlist, ...input });
 }
 
 export type WebBookingForPush = Omit<NewBookingNotice, "serviceName"> & {
+  /** La columna de la cita: su profesional recibe "Nueva cita en tu agenda". */
+  providerId: number | null;
   /** Para buscar el nombre del servicio solo si hay a quién avisarle. */
   resolveServiceName: () => Promise<string | null>;
 };
 
 /**
- * "Nueva reserva" a todos los dispositivos suscritos con permiso.
+ * "Nueva reserva" a dueña y recepción, y "Nueva cita en tu agenda" a la
+ * profesional de esa columna.
  *
  * El nombre del servicio se pide a EA **después** de saber que hay a quién
  * avisarle: sin suscripciones (o sin llaves) una reserva no cuesta ni una
@@ -129,8 +139,8 @@ export async function notifyNewWebBooking(booking: WebBookingForPush): Promise<v
   if (vapid === null) return;
 
   try {
-    const subs = await eligibleSubscriptions();
-    if (subs.length === 0) return;
+    const { general, own } = await recipientsFor({ providerId: booking.providerId, source: "web" });
+    if (general.length === 0 && own.length === 0) return;
 
     let serviceName: string | null = null;
     try {
@@ -141,16 +151,67 @@ export async function notifyNewWebBooking(booking: WebBookingForPush): Promise<v
       console.error("[push] no se pudo leer el servicio de la reserva", error);
     }
 
-    const { resolveServiceName: _omit, ...rest } = booking;
+    const { resolveServiceName: _omit, providerId: _provider, ...rest } = booking;
     void _omit;
-    const payload = buildNewBookingPayload(
-      { ...rest, serviceName },
+    void _provider;
+    const today = instantToEaDate(new Date());
+    await Promise.all([
+      general.length === 0
+        ? 0
+        : deliver(general, buildNewBookingPayload({ ...rest, serviceName }, today, PANEL_BASE_PATH), vapid),
+      own.length === 0
+        ? 0
+        : deliver(own, buildOwnBookingPayload({ ...rest, serviceName }, today, PANEL_BASE_PATH), vapid),
+    ]);
+  } catch (error) {
+    console.error("[push] no se pudo avisar la reserva web", error);
+  }
+}
+
+/**
+ * "Nueva cita en tu agenda" por una cita creada **desde el panel**: a la
+ * profesional de esa columna, salvo que la haya agendado ella misma.
+ *
+ * Corre en `after()` desde la agenda. La cita se lee de EA solo si hay alguien
+ * a quién avisarle — la mayoría de las citas del panel no cuestan ni una
+ * consulta más. Nunca lanza.
+ */
+export async function notifyPanelBooking(input: {
+  appointmentId: number;
+  providerId: number;
+  actorUserId: string;
+}): Promise<void> {
+  const vapid = vapidConfig();
+  if (vapid === null) return;
+
+  try {
+    const { own } = await recipientsFor({
+      providerId: input.providerId,
+      source: "panel",
+      actorUserId: input.actorUserId,
+    });
+    if (own.length === 0) return;
+
+    // Fresca, con los adicionales ("Esculpidas en acrílico y Semipermanente pies").
+    const appointment = await loadAppointmentForMessage(input.appointmentId);
+    const first = appointment.customerFirstName ?? "";
+    const last = appointment.customerName.startsWith(first)
+      ? appointment.customerName.slice(first.length).trim()
+      : "";
+    const payload = buildOwnBookingPayload(
+      {
+        appointmentId: input.appointmentId,
+        serviceName: appointment.serviceName,
+        customerFirstName: first,
+        customerLastName: last,
+        start: appointment.start,
+      },
       instantToEaDate(new Date()),
       PANEL_BASE_PATH,
     );
-    await deliver(subs, payload, vapid);
+    await deliver(own, payload, vapid);
   } catch (error) {
-    console.error("[push] no se pudo avisar la reserva web", error);
+    console.error("[push] no se pudo avisar la cita a su profesional", input.appointmentId, error);
   }
 }
 

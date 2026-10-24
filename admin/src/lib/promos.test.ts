@@ -41,8 +41,43 @@ describe("bestPromo", () => {
     expect(quote?.perLine).toEqual([{ key: "semi-permanent-feet-servicio", discount: 15000 }]);
   });
 
-  it("un combo no recibe la promo del día", () => {
-    expect(bestPromo({ lines: [line("semi-permanent-hands-feet", 95000)], date: WED, isFirstVisit: false })).toBeNull();
+  it("un combo en día de promo paga lo menor entre el combo y sus mitades con la promo", () => {
+    // Sábado, press on + semi pies: combo $150.000 vs $80.000 + $55.000 = $135.000.
+    expect(bestPromo({ lines: [line("press-on-hands-semi-feet", 150000)], date: SAT, isFirstVisit: false })).toMatchObject({
+      kind: "dia",
+      slug: "sabado-press",
+      discount: 15000,
+    });
+    // Miércoles, semi manos + semi pies: combo $100.000 vs $50.000 + $40.000 = $90.000.
+    expect(bestPromo({ lines: [line("semi-permanent-hands-feet", 100000)], date: WED, isFirstVisit: false })).toMatchObject({
+      slug: "miercoles-pies",
+      discount: 10000,
+    });
+    // Miércoles, press on + tradicional pies: las dos promos no se cruzan en un mismo día.
+    expect(
+      bestPromo({ lines: [line("press-on-hands-traditional-feet", 135000)], date: WED, isFirstVisit: false }),
+    ).toMatchObject({ slug: "miercoles-pies", discount: 135000 - (100000 + 25000) });
+  });
+
+  it("un combo sin mitad en promo, o un día sin promo, no baja", () => {
+    expect(bestPromo({ lines: [line("hands-feet-cleanup", 45000)], date: WED, isFirstVisit: false })).toBeNull();
+    expect(bestPromo({ lines: [line("press-on-hands-semi-feet", 150000)], date: FRI, isFirstVisit: false })).toBeNull();
+  });
+
+  it("un combo que ya sale más barato que sus mitades rebajadas no recibe nada", () => {
+    expect(bestPromo({ lines: [line("press-on-hands-semi-feet", 130000)], date: SAT, isFirstVisit: false })).toBeNull();
+  });
+
+  it("combo en día de promo: no se acumula con el 10%, gana el mayor", () => {
+    // Sábado, primera visita, press on + semi pies $150.000: día $15.000 = 10% $15.000 → empate, gana el día.
+    expect(bestPromo({ lines: [line("press-on-hands-semi-feet", 150000)], date: SAT, isFirstVisit: true })).toMatchObject({
+      kind: "dia",
+      discount: 15000,
+    });
+    // Miércoles, primera visita, rubber + semi pies $120.000: día $10.000 (70+40) vs 10% $12.000 → gana el 10%.
+    expect(
+      bestPromo({ lines: [line("rubber-base-leveling-hands-semi-feet", 120000)], date: WED, isFirstVisit: true }),
+    ).toMatchObject({ kind: "primera_visita", discount: 12000 });
   });
 
   it("primera visita: 10% de los servicios, no de los adicionales, redondeado a la centena", () => {
@@ -85,5 +120,13 @@ describe("dayPromosFor", () => {
     ]);
     expect(dayPromosFor("polygel-refill")).toEqual([]);
     expect(dayPromosFor(null)).toEqual([]);
+  });
+
+  it("un combo trae el precio de sus mitades con la promo, para la pista del paso 1", () => {
+    expect(dayPromosFor("press-on-hands-semi-feet")).toEqual([
+      { slug: "sabado-press", label: "Sábado de Press", weekday: 6, promoCOP: 80000 + 55000 },
+      { slug: "miercoles-pies", label: "Miércoles de pies", weekday: 3, promoCOP: 100000 + 40000 },
+    ]);
+    expect(dayPromosFor("hands-feet-cleanup")).toEqual([]);
   });
 });

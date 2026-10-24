@@ -47,6 +47,20 @@ export const RANGE_MODE_DAYS: Readonly<Record<RangeMode, number>> = {
   semana: 7,
 };
 
+/**
+ * Cómo se ve el rango: la grilla de recursos de siempre, o la lista de días con
+ * sus citas en orden (la vista "Agenda" de Google Calendar). El rango y el
+ * ancla son los mismos en las dos; cambiar de vista no cambia qué se pide.
+ */
+export const AGENDA_VIEWS = ["grilla", "lista"] as const;
+
+export type AgendaView = (typeof AGENDA_VIEWS)[number];
+
+/** La vista que pide la URL. Cualquier otra cosa es la grilla. */
+export function parseAgendaView(raw: string | undefined): AgendaView {
+  return raw === "lista" ? "lista" : "grilla";
+}
+
 export function isRangeMode(value: unknown): value is RangeMode {
   return typeof value === "string" && (RANGE_MODES as readonly string[]).includes(value);
 }

@@ -29,6 +29,7 @@ import type {
 } from "@/components/calendar/types";
 import { loadComboCompositions } from "@/lib/combo-source";
 import type { ComboComposition } from "@/lib/combos";
+import { loadPlannedServices } from "@/lib/planned-services";
 import { legacyStartToWallClock } from "../clientes/history";
 import { buildLegacyAgendaItems, type LegacyAgendaItem, type LegacyAgendaRow } from "./legacy";
 
@@ -95,6 +96,12 @@ export type AgendaData = {
    * función sin explicación.
    */
   combosReason: string | null;
+  /**
+   * Los servicios de cada cita además del principal (el "+ pies" de un par que
+   * no es combo), por id de cita. Sin entrada = solo el principal. Ver la
+   * migración `028`.
+   */
+  planned: Record<number, number[]>;
   /**
    * El historial de Agenda Pro de los días pedidos, de **solo lectura**. Ya
    * viene sin las filas que se recrearon en EA y recortado por rol. Ver
@@ -228,6 +235,22 @@ async function fetchFromEa(
       workingPlanExceptions: providerWorkingPlanExceptions(provider),
     }));
 
+  // Lo que la cita lleva además del principal entra al rótulo —"Esculpidas en
+  // acrílico + Semipermanente pies"— para que la grilla, la lista, el detalle y
+  // la hoja impresa lo digan sin saber que existe. Sin `gbs_admin`, cada cita
+  // se ve con su servicio principal.
+  const plannedById = await loadPlannedServices(withRelations.appointments.map((a) => a.id));
+  const serviceNames = new Map(rawServices.map((s) => [s.id, s.name ?? `Servicio ${s.id}`]));
+  const meta: Record<number, AppointmentMeta> = { ...withRelations.meta };
+  for (const [id, extras] of plannedById) {
+    const info = meta[id];
+    if (!info || extras.length === 0) continue;
+    meta[id] = {
+      ...info,
+      service: [info.service ?? "Sin servicio", ...extras.map((e) => serviceNames.get(e) ?? `Servicio ${e}`)].join(" + "),
+    };
+  }
+
   const visibleProviderIds = new Set(providers.map((p) => p.id));
   const keep = <T extends { providerId: number | null }>(item: T): boolean =>
     mine === null || (item.providerId !== null && visibleProviderIds.has(item.providerId));
@@ -246,7 +269,8 @@ async function fetchFromEa(
       (item) => keep(item) && touchesDates(item, dates),
     ),
     blockedPeriods: blockedPeriods.filter((item) => touchesDates(item, dates)),
-    meta: withRelations.meta,
+    meta,
+    planned: Object.fromEntries(plannedById),
     services: rawServices
       .map<ServiceOption>((service) => ({
         id: service.id,

@@ -196,6 +196,54 @@
           "semi-permanent-hands-traditional-feet": {
             "name": "Semi-permanent hands + traditional feet",
             "desc": "Gel polish hands + regular polish feet"
+          },
+          "rubber-base-leveling-hands-semi-feet": {
+            "name": "Rubber base leveling + semi feet",
+            "desc": "Rubber base on hands + gel polish on feet"
+          },
+          "rubber-base-leveling-hands-traditional-feet": {
+            "name": "Rubber base leveling + traditional feet",
+            "desc": "Rubber base on hands + regular polish on feet"
+          },
+          "press-on-hands-semi-feet": {
+            "name": "Press-on + semi feet",
+            "desc": "Press-on nails + gel polish on feet"
+          },
+          "press-on-hands-traditional-feet": {
+            "name": "Press-on + traditional feet",
+            "desc": "Press-on nails + regular polish on feet"
+          },
+          "dipping-hands-semi-feet": {
+            "name": "Dipping + semi feet",
+            "desc": "Dipping on hands + gel polish on feet"
+          },
+          "dipping-hands-traditional-feet": {
+            "name": "Dipping + traditional feet",
+            "desc": "Dipping on hands + regular polish on feet"
+          },
+          "builder-gel-dual-hands-semi-feet": {
+            "name": "Builder gel dual system + semi feet",
+            "desc": "Builder gel dual system on hands + gel polish on feet"
+          },
+          "builder-gel-overlay-hands-traditional-feet": {
+            "name": "Builder gel overlay hands + traditional feet",
+            "desc": "Overlay on natural nail + regular polish on feet"
+          },
+          "polygel-sculpted-hands-feet-cleanup": {
+            "name": "Polygel sculpted + foot cleanup",
+            "desc": "Polygel sculpted nails + foot cleanup, no polish"
+          },
+          "traditional-hands-feet": {
+            "name": "Traditional hands + feet",
+            "desc": "Regular polish on hands and feet"
+          },
+          "hands-cleanup-semi-feet": {
+            "name": "Hand cleanup + semi feet",
+            "desc": "Hand cleanup, no polish + gel polish on feet"
+          },
+          "hands-feet-cleanup": {
+            "name": "Hand + foot cleanup",
+            "desc": "Hand and foot cleanup, no polish"
           }
         }
       },

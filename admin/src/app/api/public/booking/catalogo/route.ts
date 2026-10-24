@@ -129,7 +129,8 @@ export async function GET() {
           isCombo: isCombo.has(s.id),
           // Las promos del día de este servicio, para que la landing las pinte
           // antes de que se elija fecha ("Miércoles $25.000"). Salen de las
-          // mismas reglas que aplica la cotización; un combo nunca trae.
+          // mismas reglas que aplica la cotización; un combo trae lo que cuestan
+          // sus mitades con la promo puesta (`dayPromosFor`).
           // Solo las que de verdad bajan el precio de EA: tachar un precio
           // que no ahorra nada sería publicidad falsa.
           dayPromos: dayPromosFor(slugOf.get(s.id) ?? null)

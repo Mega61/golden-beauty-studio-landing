@@ -1,7 +1,8 @@
 import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
-import { datesFor, parseAnchor, parseRangeMode } from "@/components/calendar";
+import { datesFor, parseAgendaView, parseAnchor, parseRangeMode } from "@/components/calendar";
 import type { UserRole } from "@/db/types";
+import { sessionCan } from "@/lib/dal";
 import { whatsappConfigured } from "@/lib/whatsapp/config";
 
 import { AgendaClient } from "./AgendaClient";
@@ -44,7 +45,7 @@ export default async function AgendaPage({
   searchParams,
 }: {
   // En Next 16 los parámetros de la petición son asíncronos.
-  searchParams: Promise<{ rango?: string; dia?: string }>;
+  searchParams: Promise<{ rango?: string; dia?: string; vista?: string }>;
 }) {
   const params = await searchParams;
   const today = todayInStudio();
@@ -55,6 +56,7 @@ export default async function AgendaPage({
   // `loadAgenda()` llama al DAL: sin sesión, esto redirige al login antes de
   // tocar EA.
   const result = await loadAgenda(dates);
+  const canConfirmByHand = await sessionCan("recordatorios:enviar");
 
   const role = navRole(result.session.role);
 
@@ -81,6 +83,7 @@ export default async function AgendaPage({
                 services: [],
                 combos: [],
                 combosReason: null,
+                planned: {},
                 capacities: [],
                 stations: result.stations,
                 legacy: [],
@@ -88,6 +91,7 @@ export default async function AgendaPage({
               }
         }
         mode={mode}
+        view={parseAgendaView(params.vista)}
         anchor={anchor}
         today={today}
         eaFailure={result.ok ? null : result.reason}
@@ -101,6 +105,7 @@ export default async function AgendaPage({
         // `ea_provider_id` no es dueña de ninguna columna.
         canWrite={result.session.role !== "staff" || result.session.eaProviderId !== null}
         whatsappConfirmation={whatsappConfigured()}
+        canConfirmByHand={canConfirmByHand}
       />
     </AppShell>
   );

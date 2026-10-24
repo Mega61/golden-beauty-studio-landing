@@ -26,7 +26,7 @@ const SERVICES = [
 const SLUGS = new Map([
   [1, "traditional-feet"],
   [2, "semi-permanent-hands"],
-  [3, "combo-semi"],
+  [3, "semi-permanent-hands-feet"],
   [4, "press-on"],
 ]);
 
@@ -90,9 +90,12 @@ describe("quoteVisit", () => {
     expect(quoteVisit(pricey, WED, true)).toMatchObject({ promo: { slug: "primera-visita", discount: 24000 } });
   });
 
-  it("un combo no lleva promo del día, pero sí el 10%", () => {
-    expect(quoteVisit(lines(3), WED, false)).toMatchObject({ promo: null, total: 120000 });
-    expect(quoteVisit(lines(3), WED, true)).toMatchObject({ promo: { slug: "primera-visita", discount: 12000 } });
+  it("un combo en miércoles paga sus mitades con la promo si sale menos, sin sumarle el 10%", () => {
+    // Combo $120.000 vs semi manos $50.000 + semi pies en promo $40.000 = $90.000.
+    expect(quoteVisit(lines(3), WED, false)).toMatchObject({ promo: { slug: "miercoles-pies", discount: 30000 }, total: 90000 });
+    expect(quoteVisit(lines(3), WED, true)).toMatchObject({ promo: { slug: "miercoles-pies", discount: 30000 }, total: 90000 });
+    // Otro día, el 10% sobre el precio del combo.
+    expect(quoteVisit(lines(3), FRI, true)).toMatchObject({ promo: { slug: "primera-visita", discount: 12000 } });
   });
 
   it("'no se sabe' no promete el 10%", () => {

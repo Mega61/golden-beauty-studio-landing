@@ -90,6 +90,12 @@ export type TodayAppointment = {
   providerName: string;
   bookedServiceId: number | null;
   bookedServiceName: string;
+  /**
+   * Lo que se agendó **además** del principal: el "+ pies" de un par que no es
+   * combo (migración `028`). Una cuenta nueva los trae ya agregados como
+   * servicios; una guardada manda lo que se guardó. Ausente = ninguno.
+   */
+  plannedServiceIds?: readonly number[];
   finance: TicketFinanceView;
 };
 
