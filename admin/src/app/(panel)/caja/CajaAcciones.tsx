@@ -98,6 +98,8 @@ function pushTexto(estado: Extract<CerrarDiaResult, { ok: true }>): string {
       return "Otro cierre simultáneo se está encargando del push.";
     case "apagado":
       return "El push al CRM está apagado: el lote quedó pendiente.";
+    case "antes-del-corte":
+      return `Día anterior al corte (${estado.push.since}): su plata vino de Agenda Pro y no se manda.`;
     case "fallo":
       return estado.push.retryable
         ? `El lote no llegó al CRM: ${estado.push.message}`

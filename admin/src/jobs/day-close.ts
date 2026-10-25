@@ -16,7 +16,7 @@ import {
   type EaLocalDateTime,
 } from "@/lib/ea";
 import { mapEaStatus } from "@/components/calendar/status-map";
-import { IngestError, type IngestClient } from "@/lib/ingest-client";
+import { IngestError, type IngestClient, type PaymentLabels } from "@/lib/ingest-client";
 import {
   buildDayClosePayments,
   buildIngestAdjustment,
@@ -510,12 +510,37 @@ export type DayCloseDeps = {
    * dice.
    */
   ingest: IngestClient | null;
+  /**
+   * Nombre de la clienta y del servicio de cada cuenta, para las notas del
+   * movimiento en Actual. **Mejor esfuerzo**: si falla, el lote sale igual sin
+   * nombres — la plata no espera a una etiqueta.
+   */
+  labelPayments?: (
+    date: EaLocalDate,
+    accounts: readonly DayAccount[],
+  ) => Promise<PaymentLabels>;
 };
+
+/**
+ * ¿Este día de caja es anterior al corte de Agenda Pro?
+ *
+ * Esa plata ya está en Actual por el scraper, con otra llave: empujarla otra
+ * vez la duplicaría sin que la deduplicación de Actual lo pueda ver. Ver
+ * `INGEST_SINCE` en `lib/ingest-client.ts`.
+ */
+export function beforeCutover(ingest: IngestClient | null, day: string): boolean {
+  return ingest?.since !== undefined && day < ingest.since;
+}
 
 /** Qué pasó con el push. Lo muestra Caja tal cual. */
 export type PushOutcome =
   | { state: "hecho"; at: Date; sent: number }
   | { state: "apagado" }
+  /**
+   * El día es anterior a `INGEST_SINCE`: su plata entró a Actual por Agenda Pro
+   * y no se manda nunca. No es un pendiente — no aparece en la cola de reintento.
+   */
+  | { state: "antes-del-corte"; since: EaLocalDate }
   | { state: "vacio" }
   | { state: "ya"; at: Date }
   /**
@@ -752,6 +777,8 @@ export function summarizePush(row: DayClose, outcome: PushOutcome): string {
       return `${day}: sin movimientos que empujar`;
     case "apagado":
       return `${day}: el push está apagado (falta INGEST_URL)`;
+    case "antes-del-corte":
+      return `${day}: anterior al corte (${outcome.since}), esa plata vino de Agenda Pro`;
     case "pendiente":
       return `${day}: otra llamada se está encargando del push`;
     case "fallo":
@@ -847,10 +874,22 @@ async function runPush(
 
   if (payments.length === 0) return { state: "vacio" };
   if (deps.ingest === null) return { state: "apagado" };
+  if (beforeCutover(deps.ingest, row.close_date)) {
+    return { state: "antes-del-corte", since: deps.ingest.since as EaLocalDate };
+  }
+
+  let labels: PaymentLabels | undefined;
+  if (deps.labelPayments !== undefined) {
+    try {
+      labels = await deps.labelPayments(row.close_date as EaLocalDate, accounts);
+    } catch (error) {
+      console.error("[caja] sin nombres para las notas de Actual; el lote sale igual", error);
+    }
+  }
 
   let sent: number;
   try {
-    const receipt = await deps.ingest.push(payments);
+    const receipt = await deps.ingest.push(payments, labels);
     sent = receipt.sent;
   } catch (error) {
     if (error instanceof IngestError) {
@@ -1105,6 +1144,11 @@ async function pushAdjustment(
   now: Date,
 ): Promise<PushOutcome> {
   if (deps.ingest === null) return { state: "apagado" };
+  // Una corrección sobre una cuenta de antes del corte no viaja: el original
+  // entró a Actual por Agenda Pro, con su cifra y su llave. Se arregla a mano.
+  if (beforeCutover(deps.ingest, payment.paid_on)) {
+    return { state: "antes-del-corte", since: deps.ingest.since as EaLocalDate };
+  }
 
   try {
     const receipt = await deps.ingest.push([payment]);

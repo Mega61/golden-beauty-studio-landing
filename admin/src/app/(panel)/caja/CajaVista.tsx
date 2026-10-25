@@ -521,7 +521,9 @@ function Cerradas({
 // ── El cierre ───────────────────────────────────────────────────────────────
 
 function Cierre({ view, bloquean }: { view: CajaView; bloquean: number }) {
-  const { dayClose, review, pushEnabled, date } = view;
+  const { dayClose, review, pushEnabled, date, cutover } = view;
+  // Un día de antes del corte nunca se empuja: su plata entró por Agenda Pro.
+  const antesDelCorte = cutover != null && date < cutover;
 
   return (
     <Card padded={false}>
@@ -551,9 +553,11 @@ function Cierre({ view, bloquean }: { view: CajaView; bloquean: number }) {
         {dayClose === null ? null : (
           <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
             Cerrado el {formatDateLong(`${date} 00:00:00`)}.{" "}
-            {dayClose.pushed_to_ingest_at === null
-              ? "El lote todavía no llegó al CRM."
-              : "El lote ya se empujó al CRM."}
+            {antesDelCorte
+              ? "Es anterior al corte de Agenda Pro: esa plata entró a Actual por allá y no se manda."
+              : dayClose.pushed_to_ingest_at === null
+                ? "El lote todavía no llegó al CRM."
+                : "El lote ya se empujó al CRM."}
           </p>
         )}
 
@@ -598,7 +602,7 @@ function Cierre({ view, bloquean }: { view: CajaView; bloquean: number }) {
                 </p>
               )}
             </>
-          ) : dayClose.pushed_to_ingest_at === null && pushEnabled ? (
+          ) : dayClose.pushed_to_ingest_at === null && pushEnabled && !antesDelCorte ? (
             <ReintentarPush fecha={date} />
           ) : null}
         </div>

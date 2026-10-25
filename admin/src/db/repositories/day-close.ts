@@ -58,14 +58,17 @@ export function dayCloseRepository(db: Db) {
      *
      * Alimenta el reintento y el tile de Diagnóstico. Un push que falló en
      * silencio es exactamente igual a no haber empujado.
+     *
+     * `since` es el corte de Agenda Pro (`INGEST_SINCE`): un cierre anterior no
+     * está pendiente, no se va a empujar nunca.
      */
-    async listPendingPush(): Promise<DayClose[]> {
-      return db
+    async listPendingPush(since?: string): Promise<DayClose[]> {
+      let query = db
         .selectFrom("day_close")
         .selectAll()
-        .where("pushed_to_ingest_at", "is", null)
-        .orderBy("close_date")
-        .execute();
+        .where("pushed_to_ingest_at", "is", null);
+      if (since !== undefined) query = query.where("close_date", ">=", since);
+      return query.orderBy("close_date").execute();
     },
 
     async markPushed(id: number, at: Date): Promise<void> {

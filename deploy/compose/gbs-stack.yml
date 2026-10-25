@@ -34,7 +34,9 @@
 #   BETTER_AUTH_SECRET        BETTER_AUTH_URL
 #   GOOGLE_CLIENT_ID          GOOGLE_CLIENT_SECRET   GOOGLE_WORKSPACE_DOMAIN
 #   TOTP_ENC_KEY
-#   INGEST_URL                INGEST_SHARED_SECRET
+#   INGEST_URL                INGEST_SHARED_SECRET   INGEST_SINCE
+#                             (INGEST_SINCE = primer día de caja del panel, YYYY-MM-DD;
+#                              obligatoria con INGEST_URL. Ver lib/ingest-client.ts)
 #   VAPID_PUBLIC_KEY          VAPID_PRIVATE_KEY      VAPID_SUBJECT   (opcionales: avisos push)
 #   WHATSAPP_TOKEN            WHATSAPP_PHONE_NUMBER_ID                (opcionales: WhatsApp automático)
 #   WHATSAPP_APP_SECRET       WHATSAPP_VERIFY_TOKEN                   (webhook de estado de Meta)
@@ -153,6 +155,7 @@ services:
 
       INGEST_URL: ${INGEST_URL}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
+      INGEST_SINCE: ${INGEST_SINCE:-}
 
       # Avisos push de reservas web. Opcionales: vacías, la función no aparece
       # (ver `admin/src/lib/push/config.ts`). El `:-` evita el aviso de Compose
@@ -404,6 +407,12 @@ services:
       RECONCILE_LOOKBACK_DAYS: ${RECONCILE_LOOKBACK_DAYS:-7}
       RECONCILE_LOOKAHEAD_DAYS: ${RECONCILE_LOOKAHEAD_DAYS:-60}
       RECONCILE_AT: ${RECONCILE_AT:-03:45}
+      # Las visitas al CRM (win-back y Stampee) salen de acá cada noche, a la
+      # ruta hermana de la de pagos (`/ingest/panel-visits`). Mismas variables
+      # que el panel; sin INGEST_URL el paso se salta y lo dice el log.
+      INGEST_URL: ${INGEST_URL}
+      INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
+      INGEST_SINCE: ${INGEST_SINCE:-}
     deploy:
       resources:
         limits:

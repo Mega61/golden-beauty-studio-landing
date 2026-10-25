@@ -14,6 +14,7 @@ import {
   reviewDay,
   summarizeDayTotals,
   summarizePush,
+  beforeCutover,
   totalsOf,
   type DayAccount,
   type DayAppointment,
@@ -223,12 +224,13 @@ describe("summarizePush", () => {
    * marca en ninguna otra parte, y son justo los casos que se confunden con
    * "nadie apretó el botón".
    */
-  it("nombra el día en los seis resultados posibles", () => {
+  it("nombra el día en los siete resultados posibles", () => {
     const outcomes: PushOutcome[] = [
       { state: "hecho", at: OCHO_PM, sent: 3 },
       { state: "ya", at: OCHO_PM },
       { state: "vacio" },
       { state: "apagado" },
+      { state: "antes-del-corte", since: "2026-10-24" as EaLocalDate },
       { state: "pendiente" },
       { state: "fallo", message: "ingest respondió 502", retryable: true },
     ];
@@ -249,6 +251,29 @@ describe("summarizePush", () => {
     // contra el CRM y cerrar la caja no puede depender de eso. Que el resumen
     // lo diga es lo que evita que alguien lo lea como un error.
     expect(summarizePush(row, { state: "apagado" })).toContain("INGEST_URL");
+  });
+});
+
+describe("beforeCutover", () => {
+  /**
+   * El corte de Agenda Pro. Un día anterior se cobró también allá, y esa plata
+   * ya entró a Actual por el scraper con otra llave: mandarla otra vez la
+   * duplicaría sin que la deduplicación de Actual lo pueda ver.
+   */
+  const ingest = (since?: string) => ({
+    push: async () => ({ sent: 0, status: 0, at: OCHO_PM }),
+    since: since as EaLocalDate | undefined,
+  });
+
+  it("un día anterior al corte no se empuja; el del corte y los siguientes sí", () => {
+    expect(beforeCutover(ingest("2026-10-24"), "2026-10-23")).toBe(true);
+    expect(beforeCutover(ingest("2026-10-24"), "2026-10-24")).toBe(false);
+    expect(beforeCutover(ingest("2026-10-24"), "2026-11-01")).toBe(false);
+  });
+
+  it("sin cliente o sin corte declarado no frena nada (el apagado lo decide otro)", () => {
+    expect(beforeCutover(null, "2020-01-01")).toBe(false);
+    expect(beforeCutover(ingest(undefined), "2020-01-01")).toBe(false);
   });
 });
 

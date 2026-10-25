@@ -19,6 +19,8 @@ export const JOB_RECONCILE = "reconcile";
 export const JOB_DAY_CLOSE_PUSH = "day-close-push";
 /** El emisor automático de recordatorios por WhatsApp (`jobs/reminders-run.ts`). */
 export const JOB_WHATSAPP_REMINDERS = "whatsapp-recordatorios";
+/** El push nocturno de visitas al CRM (`jobs/crm-visits.ts`). */
+export const JOB_CRM_VISITS = "crm-visitas";
 
 /**
  * `summary` es `VARCHAR(500)`.

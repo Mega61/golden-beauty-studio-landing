@@ -1,6 +1,6 @@
 import "server-only";
 
-import { safeBody } from "@/lib/ea";
+import { safeBody, type EaLocalDate } from "@/lib/ea";
 
 import type { IngestPayment } from "./ingest-payload";
 
@@ -31,16 +31,15 @@ import type { IngestPayment } from "./ingest-payload";
  *   la llave de Actual. Un `tx_id` de `ea-appt:501` produce
  *   `agendapro-tx:ea-appt:501` — feo, y **sin colisión posible** con los
  *   `tx_id` numéricos históricos de AgendaPro.
- * - ⚠ **No existe todavía una ruta JSON para pagos.**
- *   `POST /api/ingest/agendapro-transactions` lee `ctx.request.files` y parsea
- *   un XLSX de AgendaPro; la ruta JSON hermana
- *   (`POST /api/ingest/agendapro`) es de *visitas*, no de pagos. Hay que
- *   agregarla en el CRM sobre el `upsertPayment()` que ya existe, y eso es una
- *   decisión del dueño sobre otro sistema en producción: está propuesta, no
- *   aprobada.
- * - ⚠ Y por lo mismo, **el sobre del cuerpo es lo único que sigue sin
- *   verificar**: `{ payments: [...] }` espeja el `{ bookings: [...] }` de la
- *   ruta de visitas, que es el mejor precedente que hay. Vive en una constante.
+ * - ✅ **La ruta JSON existe desde el corte de Agenda Pro (2026-10-24):**
+ *   `POST /api/ingest/payments` con `{ payments: [...] }`, validación
+ *   todo-o-nada (un renglón malo = 400 para el lote entero) y solo acepta
+ *   `tx_id` que empiecen por `ea-appt:`. Hace upsert por `tx_id` con el mismo
+ *   `upsertPayment()` del scraper, así que `actual-sync` no cambió.
+ * - ✅ Acepta además `client_name` y `service_name` opcionales: son las notas
+ *   del movimiento en Actual ("Ana Ruiz · Forrado polygel · efectivo"). Antes
+ *   las ponía el reporte de ventas de Agenda Pro. Los arma quien llama
+ *   (`PaymentLabel`), nunca `lib/ingest-payload.ts`: no son plata.
  *
  * Lo que **no** existe en el esquema real y el plan suponía: `source`,
  * `source_tx_id`, `imported_id`, `ea_appointment_id`, `ea_provider_id`,
@@ -48,15 +47,19 @@ import type { IngestPayment } from "./ingest-payload";
  * Pro" que el plan describe **no se hizo**. El cuerpo son los siete campos de
  * `Payment` y nada más.
  *
- * ## Por eso el envío se puede apagar, y hoy está apagado
+ * ## El envío se puede apagar, y tiene fecha de corte
  *
  * `INGEST_URL` ausente ⇒ `ingestConfigFromEnv()` devuelve `null` y el cierre
- * del día ocurre igual, registrando que no se empujó. **Mientras no exista la
- * ruta JSON, ése es el modo correcto de operación**: el cuerpo ya sale en la
- * forma buena, pero apuntar `INGEST_URL` a la ruta de hoy sería mandarle JSON a
- * un parser de XLSX. Cerrar la caja del estudio no puede depender de eso — un
- * día cerrado sin push se recupera con un reintento; un día que no se pudo
- * cerrar deja a la recepción sin su herramienta.
+ * del día ocurre igual, registrando que no se empujó. Cerrar la caja del
+ * estudio no puede depender del CRM — un día cerrado sin push se recupera con
+ * un reintento; un día que no se pudo cerrar deja a la recepción sin su
+ * herramienta.
+ *
+ * **`INGEST_SINCE` es obligatoria con `INGEST_URL`.** Es el primer día cuya
+ * plata registra el panel y no Agenda Pro. Un cierre anterior —de cuando los
+ * dos sistemas corrían en paralelo— **no se empuja jamás**: esa plata ya entró
+ * a Actual por el scraper, con otra llave, y mandarla otra vez la duplicaría
+ * sin que la deduplicación de Actual pueda verlo.
  *
  * ## Reintentar no duplica
  *
@@ -74,12 +77,7 @@ import type { IngestPayment } from "./ingest-payload";
 // Dos verificadas contra el CRM y una (`INGEST_WRAPPER_KEY`) pendiente de que
 // la ruta JSON exista. Nada más del panel las conoce.
 
-/**
- * La clave del arreglo dentro del cuerpo.
- *
- * ⚠ Lo único sin verificar que queda: la ruta JSON de pagos todavía no existe
- * en el CRM. `payments` espeja el `bookings` de `POST /api/ingest/agendapro`.
- */
+/** La clave del arreglo dentro del cuerpo de `POST /api/ingest/payments`. */
 export const INGEST_WRAPPER_KEY = "payments";
 
 /** Verificado: el header de autenticación del CRM. No es Bearer. */
@@ -103,7 +101,26 @@ export type StrapiPaymentBody = {
   amount: number;
   tip: number;
   method: IngestPayment["method"];
+  client_name?: string;
+  service_name?: string;
 };
+
+/** Las notas del movimiento en Actual. Opcionales: sin ellas el pago viaja igual. */
+export type PaymentLabel = { clientName?: string | null; serviceName?: string | null };
+
+/**
+ * Las etiquetas, por `tx_id`. Se indexan por el id de la cita que va adentro de
+ * la llave, así un pago partido y sus ajustes llevan las mismas.
+ */
+export type PaymentLabels = ReadonlyMap<number, PaymentLabel>;
+
+const TX_APPOINTMENT_RE = /^ea-appt:(\d+)(?::|$)/;
+
+/** El id de la cita de EA dentro de un `tx_id` del panel, o `null`. */
+export function appointmentIdOfTx(txId: string): number | null {
+  const match = TX_APPOINTMENT_RE.exec(txId);
+  return match === null ? null : Number(match[1]);
+}
 
 /**
  * `IngestPayment` (B1) → la fila `Payment` que el CRM espera.
@@ -131,9 +148,18 @@ export function toStrapiPayment(payment: IngestPayment): StrapiPaymentBody {
   };
 }
 
-/** El sobre. Ver la advertencia de `INGEST_WRAPPER_KEY`. */
-function envelope(payments: readonly IngestPayment[]): unknown {
-  return { [INGEST_WRAPPER_KEY]: payments.map(toStrapiPayment) };
+/** El sobre, con las etiquetas pegadas a cada pago cuando las hay. */
+function envelope(payments: readonly IngestPayment[], labels?: PaymentLabels): unknown {
+  return {
+    [INGEST_WRAPPER_KEY]: payments.map((payment) => {
+      const body = toStrapiPayment(payment);
+      const id = appointmentIdOfTx(body.tx_id);
+      const label = id === null ? undefined : labels?.get(id);
+      if (label?.clientName) body.client_name = label.clientName;
+      if (label?.serviceName) body.service_name = label.serviceName;
+      return body;
+    }),
+  };
 }
 
 // ── Configuración ───────────────────────────────────────────────────────────
@@ -143,6 +169,17 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 export type IngestConfig = {
   url: string;
   secret: string;
+  /**
+   * `INGEST_SINCE`: el primer día de caja que el panel empuja. Ver el
+   * encabezado — un cierre anterior nunca sale.
+   */
+  since?: EaLocalDate;
+  /**
+   * `POST /api/ingest/panel-visits` del CRM. `INGEST_VISITS_URL`, o derivada de
+   * `INGEST_URL` cambiando `/payments` por `/panel-visits`. `null` = no se
+   * empujan visitas (una URL que no termina en `/payments` y sin override).
+   */
+  visitsUrl?: string | null;
   /** Inyectable para los tests. Por defecto el `fetch` del runtime. */
   fetch?: typeof fetch;
   /**
@@ -177,11 +214,27 @@ export function ingestConfigFromEnv(env: Env = process.env): IngestConfig | null
     );
   }
 
+  const since = env.INGEST_SINCE?.trim() ?? "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+    throw new IngestError(
+      "INGEST_URL está configurada pero INGEST_SINCE no es una fecha YYYY-MM-DD. " +
+        "Es el primer día cuya plata registra el panel y no Agenda Pro.",
+      { retryable: false },
+    );
+  }
+
+  const visitsOverride = env.INGEST_VISITS_URL?.trim();
+  const visitsUrl =
+    visitsOverride ||
+    (/\/ingest\/payments\/?$/.test(url) ? url.replace(/\/payments\/?$/, "/panel-visits") : null);
+
   const timeoutMs = Number(env.INGEST_TIMEOUT_MS);
 
   return {
     url,
     secret,
+    since: since as EaLocalDate,
+    visitsUrl,
     timeoutMs:
       Number.isInteger(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS,
   };
@@ -239,8 +292,16 @@ export type IngestReceipt = {
 };
 
 export type IngestClient = {
-  /** Manda el lote entero. Lanza `IngestError` si no salió. */
-  push(payments: readonly IngestPayment[]): Promise<IngestReceipt>;
+  /**
+   * Manda el lote entero. Lanza `IngestError` si no salió. Las etiquetas son
+   * opcionales y no cambian la plata.
+   */
+  push(payments: readonly IngestPayment[], labels?: PaymentLabels): Promise<IngestReceipt>;
+  /**
+   * El corte (`INGEST_SINCE`). Opcional en el tipo para los dobles de prueba;
+   * el cliente real lo trae siempre.
+   */
+  since?: EaLocalDate;
 };
 
 export function createIngestClient(config: IngestConfig): IngestClient {
@@ -248,7 +309,8 @@ export function createIngestClient(config: IngestConfig): IngestClient {
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return {
-    async push(payments) {
+    since: config.since,
+    async push(payments, labels) {
       // Un lote vacío no se manda. No es un error —un día sin cuentas cerradas
       // existe— pero un POST con cero movimientos es una petición que solo
       // puede confundir el log del CRM.
@@ -266,7 +328,7 @@ export function createIngestClient(config: IngestConfig): IngestClient {
             Accept: "application/json",
             [INGEST_AUTH_HEADER]: config.secret,
           },
-          body: JSON.stringify(envelope(payments)),
+          body: JSON.stringify(envelope(payments, labels)),
           signal: AbortSignal.timeout(timeoutMs),
           cache: "no-store",
         });
