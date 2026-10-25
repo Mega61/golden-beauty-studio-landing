@@ -68,6 +68,7 @@ export function TodayList({
   action,
   combos = [],
   checkFirstVisit,
+  isToday = true,
 }: {
   appointments: readonly TodayAppointment[];
   catalog: TicketCatalog;
@@ -85,6 +86,8 @@ export function TodayList({
   combos?: readonly ComboComposition[];
   /** La pregunta "¿es su primera visita?" (Server Action). Sin ella, no se pregunta. */
   checkFirstVisit?: FirstVisitCheck;
+  /** `false` cuando se está mirando un día anterior: cambia el texto del vacío. */
+  isToday?: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -227,8 +230,12 @@ export function TodayList({
     return (
       <EmptyState
         icon="hoy"
-        title="Todavía no hay citas hoy"
-        body="Cuando la agenda tenga una cita de hoy, va a aparecer acá con su botón para cerrar la cuenta."
+        title={isToday ? "Todavía no hay citas hoy" : "No hay citas este día"}
+        body={
+          isToday
+            ? "Cuando la agenda tenga una cita de hoy, va a aparecer acá con su botón para cerrar la cuenta."
+            : "Si una cita de este día no quedó registrada, agrégala en la Agenda en su fecha y hora, y vuelve acá para cerrar su cuenta."
+        }
       />
     );
   }

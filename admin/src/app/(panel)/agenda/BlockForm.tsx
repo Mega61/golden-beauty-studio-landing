@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import styles from "@/components/calendar/calendar.module.css";
 import type { ProviderOption } from "@/components/calendar/types";
 import { Button } from "@/components/ui/Button";
-import { Checkbox, Field, FormErrorSummary, Select, TextInput } from "@/components/ui/Field";
+import { Checkbox, Field, FormErrorSummary, TextInput } from "@/components/ui/Field";
+import { Combobox, DateField, TimeField } from "@/components/ui/Pickers";
 import type { EaLocalDate } from "@/lib/ea/datetime";
 import { describePlan, planBlock, type BlockForm as BlockFormValues } from "./block-resource";
 
@@ -133,21 +134,14 @@ export function BlockForm({
           <Anchored field="providerId">
             <Field label="Profesional" required error={errorFor(errors, "providerId", submitted)}>
               {(wired) => (
-                <Select
+                <Combobox<number | null>
                   {...wired}
-                  value={values.providerId ?? ""}
+                  value={values.providerId}
                   disabled={lockedProviderId !== null}
-                  onChange={(e) =>
-                    set("providerId", e.target.value === "" ? null : Number(e.target.value))
-                  }
-                >
-                  <option value="">Elige a quién…</option>
-                  {providers.map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.name}
-                    </option>
-                  ))}
-                </Select>
+                  options={providers.map((provider) => ({ value: provider.id, label: provider.name }))}
+                  onChange={(id) => set("providerId", id)}
+                  placeholder="Elige a quién…"
+                />
               )}
             </Field>
           </Anchored>
@@ -194,21 +188,17 @@ export function BlockForm({
         <Anchored field="startDate">
           <Field label="Desde el día" required error={errorFor(errors, "startDate", submitted)}>
             {(wired) => (
-              <TextInput
+              <DateField
                 {...wired}
-                type="date"
                 value={values.startDate}
-                onChange={(e) =>
+                onChange={(date) =>
                   setValues((current) => ({
                     ...current,
-                    startDate: e.target.value as EaLocalDate,
+                    startDate: date as EaLocalDate,
                     // El fin sigue al inicio mientras no se haya separado a mano:
                     // el caso de un solo día es el 90 % y no debería costar dos
                     // gestos.
-                    endDate:
-                      current.endDate < e.target.value
-                        ? (e.target.value as EaLocalDate)
-                        : current.endDate,
+                    endDate: current.endDate < date ? (date as EaLocalDate) : current.endDate,
                   }))
                 }
               />
@@ -218,12 +208,11 @@ export function BlockForm({
         <Anchored field="endDate">
           <Field label="Hasta el día" required error={errorFor(errors, "endDate", submitted)}>
             {(wired) => (
-              <TextInput
+              <DateField
                 {...wired}
-                type="date"
                 value={values.endDate}
                 min={values.startDate}
-                onChange={(e) => set("endDate", e.target.value as EaLocalDate)}
+                onChange={(date) => set("endDate", date as EaLocalDate)}
               />
             )}
           </Field>
@@ -246,12 +235,10 @@ export function BlockForm({
           <Anchored field="startTime">
             <Field label="Desde las" required error={errorFor(errors, "startTime", submitted)}>
               {(wired) => (
-                <TextInput
+                <TimeField
                   {...wired}
-                  type="time"
-                  step={300}
                   value={values.startTime ?? ""}
-                  onChange={(e) => set("startTime", e.target.value)}
+                  onChange={(time) => set("startTime", time)}
                 />
               )}
             </Field>
@@ -259,12 +246,10 @@ export function BlockForm({
           <Anchored field="endTime">
             <Field label="Hasta las" required error={errorFor(errors, "endTime", submitted)}>
               {(wired) => (
-                <TextInput
+                <TimeField
                   {...wired}
-                  type="time"
-                  step={300}
                   value={values.endTime ?? ""}
-                  onChange={(e) => set("endTime", e.target.value)}
+                  onChange={(time) => set("endTime", time)}
                 />
               )}
             </Field>

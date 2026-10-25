@@ -898,6 +898,12 @@
   min-width: 0;
 }
 
+/* Un selector abierto (calendario, lista de horas) ocupa la fila entera: en
+   media columna no cabe, y el campo de al lado le quedaría encima. */
+.formRow > :has(:global(.ui-picker__panel)) {
+  grid-column: 1 / -1;
+}
+
 @media (min-width: 30rem) {
   .formRow2 {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

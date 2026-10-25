@@ -20,6 +20,7 @@ import { IngestError, toStrapiPayment, type IngestClient } from "@/lib/ingest-cl
 import type { IngestPayment } from "@/lib/ingest-payload";
 
 import {
+  attachLateAccounts,
   closeDay,
   recordAdjustment,
   retryAdjustmentPush,
@@ -534,6 +535,128 @@ describe.skipIf(!canRunDbTests())(
     });
 
     // ── Ajustes posteriores al cierre ──────────────────────────────────────
+
+    describe("la cuenta que se cerró después del cierre", () => {
+      /** Día cerrado y empujado con una cuenta de $180.000 en efectivo. */
+      async function diaCerrado(): Promise<void> {
+        await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
+        await closeDay(deps([cita({ eaAppointmentId: 1 })]), {
+          date: DIA,
+          closedBy: OWNER_ID,
+          now: OCHO_PM,
+        });
+        ingest.lotes = [];
+      }
+
+      it(
+        "se agrega al cierre, suma a sus totales y viaja sola",
+        async () => {
+          await diaCerrado();
+          // La cita que se registró al día siguiente y se cerró desde Hoy.
+          await sembrarCuenta(db, {
+            eaAppointmentId: 2,
+            cerrada: true,
+            monto: 90_000,
+            metodo: "transferencia",
+            propina: 5_000,
+            hora: "15:00:00",
+          });
+
+          const result = await attachLateAccounts(deps([]), {
+            date: DIA,
+            actorUserId: OWNER_ID,
+            now: OCHO_PM,
+          });
+
+          expect(result.ok).toBe(true);
+          if (!result.ok) throw new Error("debería haber agregado la cuenta");
+          expect(result.attached).toBe(1);
+          expect(result.push.state).toBe("hecho");
+          // Solo la tardía: la original ya había salido, y re-mandarla
+          // pisaría su monto en Strapi si tuvo un ajuste.
+          expect(idsRecibidos(ingest)).toEqual(["ea-appt:2"]);
+
+          const [cierre] = await cierres(db);
+          expect(cierre.total_efectivo).toBe(180_000);
+          expect(cierre.total_transferencia).toBe(90_000);
+          expect(cierre.total_tips).toBe(5_000);
+          expect(cierre.appointment_count).toBe(2);
+          expect(cierre.pushed_to_ingest_at).not.toBeNull();
+
+          const filas = await cuentas(db);
+          expect(filas.every((f) => f.day_close_id === cierre.id)).toBe(true);
+          expect(filas.every((f) => f.pushed_to_ingest_at !== null)).toBe(true);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "si el CRM no contesta, el cierre vuelve a la cola y el reintento manda solo la tardía",
+        async () => {
+          await diaCerrado();
+          await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: true, monto: 90_000, hora: "15:00:00" });
+
+          ingest.modo = "caido";
+          const result = await attachLateAccounts(deps([]), {
+            date: DIA,
+            actorUserId: OWNER_ID,
+            now: OCHO_PM,
+          });
+          expect(result.ok && result.push.state).toBe("fallo");
+
+          const pendientes = await repositories(db).dayCloses.listPendingPush();
+          expect(pendientes.map((c) => c.close_date)).toEqual([DIA]);
+
+          ingest.modo = "ok";
+          const retry = await retryDayPush(deps([]), { date: DIA, now: OCHO_PM });
+          expect(retry.state).toBe("hecho");
+          expect(idsRecibidos(ingest)).toEqual(["ea-appt:2"]);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "una tardía sin método de pago no se agrega, y no se escribe nada",
+        async () => {
+          await diaCerrado();
+          await sembrarCuenta(db, {
+            eaAppointmentId: 2,
+            cerrada: true,
+            monto: 90_000,
+            metodo: null,
+            hora: "15:00:00",
+          });
+
+          const result = await attachLateAccounts(deps([]), {
+            date: DIA,
+            actorUserId: OWNER_ID,
+            now: OCHO_PM,
+          });
+
+          expect(result).toMatchObject({ ok: false, reason: "incompleta" });
+          const [cierre] = await cierres(db);
+          expect(cierre.appointment_count).toBe(1);
+          const filas = await cuentas(db);
+          expect(filas.find((f) => f.ea_appointment_id === 2)?.day_close_id).toBeNull();
+          expect(ingest.lotes).toEqual([]);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "sin cierre del día no hay nada tardío",
+        async () => {
+          await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: true });
+          const result = await attachLateAccounts(deps([]), {
+            date: DIA,
+            actorUserId: OWNER_ID,
+            now: OCHO_PM,
+          });
+          expect(result).toMatchObject({ ok: false, reason: "sin-cierre" });
+        },
+        TEST_TIMEOUT,
+      );
+    });
 
     describe("el ajuste posterior al cierre", () => {
       /** Cierra el día con una cuenta de $180.000 ya empujada. */

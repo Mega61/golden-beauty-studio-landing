@@ -173,12 +173,16 @@ export function appointmentFinanceRepository(db: Db) {
      * Va por cierre y no por cita porque el push es por cierre: Actual Budget
      * deduplica por `imported_id` y **no actualiza** el monto de una
      * transacción ya importada.
+     *
+     * Solo las que no tenían marca: una cuenta tardía agregada a un cierre ya
+     * empujado viaja sola, y la fecha de las que salieron antes no se pisa.
      */
     async markPushed(dayCloseId: number, at: Date): Promise<void> {
       await db
         .updateTable("appointment_finance")
         .set({ pushed_to_ingest_at: at })
         .where("day_close_id", "=", dayCloseId)
+        .where("pushed_to_ingest_at", "is", null)
         .execute();
     },
   };

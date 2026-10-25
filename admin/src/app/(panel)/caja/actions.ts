@@ -8,6 +8,7 @@ import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { isEaLocalDate, type EaLocalDate } from "@/lib/ea";
 import { IngestError } from "@/lib/ingest-client";
 import {
+  attachLateAccounts,
   closeDay,
   recordAdjustment,
   retryAdjustmentPush,
@@ -213,6 +214,51 @@ export async function reintentarPush(fecha: string): Promise<PushResult> {
     unstable_rethrow(error);
     console.error("[caja] no se pudo reintentar el push", error);
     return { ok: false, message: "No se pudo reintentar el push." };
+  }
+}
+
+/**
+ * Agregar al cierre de un día las cuentas que se cerraron después.
+ *
+ * Es el camino de una cita que se registró tarde —al día siguiente, o se
+ * olvidó— cuando la caja de su día ya estaba cerrada. Misma capacidad que
+ * cerrar el día: es completar ese cierre, no corregir una cifra ya empujada.
+ */
+export async function agregarTardias(fecha: string): Promise<PushResult> {
+  const parsed = FechaSchema.safeParse(fecha);
+  if (!parsed.success) return { ok: false, message: "La fecha llegó mal." };
+
+  let session;
+  try {
+    session = await requireCapability("caja:cerrar-dia");
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ForbiddenError) {
+      return { ok: false, message: "Tu rol no puede modificar el cierre del día." };
+    }
+    console.error("[caja] no se pudo verificar la sesión", error);
+    return { ok: false, message: "No se pudo verificar la sesión." };
+  }
+
+  try {
+    const result = await attachLateAccounts(dayCloseDeps(), {
+      date: parsed.data as EaLocalDate,
+      actorUserId: session.userId,
+    });
+    revalidatePath("/caja");
+    revalidatePath("/hoy");
+
+    if (!result.ok) return { ok: false, message: result.message };
+
+    const cuentas = result.attached === 1 ? "1 cuenta agregada" : `${result.attached} cuentas agregadas`;
+    return {
+      ok: result.push.state !== "fallo",
+      message: `${cuentas} al cierre. ${pushMessage(result.push)}`,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[caja] no se pudieron agregar las cuentas tardías", error);
+    return { ok: false, message: "No se pudieron agregar las cuentas. Nada quedó a medias; vuelve a intentar." };
   }
 }
 

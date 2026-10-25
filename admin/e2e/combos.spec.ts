@@ -1,6 +1,17 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { aviso, contarCitasEnEa, expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
+import {
+  aviso,
+  contarCitasEnEa,
+  elegirHora,
+  elegirOpcion,
+  expect,
+  nombresDeOpciones,
+  phoneNuevo,
+  queryEa,
+  queryOne,
+  test,
+} from "./fixtures";
 
 /**
  * Llegar a un combo eligiendo sus dos mitades.
@@ -51,29 +62,9 @@ const PRECIO_PIES = 55_000;
 const PRECIO_COMBO = 95_000;
 const SUMA = PRECIO_MANOS + PRECIO_PIES; // 105.000 — lo que NO se cobra.
 
-/** El texto de una opción es el nombre, solo o con la duración pegada ("… · 1 h"). */
-function textoDeOpcion(nombre: string): RegExp {
-  const literal = nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^\\s*${literal}(\\s·|\\s*$)`);
-}
-
-/**
- * Elige en un `<select>` la opción que es ese servicio.
- *
- * `selectOption({ label })` exige el texto **exacto**, y las opciones de la
- * agenda llevan la duración pegada ("Semipermanente manos · 1 h"): la
- * coincidencia exacta falla y el mensaje —"expected string, got object" si se
- * intenta con una expresión regular— no habla de eso. Se resuelve por el
- * `value`, que es el id de EA y es lo único estable.
- *
- * Y no por "contiene": con los nombres del estudio, "Semipermanente manos" está
- * dentro de "Semipermanente manos + pies", y elegir el primero que lo contenga
- * puede ser elegir el combo.
- */
-async function elegirPorTexto(select: Locator, nombre: string): Promise<void> {
-  const opcion = select.locator("option").filter({ hasText: textoDeOpcion(nombre) });
-  await expect(opcion, `no hay exactamente una opción "${nombre}"`).toHaveCount(1);
-  await select.selectOption(await opcion.getAttribute("value"));
+/** Elige en el selector de la agenda el servicio con ese nombre exacto. */
+async function elegirPorTexto(campo: Locator, nombre: string): Promise<void> {
+  await elegirOpcion(campo, { nombre });
 }
 
 /**
@@ -149,11 +140,11 @@ test.describe("componer un combo desde la agenda", () => {
     await panel.getByRole("button", { name: /nueva cita/i }).click();
 
     const servicio = panel.getByRole("combobox", { name: /^Servicio/ });
-    const opciones = await servicio.locator("option").allTextContents();
+    const opciones = await nombresDeOpciones(servicio);
 
-    expect(opciones.some((o) => textoDeOpcion(MANOS).test(o))).toBe(true);
+    expect(opciones).toContain(MANOS);
     expect(
-      opciones.some((o) => textoDeOpcion(COMBO).test(o)),
+      opciones.includes(COMBO),
       "el combo se ofrece en la lista: se llega a él componiendo, no eligiéndolo",
     ).toBe(false);
   });
@@ -192,11 +183,11 @@ test.describe("componer un combo desde la agenda", () => {
     // cotización: ahí arriba las dos duraciones aparecen juntas a propósito
     // (2 h 15 min tachado, 2 h real), así que buscar texto no distingue cuál
     // ganó. El fin de la cita sí: 2 h después del inicio, no 2 h 15.
-    await panel.getByLabel(/^Empieza/).fill("10:00");
+    await elegirHora(panel.getByLabel(/^Empieza/), "10:00");
     await expect(
       panel.getByLabel(/^Termina/),
       "el fin salió de la suma de las mitades en vez de la duración del combo",
-    ).toHaveValue("12:00");
+    ).toHaveAttribute("data-value", "12:00");
   });
 
   test("quitar los pies devuelve la cita al servicio suelto", async ({ panel }) => {
@@ -216,7 +207,7 @@ test.describe("componer un combo desde la agenda", () => {
       0,
     );
     // El selector principal sigue en la mitad que se había elegido.
-    await expect(servicio).toHaveValue(/\d+/);
+    await expect(servicio).toHaveAttribute("data-value", /\d+/);
   });
 
   test("agendar el par guarda UNA cita, y es la del combo", async ({ panel }) => {
@@ -248,7 +239,7 @@ test.describe("componer un combo desde la agenda", () => {
     // 22:00 el combo se encimaba con la cita de las 21:00 de `horario.spec.ts`
     // en cuanto el primer servicio durara más de una hora. La casilla lo
     // autoriza de una.
-    await panel.getByLabel(/^Empieza/).fill("00:30");
+    await elegirHora(panel.getByLabel(/^Empieza/), "00:30");
     await panel.getByRole("checkbox", { name: /fuera del horario/i }).check();
     await panel.getByRole("button", { name: /^crear cita$/i }).click();
 
@@ -317,14 +308,14 @@ test.describe("manos + pies que no son combo, desde la agenda", () => {
 
     // Casi cuatro horas no caben entre las franjas de la primera profesional
     // (ver `caja.spec.ts`): esta va con la segunda, a las 00:30.
-    await panel.getByRole("combobox", { name: /^Profesional/ }).selectOption({ index: 1 });
-    await panel.getByLabel(/^Empieza/).fill("00:30");
-    await panel.getByRole("combobox", { name: /^Servicio/ }).selectOption(MANOS);
+    await elegirOpcion(panel.getByRole("combobox", { name: /^Profesional/ }), { index: 1 });
+    await elegirHora(panel.getByLabel(/^Empieza/), "00:30");
+    await elegirOpcion(panel.getByRole("combobox", { name: /^Servicio/ }), { valor: MANOS });
     await panel.getByRole("button", { name: /agregar otro servicio/i }).click();
-    await panel.getByLabel(/otro servicio en la misma cita/i).selectOption(PIES);
+    await elegirOpcion(panel.getByLabel(/otro servicio en la misma cita/i), { valor: PIES });
 
     // El fin cubre los dos: 150 + 75 minutos.
-    await expect(panel.getByLabel(/^Termina/)).toHaveValue("04:15");
+    await expect(panel.getByLabel(/^Termina/)).toHaveAttribute("data-value", "04:15");
 
     await panel.getByRole("checkbox", { name: /fuera del horario/i }).check();
     await panel.getByRole("button", { name: /^crear cita$/i }).click();

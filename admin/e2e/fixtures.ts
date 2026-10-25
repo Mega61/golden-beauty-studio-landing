@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Lo que la suite E2E necesita para existir: una sesión y datos que limpiar.
@@ -231,4 +231,86 @@ export function limpiarDatosDePrueba(): void {
 export function phoneNuevo(): string {
   const n = String(Math.floor(Math.random() * 90_000_000) + 10_000_000);
   return `30${n}`;
+}
+
+// ── Selectores propios (`components/ui/Pickers.tsx`) ──────────────────────────
+//
+// La agenda ya no usa `<select>` ni `<input type="date|time">` —abrían la rueda
+// del sistema en el celular, sin búsqueda—, así que `selectOption()` y `fill()`
+// no sirven sobre esos campos. Estas tres funciones hacen lo que haría una
+// persona: abrir, buscar o navegar, y tocar la opción.
+
+/** El panel que abre un selector, por su `aria-controls`. */
+async function panelDe(campo: Locator): Promise<Locator> {
+  const id = await campo.getAttribute("aria-controls");
+  if (!id) throw new Error("el selector no dice qué panel controla (aria-controls)");
+  return campo.page().locator(`[id="${id}"]`);
+}
+
+/**
+ * Elegir una opción de un `Combobox`: por posición (`index`, desde 0, sin
+ * contar ningún "Elige…") o por un texto que la opción tiene que cumplir.
+ * Con `buscar`, se escribe en la búsqueda antes de elegir.
+ */
+export async function elegirOpcion(
+  campo: Locator,
+  opcion: { index: number } | { valor: string } | { nombre: string; buscar?: string },
+): Promise<void> {
+  if ((await campo.getAttribute("aria-expanded")) !== "true") await campo.click();
+  const lista = await panelDe(campo);
+  if ("buscar" in opcion && opcion.buscar) {
+    await lista.page().getByPlaceholder(/^(Busca|Buscar|Escribe)/).last().fill(opcion.buscar);
+  }
+  const opciones = lista.getByRole("option");
+  // Por el nombre **exacto**, no por "contiene": "Semipermanente manos" está
+  // dentro de "Semipermanente manos + pies", y elegir el primero que lo
+  // contenga puede ser elegir el combo. La duración y el precio van en otra
+  // línea de la opción, así que el nombre se compara solo.
+  const elegida =
+    "index" in opcion
+      ? opciones.nth(opcion.index)
+      : "valor" in opcion
+        ? lista.locator(`[role="option"][data-value="${opcion.valor}"]`)
+        : opciones.filter({ has: lista.page().getByText(opcion.nombre, { exact: true }) });
+  if ("nombre" in opcion) {
+    await expect(elegida, `no hay exactamente una opción "${opcion.nombre}"`).toHaveCount(1);
+  }
+  await elegida.click();
+}
+
+/** Los nombres de las opciones de un `Combobox` (sin la duración ni el precio). Lo deja cerrado. */
+export async function nombresDeOpciones(campo: Locator): Promise<string[]> {
+  await campo.click();
+  const lista = await panelDe(campo);
+  const nombres = await lista.locator(".ui-picker__body > span:first-child").allTextContents();
+  await campo.click();
+  return nombres;
+}
+
+/** Poner una hora `HH:MM` en un `TimeField`: se escribe y se elige con Enter. */
+export async function elegirHora(campo: Locator, hhmm: string): Promise<void> {
+  if ((await campo.getAttribute("aria-expanded")) !== "true") await campo.click();
+  const busqueda = campo.page().getByPlaceholder(/^Escribe la hora/);
+  await busqueda.fill(hhmm);
+  await busqueda.press("Enter");
+  await expect(campo).toHaveAttribute("data-value", hhmm);
+}
+
+/** Poner una fecha `YYYY-MM-DD` en un `DateField`, navegando mes a mes. */
+export async function elegirFecha(campo: Locator, fecha: string): Promise<void> {
+  if ((await campo.getAttribute("aria-expanded")) !== "true") await campo.click();
+  const calendario = await panelDe(campo);
+  for (let i = 0; i < 36; i++) {
+    const dia = calendario.locator(`[data-date="${fecha}"]`);
+    if ((await dia.count()) > 0) {
+      await dia.click();
+      await expect(campo).toHaveAttribute("data-value", fecha);
+      return;
+    }
+    const primero = await calendario.locator("[data-date]").first().getAttribute("data-date");
+    await calendario
+      .getByRole("button", { name: primero !== null && fecha < primero ? "Mes anterior" : "Mes siguiente" })
+      .click();
+  }
+  throw new Error(`no se llegó a ${fecha} en el calendario`);
 }

@@ -6,7 +6,8 @@ import { ConflictReview } from "@/components/calendar";
 import type { MetaIndex, ProviderOption, ServiceOption } from "@/components/calendar/types";
 import styles from "@/components/calendar/calendar.module.css";
 import { Button } from "@/components/ui/Button";
-import { Checkbox, Field, Select, TextArea, TextInput } from "@/components/ui/Field";
+import { Checkbox, Field, TextArea, TextInput } from "@/components/ui/Field";
+import { Combobox, DateField, TimeField, type PickerOption } from "@/components/ui/Pickers";
 import { formatCOP, formatDuration, formatPhoneCO } from "@/components/ui/format";
 import { STATUS_IDS, STATUS_META } from "@/components/ui/status";
 import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
@@ -342,19 +343,16 @@ export function AppointmentForm({
 
       <Field label="Servicio" required>
         {(wired) => (
-          <Select
+          <Combobox<number | null>
             {...wired}
-            value={baseId ?? ""}
-            onChange={(e) => pickService(e.target.value === "" ? null : Number(e.target.value))}
-          >
-            <option value="">Elige un servicio…</option>
-            {pickable.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-                {option.duration ? ` · ${formatDuration(option.duration)}` : ""}
-              </option>
-            ))}
-          </Select>
+            value={baseId}
+            options={serviceOptions(pickable)}
+            onChange={pickService}
+            placeholder="Elige un servicio…"
+            searchable
+            searchPlaceholder="Busca: semi, pies, acrílico…"
+            emptyText="Ningún servicio se llama así."
+          />
         )}
       </Field>
 
@@ -367,20 +365,15 @@ export function AppointmentForm({
           hint="Se agenda como combo: un solo turno, con su propio precio."
         >
           {(wired) => (
-            <Select
+            <Combobox<number | null>
               {...wired}
-              value={partnerId ?? ""}
-              onChange={(e) =>
-                pickPartner(e.target.value === "" ? null : Number(e.target.value))
-              }
-            >
-              <option value="">No, solo {baseRole === "feet" ? "pies" : "manos"}</option>
-              {partners.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </Select>
+              value={partnerId}
+              options={[
+                { value: null, label: `No, solo ${baseRole === "feet" ? "pies" : "manos"}` },
+                ...partners.map((option) => ({ value: option.id, label: option.name })),
+              ]}
+              onChange={pickPartner}
+            />
           )}
         </Field>
       ) : null}
@@ -428,29 +421,19 @@ export function AppointmentForm({
 
       <Field label="Profesional" required>
         {(wired) => (
-          <Select
+          <Combobox<number>
             {...wired}
             value={draft.providerId}
-            onChange={(e) => set("providerId", Number(e.target.value))}
-          >
-            {providers.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </Select>
+            options={providers.map((option) => ({ value: option.id, label: option.name }))}
+            onChange={(id) => set("providerId", id)}
+          />
         )}
       </Field>
 
       <div className={`${styles.formRow} ${styles.formRow2}`}>
         <Field label="Fecha" required>
           {(wired) => (
-            <TextInput
-              {...wired}
-              type="date"
-              value={draft.date}
-              onChange={(e) => set("date", e.target.value)}
-            />
+            <DateField {...wired} value={draft.date} onChange={(date) => set("date", date)} />
           )}
         </Field>
         <Field
@@ -458,15 +441,7 @@ export function AppointmentForm({
           required
           hint={length > 0 ? `Dura ${formatDuration(length)}` : undefined}
         >
-          {(wired) => (
-            <TextInput
-              {...wired}
-              type="time"
-              step={300}
-              value={draft.startTime}
-              onChange={(e) => pickStart(e.target.value)}
-            />
-          )}
+          {(wired) => <TimeField {...wired} value={draft.startTime} onChange={pickStart} />}
         </Field>
       </div>
 
@@ -477,35 +452,28 @@ export function AppointmentForm({
           error={length <= 0 ? "Tiene que ser después de que empieza." : undefined}
         >
           {(wired) => (
-            <TextInput
-              {...wired}
-              type="time"
-              step={300}
-              value={draft.endTime}
-              onChange={(e) => set("endTime", e.target.value)}
-            />
+            <TimeField {...wired} value={draft.endTime} onChange={(time) => set("endTime", time)} />
           )}
         </Field>
 
         {draft.id !== undefined ? (
           <Field label="Estado">
             {(wired) => (
-              <Select
+              <Combobox<string>
                 {...wired}
                 value={draft.status}
-                onChange={(e) => set("status", e.target.value)}
-              >
-                {/* Las etiquetas del panel son las que `docs/DEV-LOCAL.md`
-                    manda configurar en EA. Si alguien renombró la lista allá,
-                    la cita se guarda con la cadena que se elija acá y el mapa
-                    de estados la dibujará punteada — que es la señal correcta,
-                    no un crash. */}
-                {STATUS_IDS.map((id) => (
-                  <option key={id} value={STATUS_META[id].label}>
-                    {STATUS_META[id].label}
-                  </option>
-                ))}
-              </Select>
+                // Las etiquetas del panel son las que `docs/DEV-LOCAL.md` manda
+                // configurar en EA. Si alguien renombró la lista allá, la cita
+                // trae una cadena que no está acá: se agrega tal cual, para que
+                // el selector no quede en blanco sobre un valor que sí tiene.
+                options={[
+                  ...STATUS_IDS.map((id) => ({ value: STATUS_META[id].label, label: STATUS_META[id].label })),
+                  ...(STATUS_IDS.some((id) => STATUS_META[id].label === draft.status) || draft.status === ""
+                    ? []
+                    : [{ value: draft.status, label: draft.status }]),
+                ]}
+                onChange={(status) => set("status", status)}
+              />
             )}
           </Field>
         ) : null}
@@ -589,6 +557,25 @@ export function AppointmentForm({
 // ---------------------------------------------------------------------------
 
 /**
+ * Los servicios como opciones del selector: el nombre arriba, y debajo la
+ * duración y el precio — que es con lo que se distingue "Semipermanente" de
+ * "Semipermanente + retiro" sin abrir la ficha.
+ */
+function serviceOptions(services: readonly ServiceOption[]): PickerOption<number | null>[] {
+  return services.map((option) => ({
+    value: option.id,
+    label: option.name,
+    detail:
+      [
+        option.duration ? formatDuration(option.duration) : null,
+        option.priceCOP !== null && option.priceCOP !== undefined ? formatCOP(option.priceCOP) : null,
+      ]
+        .filter(Boolean)
+        .join(" · ") || undefined,
+  }));
+}
+
+/**
  * Lo que se suma al servicio principal en la misma cita: la lista de lo
  * agregado y un selector para agregar más.
  *
@@ -656,24 +643,22 @@ function ExtraServices({
           hint="Si con el principal forma un combo, la cita pasa a ser el combo."
         >
           {(wired) => (
-            <Select
+            <Combobox<number | null>
               {...wired}
-              autoFocus
-              value=""
-              onChange={(e) => {
-                if (e.target.value === "") return;
-                onAdd(Number(e.target.value));
+              value={null}
+              options={serviceOptions(pickable)}
+              onChange={(id) => {
+                if (id === null) return;
+                onAdd(id);
                 setAdding(false);
               }}
-            >
-              <option value="">Elige un servicio…</option>
-              {pickable.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                  {option.duration ? ` · ${formatDuration(option.duration)}` : ""}
-                </option>
-              ))}
-            </Select>
+              onDismiss={() => setAdding(false)}
+              defaultOpen
+              placeholder="Elige un servicio…"
+              searchable
+              searchPlaceholder="Busca: semi, pies, acrílico…"
+              emptyText="Ningún servicio se llama así."
+            />
           )}
         </Field>
       ) : canAdd ? (
