@@ -89,6 +89,24 @@ test.describe("ergonomía en el teléfono", () => {
           const centro = document.elementFromPoint(cx, cy);
           if (!centro || centro.tagName.startsWith("NEXTJS")) return;
           if (!(centro === el || el.contains(centro) || centro.contains(el))) return;
+          // Tampoco lo que está **a medias** debajo de una capa fija —la barra
+          // de pestañas de abajo—: su centro asoma, pero medirlo daría la mitad
+          // de su alto. Al hacer scroll queda entero, y ahí sí se mide. Sin
+          // esto, cuántas citas hay en el día decidía si la prueba pasaba.
+          const tapado = (y: number) => {
+            const hit = document.elementFromPoint(cx, y);
+            return hit !== null && !(hit === el || el.contains(hit) || hit.contains(el));
+          };
+          if (tapado(Math.round(b.top + 2)) || tapado(Math.round(b.bottom - 2))) {
+            const capa = (y: number) => {
+              let n: Element | null = document.elementFromPoint(cx, y);
+              for (; n; n = n.parentElement) {
+                if (getComputedStyle(n).position === "fixed" || getComputedStyle(n).position === "sticky") return true;
+              }
+              return false;
+            };
+            if (capa(Math.round(b.top + 2)) || capa(Math.round(b.bottom - 2))) return;
+          }
 
           // **Un enlace dentro de una frase no es un objetivo táctil.** "ve a
           // Hoy" mide 24 px de ancho porque la palabra mide eso, y estirarlo a
