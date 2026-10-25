@@ -1187,10 +1187,10 @@ contenedor `admin`, que es el único que tiene la agenda, el scheduler y la base
   conversación con el equipo.
 - **El texto manual y el de Meta son dos textos distintos, a propósito.** El de `wa.me`
   (`buildReminderText` / `buildConfirmationText` en `lib/whatsapp/manual-reminder.ts`, plantilla
-  `manual-wa-me-v3`) lleva emojis y el día, la fecha y la hora en renglones propios —también "Hoy,
+  `manual-wa-me-v4`) lleva emojis y el día, la fecha y la hora en renglones propios —también "Hoy,
   viernes 16 de octubre", no "hoy" a secas—. La confirmación dice "quedó agendada", y el
-  recordatorio cierra pidiendo "Responde *SÍ* para confirmar": ese SÍ en el chat es la confirmación
-  de asistencia. Las plantillas de la Cloud API
+  recordatorio cierra con "¿Nos confirmas tu asistencia?": la respuesta en el chat es la
+  confirmación de asistencia. Las plantillas de la Cloud API
   (`lib/whatsapp/template-params.ts`) siguen sobrias: tienen que coincidir letra por letra con lo
   aprobado en Meta, y ponerles emojis exige cambiar las dos cosas a la vez y volver a pasar la
   revisión. Ninguno de los dos lleva precio.

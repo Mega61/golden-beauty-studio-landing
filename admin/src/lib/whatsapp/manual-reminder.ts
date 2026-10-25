@@ -35,10 +35,11 @@ import { eaDatePart, eaLocalToInstant, type EaLocalDate, type EaLocalDateTime } 
  *
  * `v2`: el texto con emojis y el día y la hora en renglones propios. Las filas
  * viejas siguen diciendo `v1`, que es lo que de verdad se mandó entonces.
- * `v3` (2026-10-24): la confirmación dice "agendada" y el recordatorio le pide
- * a la clienta que responda SÍ, para tener en el chat que va a venir.
+ * `v3` (2026-10-24): la confirmación dice "agendada" y el recordatorio cierra
+ * preguntando "¿Nos confirmas tu asistencia?", para tener en el chat que va a venir.
+ * `v4`: el recordatorio cierra solo con la pregunta, sin "Responde SÍ".
  */
-export const MANUAL_TEMPLATE = "manual-wa-me-v3";
+export const MANUAL_TEMPLATE = "manual-wa-me-v4";
 
 /** La dirección que va en el mensaje. Una sola, escrita una sola vez. */
 export const STUDIO_ADDRESS = "Calle 69 Sur #43a - 41, primer piso, Sabaneta";
@@ -273,12 +274,11 @@ function capitalize(text: string): string {
 const CLOSING_BOOKED = "Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍";
 
 /**
- * El cierre del recordatorio: **pide una respuesta**. Un "SÍ" en el chat es la
- * confirmación de asistencia que el estudio no tiene de otra forma, y una
+ * El cierre del recordatorio: **pide una respuesta**. La respuesta en el chat es
+ * la confirmación de asistencia que el estudio no tiene de otra forma, y una
  * pregunta directa se contesta mucho más que un "si necesitas cambiarla".
  */
-const CLOSING_ASK_CONFIRM =
-  "¿Nos confirmas tu asistencia? Responde *SÍ* para confirmar, o escríbenos si necesitas cambiarla. 🤍";
+const CLOSING_ASK_CONFIRM = "¿Nos confirmas tu asistencia? 🤍";
 
 function composeMessage(input: {
   customerFirstName: string | null;
