@@ -4,7 +4,7 @@
  *
  * Es el hermano de `manual-reminder.ts` para el momento de la reserva. Cuando
  * alguien reserva —por la página o desde la agenda del panel— la dueña le
- * escribe a la clienta "tu cita quedó confirmada" desde el WhatsApp del
+ * escribe a la clienta "tu cita quedó agendada" desde el WhatsApp del
  * estudio. Mientras Meta no apruebe las plantillas, eso es un toque por
  * reserva; con la Cloud API prendida lo hace `confirmation.ts` solo, y esta
  * lista muestra si salió.

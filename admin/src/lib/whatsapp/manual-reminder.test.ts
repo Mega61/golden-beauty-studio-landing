@@ -356,7 +356,7 @@ describe("buildReminderText", () => {
         "🕒 10:00 a. m.",
         "📍 Golden Beauty Studio — Calle 69 Sur #43a - 41, primer piso, Sabaneta",
         "",
-        "Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍",
+        "¿Nos confirmas tu asistencia? Responde *SÍ* para confirmar, o escríbenos si necesitas cambiarla. 🤍",
       ].join("\n"),
     );
   });
@@ -398,7 +398,7 @@ describe("buildReminderText", () => {
     expect(text).not.toMatch(/\$|COP|\d{2,3}\.\d{3}|precio|valor/i);
   });
 
-  it("lleva la dirección exacta y la invitación a responder", () => {
+  it("lleva la dirección exacta y pide que confirme la asistencia respondiendo", () => {
     const text = buildReminderText({
       customerFirstName: "Laura",
       serviceName: "x",
@@ -407,9 +407,7 @@ describe("buildReminderText", () => {
     });
     expect(STUDIO_ADDRESS).toBe("Calle 69 Sur #43a - 41, primer piso, Sabaneta");
     expect(text).toContain(STUDIO_ADDRESS);
-    expect(text.endsWith("Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍")).toBe(
-      true,
-    );
+    expect(text.endsWith("¿Nos confirmas tu asistencia? Responde *SÍ* para confirmar, o escríbenos si necesitas cambiarla. 🤍")).toBe(true);
   });
 
   it("la fecha se lee de la hora de pared, sin pasar por la zona del proceso", () => {
@@ -487,7 +485,7 @@ describe("buildConfirmationText", () => {
       [
         "¡Hola, Laura! ✨",
         "",
-        "Tu cita de Semipermanente manos quedó confirmada 💅",
+        "Tu cita de Semipermanente manos quedó agendada 💅",
         "📅 Viernes 16 de octubre",
         "🕒 10:00 a. m.",
         "📍 Golden Beauty Studio — Calle 69 Sur #43a - 41, primer piso, Sabaneta",
@@ -506,7 +504,7 @@ describe("buildConfirmationText", () => {
     });
     const lines = text.split("\n");
     expect(lines[0]).toBe("¡Hola! ✨");
-    expect(lines[2]).toBe("Tu cita quedó confirmada 💅");
+    expect(lines[2]).toBe("Tu cita quedó agendada 💅");
     expect(lines[3]).toBe("📅 Viernes 16 de octubre");
     expect(lines[4]).toBe("🕒 1:30 p. m.");
   });

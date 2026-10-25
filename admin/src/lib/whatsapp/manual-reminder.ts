@@ -35,8 +35,10 @@ import { eaDatePart, eaLocalToInstant, type EaLocalDate, type EaLocalDateTime } 
  *
  * `v2`: el texto con emojis y el día y la hora en renglones propios. Las filas
  * viejas siguen diciendo `v1`, que es lo que de verdad se mandó entonces.
+ * `v3` (2026-10-24): la confirmación dice "agendada" y el recordatorio le pide
+ * a la clienta que responda SÍ, para tener en el chat que va a venir.
  */
-export const MANUAL_TEMPLATE = "manual-wa-me-v2";
+export const MANUAL_TEMPLATE = "manual-wa-me-v3";
 
 /** La dirección que va en el mensaje. Una sola, escrita una sola vez. */
 export const STUDIO_ADDRESS = "Calle 69 Sur #43a - 41, primer piso, Sabaneta";
@@ -267,11 +269,23 @@ function capitalize(text: string): string {
  * se cobra (adicionales, promos que se aplican al pagar), y un número en el
  * mensaje es un número que la clienta va a reclamar en caja.
  */
+/** El cierre de la confirmación: solo cómo cambiarla. */
+const CLOSING_BOOKED = "Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍";
+
+/**
+ * El cierre del recordatorio: **pide una respuesta**. Un "SÍ" en el chat es la
+ * confirmación de asistencia que el estudio no tiene de otra forma, y una
+ * pregunta directa se contesta mucho más que un "si necesitas cambiarla".
+ */
+const CLOSING_ASK_CONFIRM =
+  "¿Nos confirmas tu asistencia? Responde *SÍ* para confirmar, o escríbenos si necesitas cambiarla. 🤍";
+
 function composeMessage(input: {
   customerFirstName: string | null;
   headline: string;
   dateLine: string;
   start: EaLocalDateTime;
+  closing: string;
 }): string {
   const name = presentableFirstName(input.customerFirstName);
   const greeting = name === null ? "¡Hola! ✨" : `¡Hola, ${name}! ✨`;
@@ -284,7 +298,7 @@ function composeMessage(input: {
     `🕒 ${clockTime(input.start)}`,
     `📍 Golden Beauty Studio — ${STUDIO_ADDRESS}`,
     "",
-    "Si necesitas cambiarla, respóndenos por aquí. ¡Te esperamos! 🤍",
+    input.closing,
   ].join("\n");
 }
 
@@ -313,6 +327,7 @@ export function buildReminderText(input: {
     headline: `Te recordamos tu cita${serviceSuffix(input.serviceName)}`,
     dateLine: `${relative}, ${formatDateLong(input.start)}`,
     start: input.start,
+    closing: CLOSING_ASK_CONFIRM,
   });
 }
 
@@ -332,9 +347,10 @@ export function buildConfirmationText(input: {
 }): string {
   return composeMessage({
     customerFirstName: input.customerFirstName,
-    headline: `Tu cita${serviceSuffix(input.serviceName)} quedó confirmada`,
+    headline: `Tu cita${serviceSuffix(input.serviceName)} quedó agendada`,
     dateLine: capitalize(formatDateLong(input.start)),
     start: input.start,
+    closing: CLOSING_BOOKED,
   });
 }
 
