@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, Panel, formatCOP, formatDateLong } from "@/components/ui";
 
 import { agregarTardias, cerrarDia, reintentarPush, type CerrarDiaResult, type PushResult } from "./actions";
 
@@ -53,15 +53,25 @@ export function CierreDelDia({
   fecha,
   bloqueado,
   cuentas,
+  totales,
 }: {
   fecha: string;
   bloqueado: boolean;
   cuentas: number;
+  /** Lo que se va a congelar y mandar, para leerlo antes de confirmar. */
+  totales: { efectivo: number; transferencia: number; otro: number; tips: number };
 }) {
   const [estado, enviar, enviando] = useActionState<CerrarDiaResult | null>(
     () => cerrarDia(fecha),
     null,
   );
+  // El cierre congela las cuentas y manda la plata a Actual, que no deja
+  // corregir una cifra ya importada. Se puede cerrar desde el celular, así que
+  // un toque no alcanza: el primero abre el resumen y el segundo cierra.
+  const [confirmando, setConfirmando] = useState(false);
+  useEffect(() => {
+    if (estado !== null) setConfirmando(false);
+  }, [estado]);
 
   const mensaje =
     estado === null
@@ -70,19 +80,70 @@ export function CierreDelDia({
         ? { ok: estado.push.state !== "fallo", message: `${estado.message} ${pushTexto(estado)}` }
         : { ok: false, message: estado.message };
 
+  const etiqueta = `${cuentas} ${cuentas === 1 ? "cuenta" : "cuentas"}`;
+  const fila = (label: string, valor: number) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+      <span>{label}</span>
+      <strong style={{ fontVariantNumeric: "tabular-nums" }}>{formatCOP(valor)}</strong>
+    </div>
+  );
+
   return (
-    <form action={enviar}>
+    <>
       <Button
-        type="submit"
+        type="button"
         variant="primary"
-        loading={enviando}
-        loadingLabel="Cerrando el día"
-        disabled={bloqueado}
+        block
+        disabled={bloqueado || enviando}
+        onClick={() => setConfirmando(true)}
       >
-        Cerrar el día ({cuentas} {cuentas === 1 ? "cuenta" : "cuentas"})
+        Cerrar el día ({etiqueta})
       </Button>
       <Mensaje estado={mensaje} />
-    </form>
+
+      <Panel
+        open={confirmando}
+        onClose={() => {
+          if (!enviando) setConfirmando(false);
+        }}
+        dismissable={!enviando}
+        title="¿Cerrar el día?"
+        footer={
+          <form
+            action={enviar}
+            style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={enviando}
+              onClick={() => setConfirmando(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary" loading={enviando} loadingLabel="Cerrando el día">
+              Sí, cerrar el día
+            </Button>
+          </form>
+        }
+      >
+        <div style={{ display: "grid", gap: "0.75rem", fontSize: "var(--text-sm)" }}>
+          <p style={{ margin: 0 }}>
+            <strong>{formatDateLong(`${fecha} 00:00:00`)}</strong> · {etiqueta}
+          </p>
+          <div style={{ display: "grid", gap: "0.375rem" }}>
+            {fila("Efectivo", totales.efectivo)}
+            {fila("Transferencia", totales.transferencia)}
+            {totales.otro === 0 ? null : fila("Otro", totales.otro)}
+            {totales.tips === 0 ? null : fila("Propinas (aparte)", totales.tips)}
+          </div>
+          <p style={{ margin: 0, color: "var(--color-ink-soft)", fontSize: "var(--text-xs)" }}>
+            Al cerrar, estas cuentas quedan congeladas y la plata se manda a Actual Budget. Una
+            corrección después del cierre viaja como ajuste aparte, no edita la cifra.
+          </p>
+        </div>
+      </Panel>
+    </>
   );
 }
 
