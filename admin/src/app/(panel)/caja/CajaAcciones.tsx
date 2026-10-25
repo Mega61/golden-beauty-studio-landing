@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { Button } from "@/components/ui";
 
-import { cerrarDia, reintentarPush, type CerrarDiaResult, type PushResult } from "./actions";
+import { agregarTardias, cerrarDia, reintentarPush, type CerrarDiaResult, type PushResult } from "./actions";
 
 /**
  * Los botones de Caja.
@@ -125,6 +125,28 @@ export function ReintentarPush({ fecha }: { fecha: string }) {
     <form action={enviar}>
       <Button type="submit" loading={enviando} loadingLabel="Empujando el lote">
         Reintentar el push al CRM
+      </Button>
+      <Mensaje estado={estado} />
+    </form>
+  );
+}
+
+/**
+ * Agregar al cierre las cuentas que se cerraron después de él.
+ *
+ * Congela esas cuentas bajo el cierre del día y las empuja solas: las que ya
+ * habían salido no se vuelven a mandar.
+ */
+export function AgregarTardias({ fecha, cuentas }: { fecha: string; cuentas: number }) {
+  const [estado, enviar, enviando] = useActionState<PushResult | null>(
+    () => agregarTardias(fecha),
+    null,
+  );
+
+  return (
+    <form action={enviar}>
+      <Button type="submit" variant="primary" loading={enviando} loadingLabel="Agregando al cierre">
+        Agregar al cierre ({cuentas} {cuentas === 1 ? "cuenta" : "cuentas"})
       </Button>
       <Mensaje estado={estado} />
     </form>

@@ -138,10 +138,13 @@ function financeViewOf(
  */
 export async function loadToday(
   session: PanelSession,
-  options: { verTodas: boolean; now?: Date } = { verTodas: true },
+  options: { verTodas: boolean; now?: Date; date?: EaLocalDate } = { verTodas: true },
 ): Promise<TodayData> {
   const now = options.now ?? new Date();
-  const date = instantToEaDate(now);
+  // Un día anterior cuando se pide: la cita que se registró tarde se cierra en
+  // su propio día, porque `paid_at` cae en la fecha de la cita y así entra a la
+  // caja de ese día.
+  const date = options.date ?? instantToEaDate(now);
   const problems: TodayProblem[] = [];
 
   const soloProvider = options.verTodas ? null : session.eaProviderId;

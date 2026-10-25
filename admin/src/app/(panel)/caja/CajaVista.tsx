@@ -16,7 +16,7 @@ import {
 import { mapEaStatus } from "@/components/calendar/status-map";
 import type { DayAccount, DayIssue, DayTotals } from "@/jobs/day-close";
 
-import { CierreDelDia, ReintentarPush } from "./CajaAcciones";
+import { AgregarTardias, CierreDelDia, ReintentarPush } from "./CajaAcciones";
 import type { CajaView } from "./data";
 
 /**
@@ -70,11 +70,16 @@ export function CajaVista({ view }: { view: CajaView }) {
       <Fecha date={date} today={today} />
 
       <Pendientes
+        date={date}
         bloquean={bloquean}
         enCurso={enCurso}
         cerrado={dayClose !== null}
         bloqueadoAparte={review.blockers.length > 0}
       />
+
+      {view.late.length === 0 ? null : (
+        <Tardias date={date} accounts={view.late} nombres={nombres} />
+      )}
 
       <Totales totals={review.totals} cerrado={dayClose !== null} />
 
@@ -198,11 +203,13 @@ const ISSUE_COLUMNS: ReadonlyArray<Column<DayIssue>> = [
 ];
 
 function Pendientes({
+  date,
   bloquean,
   enCurso,
   cerrado,
   bloqueadoAparte,
 }: {
+  date: string;
   bloquean: readonly DayIssue[];
   enCurso: readonly DayIssue[];
   cerrado: boolean;
@@ -247,8 +254,11 @@ function Pendientes({
                 color: "var(--color-ink-soft)",
               }}
             >
-              Mientras quede una, el día no se puede cerrar. Cada una se resuelve desde{" "}
-              <Link href="/hoy">Hoy</Link>, cerrando su cuenta.
+              {cerrado
+                ? "El día ya se cerró, pero estas citas quedaron sin cuenta. Ciérrala desde "
+                : "Mientras quede una, el día no se puede cerrar. Cada una se resuelve desde "}
+              <Link href={`/hoy?fecha=${date}`}>Hoy, en este día</Link>
+              {cerrado ? ", y después agrégala al cierre acá." : ", cerrando su cuenta."}
             </p>
             <DataTable
               columns={ISSUE_COLUMNS}
@@ -513,6 +523,50 @@ function Cerradas({
             />
           }
         />
+      </div>
+    </Card>
+  );
+}
+
+// ── Cuentas tardías ─────────────────────────────────────────────────────────
+
+/**
+ * Cuentas cerradas después del cierre del día.
+ *
+ * Una cita que se registró tarde y se cerró desde Hoy navegando a su día. Hasta
+ * que se agregan, no están en los totales del cierre ni llegaron al CRM — así
+ * que no se esconden en la tabla de cerradas: tienen su tarjeta y su botón.
+ */
+function Tardias({
+  date,
+  accounts,
+  nombres,
+}: {
+  date: string;
+  accounts: readonly DayAccount[];
+  nombres: ReadonlyMap<number, string>;
+}) {
+  return (
+    <Card padded={false}>
+      <CardHead
+        title={
+          accounts.length === 1
+            ? "1 cuenta cerrada después del cierre"
+            : `${accounts.length} cuentas cerradas después del cierre`
+        }
+      />
+      <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.75rem" }}>
+        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
+          Todavía no cuentan en los totales del cierre ni llegaron al CRM. Agregarlas las suma al
+          cierre de este día y las envía; las cuentas que ya habían salido no se vuelven a mandar.
+        </p>
+        <DataTable
+          columns={accountColumns(nombres)}
+          rows={accounts}
+          rowKey={(row) => String(row.financeId)}
+          caption="Cuentas cerradas después del cierre del día"
+        />
+        <AgregarTardias fecha={date} cuentas={accounts.length} />
       </div>
     </Card>
   );

@@ -857,10 +857,14 @@ async function runPush(
   }
 
   const repos = repositories(deps.db);
-  const accounts = await withPayments(
-    repos,
-    await repos.appointmentFinance.listByDayClose(row.id),
-  );
+  // Solo lo que todavía no salió. En el primer push es el cierre entero; si
+  // después se le agregaron cuentas tardías (`attachLateAccounts()`), son solo
+  // ésas. Re-mandar una cuenta ya empujada no es inocuo: si tuvo un ajuste, su
+  // `amount_charged` ya trae el delta, y el upsert de Strapi le pisaría el monto
+  // original con uno que cuenta el ajuste dos veces.
+  const accounts = (
+    await withPayments(repos, await repos.appointmentFinance.listByDayClose(row.id))
+  ).filter((account) => account.pushedToIngestAt === null);
 
   let payments: IngestPayment[];
   try {
@@ -936,6 +940,126 @@ export async function retryDayPush(
   const row = await repositories(deps.db).dayCloses.findByDate(input.date);
   if (row === undefined) return { state: "sin-cierre" };
   return pushClose(deps, row, now);
+}
+
+// ── Cuentas cerradas después del cierre ─────────────────────────────────────
+
+/**
+ * Las cuentas del día que se cerraron **después** de que el día se cerró.
+ *
+ * Pasa cuando una cita se agenda tarde —se olvidó, o se registró al día
+ * siguiente— y su cuenta se cierra desde Hoy navegando a ese día. Mientras no
+ * estén en el cierre no viajan al CRM ni cuentan en sus totales, así que Caja
+ * las muestra y ofrece agregarlas. Sin cierre no hay nada tardío: son cuentas
+ * normales del día.
+ */
+export function lateAccountsOf(review: DayReview, dayClose: DayClose | null): DayAccount[] {
+  if (dayClose === null) return [];
+  return review.closed.filter((account) => account.dayCloseId === null);
+}
+
+export type AttachLateResult =
+  | { ok: false; reason: "sin-cierre" | "vacio" | "incompleta" | "lote"; message: string }
+  | { ok: true; attached: number; totals: DayTotals; push: PushOutcome };
+
+/**
+ * Agregar a un cierre ya hecho las cuentas que se cerraron después.
+ *
+ * No reabre el día ni re-juzga la compuerta: el día sigue cerrado una sola vez
+ * (`uq_day_close_date`). Lo que hace es lo mismo que el cierre hizo con las
+ * demás cuentas, para éstas: las congela bajo el cierre, suma sus totales a la
+ * fila `day_close` y las empuja. El push manda **solo** las que no habían
+ * salido (`runPush()`), cada una con su `tx_id` de siempre — no es un ajuste,
+ * porque nunca se había empujado nada de esa cita.
+ *
+ * Una cuenta tardía incompleta (sin método de pago, cortesía con cobro) no se
+ * agrega: es la misma regla de la compuerta, y agregarla congelaría una cifra
+ * que todavía hay que arreglar desde Hoy.
+ */
+export async function attachLateAccounts(
+  deps: DayCloseDeps,
+  input: { date: EaLocalDate; actorUserId: AuthId; now?: Date },
+): Promise<AttachLateResult> {
+  const now = input.now ?? new Date();
+  const repos = repositories(deps.db);
+
+  const dayClose = await repos.dayCloses.findByDate(input.date);
+  if (dayClose === undefined) {
+    return {
+      ok: false,
+      reason: "sin-cierre",
+      message: "Ese día todavía no está cerrado: las cuentas entran con el cierre normal.",
+    };
+  }
+
+  const [dayStart, dayEnd] = dayBounds(input.date);
+  const rows = (await repos.appointmentFinance.listByStartRange(dayStart, dayEnd)).filter(
+    (row) => row.closed_at !== null && row.day_close_id === null,
+  );
+  if (rows.length === 0) {
+    return { ok: false, reason: "vacio", message: "No hay cuentas tardías que agregar." };
+  }
+
+  const late = await withPayments(repos, rows);
+
+  for (const account of late) {
+    const falta = missingOf(account);
+    if (falta !== null) {
+      return {
+        ok: false,
+        reason: "incompleta",
+        message: `La cita #${account.eaAppointmentId} no se puede agregar: ${falta.toLowerCase()}. Corrígela desde Hoy.`,
+      };
+    }
+  }
+
+  try {
+    buildDayClosePayments(late);
+  } catch (error) {
+    if (error instanceof IngestPayloadError) {
+      return { ok: false, reason: "lote", message: error.message };
+    }
+    throw error;
+  }
+
+  const totals = summarizeDayTotals(late);
+  if (totals.efectivo < 0 || totals.transferencia < 0 || totals.otro < 0) {
+    return {
+      ok: false,
+      reason: "incompleta",
+      message: "Algún total por método quedó negativo. Revisa las cuentas antes de agregarlas.",
+    };
+  }
+
+  await deps.db.transaction().execute(async (trx) => {
+    const tx = repositories(trx);
+    await tx.appointmentFinance.attachToDayClose(
+      late.map((account) => account.financeId),
+      dayClose.id,
+    );
+    await tx.dayCloses.addLateAccounts(dayClose.id, totals);
+    await tx.auditLog.append({
+      actorUserId: input.actorUserId,
+      action: "day.attach-late",
+      entity: "day_close",
+      entityId: dayClose.id,
+      before: totalsOf(dayClose),
+      after: {
+        date: input.date,
+        added: totals,
+        accounts: late.map((account) => account.eaAppointmentId),
+      },
+      at: now,
+    });
+  });
+
+  const fresh = await repos.dayCloses.findById(dayClose.id);
+  const push: PushOutcome =
+    fresh === undefined
+      ? { state: "fallo", message: "El cierre desapareció entre dos consultas.", retryable: true }
+      : await pushClose(deps, fresh, now);
+
+  return { ok: true, attached: late.length, totals, push };
 }
 
 // ── Ajustes posteriores al cierre ───────────────────────────────────────────

@@ -131,6 +131,7 @@ export function fixtureCajaView(caso: Caso): CajaView {
     date: DIA,
     today: DIA,
     review,
+    late: [],
     dayClose: cerrado
       ? {
           id: 12,

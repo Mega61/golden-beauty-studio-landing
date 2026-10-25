@@ -6,7 +6,9 @@ import Link from "next/link";
 
 import { Icon, formatDateLong, formatTime } from "@/components/ui";
 import { unmarkedAppointments } from "@/lib/attendance";
-import { instantToEaLocal } from "@/lib/ea";
+import { getDb } from "@/db/client";
+import { repositories } from "@/db/repositories";
+import { instantToEaDate, instantToEaLocal, isEaLocalDate, type EaLocalDate } from "@/lib/ea";
 import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
 import { loadComboCompositions } from "@/lib/combo-source";
@@ -48,8 +50,44 @@ function shellRole(role: UserRole): Role {
   return role === "admin" ? "reception" : role;
 }
 
-export default async function HoyPage() {
+/**
+ * El día que se mira. `?fecha=YYYY-MM-DD` abre un día anterior, para cerrar la
+ * cuenta de una cita que se registró tarde o que nadie alcanzó a cerrar. El
+ * futuro no: ahí no hay nada que cobrar. Cualquier otra cosa cae en hoy.
+ */
+function parseFecha(raw: string | undefined, today: EaLocalDate): EaLocalDate {
+  return isEaLocalDate(raw) && raw <= today ? raw : today;
+}
+
+/** Un día antes o después, en calendario. Sin husos: es una fecha, no un instante. */
+function shiftDate(date: string, days: number): string {
+  const at = new Date(`${date}T00:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
+}
+
+/**
+ * Si la caja de un día anterior ya se cerró. Solo se pregunta para el pasado, y
+ * si la base no contesta se calla: es un aviso, la regla vive en Caja.
+ */
+async function dayAlreadyClosed(date: EaLocalDate): Promise<boolean> {
+  try {
+    return (await repositories(getDb()).dayCloses.findByDate(date)) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+export default async function HoyPage({
+  searchParams,
+}: {
+  // En Next 16 los parámetros de la petición son asíncronos.
+  searchParams: Promise<{ fecha?: string }>;
+}) {
   const session = await requireSession();
+  const today = instantToEaDate(new Date());
+  const fecha = parseFecha((await searchParams).fecha, today);
+  const isToday = fecha === today;
 
   const [verTodas, canCharge, canSeeTotals, canFixAfterClose, canRemind, canGiveCourtesy] =
     await Promise.all([
@@ -65,8 +103,8 @@ export default async function HoyPage() {
   // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
   // que la pasada diaria no dependa de acordarse. Si la carga falla, el acceso
   // sale sin número —nunca tumba Hoy por un dato accesorio.
-  const [{ date, appointments, catalog, problems }, pendingReminders, comboSource] = await Promise.all([
-    loadToday(session, { verTodas }),
+  const [{ date, appointments, catalog, problems }, pendingReminders, comboSource, cajaCerrada] = await Promise.all([
+    loadToday(session, { verTodas, date: fecha }),
     // Recordatorios **y** reservas nuevas por confirmar: los dos son mensajes
     // que salen del mismo botón de la misma pantalla.
     canRemind
@@ -84,6 +122,7 @@ export default async function HoyPage() {
     // Para "¿también pies?" en la cuenta: el par que es un combo se cobra como
     // el combo. Nunca lanza; sin composiciones la hoja simplemente no lo ofrece.
     loadComboCompositions(),
+    isToday ? Promise.resolve(false) : dayAlreadyClosed(fecha),
   ]);
 
   const eaCaido = problems.find((p) => p.source === "ea") ?? null;
@@ -128,8 +167,48 @@ export default async function HoyPage() {
           }}
         >
           {formatDateLong(`${date} 00:00:00`)}
+          {isToday ? "" : " · día anterior"}
           {verTodas ? "" : " · tus citas"}
         </p>
+
+        {/* Enlaces y no un control con estado, igual que en Caja: la pantalla
+            es un Server Component y navegar es lo que ya sabe hacer. */}
+        <nav
+          aria-label="Cambiar de día"
+          style={{ display: "flex", gap: "0.75rem", fontSize: "var(--text-2xs)", marginTop: "-0.5rem" }}
+        >
+          <Link href={`/hoy?fecha=${shiftDate(date, -1)}`}>← Día anterior</Link>
+          {isToday ? null : (
+            <>
+              {shiftDate(date, 1) < today ? (
+                <Link href={`/hoy?fecha=${shiftDate(date, 1)}`}>Día siguiente →</Link>
+              ) : null}
+              <Link href="/hoy">Volver a hoy</Link>
+            </>
+          )}
+        </nav>
+
+        {cajaCerrada ? (
+          <div
+            role="status"
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-warn-tint)",
+              border: "1px solid var(--color-warn-line)",
+              color: "var(--color-warn-ink)",
+            }}
+          >
+            <Icon name="caja" size={18} style={{ flex: "none", marginTop: 1 }} />
+            <span>
+              La caja de este día ya se cerró. Una cuenta que cierres ahora queda por fuera del
+              cierre hasta que recepción la agregue desde{" "}
+              <Link href={`/caja?fecha=${date}`}>Caja</Link>.
+            </span>
+          </div>
+        ) : null}
 
         {dbCaida === null ? null : (
           <div
@@ -186,8 +265,8 @@ export default async function HoyPage() {
             <span>
               <strong>
                 {sinMarcar.length === 1
-                  ? "1 cita de hoy sin marcar"
-                  : `${sinMarcar.length} citas de hoy sin marcar`}
+                  ? `1 cita ${isToday ? "de hoy" : "de este día"} sin marcar`
+                  : `${sinMarcar.length} citas ${isToday ? "de hoy" : "de este día"} sin marcar`}
               </strong>
               {" — "}
               {sinMarcar
@@ -210,6 +289,7 @@ export default async function HoyPage() {
           action={cerrarCuenta}
           combos={comboSource.combos}
           checkFirstVisit={revisarPrimeraVisita}
+          isToday={isToday}
         />
       </div>
     </AppShell>

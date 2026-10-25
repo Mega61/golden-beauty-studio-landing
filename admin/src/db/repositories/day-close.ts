@@ -71,6 +71,29 @@ export function dayCloseRepository(db: Db) {
       return query.orderBy("close_date").execute();
     },
 
+    /**
+     * Suma a un cierre las cuentas que se cerraron después de él, y lo deja
+     * **sin empujar**: lo que se agregó todavía no llegó al CRM, y así el
+     * cierre vuelve a la lista de reintento hasta que llegue.
+     */
+    async addLateAccounts(
+      id: number,
+      totals: { efectivo: number; transferencia: number; otro: number; tips: number; count: number },
+    ): Promise<void> {
+      await db
+        .updateTable("day_close")
+        .set((eb) => ({
+          total_efectivo: eb("total_efectivo", "+", totals.efectivo),
+          total_transferencia: eb("total_transferencia", "+", totals.transferencia),
+          total_otro: eb("total_otro", "+", totals.otro),
+          total_tips: eb("total_tips", "+", totals.tips),
+          appointment_count: eb("appointment_count", "+", totals.count),
+          pushed_to_ingest_at: null,
+        }))
+        .where("id", "=", id)
+        .execute();
+    },
+
     async markPushed(id: number, at: Date): Promise<void> {
       await db
         .updateTable("day_close")

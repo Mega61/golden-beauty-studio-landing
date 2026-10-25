@@ -12,6 +12,7 @@ import {
   type PaymentLabels,
 } from "@/lib/ingest-client";
 import {
+  lateAccountsOf,
   loadReview,
   type DayAccount,
   type DayAppointment,
@@ -158,6 +159,11 @@ export type CajaView = {
   review: DayReview;
   /** `null` = el día todavía no se cerró. */
   dayClose: DayClose | null;
+  /**
+   * Cuentas del día cerradas **después** del cierre: todavía fuera de sus
+   * totales y sin viajar al CRM. Vacío si el día no está cerrado.
+   */
+  late: DayAccount[];
   /** Cierres anteriores que quedaron sin llegar a ingest. */
   pendingPush: DayClose[];
   /** Si el push está configurado. Lo dice la pantalla en vez de mentir. */
@@ -201,6 +207,7 @@ export async function loadCajaView(
     today,
     review,
     dayClose: dayClose ?? null,
+    late: lateAccountsOf(review, dayClose ?? null),
     pendingPush: pendingPush.filter((row) => row.close_date !== date),
     pushEnabled,
     cutover: config?.since ?? null,
