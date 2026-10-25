@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button, Panel, formatCOP, formatDateLong } from "@/components/ui";
 
@@ -61,17 +61,15 @@ export function CierreDelDia({
   /** Lo que se va a congelar y mandar, para leerlo antes de confirmar. */
   totales: { efectivo: number; transferencia: number; otro: number; tips: number };
 }) {
-  const [estado, enviar, enviando] = useActionState<CerrarDiaResult | null>(
-    () => cerrarDia(fecha),
-    null,
-  );
   // El cierre congela las cuentas y manda la plata a Actual, que no deja
   // corregir una cifra ya importada. Se puede cerrar desde el celular, así que
   // un toque no alcanza: el primero abre el resumen y el segundo cierra.
   const [confirmando, setConfirmando] = useState(false);
-  useEffect(() => {
-    if (estado !== null) setConfirmando(false);
-  }, [estado]);
+  const [estado, enviar, enviando] = useActionState<CerrarDiaResult | null>(async () => {
+    const resultado = await cerrarDia(fecha);
+    setConfirmando(false);
+    return resultado;
+  }, null);
 
   const mensaje =
     estado === null
