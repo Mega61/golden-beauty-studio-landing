@@ -1,4 +1,4 @@
-import { aviso, expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
+import { aviso, elegirFecha, elegirHora, elegirOpcion, expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
 
 /**
  * Confirmarle una reserva a la clienta por WhatsApp, a mano.
@@ -41,10 +41,10 @@ test("crear una cita y confirmarla por WhatsApp desde el aviso", async ({ panel 
   await panel.getByRole("button", { name: /crear y usar/i }).click();
   await expect(panel.getByRole("button", { name: /cambiar/i })).toBeVisible();
 
-  await panel.getByRole("combobox", { name: /^Servicio/ }).selectOption({ index: 1 });
+  await elegirOpcion(panel.getByRole("combobox", { name: /^Servicio/ }), { index: 0 });
   // Mañana a la 1:00, fuera de toda franja de la suite (que agenda hoy).
-  await panel.getByLabel(/^Fecha/).fill(mananaEnBogota());
-  await panel.getByLabel(/^Empieza/).fill("01:00");
+  await elegirFecha(panel.getByLabel(/^Fecha/), mananaEnBogota());
+  await elegirHora(panel.getByLabel(/^Empieza/), "01:00");
   await panel.getByRole("checkbox", { name: /fuera del horario/i }).check();
   // Sin Cloud API la casilla automática no existe; con ella, se apaga para
   // que la confirmación vaya por este botón.

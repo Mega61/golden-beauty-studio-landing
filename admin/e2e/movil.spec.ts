@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { elegirOpcion, expect, test } from "./fixtures";
 
 /**
  * Ergonomía móvil, medida en cada pantalla.
@@ -126,4 +126,68 @@ test.describe("ergonomía en el teléfono", () => {
       ).toBeLessThanOrEqual(TOLERADOS[ruta] ?? 0);
     });
   }
+});
+
+test.describe("nueva cita en el teléfono", () => {
+  // En el celular un `<select>` abre la rueda del sistema, que no deja buscar:
+  // con veinte servicios, encontrar uno era girar a ciegas. El formulario usa
+  // los selectores propios del panel (`components/ui/Pickers.tsx`), iguales en
+  // todos los teléfonos.
+  test("el servicio se busca escribiendo, sin selectores del sistema", async ({ panel }) => {
+    await panel.goto("/admin/agenda");
+    await panel.getByRole("button", { name: /nueva cita/i }).click();
+
+    const servicio = panel.getByRole("combobox", { name: /^Servicio/ });
+    await expect(servicio).toBeVisible();
+
+    const nativos = panel.locator(
+      'form select, form input[type="date"], form input[type="time"]',
+    );
+    await expect(nativos, "quedó un selector nativo en el formulario").toHaveCount(0);
+
+    await servicio.click();
+    const busqueda = panel.getByPlaceholder(/^Busca:/);
+    await expect(busqueda, "la búsqueda no recibió el foco").toBeFocused();
+
+    const opciones = panel.getByRole("listbox").getByRole("option");
+    const total = await opciones.count();
+    expect(total, "EA no ofreció ningún servicio").toBeGreaterThan(0);
+
+    // Lo que se busca: las primeras letras del primer servicio, sin tildes ni
+    // mayúsculas. Así no depende del catálogo de cada base.
+    const primero = (await opciones.first().locator(".ui-picker__body > span").first().textContent()) ?? "";
+    const termino = primero.normalize("NFD").replace(/[\u0300-\u036f]/g, "").slice(0, 4).toLowerCase();
+    await busqueda.fill(termino);
+    await expect(opciones.first()).toBeVisible();
+    expect(await opciones.count()).toBeLessThanOrEqual(total);
+
+    await busqueda.fill("zzzz-no-existe");
+    await expect(opciones).toHaveCount(0);
+    await expect(panel.getByText("Ningún servicio se llama así.")).toBeVisible();
+
+    await busqueda.fill(termino);
+    await opciones.first().click();
+    await expect(servicio).toHaveAttribute("data-value", /\d+/);
+  });
+
+  test("la fecha y la hora no desbordan la pantalla", async ({ panel }) => {
+    await panel.goto("/admin/agenda");
+    await panel.getByRole("button", { name: /nueva cita/i }).click();
+
+    const anchoSinScroll = () =>
+      panel.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+
+    await panel.getByLabel(/^Fecha/).click();
+    await expect(panel.getByRole("dialog", { name: "Elegir fecha" })).toBeVisible();
+    expect(await anchoSinScroll(), "el calendario empuja la página de lado").toBeLessThanOrEqual(0);
+    await panel.getByRole("button", { name: "Mes siguiente" }).click();
+    await panel.getByLabel(/^Fecha/).click();
+
+    await elegirOpcion(panel.getByRole("combobox", { name: /^Profesional/ }), { index: 0 });
+    await panel.getByLabel(/^Empieza/).click();
+    await panel.getByPlaceholder(/^Escribe la hora/).fill("2 pm");
+    await panel.getByPlaceholder(/^Escribe la hora/).press("Enter");
+    await expect(panel.getByLabel(/^Empieza/)).toHaveAttribute("data-value", "14:00");
+    expect(await anchoSinScroll()).toBeLessThanOrEqual(0);
+  });
 });

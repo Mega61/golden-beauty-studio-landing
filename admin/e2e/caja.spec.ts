@@ -1,4 +1,4 @@
-import { expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
+import { elegirHora, elegirOpcion, expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
 
 /**
  * Cerrar la cuenta de una cita: el único camino por el que entra plata.
@@ -52,8 +52,8 @@ test.describe("cerrar una cuenta", () => {
     await panel.getByRole("button", { name: /crear y usar/i }).click();
     await expect(panel.getByRole("button", { name: /cambiar/i })).toBeVisible();
 
-    await panel.getByRole("combobox", { name: /^Servicio/ }).selectOption({ index: 1 });
-    await panel.getByLabel(/^Empieza/).fill(HORA);
+    await elegirOpcion(panel.getByRole("combobox", { name: /^Servicio/ }), { index: 0 });
+    await elegirHora(panel.getByLabel(/^Empieza/), HORA);
     await panel.getByRole("checkbox", { name: /fuera del horario/i }).check();
     await panel.getByRole("button", { name: /^crear cita$/i }).click();
     await expect(panel.getByText("Cita creada.")).toBeVisible({ timeout: 15_000 });

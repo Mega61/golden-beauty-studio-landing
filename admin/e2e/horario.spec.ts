@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { contarCitasEnEa, expect, phoneNuevo, test } from "./fixtures";
+import { contarCitasEnEa, elegirHora, elegirOpcion, expect, phoneNuevo, test } from "./fixtures";
 
 /**
  * Agendar fuera del horario de la profesional, a propósito.
@@ -47,12 +47,11 @@ async function armarCita(panel: Page, marca: string, hora: string) {
   await expect(panel.getByRole("button", { name: /cambiar/i })).toBeVisible();
 
   const servicio = panel.getByRole("combobox", { name: /^Servicio/ });
-  await servicio.selectOption({ index: 1 });
+  await elegirOpcion(servicio, { index: 0 });
 
   // El fin se recalcula solo desde el inicio con la duración del servicio, así
-  // que basta con correr el inicio. `getByLabel` y no `getByRole("textbox")`:
-  // un `<input type="time">` no expone ese rol.
-  await panel.getByLabel(/^Empieza/).fill(hora);
+  // que basta con correr el inicio.
+  await elegirHora(panel.getByLabel(/^Empieza/), hora);
 }
 
 test.describe("fuera del horario de la profesional", () => {

@@ -1,4 +1,4 @@
-import { contarCitasEnEa, expect, phoneNuevo, test } from "./fixtures";
+import { contarCitasEnEa, elegirOpcion, expect, nombresDeOpciones, phoneNuevo, test } from "./fixtures";
 
 /**
  * Agendar una cita, que es para lo que existe el panel.
@@ -125,9 +125,9 @@ test.describe("crear una cita", () => {
 
     // El servicio: el primero que ofrezca el catálogo de EA.
     const servicio = panel.getByRole("combobox", { name: /^Servicio/ });
-    const opciones = await servicio.locator("option").all();
-    expect(opciones.length, "EA no ofreció ningún servicio").toBeGreaterThan(1);
-    await servicio.selectOption({ index: 1 });
+    const opciones = await nombresDeOpciones(servicio);
+    expect(opciones.length, "EA no ofreció ningún servicio").toBeGreaterThan(0);
+    await elegirOpcion(servicio, { index: 0 });
 
     // La hora que ofrece el botón «Nueva cita» es el inicio de la grilla
     // (8:00), y la técnica empieza a las 9:00 — así que el panel responde con

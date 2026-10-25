@@ -146,7 +146,7 @@ const WEEKDAYS = [
   "viernes",
   "sábado",
 ];
-const MONTHS = [
+export const MONTHS = [
   "enero",
   "febrero",
   "marzo",
