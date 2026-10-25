@@ -10,3 +10,4 @@ coverage/
 # Playwright: trazas, capturas y reporte de la última corrida.
 test-results/
 playwright-report/
+node_modules
