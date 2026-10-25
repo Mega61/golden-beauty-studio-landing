@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appointmentIdOfTx,
   createIngestClient,
   IngestError,
   ingestConfigFromEnv,
@@ -135,18 +136,48 @@ describe("ingestConfigFromEnv", () => {
     ).toThrow(/INGEST_SHARED_SECRET/);
   });
 
-  it("lee la URL, el secreto y el timeout", () => {
+  it("lee la URL, el secreto, el corte y el timeout", () => {
     const config = ingestConfigFromEnv({
       INGEST_URL: " https://crm/api/ingest ",
       INGEST_SHARED_SECRET: ` ${SECRETO} `,
+      INGEST_SINCE: "2026-10-24",
       INGEST_TIMEOUT_MS: "5000",
     });
 
     expect(config).toEqual({
       url: "https://crm/api/ingest",
       secret: SECRETO,
+      since: "2026-10-24",
+      visitsUrl: null,
       timeoutMs: 5000,
     });
+  });
+
+  it("con URL y sin INGEST_SINCE lanza: sin corte, un cierre del paralelo duplicaría plata en Actual", () => {
+    expect(() =>
+      ingestConfigFromEnv({ INGEST_URL: "https://crm/api/ingest/payments", INGEST_SHARED_SECRET: SECRETO }),
+    ).toThrow(/INGEST_SINCE/);
+    expect(() =>
+      ingestConfigFromEnv({
+        INGEST_URL: "https://crm/api/ingest/payments",
+        INGEST_SHARED_SECRET: SECRETO,
+        INGEST_SINCE: "24/10/2026",
+      }),
+    ).toThrow(/INGEST_SINCE/);
+  });
+
+  it("deriva la ruta de visitas de la de pagos, y respeta un override", () => {
+    const base = { INGEST_SHARED_SECRET: SECRETO, INGEST_SINCE: "2026-10-24" };
+    expect(
+      ingestConfigFromEnv({ ...base, INGEST_URL: "https://cms/api/ingest/payments" })?.visitsUrl,
+    ).toBe("https://cms/api/ingest/panel-visits");
+    expect(
+      ingestConfigFromEnv({
+        ...base,
+        INGEST_URL: "https://cms/api/ingest/payments",
+        INGEST_VISITS_URL: "https://otro/visitas",
+      })?.visitsUrl,
+    ).toBe("https://otro/visitas");
   });
 
   it.each(["0", "-1", "abc", "1.5", ""])(
@@ -155,6 +186,7 @@ describe("ingestConfigFromEnv", () => {
       const config = ingestConfigFromEnv({
         INGEST_URL: "https://crm/api/ingest",
         INGEST_SHARED_SECRET: SECRETO,
+        INGEST_SINCE: "2026-10-24",
         INGEST_TIMEOUT_MS,
       });
       expect(config?.timeoutMs).toBe(20_000);
@@ -165,6 +197,29 @@ describe("ingestConfigFromEnv", () => {
 // ── El envío ────────────────────────────────────────────────────────────────
 
 describe("createIngestClient().push", () => {
+  it("pega el nombre de la clienta y el servicio a cada pago de la cita, ajustes incluidos", async () => {
+    const { doFetch, calls } = fakeFetch(() => ok());
+    const client = createIngestClient({ url: "https://crm/api/ingest", secret: SECRETO, fetch: doFetch });
+    const ajuste = { ...PAGO, source_tx_id: `${PAGO.source_tx_id}:adj1`, amount: -5000 };
+    const otra = { ...PAGO, source_tx_id: "ea-appt:999" };
+
+    await client.push([PAGO, ajuste, otra], new Map([[appointmentIdOfTx(PAGO.source_tx_id)!, { clientName: "Ana Ruiz", serviceName: "Forrado polygel" }]]));
+
+    const body = JSON.parse(String(calls[0]?.init?.body)) as { payments: Record<string, unknown>[] };
+    expect(body.payments[0]).toMatchObject({ client_name: "Ana Ruiz", service_name: "Forrado polygel" });
+    expect(body.payments[1]).toMatchObject({ client_name: "Ana Ruiz", amount: -5000 });
+    // Sin etiqueta no se inventa nada: el campo no viaja.
+    expect(body.payments[2]).not.toHaveProperty("client_name");
+  });
+
+  it("lee el id de la cita de cualquier llave del panel, y de ninguna otra", () => {
+    expect(appointmentIdOfTx("ea-appt:501")).toBe(501);
+    expect(appointmentIdOfTx("ea-appt:501:efectivo")).toBe(501);
+    expect(appointmentIdOfTx("ea-appt:501:adj2")).toBe(501);
+    expect(appointmentIdOfTx("ea-appt:5012x")).toBeNull();
+    expect(appointmentIdOfTx("1234")).toBeNull();
+  });
+
   it("manda el lote con el header `x-ingest-secret` y el sobre", async () => {
     const { doFetch, calls } = fakeFetch(() => ok());
     const client = createIngestClient({ url: "https://crm/api/ingest", secret: SECRETO, fetch: doFetch });

@@ -14,7 +14,10 @@ import {
 
 import { syncComboTable, type ComboSyncResult } from "@/lib/combo-source";
 
+import { ingestConfigFromEnv } from "@/lib/ingest-client";
+
 import { runAttendanceBackfill, summarizeAttendanceBackfill } from "./attendance-backfill";
+import { pushCrmVisits, recordCrmVisits, summarizeCrmVisits } from "./crm-visits";
 
 import {
   createServicePriceCache,
@@ -386,6 +389,9 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<Reconc
       lookaheadDays: positiveIntFromEnv(env.RECONCILE_LOOKAHEAD_DAYS),
     });
     await catchUpAttendance(db, ea, report.from, env);
+    // Después de la asistencia, para que una "Completada" escrita esta noche
+    // llegue al CRM como visita hecha.
+    await pushVisitsToCrm(db, ea, env);
     return report;
   } finally {
     await db.destroy();
@@ -429,5 +435,33 @@ async function catchUpAttendance(
       "reconcile: no se pudo poner al día la asistencia. El barrido sí corrió.",
       error,
     );
+  }
+}
+
+/**
+ * Las visitas al CRM (win-back y Stampee), en reemplazo del reporte de reservas
+ * de Agenda Pro. Mejor esfuerzo, como la asistencia: un CRM caído o mal
+ * configurado se grita en el log y en Diagnóstico, y la noche sigue.
+ */
+async function pushVisitsToCrm(db: Db, ea: EaClient, env: NodeJS.ProcessEnv): Promise<void> {
+  const startedAt = new Date();
+  try {
+    const result = await pushCrmVisits({
+      db,
+      ea,
+      config: ingestConfigFromEnv(env),
+      lookbackDays: positiveIntFromEnv(env.CRM_VISITS_LOOKBACK_DAYS),
+      lookaheadDays: positiveIntFromEnv(env.CRM_VISITS_LOOKAHEAD_DAYS),
+    });
+    const line = `reconcile: ${summarizeCrmVisits(result)}`;
+    if (result.state === "fallo") console.error(line);
+    else console.log(line);
+    await recordCrmVisits(db, startedAt, result);
+  } catch (error) {
+    console.error("reconcile: no se pudieron mandar las visitas al CRM. El barrido sí corrió.", error);
+    await recordCrmVisits(db, startedAt, {
+      state: "fallo",
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 }

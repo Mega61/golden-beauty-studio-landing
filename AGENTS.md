@@ -107,6 +107,15 @@ El 40 % de lo cobrado, quincenal. El motor de reglas puro vive en
   mismo repartidor que usa el resto del panel, para que la suma de los renglones
   sea exactamente el total y no el total ± 2.
 
+## Integraciones después de Agenda Pro (corte 2026-10-24)
+
+Agenda Pro se apagó el 2026-10-24 y con él el scraper nocturno del CRM (`agendapro-pull.yml`, hoy solo manual). El panel es el productor de todo lo que alimentaba:
+
+- **Plata → Actual Budget.** "Cerrar el día" en Caja hace `POST {INGEST_URL}` (= `…/api/ingest/payments` del CRM) con los pagos del día y el nombre de la clienta y del servicio. `actual-sync` (workflow propio en el CRM, 21:30 y 06:30) los pasa a Actual con `imported_id = agendapro-tx:ea-appt:<id>` — el prefijo `agendapro-tx:` se queda a propósito: el bot de finanzas (`finanzas-ingesta`) enlaza transferencias del banco con ventas del estudio por ese prefijo.
+- **`INGEST_SINCE` es el corte.** Obligatoria con `INGEST_URL`. Un cierre anterior —del paralelo, cuando la plata también se registraba en Agenda Pro— no se empuja nunca, ni con Reintentar, ni sus ajustes: duplicaría ingresos que Actual no puede deduplicar.
+- **Visitas → CRM, win-back y Stampee.** El reconcile nocturno (`jobs/crm-visits.ts`) manda las citas de EA desde el corte (7 días atrás, 60 adelante) a `…/api/ingest/panel-visits`; el CRM recalcula el win-back y sincroniza Stampee. Cuenta cerrada = visita hecha; no asistió = cancelada. Queda en `job_run` como `crm-visitas`.
+- **Cortesías:** las decide la casilla de la cuenta, no la lista `COURTESY_PHONES` de `actual-sync` — las filas del panel se saltan esa lista.
+
 ## Panel de administración (`/admin`)
 
 El plan completo vive en **`docs/ADMIN-PANEL.md`** — topología, modelo de datos, fases y verificación. El reparto en paquetes de trabajo y las reglas de propiedad de archivos viven en **`docs/WORK-PACKAGES.md`**, con cuatro agentes en `.claude/agents/` (`gbs-builder`, `gbs-money-auditor`, `gbs-verifier`, `gbs-ea-scout`). El runbook de despliegue en la VM (pinear EA, el SQL de `mysql-transversal`, el stack en Portainer, Caddy, y los ensayos de rollback y de restauración) vive en **`docs/DEPLOY.md`**. Cómo levantar el entorno local, qué va en cada `.env.local` y cómo validar cada paquete: **`docs/DEV-LOCAL.md`** (`deploy/compose/dev-stack.yml` levanta EA + MySQL + Mailpit; el panel corre en el host con `npm run dev`). Léelos antes de tocar nada bajo `admin/`. Lo mínimo para no romper cosas desde este repo:

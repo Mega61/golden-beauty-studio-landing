@@ -981,6 +981,58 @@ export async function listDayAppointments(
 }
 
 /**
+ * Las citas cuyo **inicio** cae entre `from` y `till` (inclusivos, días del
+ * estudio), con sus relaciones.
+ *
+ * Mismo recorrido que `listDayAppointments()` —acceso crudo para leer las
+ * relaciones, paginación que se agota o lanza— pero para un rango: una sola
+ * consulta paginada en vez de una por día, que con el cupo de EA (100 cada
+ * 120 s para todo el panel) es la diferencia entre caber y no caber. `till` de
+ * EA compara contra el **fin** de la cita, así que se pide un día más y se
+ * recorta en memoria por fecha de inicio.
+ */
+export async function listAppointmentsInRange(
+  ea: Pick<EaClient, "raw">,
+  query: {
+    from: EaLocalDate;
+    till: EaLocalDate;
+    with?: readonly string[];
+    maxPages?: number;
+    pageLength?: number;
+  },
+): Promise<AppointmentWithRelations[]> {
+  const maxPages = query.maxPages ?? DAY_MAX_PAGES;
+  const pageLength = query.pageLength ?? DAY_PAGE_LENGTH;
+  const tillPlusOne = new Date(`${query.till}T00:00:00Z`);
+  tillPlusOne.setUTCDate(tillPlusOne.getUTCDate() + 1);
+  const out: AppointmentWithRelations[] = [];
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const params = buildListParams({ with: query.with });
+    params.set("from", query.from);
+    params.set("till", tillPlusOne.toISOString().slice(0, 10));
+    params.set("page", String(page));
+    params.set("length", String(pageLength));
+
+    const payload = await ea.raw({ method: "GET", path: "appointments", params });
+    if (!Array.isArray(payload)) {
+      throw new Error("EA devolvió algo que no es una lista de citas");
+    }
+    for (const raw of payload) {
+      const row = decodeAppointmentWithRelations(raw as ApiShape);
+      const day = eaDatePart(row.appointment.start);
+      if (day >= query.from && day <= query.till) out.push(row);
+    }
+    if (payload.length < pageLength) return out;
+  }
+
+  throw new Error(
+    `Las citas de ${query.from} a ${query.till} superaron ${maxPages} páginas de ${pageLength}. ` +
+      "Se aborta en vez de devolver medio rango.",
+  );
+}
+
+/**
  * Las citas **agendadas** desde `since` (por `book_datetime`), de la más nueva
  * a la más vieja, con sus relaciones.
  *

@@ -126,11 +126,11 @@ GOOGLE_WORKSPACE_DOMAIN="goldenbeautystudio.com.co"
 TOTP_ENC_KEY="<openssl rand -base64 32>"
 
 # ── Integraciones ────────────────────────────────────────────────
-# Dejar INGEST_URL VACÍA. El push queda apagado y el cierre diario registra
-# que no salió; se reintenta con el botón "Reintentar" cuando la ruta exista.
-# Ver la nota de abajo antes de ponerle un valor.
+# Vacía = push apagado; el cierre diario registra que no salió. Para probar
+# contra el CRM local: http://localhost:1337/api/ingest/payments + INGEST_SINCE.
 INGEST_URL=""
 INGEST_SHARED_SECRET="<el mismo del CRM local>"
+INGEST_SINCE=""
 
 # ── Entorno ──────────────────────────────────────────────────────
 TZ="America/Bogota"
@@ -151,20 +151,17 @@ TICKET_STAFF_COBRA="true"
 | `GOOGLE_CLIENT_ID` / `_SECRET` | Login de Workspace de la dueña y recepción | No entra nadie con Google |
 | `GOOGLE_WORKSPACE_DOMAIN` | Se compara contra el claim `hd` del ID token. Es una de las dos compuertas | Un Gmail personal cualquiera entraría al panel |
 | `TOTP_ENC_KEY` | Cifra los secretos TOTP de las técnicas en reposo | Los secretos quedarían en claro en la base |
-| `INGEST_URL` / `INGEST_SHARED_SECRET` | Push de pagos a Strapi al cerrar el día | El cierre diario no llega a Actual Budget |
+| `INGEST_URL` / `INGEST_SHARED_SECRET` | Push de pagos a Strapi al cerrar el día (`…/api/ingest/payments`), y de visitas cada noche desde el reconcile (`…/api/ingest/panel-visits`, derivada) | El cierre diario no llega a Actual Budget; el win-back y Stampee se quedan quietos |
+| `INGEST_SINCE` | Obligatoria con `INGEST_URL`. Primer día de caja del panel (`2026-10-24` en producción). Un cierre anterior **nunca** se empuja: esa plata entró a Actual por Agenda Pro | Sin ella el panel no arma el cliente de ingest y Caja lo dice |
 
-> **`INGEST_URL` va vacía hasta que el CRM tenga una ruta JSON.**
-> `POST /api/ingest/agendapro-transactions` —la única ruta de transacciones que
-> existe hoy— lee `ctx.request.files` y parsea un **XLSX de Agenda Pro**.
-> Apuntarle el JSON del panel es mandarle un cuerpo que su parser de planillas
-> no entiende. La ruta JSON que sí existe, `POST /api/ingest/agendapro`, es de
-> **visitas** (`{ bookings: [...] }`), no de pagos.
->
-> El panel manda `{ payments: [...] }` con los cinco campos de `Payment` y el
-> header `x-ingest-secret`. Lo que falta del lado del CRM es un
-> `POST /api/ingest/payments` que llame a `upsertPayment()`, que ya existe en
-> `src/api/payment/services/ingest.ts` y se describe como "the ONE upsert path".
-> Está **propuesto, no aprobado**: toca un segundo sistema en producción.
+> **Desde el corte de Agenda Pro (2026-10-24) el CRM tiene las dos rutas JSON**
+> (`Mega61/golden-beauty-studio-crm`): `POST /api/ingest/payments` recibe
+> `{ payments: [...] }` —los cinco campos de `Payment` más `client_name` y
+> `service_name`, solo `tx_id` que empiecen por `ea-appt:`, todo-o-nada— y
+> `POST /api/ingest/panel-visits` recibe `{ visits, window }`, recalcula el
+> win-back y sincroniza Stampee. `actual-sync` corre solo
+> (`.github/workflows/actual-sync.yml`, 21:30 y 06:30) y ya no depende del
+> scraper, que quedó manual.
 >
 > Con `INGEST_URL` vacía el cierre del día funciona completo — congela los
 > montos, escribe `day_close` y deja `pushed_to_ingest_at` en `NULL`. El push

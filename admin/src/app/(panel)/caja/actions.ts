@@ -83,6 +83,8 @@ function pushMessage(push: PushOutcome): string {
       return "Otro cierre simultáneo se está encargando del push. Refresca en un momento.";
     case "apagado":
       return "El push está apagado (falta INGEST_URL): el día quedó cerrado sin empujar.";
+    case "antes-del-corte":
+      return `Este día es anterior al corte (${push.since}): su plata entró a Actual por Agenda Pro y no se manda.`;
     case "fallo":
       return push.retryable
         ? `El CRM no recibió el lote: ${push.message} Se puede reintentar.`

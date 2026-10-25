@@ -34,6 +34,7 @@ import { createEaClient, eaConfigFromEnv } from "@/lib/ea/client";
 import { instantToEaDate, type EaLocalDate } from "@/lib/ea";
 import { mapEaStatus, unmappedStatuses } from "@/components/calendar";
 import { whatsappConfigured } from "@/lib/whatsapp/config";
+import { ingestConfigFromEnv } from "@/lib/ingest-client";
 
 import { addDays } from "../reportes/period";
 import {
@@ -245,7 +246,7 @@ export async function loadDiagnostics(now: Date = new Date()): Promise<Diagnosti
     const [lastEvent, closes, pending, lastReconcileRun] = await Promise.all([
       repos.webhookEvents.lastReceivedAt(),
       repos.dayCloses.listByDateRange(from, to),
-      repos.dayCloses.listPendingPush(),
+      repos.dayCloses.listPendingPush(ingestConfigFromEnv()?.since),
       // La respuesta exacta a "¿el reconcile corrió?". Una corrida que no
       // encontró nada que reparar también deja fila, que es justo lo que el
       // proxy anterior no podía ver.

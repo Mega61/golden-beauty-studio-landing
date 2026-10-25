@@ -5,9 +5,15 @@ import { repositories } from "@/db/repositories";
 import type { DayClose } from "@/db/types";
 import { instantToEaDate, isEaLocalDate, type EaLocalDate } from "@/lib/ea";
 import { createEaClient, listDayAppointments, type EaClient } from "@/lib/ea/client";
-import { createIngestClient, ingestConfigFromEnv } from "@/lib/ingest-client";
+import {
+  createIngestClient,
+  ingestConfigFromEnv,
+  type PaymentLabel,
+  type PaymentLabels,
+} from "@/lib/ingest-client";
 import {
   loadReview,
+  type DayAccount,
   type DayAppointment,
   type DayAppointmentSource,
   type DayCloseDeps,
@@ -70,6 +76,38 @@ export function loadDayAppointments(client?: EaClient): DayAppointmentSource {
   };
 }
 
+/**
+ * Las notas de cada movimiento en Actual: quién pagó y qué servicio se hizo.
+ *
+ * Antes las ponía el reporte de ventas de Agenda Pro. Dos lecturas a EA por
+ * cierre (las citas del día con la clienta, y el catálogo), no una por cita. El
+ * servicio es el **realizado** (`performed_service_id`), no el agendado. Si algo
+ * falla, `runPush()` manda el lote sin nombres: no son plata.
+ */
+export function labelDayPayments(client?: EaClient) {
+  return async (date: EaLocalDate, accounts: readonly DayAccount[]): Promise<PaymentLabels> => {
+    const ea = client ?? createEaClient();
+    const [citas, services] = await Promise.all([
+      listDayAppointments(ea, { date, with: ["customer", "service"] }),
+      ea.services.list(),
+    ]);
+    const serviceName = new Map(services.map((service) => [service.id, service.name]));
+    const byId = new Map(citas.map((cita) => [cita.appointment.id, cita]));
+
+    const labels = new Map<number, PaymentLabel>();
+    for (const account of accounts) {
+      const cita = byId.get(account.eaAppointmentId);
+      const performed =
+        account.performedServiceId === null ? null : serviceName.get(account.performedServiceId);
+      labels.set(account.eaAppointmentId, {
+        clientName: cita === undefined ? null : personName(cita.customer, "") || null,
+        serviceName: performed ?? cita?.service?.name ?? null,
+      });
+    }
+    return labels;
+  };
+}
+
 function personName(
   person: { firstName: string | null; lastName: string | null } | null,
   fallback: string,
@@ -94,6 +132,7 @@ export function dayCloseDeps(): DayCloseDeps {
     db: getDb(),
     loadAppointments: loadDayAppointments(),
     ingest: config === null ? null : createIngestClient(config),
+    labelPayments: labelDayPayments(),
   };
 }
 
@@ -123,6 +162,8 @@ export type CajaView = {
   pendingPush: DayClose[];
   /** Si el push está configurado. Lo dice la pantalla en vez de mentir. */
   pushEnabled: boolean;
+  /** `INGEST_SINCE`: los días anteriores no se empujan nunca. */
+  cutover?: string | null;
 };
 
 /**
@@ -146,12 +187,13 @@ export async function loadCajaView(
   // El cliente de ingest no se crea acá: la pantalla no empuja nada. Lo único
   // que necesita saber es si está configurado, para no ofrecer "Reintentar" en
   // un panel donde el push está apagado a propósito.
-  const pushEnabled = ingestConfigFromEnv() !== null;
+  const config = ingestConfigFromEnv();
+  const pushEnabled = config !== null;
 
   const [review, dayClose, pendingPush] = await Promise.all([
     loadReview({ db, loadAppointments: loadDayAppointments() }, date, now),
     repos.dayCloses.findByDate(date),
-    repos.dayCloses.listPendingPush(),
+    repos.dayCloses.listPendingPush(config?.since),
   ]);
 
   return {
@@ -161,5 +203,6 @@ export async function loadCajaView(
     dayClose: dayClose ?? null,
     pendingPush: pendingPush.filter((row) => row.close_date !== date),
     pushEnabled,
+    cutover: config?.since ?? null,
   };
 }
