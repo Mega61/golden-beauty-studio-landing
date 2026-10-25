@@ -4,7 +4,7 @@ import { aviso, expect, phoneNuevo, queryEa, queryOne, test } from "./fixtures";
  * Confirmarle una reserva a la clienta por WhatsApp, a mano.
  *
  * **El caso real**: alguien reserva —por la página o desde la agenda— y la
- * dueña le escribe "tu cita quedó confirmada" desde el WhatsApp del estudio.
+ * dueña le escribe "tu cita quedó agendada" desde el WhatsApp del estudio.
  * Mientras Meta no apruebe las plantillas, es un toque por reserva; lo que no
  * puede pasar es que la clienta reciba dos confirmaciones, o ninguna, porque
  * la pantalla no sabía qué se había mandado.
@@ -69,7 +69,7 @@ test("crear una cita y confirmarla por WhatsApp desde el aviso", async ({ panel 
     .toMatch(/^https:\/\/api\.whatsapp\.com\/send\?phone=57\d+&text=/);
   const texto = decodeURIComponent(new URL(tab.url()).searchParams.get("text") ?? "");
   expect(texto).toContain(`¡Hola, ${marca}!`);
-  expect(texto).toContain("quedó confirmada");
+  expect(texto).toContain("quedó agendada");
   expect(texto, "la confirmación nunca lleva precio").not.toMatch(/\$\s?\d/);
   await tab.close();
 
