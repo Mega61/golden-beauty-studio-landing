@@ -356,7 +356,7 @@ describe("buildReminderText", () => {
         "🕒 10:00 a. m.",
         "📍 Golden Beauty Studio — Calle 69 Sur #43a - 41, primer piso, Sabaneta",
         "",
-        "¿Nos confirmas tu asistencia? Responde *SÍ* para confirmar, o escríbenos si necesitas cambiarla. 🤍",
+        "¿Nos confirmas tu asistencia? 🤍",
       ].join("\n"),
     );
   });
@@ -407,7 +407,7 @@ describe("buildReminderText", () => {
     });
     expect(STUDIO_ADDRESS).toBe("Calle 69 Sur #43a - 41, primer piso, Sabaneta");
     expect(text).toContain(STUDIO_ADDRESS);
-    expect(text.endsWith("¿Nos confirmas tu asistencia? Responde *SÍ* para confirmar, o escríbenos si necesitas cambiarla. 🤍")).toBe(true);
+    expect(text.endsWith("¿Nos confirmas tu asistencia? 🤍")).toBe(true);
   });
 
   it("la fecha se lee de la hora de pared, sin pasar por la zona del proceso", () => {
