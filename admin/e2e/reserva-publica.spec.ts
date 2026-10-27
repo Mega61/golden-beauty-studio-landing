@@ -70,8 +70,15 @@ test.describe("el catálogo público", () => {
     }
 
     // Y nada de más en la raíz: `chained` avisa que manos + pies sin combo se
-    // reservan como dos citas seguidas.
-    expect(Object.keys(body).sort()).toEqual(["chained", "combos", "providers", "services"]);
+    // reservan como dos citas seguidas, y `firstVisitPercent` es el 10 % que la
+    // landing anuncia en el paso 3 (una regla pública, no un dato de nadie).
+    expect(Object.keys(body).sort()).toEqual([
+      "chained",
+      "combos",
+      "firstVisitPercent",
+      "providers",
+      "services",
+    ]);
 
     // Los combos viajan aparte para que la landing pueda esconderlos de la
     // lista y llegar a ellos componiendo, igual que la agenda del panel.

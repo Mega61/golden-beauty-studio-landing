@@ -359,8 +359,12 @@ describe.skipIf(!canRunDbTests())(
           // se puede afirmar que sea idempotente.
           expect(ingest.lotes).toHaveLength(1);
           expect(idsRecibidos(ingest)).toEqual(["ea-appt:1"]);
+          // La perdedora no empuja: dice "pendiente" si la ganadora todavía
+          // está mandando, o "ya" si terminó antes de que la perdedora leyera
+          // la fila. Las dos son ciertas; cuál sale depende del planificador, y
+          // exigir una sola dejaba la imagen del panel sin construir al azar.
           const perdedor = [a, b].find((r) => r.ok && !r.created);
-          expect(perdedor?.ok && perdedor.push.state).toBe("pendiente");
+          expect(["pendiente", "ya"]).toContain(perdedor?.ok && perdedor.push.state);
         },
         TEST_TIMEOUT,
       );

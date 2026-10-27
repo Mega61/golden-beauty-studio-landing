@@ -1,4 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
+import { parsePricingSource } from "../src/app/(panel)/servicios/pricing-parse";
+import { SHOWCASE_PRICING_SOURCE } from "../src/data/showcase-pricing";
 
 import {
   aviso,
@@ -56,11 +58,27 @@ const PIEZAS = [
 
 type PricingId = (typeof PIEZAS)[number]["pricingId"];
 
-/** Lo que `src/data/pricing.ts` dice de estas tres. La prueba de que no se suma. */
-const PRECIO_MANOS = 50_000;
-const PRECIO_PIES = 55_000;
-const PRECIO_COMBO = 95_000;
-const SUMA = PRECIO_MANOS + PRECIO_PIES; // 105.000 — lo que NO se cobra.
+/**
+ * Lo que `src/data/pricing.ts` dice de estas tres. La prueba de que no se suma.
+ *
+ * Se leen de la copia horneada y no se escriben acá: la dueña cambia precios,
+ * y un número escrito a mano dejaba la suite en rojo por un cambio correcto.
+ */
+const VITRINA = new Map(parsePricingSource(SHOWCASE_PRICING_SOURCE).map((e) => [e.id, e]));
+const precioDe = (id: PricingId): number => {
+  const entrada = VITRINA.get(id);
+  if (!entrada) throw new Error(`${id} ya no está en pricing.ts`);
+  return entrada.priceCOP;
+};
+const PRECIO_MANOS = precioDe("semi-permanent-hands");
+const PRECIO_PIES = precioDe("semi-permanent-feet");
+const PRECIO_COMBO = precioDe("semi-permanent-hands-feet");
+const SUMA = PRECIO_MANOS + PRECIO_PIES; // lo que NO se cobra.
+const DURACION_COMBO = VITRINA.get("semi-permanent-hands-feet")?.durationMin ?? 0;
+
+/** `95000` → `/95\.000/`, como lo escribe la pantalla. */
+const cifra = (pesos: number): RegExp =>
+  new RegExp(pesos.toLocaleString("es-CO").replace(/\./g, "\\."));
 
 /** Elige en el selector de la agenda el servicio con ese nombre exacto. */
 async function elegirPorTexto(campo: Locator, nombre: string): Promise<void> {
@@ -173,9 +191,9 @@ test.describe("componer un combo desde la agenda", () => {
     const cotizacion = panel.getByText(/Ahorra/);
     await expect(cotizacion).toBeVisible();
 
-    await expect(panel.getByText(/105\.000/), "no se muestra la suma tachada").toBeVisible();
-    await expect(panel.getByText(/95\.000/), "no se muestra el precio del combo").toBeVisible();
-    await expect(cotizacion).toContainText(/10\.000/);
+    await expect(panel.getByText(cifra(SUMA)), "no se muestra la suma tachada").toBeVisible();
+    await expect(panel.getByText(cifra(PRECIO_COMBO)), "no se muestra el precio del combo").toBeVisible();
+    await expect(cotizacion).toContainText(cifra(SUMA - PRECIO_COMBO));
 
     // Y la duración que **manda** es la del combo.
     //
@@ -306,16 +324,16 @@ test.describe("manos + pies que no son combo, desde la agenda", () => {
     await panel.getByRole("button", { name: /crear y usar/i }).click();
     await expect(panel.getByRole("button", { name: /cambiar/i })).toBeVisible();
 
-    // Casi cuatro horas no caben entre las franjas de la primera profesional
-    // (ver `caja.spec.ts`): esta va con la segunda, a las 00:30.
-    await elegirOpcion(panel.getByRole("combobox", { name: /^Profesional/ }), { index: 1 });
-    await elegirHora(panel.getByLabel(/^Empieza/), "00:30");
+    // Casi cuatro horas: va en el hueco de 10:00 a 21:00 de la primera
+    // profesional (ver `caja.spec.ts`). La base de CI siembra **una sola**.
+    await elegirOpcion(panel.getByRole("combobox", { name: /^Profesional/ }), { index: 0 });
+    await elegirHora(panel.getByLabel(/^Empieza/), "16:00");
     await elegirOpcion(panel.getByRole("combobox", { name: /^Servicio/ }), { valor: MANOS });
     await panel.getByRole("button", { name: /agregar otro servicio/i }).click();
     await elegirOpcion(panel.getByLabel(/otro servicio en la misma cita/i), { valor: PIES });
 
     // El fin cubre los dos: 150 + 75 minutos.
-    await expect(panel.getByLabel(/^Termina/)).toHaveAttribute("data-value", "04:15");
+    await expect(panel.getByLabel(/^Termina/)).toHaveAttribute("data-value", "19:45");
 
     await panel.getByRole("checkbox", { name: /fuera del horario/i }).check();
     await panel.getByRole("button", { name: /^crear cita$/i }).click();
@@ -333,7 +351,7 @@ test.describe("manos + pies que no son combo, desde la agenda", () => {
         WHERE c.first_name = '${marca}'`,
     );
     const [idCita, ...resto] = (fila ?? "").split("|");
-    expect(resto.join("|")).toBe(`${MANOS}|00:30:00|04:15:00`);
+    expect(resto.join("|")).toBe(`${MANOS}|16:00:00|19:45:00`);
 
     // …y los pies como adicional de esa misma cita.
     expect(
@@ -350,6 +368,8 @@ test.describe("manos + pies que no son combo, desde la agenda", () => {
 
 /** Lo que la vitrina afirma y este archivo da por cierto. Falla ruidoso si cambia. */
 test("los números de la vitrina siguen siendo los que este archivo supone", () => {
-  expect(SUMA).toBe(105_000);
+  // Sin ahorro la pantalla no tacha nada, y la prueba de arriba no tendría qué mirar.
   expect(PRECIO_COMBO).toBeLessThan(SUMA);
+  // "Termina" se comprueba a las 12:00 desde las 10:00.
+  expect(DURACION_COMBO).toBe(120);
 });
