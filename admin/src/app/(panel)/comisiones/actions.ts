@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { isEaLocalDate } from "@/lib/ea";
+import { loadDayAppointments } from "../caja/data";
 
 import { describeBlockers } from "./blockers";
 import {
@@ -192,8 +193,10 @@ export async function marcarRevisada(
   }
 
   try {
+    // Cliente fresco: esta lectura decide si se puede revisar, y un camino que
+    // decide no lee de caché.
     const result = await markFortnightReviewed(
-      { db: getDb() },
+      { db: getDb(), loadAppointments: loadDayAppointments() },
       {
         period: fortnightOf(parsed.data),
         eaProviderId: provider.data,

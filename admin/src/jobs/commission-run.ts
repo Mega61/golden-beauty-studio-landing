@@ -23,6 +23,8 @@ import {
   type LineAssignment,
 } from "@/lib/commission";
 import { FULL_BASIS_POINTS } from "@/lib/combo-allocation";
+import { mapEaStatus } from "@/components/calendar/status-map";
+import type { DayAppointmentSource } from "./day-close";
 import {
   commissionBasesOf,
   computeTicketTotals,
@@ -733,7 +735,15 @@ function entryKey(itemId: number, eaProviderId: number): string {
 
 // ── La corrida ──────────────────────────────────────────────────────────────
 
-export type CommissionRunDeps = { db: Db };
+export type CommissionRunDeps = {
+  db: Db;
+  /**
+   * Las citas de un día, de EA. Opcional: con ella, la compuerta deja pasar un
+   * día sin cierre en el que **no hubo nada que cerrar** (ninguna cita, o solo
+   * canceladas e inasistencias). Sin ella, todo día sin cierre bloquea.
+   */
+  loadAppointments?: DayAppointmentSource;
+};
 
 export type FortnightRunRow = {
   eaProviderId: number;
@@ -1089,16 +1099,51 @@ export async function assessFortnight(
 
   const closed = new Set(closes.map((row) => row.close_date));
 
+  // Un día que todavía no llegó no puede tener cierre, y listarlo como
+  // faltante convertiría la compuerta en ruido durante toda la quincena.
+  const sinCierre = fortnightDays(period).filter((day) => day < today && !closed.has(day));
+
   return {
     period,
-    // Un día que todavía no llegó no puede tener cierre, y listarlo como
-    // faltante convertiría la compuerta en ruido durante toda la quincena.
-    missingDayCloses: fortnightDays(period).filter(
-      (day) => day < today && !closed.has(day),
-    ),
+    missingDayCloses: await dropDaysWithNothingToClose(sinCierre, deps.loadAppointments),
     flaggedEntries: flagged.length,
     open: period.periodEnd >= today,
   };
+}
+
+/**
+ * Saca de los días sin cierre los que no tenían nada que cerrar.
+ *
+ * Un domingo sin citas no tiene caja, y exigirle un cierre obligaba a abrir
+ * Caja día por día solo para apretar un botón sobre nada. La compuerta existe
+ * para que ninguna cita atendida quede sin cuenta; un día sin citas —o solo
+ * con canceladas e inasistencias, que `reviewDay()` tampoco espera cobrar— no
+ * puede esconder una.
+ *
+ * Si EA no responde, el día **se queda** como faltante: la dirección segura es
+ * pedir un cierre de más, no pagar una quincena con una cuenta sin cerrar.
+ */
+async function dropDaysWithNothingToClose(
+  days: EaLocalDate[],
+  loadAppointments: DayAppointmentSource | undefined,
+): Promise<EaLocalDate[]> {
+  if (loadAppointments === undefined || days.length === 0) return days;
+
+  const required = await Promise.all(
+    days.map(async (day) => {
+      try {
+        const citas = await loadAppointments(day);
+        return citas.some((cita) => {
+          const token = mapEaStatus(cita.status);
+          return token !== "cancelada" && token !== "no-asistio";
+        });
+      } catch {
+        return true;
+      }
+    }),
+  );
+
+  return days.filter((_, index) => required[index]);
 }
 
 // ── Los dos estados que faltan ──────────────────────────────────────────────

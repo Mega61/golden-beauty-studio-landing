@@ -465,7 +465,18 @@ const COLUMNAS: ReadonlyArray<Column<SettlementAppointment>> = [
     from: "siempre",
     listSlot: "primary",
     render: (cita) => (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem" }}>
+      // Envuelve en vez de cortar: en el celular la lista corta el primario
+      // con elipsis, y "Diferencia con el precio de Agenda Pro" cortado no
+      // dice qué se está pagando.
+      <span
+        style={{
+          display: "inline-flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "0.375rem",
+          whiteSpace: "normal",
+        }}
+      >
         {cita.flagged ? (
           <Icon
             name="alerta"
