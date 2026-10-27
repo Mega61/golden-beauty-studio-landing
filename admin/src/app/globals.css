@@ -218,6 +218,14 @@
     box-sizing: border-box;
   }
 
+  /* Un `<details>` casi siempre es ítem de un grid o un flex (las tarjetas), y
+     con el `min-width: auto` de fábrica crece hasta el ancho de lo que lleva
+     adentro sin cortar: el desglose de Comisiones empujaba el monto fuera de
+     la pantalla del celular con un título largo. */
+  details {
+    min-width: 0;
+  }
+
   html,
   body {
     margin: 0;

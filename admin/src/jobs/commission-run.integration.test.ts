@@ -431,6 +431,55 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
+        "un día sin nada que cerrar no pide cierre de caja",
+        async () => {
+          // El 13 no hubo citas, el 14 solo una cancelada y una inasistencia;
+          // el 15 sí tuvo una atendida. Del 1 al 12 se cerraron.
+          const { dayCloses } = repositories(db);
+          for (const day of fortnightDays(QUINCENA).slice(0, 12)) {
+            await dayCloses.insert({
+              close_date: day,
+              closed_by: OWNER_ID,
+              closed_at: eaLocalToInstant(dt(`${day} 20:00:00`)),
+            });
+          }
+          const citaCon = (id: number, status: string, day: string) => ({
+            eaAppointmentId: id,
+            status,
+            start: dt(`${day} 10:00:00`),
+            end: dt(`${day} 11:00:00`),
+            customerName: "Clienta",
+            providerName: "Lina",
+          });
+          const porDia: Record<string, ReturnType<typeof citaCon>[]> = {
+            "2026-09-13": [],
+            "2026-09-14": [citaCon(1, "Cancelada", "2026-09-14"), citaCon(2, "No asistió", "2026-09-14")],
+            "2026-09-15": [citaCon(3, "Reservada", "2026-09-15")],
+          };
+
+          const assessment = await assessFortnight(
+            { db, loadAppointments: async (day) => porDia[day] ?? [] },
+            { period: QUINCENA, now: DESPUES },
+          );
+          expect(assessment.missingDayCloses).toEqual(["2026-09-15"]);
+
+          // Si EA no responde, el día se sigue pidiendo: un cierre de más es
+          // mejor que pagar con una cuenta sin cerrar.
+          const sinEa = await assessFortnight(
+            {
+              db,
+              loadAppointments: async () => {
+                throw new Error("EA no responde");
+              },
+            },
+            { period: QUINCENA, now: DESPUES },
+          );
+          expect(sinEa.missingDayCloses).toEqual(["2026-09-13", "2026-09-14", "2026-09-15"]);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
         "paga, congela las entradas y deja de recalcular",
         async () => {
           await runFortnight({ db }, { period: QUINCENA, actorUserId: OWNER_ID, now: DESPUES });
