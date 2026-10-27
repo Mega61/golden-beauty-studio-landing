@@ -95,8 +95,8 @@ export type AgendaClientProps = {
   whatsappConfirmation: boolean;
   /**
    * ¿Puede quien mira mandar la confirmación a mano (`recordatorios:enviar`)?
-   * Con eso aparece "Enviar confirmación por WhatsApp" en el aviso de cita creada y en
-   * el detalle de la cita.
+   * Con eso aparece "Enviar por WhatsApp" en el aviso de cita creada y "Enviar
+   * confirmación por WhatsApp" en el detalle de la cita.
    */
   canConfirmByHand: boolean;
 };
@@ -541,7 +541,8 @@ export function AgendaClient({
             tone: "ok",
             duration: 15_000,
             undo: {
-              label: "Enviar confirmación por WhatsApp",
+              // Corto: el aviso ya dice "Cita creada." y el botón cabe al lado.
+              label: "Enviar por WhatsApp",
               icon: "mensaje",
               onUndo: () => confirmByWhatsapp(createdId),
             },

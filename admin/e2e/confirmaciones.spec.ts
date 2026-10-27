@@ -62,7 +62,7 @@ test("crear una cita y confirmarla por WhatsApp desde el aviso", async ({ panel 
 
   // El botón del aviso abre WhatsApp con el mensaje listo.
   const popup = panel.waitForEvent("popup");
-  await panel.getByRole("button", { name: /enviar confirmación por whatsapp/i }).first().click();
+  await panel.getByRole("button", { name: /enviar por whatsapp/i }).first().click();
   const tab = await popup;
   await expect
     .poll(() => tab.url(), { message: "la pestaña no fue a WhatsApp", timeout: 15_000 })
