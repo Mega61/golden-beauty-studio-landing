@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canConfirm,
   attendanceOutcome,
   attendanceView,
   attendanceWindowOpen,
@@ -153,6 +154,47 @@ describe("planAttendanceWrite", () => {
     expect(planAttendanceWrite({ ...base, mark: "llego", currentStatus: "Pendiente" }).ok).toBe(
       false,
     );
+  });
+});
+
+describe("confirmar", () => {
+  const plan = (mark: "confirmar" | "desconfirmar", currentStatus: string, extra = {}) =>
+    planAttendanceWrite({ mark, currentStatus, closed: false, windowOpen: false, ...extra });
+
+  it("se ofrece solo mientras la cita está por confirmar y sin cuenta", () => {
+    expect(canConfirm("Reservada", false)).toBe(true);
+    expect(canConfirm("Reprogramada", null)).toBe(true);
+    expect(canConfirm("Confirmada", false)).toBe(false);
+    expect(canConfirm("Completada", false)).toBe(false);
+    expect(canConfirm("Cancelada", false)).toBe(false);
+    expect(canConfirm("Reservada", true)).toBe(false);
+  });
+
+  it("pasa a Confirmada a cualquier hora, días antes también", () => {
+    expect(plan("confirmar", "Reservada")).toEqual({ ok: true, status: "Confirmada" });
+  });
+
+  it("si ya estaba confirmada no escribe nada", () => {
+    expect(plan("confirmar", "Confirmada")).toEqual({ ok: true, status: null });
+  });
+
+  it("no confirma lo que ya pasó", () => {
+    expect(plan("confirmar", "Completada").ok).toBe(false);
+    expect(plan("confirmar", "No asistió").ok).toBe(false);
+    expect(plan("confirmar", "Reservada", { closed: true }).ok).toBe(false);
+    expect(plan("confirmar", "Cancelada").ok).toBe(false);
+  });
+
+  it("deshacer vuelve al estado exacto de antes", () => {
+    expect(plan("desconfirmar", "Confirmada", { restoreTo: "Reprogramada" })).toEqual({
+      ok: true,
+      status: "Reprogramada",
+    });
+    expect(plan("desconfirmar", "Confirmada", { restoreTo: "Completada" })).toEqual({
+      ok: true,
+      status: "Reservada",
+    });
+    expect(plan("desconfirmar", "Completada")).toEqual({ ok: true, status: null });
   });
 });
 
