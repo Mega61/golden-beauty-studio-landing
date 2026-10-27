@@ -369,7 +369,7 @@ describe("toCommissionRule", () => {
  *     adicional        1 ×  10.000 → completo a Lina        →  4.000
  *
  * D · 2026-09-10 · Sara · retoque de garantía
- *     renglón manual   1 ×       0 → sin balde de applies_to → 0, MARCADO
+ *     renglón manual   1 ×       0 → regla `ambos` sobre 0   → 0
  *
  * E · 2026-09-12 · Lina · cuenta sin cerrar → saltada
  *
@@ -476,9 +476,10 @@ describe("la quincena de referencia", () => {
     expect(amountOf(resultado.entries, 6, SARA)).toBeUndefined();
   });
 
-  it("deja el renglón manual en cero y marcado", () => {
+  it("pasa el renglón manual por la regla global, sin marcarlo", () => {
     const manual = resultado.entries.find((entry) => entry.itemId === 7);
-    expect(manual).toMatchObject({ amount: 0, ruleId: null, flag: "renglon-manual" });
+    expect(manual).toMatchObject({ amount: 0, rateBp: 4000, flag: null });
+    expect(manual?.ruleId).not.toBeNull();
   });
 
   it("salta la cuenta sin cerrar y lo dice", () => {
@@ -496,7 +497,7 @@ describe("la quincena de referencia", () => {
   it("suma por técnica lo que hay que pagarle el 15", () => {
     expect(resultado.totals).toEqual([
       { eaProviderId: LINA, base: 569_000, amount: 227_600, flagged: 0, appointments: 3 },
-      { eaProviderId: SARA, base: 100_000, amount: 40_000, flagged: 1, appointments: 2 },
+      { eaProviderId: SARA, base: 100_000, amount: 40_000, flagged: 0, appointments: 2 },
     ]);
   });
 

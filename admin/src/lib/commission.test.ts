@@ -211,15 +211,23 @@ describe("applies_to — principal, adicionales, ambos", () => {
     expect(resolveRule([ambos], extra, SOFIA).rule?.id).toBe(1);
   });
 
-  it("un renglón manual queda en cero MARCADO, no metido a la fuerza en principal", () => {
-    // No tiene servicio ni categoría, así que ninguna regla por servicio o por
-    // categoría puede alcanzarlo, y `applies_to` no tiene un valor que lo
-    // describa. Se marca para que se vea en revisión.
+  it("un renglón manual comisiona con la regla `ambos`", () => {
+    // "Se puso una uña y diseño": plata cobrada por trabajo de la técnica.
     const manual = line({ itemId: 3, kind: "manual", eaServiceId: null, categoryId: null });
-    const resolved = resolveRule([rule({ id: 1 })], manual, SOFIA);
+    const resolved = resolveRule([rule({ id: 1, appliesTo: "ambos" })], manual, SOFIA);
 
-    expect(resolved.rule).toBeNull();
-    expect(resolved.flag).toBe("renglon-manual");
+    expect(resolved.rule?.id).toBe(1);
+    expect(resolved.flag).toBeNull();
+  });
+
+  it("pero no se mete a la fuerza en principal ni en adicionales: queda en cero MARCADO", () => {
+    const manual = line({ itemId: 3, kind: "manual", eaServiceId: null, categoryId: null });
+
+    for (const appliesTo of ["principal", "adicionales"] as const) {
+      const resolved = resolveRule([rule({ id: 1, appliesTo })], manual, SOFIA);
+      expect(resolved.rule).toBeNull();
+      expect(resolved.flag).toBe("renglon-manual");
+    }
   });
 });
 

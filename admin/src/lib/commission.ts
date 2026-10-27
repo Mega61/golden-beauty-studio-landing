@@ -112,10 +112,11 @@ export type CommissionFlag =
   /** Ninguna regla vigente aplica al renglón. Cero marcado, no cero calculado. */
   | "sin-regla"
   /**
-   * Renglón fuera del catálogo. No tiene servicio ni categoría, así que ninguna
-   * regla por servicio o por categoría puede alcanzarlo, y `applies_to` no
-   * tiene un valor que lo describa. Se deja en cero y se marca en vez de
-   * meterlo a la fuerza en el balde de `principal`.
+   * Renglón fuera del catálogo sin regla que lo alcance. No tiene servicio ni
+   * categoría, y no es ni `principal` ni `adicionales`, así que solo lo alcanza
+   * una regla `ambos` sin servicio ni categoría (la global del 40 %). Si no hay
+   * ninguna, se deja en cero y se marca en vez de meterlo a la fuerza en el
+   * balde de `principal`.
    */
   | "renglon-manual"
   /**
@@ -203,7 +204,10 @@ export function ruleSpecificity(rule: CommissionRuleInput): number {
 /**
  * A qué balde de `applies_to` pertenece un renglón.
  *
- * `manual` no tiene balde y devuelve `null` — ver el flag `renglon-manual`.
+ * `manual` no tiene balde y devuelve `null`: solo lo alcanza una regla `ambos`.
+ * Es plata cobrada por trabajo de la técnica ("se puso una uña y diseño", "dos
+ * moños"), y la dueña decidió (2026-10-27) que comisiona como lo demás. Lo que
+ * no se hace es adivinar si es principal o adicional — ver `renglon-manual`.
  */
 function bucketFor(kind: FinanceItemKind): CommissionAppliesTo | null {
   if (kind === "servicio") return "principal";
@@ -215,7 +219,7 @@ function matches(
   rule: CommissionRuleInput,
   line: CommissionableLine,
   eaProviderId: number,
-  bucket: CommissionAppliesTo,
+  bucket: CommissionAppliesTo | null,
 ): boolean {
   if (rule.eaProviderId !== null && rule.eaProviderId !== eaProviderId) return false;
   if (rule.eaServiceId !== null && rule.eaServiceId !== line.eaServiceId) return false;
@@ -251,10 +255,6 @@ export function resolveRule(
 ): RuleResolution {
   const bucket = bucketFor(line.kind);
 
-  if (bucket === null) {
-    return { rule: null, flag: "renglon-manual" };
-  }
-
   assertDate(line.serviceDate, "La fecha del servicio");
 
   const applicable = rules.filter((rule) => {
@@ -264,7 +264,7 @@ export function resolveRule(
   });
 
   if (applicable.length === 0) {
-    return { rule: null, flag: "sin-regla" };
+    return { rule: null, flag: bucket === null ? "renglon-manual" : "sin-regla" };
   }
 
   // Gana la más específica; a igual especificidad, la de `valid_from` más
