@@ -1,6 +1,6 @@
 import "server-only";
 
-import { legacyAppointmentRepository, stationRepository } from "@/db/repositories";
+import { legacyAppointmentRepository, repositories, stationRepository } from "@/db/repositories";
 import { getDb } from "@/db/client";
 import type { GridProvider } from "@/lib/calendar-layout";
 import type { ServiceCapacity, StationSlot } from "@/lib/conflict";
@@ -30,6 +30,7 @@ import type {
 import { loadComboCompositions } from "@/lib/combo-source";
 import type { ComboComposition } from "@/lib/combos";
 import { loadPlannedServices } from "@/lib/planned-services";
+import { waSentLabelsByAppointment } from "@/lib/whatsapp/sent-labels";
 import { legacyStartToWallClock } from "../clientes/history";
 import { buildLegacyAgendaItems, type LegacyAgendaItem, type LegacyAgendaRow } from "./legacy";
 
@@ -249,6 +250,22 @@ async function fetchFromEa(
       ...info,
       service: [info.service ?? "Sin servicio", ...extras.map((e) => serviceNames.get(e) ?? `Servicio ${e}`)].join(" + "),
     };
+  }
+
+  // Lo que ya salió por WhatsApp, para el detalle y la lista. Una consulta
+  // para toda la ventana; si falla, las citas salen sin etiqueta y nada más.
+  try {
+    const sent = waSentLabelsByAppointment(
+      await repositories(getDb()).waMessages.listByAppointmentIds(
+        withRelations.appointments.map((a) => a.id),
+      ),
+    );
+    for (const [id, labels] of sent) {
+      const info = meta[id];
+      if (info) meta[id] = { ...info, waSent: labels };
+    }
+  } catch (error) {
+    console.error("[agenda] no se pudieron leer los mensajes de WhatsApp", error);
   }
 
   const visibleProviderIds = new Set(providers.map((p) => p.id));

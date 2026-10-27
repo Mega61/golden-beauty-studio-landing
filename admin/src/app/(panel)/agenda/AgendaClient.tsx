@@ -33,6 +33,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { formatDateLong, formatTimeRange } from "@/components/ui/format";
 import { useToast } from "@/components/ui/Toast";
 import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
+import { WaSentLabels } from "@/components/ui/WaSentLabels";
 import { buildDayGrid, type DayGrid } from "@/lib/calendar-layout";
 import type { ConflictReport } from "@/lib/conflict";
 import { addMinutes, eaDatePart, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea/datetime";
@@ -974,6 +975,15 @@ function AppointmentDetail({
               {/* El teléfono de EA llega como lo tecleó alguien: el componente
                   lo normaliza antes de armar el `wa.me` y el `tel:`. */}
               <WhatsAppLink phone={info.phone} customerName={info.customer} withCall />
+            </span>
+          </>
+        ) : null}
+
+        {info?.waSent && info.waSent.length > 0 ? (
+          <>
+            <span className={styles.detailKey}>Mensajes</span>
+            <span className={styles.detailValue}>
+              <WaSentLabels labels={info.waSent} />
             </span>
           </>
         ) : null}

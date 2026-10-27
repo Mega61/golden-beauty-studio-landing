@@ -24,6 +24,7 @@ import type { TicketCatalog } from "@/components/ticket/catalog";
 import type { TicketFinanceView, TodayAppointment } from "@/components/ticket/types";
 import { loadPlannedServices } from "@/lib/planned-services";
 import type { PanelSession } from "@/lib/dal";
+import { waSentLabelsByAppointment, type WaSentLabel } from "@/lib/whatsapp/sent-labels";
 import { loadCatalogForClose } from "./catalog-server";
 
 /**
@@ -250,6 +251,21 @@ export async function loadToday(
       }
     }
 
+    // Lo que ya salió por WhatsApp, para la etiqueta de cada tarjeta. Igual que
+    // la cortesía: si falla, las tarjetas salen sin etiqueta y nada más.
+    let waSent = new Map<number, WaSentLabel[]>();
+    if (db !== null) {
+      try {
+        waSent = waSentLabelsByAppointment(
+          await repositories(db).waMessages.listByAppointmentIds(
+            citas.map(({ appointment }) => appointment.id),
+          ),
+        );
+      } catch (error) {
+        console.error("[hoy] no se pudieron leer los mensajes de WhatsApp", error);
+      }
+    }
+
     const appointments = citas
       .map(({ appointment, service, provider, customer }): TodayAppointment => {
         const finance = financeByEaId.get(appointment.id);
@@ -273,6 +289,7 @@ export async function loadToday(
             ),
           ].join(" + "),
           plannedServiceIds: planned.get(appointment.id) ?? [],
+          waSent: waSent.get(appointment.id),
           finance: viewFor(finance),
         };
       })

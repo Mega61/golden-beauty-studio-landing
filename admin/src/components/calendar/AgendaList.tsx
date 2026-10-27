@@ -3,6 +3,7 @@
 import type { Appointment } from "@/lib/ea/types";
 import type { EaLocalDate } from "@/lib/ea/datetime";
 import { StatusPill } from "../ui/StatusPill";
+import { WaSentLabels } from "../ui/WaSentLabels";
 import { formatDateLong, formatDuration, formatTime } from "../ui/format";
 import type { AgendaListDay } from "./agenda-list";
 import styles from "./calendar.module.css";
@@ -95,6 +96,7 @@ export function AgendaList({
                             ) : null}
                             <span className={styles.listProv}> · {providerName}</span>
                           </span>
+                          <WaSentLabels labels={info?.waSent} />
                         </span>
                         <span className={styles.listState}>
                           {past ? (

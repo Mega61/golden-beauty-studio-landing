@@ -14,6 +14,8 @@
  * es exactamente donde se serializa.
  */
 
+import type { WaSentLabel } from "@/lib/whatsapp/sent-labels";
+
 import type {
   Cop,
   FinanceItemKind,
@@ -96,6 +98,11 @@ export type TodayAppointment = {
    * servicios; una guardada manda lo que se guardó. Ausente = ninguno.
    */
   plannedServiceIds?: readonly number[];
+  /**
+   * Lo que ya se le mandó por WhatsApp ("Confirmación enviada"…). Solo se
+   * muestra: no es el estado de la cita. Ausente = nada, o no se pudo leer.
+   */
+  waSent?: readonly WaSentLabel[];
   finance: TicketFinanceView;
 };
 

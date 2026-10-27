@@ -14,6 +14,7 @@
 export { Icon, type IconName, type IconProps } from "./Icon";
 export { Button, ButtonLink, type ButtonProps, type ButtonVariant } from "./Button";
 export { StatusPill } from "./StatusPill";
+export { WaSentLabels } from "./WaSentLabels";
 export {
   STATUS_IDS,
   STATUS_META,
