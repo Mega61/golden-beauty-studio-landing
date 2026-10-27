@@ -46,7 +46,7 @@ export type ToastInput = {
     label?: string;
     /**
      * El ícono del botón. Por defecto el de deshacer; otro cuando el botón del
-     * aviso es la acción que sigue ("Enviar confirmación por WhatsApp" tras crear una cita).
+     * aviso es la acción que sigue ("Enviar por WhatsApp" tras crear una cita).
      */
     icon?: IconName;
     /**
