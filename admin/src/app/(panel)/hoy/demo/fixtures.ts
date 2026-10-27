@@ -123,6 +123,10 @@ export const CITAS_DEMO: TodayAppointment[] = [
     providerName: "Lina",
     bookedServiceId: 5,
     bookedServiceName: "Press-on",
+    waSent: [
+      { kind: "confirmacion", state: "leido", text: "Confirmación leída" },
+      { kind: "recordatorio", state: "enviado", text: "Recordatorio enviado" },
+    ],
     // La cita ya tiene su precio congelado desde el webhook: 100.000.
     finance: { ...SIN_CUENTA, snapshot: 100_000, snapshotSource: "webhook" },
   },
@@ -168,6 +172,7 @@ export const CITAS_DEMO: TodayAppointment[] = [
     providerName: "Marcela",
     bookedServiceId: 11,
     bookedServiceName: "Forrado en acrílico",
+    waSent: [{ kind: "confirmacion", state: "fallido", text: "Confirmación falló" }],
     finance: { ...SIN_CUENTA, snapshot: 85_000, snapshotSource: "reconcile" },
   },
   {

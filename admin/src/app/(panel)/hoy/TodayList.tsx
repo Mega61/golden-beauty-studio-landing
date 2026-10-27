@@ -8,6 +8,7 @@ import {
   EmptyState,
   Icon,
   StatusPill,
+  WaSentLabels,
   formatCOP,
   formatTimeRange,
   useToast,
@@ -376,6 +377,7 @@ function AppointmentCard({
           <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
             {appointment.bookedServiceName}
           </p>
+          <WaSentLabels labels={appointment.waSent} />
           {/* Para avisar que la técnica se atrasó o preguntar si ya viene,
               sin salir de Hoy a buscar el número. */}
           {appointment.customerPhone ? (

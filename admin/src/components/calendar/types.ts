@@ -1,3 +1,5 @@
+import type { WaSentLabel } from "@/lib/whatsapp/sent-labels";
+
 /**
  * Lo que la grilla necesita saber de una cita **además** de la cita.
  *
@@ -24,6 +26,11 @@ export type AppointmentMeta = {
   serviceColor: string | null;
   /** Teléfono en E.164, para el detalle. La identidad de la clienta. */
   phone: string | null;
+  /**
+   * Lo que ya se le mandó por WhatsApp ("Confirmación enviada"…). Solo se
+   * muestra: no es el estado de la cita. Ausente = nada, o no se pudo leer.
+   */
+  waSent?: readonly WaSentLabel[];
 };
 
 /** Metadatos por id de cita. Un objeto plano: cruza el borde servidor→cliente. */
