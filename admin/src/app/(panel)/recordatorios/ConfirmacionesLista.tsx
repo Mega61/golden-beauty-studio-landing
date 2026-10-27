@@ -199,7 +199,7 @@ function ConfirmationCard({
         >
           {row.state === "fallo-automatico"
             ? "Confirmar a mano por WhatsApp"
-            : "Confirmar por WhatsApp"}
+            : "Enviar confirmación por WhatsApp"}
         </Button>
       ) : null}
 

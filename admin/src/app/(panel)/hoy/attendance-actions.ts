@@ -41,6 +41,14 @@ import { EaApiError } from "@/lib/ea/errors";
  * cualquiera (`requireOwnProvider`).
  */
 
+const MARKS: ReadonlySet<string> = new Set<AttendanceMark>([
+  "llego",
+  "no-asistio",
+  "deshacer",
+  "confirmar",
+  "desconfirmar",
+]);
+
 export type AttendanceResult =
   | { status: "ok"; eaStatus: string; previous: string }
   | { status: "error"; message: string };
@@ -56,7 +64,7 @@ export async function marcarAsistencia(input: {
   if (!Number.isInteger(id) || id <= 0) {
     return { status: "error", message: "Esa cita no se puede marcar desde el panel." };
   }
-  if (input.mark !== "llego" && input.mark !== "no-asistio" && input.mark !== "deshacer") {
+  if (!MARKS.has(input.mark)) {
     return { status: "error", message: "Acción desconocida." };
   }
 
@@ -83,8 +91,8 @@ export async function marcarAsistencia(input: {
   }
 
   // ¿Tiene la cuenta cerrada? Es lo que impide acusar de inasistencia a quien
-  // pagó. Sin la base no se sabe, y "no sé" solo se tolera para "Llegó", que
-  // no depende de eso.
+  // pagó. Sin la base no se sabe, y "no sé" solo se tolera para "Llegó" y
+  // para confirmar, que no dependen de eso.
   let closed = false;
   try {
     const row = await repositories(getDb()).appointmentFinance.findByEaAppointmentId(id);
@@ -92,7 +100,7 @@ export async function marcarAsistencia(input: {
   } catch (error) {
     unstable_rethrow(error);
     console.error("[asistencia] no se pudo leer la cuenta", error);
-    if (input.mark !== "llego") {
+    if (input.mark === "no-asistio" || input.mark === "deshacer") {
       return {
         status: "error",
         message: "La base del panel no respondió. No se marcó nada.",
@@ -131,7 +139,10 @@ export async function marcarAsistencia(input: {
   try {
     await repositories(getDb()).auditLog.append({
       actorUserId: session.userId,
-      action: "cita.asistencia",
+      action:
+        input.mark === "confirmar" || input.mark === "desconfirmar"
+          ? "cita.confirmacion"
+          : "cita.asistencia",
       entity: "ea_appointment",
       entityId: id,
       before: { status: previous },
@@ -155,5 +166,5 @@ function failureMessage(error: unknown): string {
       return "La agenda no respondió. No se marcó nada.";
     }
   }
-  return "No se pudo marcar la asistencia.";
+  return "No se pudo cambiar el estado de la cita.";
 }

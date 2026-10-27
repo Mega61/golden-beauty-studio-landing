@@ -5,14 +5,23 @@ import { useState, useSyncExternalStore, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
-import { attendanceView, attendanceWindowOpen, type AttendanceMark } from "@/lib/attendance";
+import {
+  attendanceView,
+  attendanceWindowOpen,
+  canConfirm,
+  type AttendanceMark,
+} from "@/lib/attendance";
 import { instantToEaLocal, type EaLocalDateTime } from "@/lib/ea/datetime";
 
 import { marcarAsistencia } from "./attendance-actions";
 
 /**
- * "Llegó" / "No asistió", con su "Deshacer". Lo usan la tarjeta de Hoy y el
- * detalle de la cita en la agenda.
+ * "Confirmar", "Llegó" / "No asistió", con su "Deshacer". Lo usan la tarjeta
+ * de Hoy y el detalle de la cita en la agenda.
+ *
+ * "Confirmar" pasa la cita de Reservada a Confirmada cuando la clienta
+ * contesta: lo que la dueña hacía abriendo la cita y cambiando el estado a
+ * mano. Se ofrece a cualquier hora, no solo cerca de la cita.
  *
  * Un toque, sin formulario: la técnica lo marca entre dos clientas. Las reglas
  * —cuándo se ofrece, qué se escribe, cuándo se puede deshacer— son de
@@ -66,7 +75,9 @@ export function AttendanceControl({
     windowOpen: now !== null && attendanceWindowOpen(start, now),
   });
 
-  if (view.kind === "nada" || view.kind === "temprano") return null;
+  const confirmable = canConfirm(effective, closed);
+
+  if ((view.kind === "nada" || view.kind === "temprano") && !confirmable) return null;
 
   const run = (mark: AttendanceMark, restoreTo?: string) => {
     const previous = effective;
@@ -81,8 +92,19 @@ export function AttendanceControl({
       setOptimistic({ from: status, to: result.eaStatus });
       onMarked?.({ mark, eaStatus: result.eaStatus });
 
-      if (mark === "deshacer") {
-        toast({ message: "Marca deshecha.", tone: "neutral" });
+      if (mark === "deshacer" || mark === "desconfirmar") {
+        toast({
+          message: mark === "deshacer" ? "Marca deshecha." : "Confirmación deshecha.",
+          tone: "neutral",
+        });
+        return;
+      }
+      if (mark === "confirmar") {
+        toast({
+          message: "Cita confirmada.",
+          tone: "ok",
+          undo: { onUndo: () => run("desconfirmar", previous) },
+        });
         return;
       }
       toast({
@@ -132,6 +154,36 @@ export function AttendanceControl({
     );
   }
 
+  const confirmar = confirmable ? (
+    <Button
+      variant="primary"
+      icon="check"
+      block
+      loading={pending}
+      loadingLabel="Confirmando"
+      onClick={() => run("confirmar")}
+    >
+      Confirmar cita
+    </Button>
+  ) : null;
+
+  if (view.kind !== "marcar") return confirmar;
+
+  return (
+    <>
+      {confirmar}
+      <MarcarAsistencia pending={pending} run={run} />
+    </>
+  );
+}
+
+function MarcarAsistencia({
+  pending,
+  run,
+}: {
+  pending: boolean;
+  run: (mark: AttendanceMark) => void;
+}) {
   return (
     <div style={rowStyle} role="group" aria-label="¿Llegó la clienta?">
       <Button

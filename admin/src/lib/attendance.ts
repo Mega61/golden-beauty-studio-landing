@@ -50,6 +50,7 @@ import { addMinutes, isEaLocalDateTime } from "@/lib/ea/datetime";
 /** Las cadenas que se escriben en EA. Son las de `jobs/status-options.ts`. */
 export const EA_STATUS = {
   reservada: "Reservada",
+  confirmada: "Confirmada",
   completada: "Completada",
   noAsistio: "No asistió",
 } as const;
@@ -113,7 +114,20 @@ export function attendanceView(input: {
 
 // ── Lo que se escribe ───────────────────────────────────────────────────────
 
-export type AttendanceMark = "llego" | "no-asistio" | "deshacer";
+export type AttendanceMark = "llego" | "no-asistio" | "deshacer" | "confirmar" | "desconfirmar";
+
+/**
+ * ¿Se ofrece "Confirmar"? Mientras la cita siga **Reservada** (o Reprogramada,
+ * que es lo mismo para el panel) y sin cuenta cerrada, a cualquier hora: se
+ * confirma cuando la clienta contesta, que puede ser días antes.
+ *
+ * Confirmar es lo que la dueña hacía a mano abriendo la cita y cambiando el
+ * estado. No tiene nada que ver con que se haya mandado un mensaje: eso lo
+ * dicen las etiquetas de `lib/whatsapp/sent-labels.ts`.
+ */
+export function canConfirm(status: string | null | undefined, closed: boolean | null): boolean {
+  return closed !== true && mapEaStatus(status) === "reservada";
+}
 
 export type AttendancePlan =
   /** `status: null` = ya estaba así; no hay nada que escribir. */
@@ -165,6 +179,27 @@ export function planAttendanceWrite(input: {
       if (token === "no-asistio") return { ok: true, status: null };
       if (!input.windowOpen) return { ok: false, message: "Todavía no es la hora de la cita." };
       return { ok: true, status: EA_STATUS.noAsistio };
+    }
+    case "confirmar": {
+      if (input.closed || token === "completada") {
+        return { ok: false, message: "La clienta ya vino: no hay nada que confirmar." };
+      }
+      if (token === "no-asistio") {
+        return { ok: false, message: "La cita está marcada como no asistió." };
+      }
+      if (token === "confirmada") return { ok: true, status: null };
+      return { ok: true, status: EA_STATUS.confirmada };
+    }
+    case "desconfirmar": {
+      if (token !== "confirmada") return { ok: true, status: null };
+      // Vuelve al estado exacto que tenía ("Reprogramada" sigue siéndolo).
+      return {
+        ok: true,
+        status:
+          mapEaStatus(input.restoreTo) === "reservada" && input.restoreTo
+            ? input.restoreTo.trim()
+            : EA_STATUS.reservada,
+      };
     }
     case "deshacer": {
       if (token !== "completada" && token !== "no-asistio") return { ok: true, status: null };

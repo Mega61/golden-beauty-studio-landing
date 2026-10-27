@@ -32,6 +32,7 @@ import {
 } from "@/components/ticket";
 import { mapEaStatus } from "@/components/calendar/status-map";
 import { AttendanceControl } from "./AttendanceControl";
+import { canConfirm, type AttendanceMark } from "@/lib/attendance";
 import type { ComboComposition } from "@/lib/combos";
 
 /**
@@ -333,7 +334,7 @@ function AppointmentCard({
   readOnly: boolean;
   onOpen: () => void;
   onRetry: () => void;
-  onAttendance: (outcome: { mark: "llego" | "no-asistio" | "deshacer" }) => void;
+  onAttendance: (outcome: { mark: AttendanceMark }) => void;
 }) {
   const { finance } = appointment;
   const cerrada = finance.closedAt !== null;
@@ -474,7 +475,13 @@ function AppointmentCard({
       />
 
       <Button
-        variant={cerrada || pending !== null ? "secondary" : "primary"}
+        // Mientras la cita esté por confirmar, el botón principal es
+        // "Confirmar cita": dos dorados en la misma tarjeta no dicen cuál va.
+        variant={
+          cerrada || pending !== null || canConfirm(appointment.status, cerrada)
+            ? "secondary"
+            : "primary"
+        }
         block
         onClick={onOpen}
         icon={cerrada ? undefined : "caja"}
