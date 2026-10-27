@@ -78,6 +78,11 @@ El 40 % de lo cobrado, quincenal. El motor de reglas puro vive en
   de la técnica; meterla en la base pagaría un 40 % encima de plata que ya era
   suya. Hay un test que le cambia la propina a una cuenta y exige que la
   comisión no se mueva.
+- **El renglón manual comisiona como lo demás** (decisión de la dueña,
+  2026-10-27): "se puso una uña y diseño" es plata cobrada por trabajo de la
+  técnica. Lo alcanza solo una regla `applies_to = 'ambos'` sin servicio ni
+  categoría (la global); sin una así, queda en cero y marcado
+  (`renglon-manual`) en vez de adivinar si es principal o adicional.
 - **Nada se recalcula en retrospectiva.** El precio se congela en
   `appointment_finance` al cerrar la cuenta, porque `ea_appointments` no guarda
   plata. Una comisión calculada hoy con el precio de hoy sobre una cita de hace

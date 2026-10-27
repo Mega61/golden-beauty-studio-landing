@@ -196,8 +196,8 @@ describe.skipIf(!canRunDbTests())(
           });
           // La cuenta sin cerrar del día 12 no produce nada, y se dice.
           expect(result.skipped.map((s) => s.reason)).toEqual(["sin-cerrar"]);
-          // El renglón manual del retoque de garantía queda marcado.
-          expect(result.flagged).toBe(1);
+          // El renglón manual del retoque de garantía pasa por la regla global.
+          expect(result.flagged).toBe(0);
 
           expect(result.runs).toEqual([
             {
@@ -249,11 +249,12 @@ describe.skipIf(!canRunDbTests())(
           ]);
           expect(combo.every((e) => e.rateBp === 4000)).toBe(true);
 
-          // El manual: cero **marcado**, sin regla. Es lo que la base puede
-          // distinguir de un cero correcto.
+          // El manual (retoque de garantía, en cero) pasa por la regla global:
+          // cero calculado, no marcado.
           const manual = entradas.filter((e) => e.itemKind === "manual");
           expect(manual).toHaveLength(1);
-          expect(manual[0]).toMatchObject({ amount: 0, commissionRuleId: null, rateBp: null });
+          expect(manual[0]).toMatchObject({ amount: 0, rateBp: 4000 });
+          expect(manual[0].commissionRuleId).not.toBeNull();
         },
         TEST_TIMEOUT,
       );
@@ -355,6 +356,15 @@ describe.skipIf(!canRunDbTests())(
       it(
         "no deja revisar mientras falten cierres de caja o queden renglones marcados",
         async () => {
+          // La regla global vence el 9: el retoque del 10 queda sin regla. Desde
+          // que el renglón manual comisiona, es la forma de tener uno marcado.
+          await db
+            .updateTable("commission_rule")
+            .set({ valid_to: "2026-09-09" })
+            .where("ea_provider_id", "is", null)
+            .where("category_id", "is", null)
+            .where("ea_service_id", "is", null)
+            .execute();
           await runFortnight({ db }, { period: QUINCENA, actorUserId: OWNER_ID, now: DESPUES });
 
           const sinCierres = await markFortnightReviewed(
@@ -368,7 +378,7 @@ describe.skipIf(!canRunDbTests())(
           expect(sinCierres.blockers).toHaveLength(2);
 
           // Con los quince días cerrados sigue faltando el renglón marcado: la
-          // marca del retoque de garantía es un bloqueo, no un adorno.
+          // marca es un bloqueo, no un adorno.
           await cerrarTodosLosDias(db);
           const conMarca = await markFortnightReviewed(
             { db },
@@ -1059,7 +1069,7 @@ async function sembrarQuincenaDeReferencia(db: Kysely<Database>): Promise<void> 
     ],
   });
 
-  // D · retoque de garantía: renglón manual en cero, marcado.
+  // D · retoque de garantía: renglón manual en cero.
   await sembrarCuenta(db, {
     eaAppointmentId: 5004,
     fecha: "2026-09-10",
