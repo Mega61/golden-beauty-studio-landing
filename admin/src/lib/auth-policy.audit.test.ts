@@ -50,6 +50,8 @@ const TODAS: Capability[] = [
   "pauta:registrar",
   "clientes:exportar",
   "cortesia:otorgar",
+  "fidelidad:ver",
+  "fidelidad:canjear",
 ];
 
 /**
@@ -98,6 +100,9 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "clientes:exportar": false,
     // Cortesía de la casa: regalar un servicio es decisión de la dueña.
     "cortesia:otorgar": false,
+    // Las tarjetas de sellos y el canje del premio son de mostrador.
+    "fidelidad:ver": true,
+    "fidelidad:canjear": true,
   },
   staff: {
     "cuenta:cerrar-propia": true,
@@ -132,11 +137,14 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // La técnica no regala servicios: una cortesía le paga comisión sobre un
     // trabajo que nadie cobró, así que marcarla sería decidir su propia plata.
     "cortesia:otorgar": false,
+    // El premio es un descuento sobre su propio servicio; lo aplica el mostrador.
+    "fidelidad:ver": false,
+    "fidelidad:canjear": false,
   },
 };
 
 describe("AUDIT · la matriz completa, celda por celda, contra el plan", () => {
-  it("69 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
+  it("75 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
     for (const role of ["owner", "admin", "staff"] as UserRole[]) {
       for (const capability of TODAS) {
         const esperado = DEL_PLAN[role][capability];

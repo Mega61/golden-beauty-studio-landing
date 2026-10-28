@@ -64,6 +64,7 @@ describe("bottomBarFor", () => {
       "clientas",
     ]);
     expect(overflowFor("reception").map((d) => d.id)).toEqual([
+      "fidelidad",
       "recordatorios",
       "comisiones",
       "servicios",

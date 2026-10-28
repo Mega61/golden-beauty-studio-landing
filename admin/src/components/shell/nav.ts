@@ -74,6 +74,16 @@ export const DESTINATIONS: readonly Destination[] = [
     bottom: 4,
   },
   {
+    id: "fidelidad",
+    label: "Fidelidad",
+    href: "/fidelidad",
+    icon: "regalo",
+    // Las tarjetas de sellos de Stampee: quién va por dónde y a quién le toca
+    // el premio. Es una lista de clientas, así que va con Clientes. La técnica
+    // se entera del premio en la tarjeta de su cita en Hoy.
+    roles: NO_STAFF,
+  },
+  {
     id: "recordatorios",
     label: "Recordatorios",
     href: "/recordatorios",

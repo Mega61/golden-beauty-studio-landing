@@ -357,6 +357,7 @@ function AppointmentCard({
             {appointment.providerName}
           </p>
           <WaSentLabels labels={appointment.waSent} />
+          {appointment.loyalty ? <LoyaltyChip loyalty={appointment.loyalty} /> : null}
         </div>
         {/* Para avisar que la técnica se atrasó o preguntar si ya viene, sin
             salir de Hoy a buscar el número. En su ícono: el número ya lo
@@ -425,5 +426,27 @@ function AppointmentCard({
         </Button>
       </div>
     </article>
+  );
+}
+
+/**
+ * El aviso de Stampee en la tarjeta de la cita. "Premio listo" es para que
+ * quien cierre la cuenta aplique el descuento; "le falta 1" es para que se lo
+ * digan a la clienta — es el empujón que la hace volver.
+ */
+function LoyaltyChip({ loyalty }: { loyalty: NonNullable<TodayAppointment["loyalty"]> }) {
+  const lista = loyalty.stage === "lista";
+  return (
+    <p className={styles.loyalty}>
+      <span className={`${styles.chip} ${lista ? styles.chipOk : styles.chipWarn}`}>
+        <Icon name="regalo" size={14} />
+        {lista
+          ? "Premio listo"
+          : loyalty.remaining === 1
+            ? "Le falta 1 sello"
+            : `Le faltan ${loyalty.remaining} sellos`}
+      </span>
+      {loyalty.rewardName ? <span className={styles.loyaltyReward}>{loyalty.rewardName}</span> : null}
+    </p>
   );
 }

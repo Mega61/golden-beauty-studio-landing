@@ -24,6 +24,7 @@ export type IconName =
   | "equipo"
   | "comisiones"
   | "reportes"
+  | "regalo"
   | "diagnostico"
   | "externo"
   | "mas-signo"
@@ -111,8 +112,15 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M7 20v-6M12 20V6M17 20v-9" />
     </>
   ),
-  diagnostico: (
+  // Fidelidad: el premio que espera al final de la tarjeta de sellos.
+  regalo: (
     <>
+      <rect x="4" y="9" width="16" height="11" rx="1" />
+      <path d="M3 9h18M12 9v11" />
+      <path d="M12 9c-1.5-3-5-4-5.5-2S9 9 12 9c3 0 6-.5 5.5-2S13.5 6 12 9" />
+    </>
+  ),
+  diagnostico: (    <>
       <path d="M3 12h4l2.5-6 4 12 2.5-6h5" />
     </>
   ),

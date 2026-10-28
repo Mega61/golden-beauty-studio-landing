@@ -1,0 +1,84 @@
+/* La tarjeta de sellos. El dorado es el de la marca: un sello ganado es
+   "dorado"; la tarjeta llena se pinta en verde porque es una acción pendiente
+   (aplicar el premio), no un adorno. */
+
+.dots {
+  --dot: 0.75rem;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+.dots[data-size="sm"] {
+  --dot: 0.5rem;
+  gap: 0.1875rem;
+}
+
+.dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  border: 1.5px solid var(--color-ink-mute);
+  background: transparent;
+}
+.dot[data-fill="visita"] {
+  border-color: var(--color-gold-dark);
+  background: var(--color-gold-dark);
+}
+/* Regalado: mismo dorado, más claro. Se lee "lleno" pero no "vino". */
+.dot[data-fill="regalo"] {
+  border-color: var(--color-gold-dark);
+  background: var(--color-gold-bright);
+}
+.dots[data-stage="lista"] .dot[data-fill] {
+  border-color: var(--color-ok-ink);
+  background: var(--color-ok-ink);
+}
+.dots[data-stage="canjeada"] .dot[data-fill] {
+  border-color: var(--color-ink-mute);
+  background: var(--color-ink-mute);
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  min-width: 6rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-ivory-deep);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-gold-dark);
+}
+.bar[data-stage="lista"] > span {
+  background: var(--color-ok-ink);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.1875rem 0.5rem;
+  border: 1px solid var(--hair-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-ivory);
+  color: var(--color-ink-soft);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+.pill[data-stage="lista"] {
+  border-color: var(--color-ok-line);
+  background: var(--color-ok-tint);
+  color: var(--color-ok-ink);
+}
+.pill[data-stage="cerca"] {
+  border-color: var(--color-warn-line);
+  background: var(--color-warn-tint);
+  color: var(--color-warn-ink);
+}

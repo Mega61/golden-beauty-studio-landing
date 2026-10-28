@@ -152,6 +152,7 @@ TICKET_STAFF_COBRA="true"
 | `GOOGLE_WORKSPACE_DOMAIN` | Se compara contra el claim `hd` del ID token. Es una de las dos compuertas | Un Gmail personal cualquiera entraría al panel |
 | `TOTP_ENC_KEY` | Cifra los secretos TOTP de las técnicas en reposo | Los secretos quedarían en claro en la base |
 | `INGEST_URL` / `INGEST_SHARED_SECRET` | Push de pagos a Strapi al cerrar el día (`…/api/ingest/payments`), y de visitas cada noche desde el reconcile (`…/api/ingest/panel-visits`, derivada) | El cierre diario no llega a Actual Budget; el win-back y Stampee se quedan quietos |
+| `STAMPEE_API_URL` / `STAMPEE_API_KEY` | Fidelidad: lee tarjetas y campañas de Stampee (`https://api.loyalty.goldenbeautystudio.com.co`, llave `stmp_…` de Stampee → Ajustes → API) y aplica premios. `STAMPEE_APP_URL` (`https://loyalty.goldenbeautystudio.com.co`) solo arma el link a la tarjeta | La pantalla de Fidelidad dice que no está conectada; Hoy y la ficha salen sin sellos |
 | `INGEST_SINCE` | Obligatoria con `INGEST_URL`. Primer día de caja del panel (`2026-10-24` en producción). Un cierre anterior **nunca** se empuja: esa plata entró a Actual por Agenda Pro | Sin ella el panel no arma el cliente de ingest y Caja lo dice |
 
 > **Desde el corte de Agenda Pro (2026-10-24) el CRM tiene las dos rutas JSON**

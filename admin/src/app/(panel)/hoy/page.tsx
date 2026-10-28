@@ -12,6 +12,8 @@ import { instantToEaDate, instantToEaLocal, isEaLocalDate, type EaLocalDate } fr
 import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
 import { loadComboCompositions } from "@/lib/combo-source";
+import { loadLoyaltyWithin } from "@/lib/stampee/client";
+import { clientsForPhone, leadingCard } from "@/lib/stampee/model";
 import { cerrarCuenta, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
 import { loadConfirmations, pendingConfirmations } from "../recordatorios/confirmations-data";
@@ -113,7 +115,7 @@ export default async function HoyPage({
   // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
   // que la pasada diaria no dependa de acordarse. Si la carga falla, el acceso
   // sale sin número —nunca tumba Hoy por un dato accesorio.
-  const [{ date, appointments, catalog, problems }, pendingReminders, comboSource, cajaCerrada] = await Promise.all([
+  const [{ date, appointments: citas, catalog, problems }, pendingReminders, comboSource, cajaCerrada, loyalty] = await Promise.all([
     loadToday(session, { verTodas, date: fecha }),
     // Recordatorios **y** reservas nuevas por confirmar: los dos son mensajes
     // que salen del mismo botón de la misma pantalla.
@@ -133,7 +135,23 @@ export default async function HoyPage({
     // el combo. Nunca lanza; sin composiciones la hoja simplemente no lo ofrece.
     loadComboCompositions(),
     isToday ? Promise.resolve(false) : dayAlreadyClosed(fecha),
+    // "Premio listo" / "le falta 1 sello" en la tarjeta de la cita. Es un
+    // detalle: con Stampee lento o caído Hoy sale igual, sin sellos.
+    loadLoyaltyWithin(1_500),
   ]);
+
+  const appointments = citas.map((appointment) => {
+    if (!loyalty?.ok) return appointment;
+    const card = leadingCard(
+      clientsForPhone(loyalty.data, appointment.customerPhone).flatMap((client) => client.cards),
+    );
+    return card && (card.stage === "lista" || card.stage === "cerca")
+      ? {
+          ...appointment,
+          loyalty: { stage: card.stage, remaining: card.remaining, rewardName: card.rewardName },
+        }
+      : appointment;
+  });
 
   const eaCaido = problems.find((p) => p.source === "ea") ?? null;
   const dbCaida = problems.find((p) => p.source === "db") ?? null;

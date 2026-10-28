@@ -180,6 +180,9 @@ describe("can — el alcance de una técnica", () => {
     "clientes:exportar",
     // Regalar un servicio: la cortesía le paga comisión sobre lo que nadie cobró.
     "cortesia:otorgar",
+    // El premio de fidelidad es un descuento sobre su propio servicio.
+    "fidelidad:ver",
+    "fidelidad:canjear",
   ];
 
   it.each(PROHIBIDAS)("staff NO alcanza %s", (capability) => {
@@ -233,6 +236,11 @@ describe("can — recepción y dueña", () => {
     expect(can("staff", "cortesia:otorgar", { staffCobra: true })).toBe(false);
   });
 
+  it("recepción ve las tarjetas de sellos y aplica el premio", () => {
+    expect(can("admin", "fidelidad:ver")).toBe(true);
+    expect(can("admin", "fidelidad:canjear")).toBe(true);
+  });
+
   it("recepción manda los recordatorios por wa.me y registra las bajas", () => {
     expect(can("admin", "recordatorios:enviar")).toBe(true);
     expect(can("admin", "recordatorios:baja")).toBe(true);
@@ -275,6 +283,8 @@ describe("can — recepción y dueña", () => {
       "pauta:registrar",
       "clientes:exportar",
       "cortesia:otorgar",
+      "fidelidad:ver",
+      "fidelidad:canjear",
     ];
     for (const capability of TODAS) {
       expect(can("owner", capability)).toBe(true);
