@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
 
@@ -107,12 +108,20 @@ export function Button({
 }
 
 export type ButtonLinkProps = Common &
-  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "className">;
+  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "className" | "href"> & {
+    href: string;
+  };
 
 /**
  * La misma forma, pero navega. Existe para que "Ver la cita" y "Guardar" se
  * vean idénticos: si el mismo gesto visual a veces navega y a veces actúa, la
  * usuaria deja de confiar en el gesto.
+ *
+ * Es un `next/link`, no un `<a>`: con `basePath: "/admin"`, un `<a href="/hoy">`
+ * crudo salta a la landing (`/hoy` no existe allá) — así estaban "Ver
+ * recordatorios" en Hoy y los dos botones de `/salir`. `Link` antepone el
+ * `basePath` a las rutas internas y deja quietas las externas (`https://`,
+ * `wa.me`), y de paso navega sin recargar la página.
  */
 export function ButtonLink({
   variant = "secondary",
@@ -120,13 +129,14 @@ export function ButtonLink({
   icon,
   block = false,
   children,
+  href,
   ...rest
 }: ButtonLinkProps) {
   const iconOnly = Boolean(icon) && children == null;
   return (
-    <a {...rest} className={classes(variant, size, block, iconOnly)}>
+    <Link href={href} {...rest} className={classes(variant, size, block, iconOnly)}>
       {icon ? <Icon name={icon} size={size === "sm" ? 16 : 18} /> : null}
       {children}
-    </a>
+    </Link>
   );
 }

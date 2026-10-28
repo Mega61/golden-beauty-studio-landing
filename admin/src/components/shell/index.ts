@@ -1,6 +1,8 @@
 /** Superficie pública del shell (WP-A3). */
 
 export { AppShell } from "./AppShell";
+export { PanelFrame } from "./PanelFrame";
+export { ScreenSkeleton } from "./ScreenSkeleton";
 export { SideNav } from "./SideNav";
 export { BottomBar } from "./BottomBar";
 export { Wordmark } from "./Wordmark";

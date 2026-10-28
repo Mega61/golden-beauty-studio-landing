@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "./Icon";
 
 /**
@@ -61,9 +62,11 @@ export function ReadOnlyBand({
         {detailsHref ? (
           <>
             {" "}
-            <a href={detailsHref} style={{ fontWeight: 700 }}>
+            {/* `Link` y no `<a>`: con `basePath: "/admin"` un `href` crudo
+                saltaba a /diagnostico de la landing, que no existe. */}
+            <Link href={detailsHref} style={{ fontWeight: 700 }}>
               Ver Diagnóstico
-            </a>
+            </Link>
           </>
         ) : null}
       </span>

@@ -24,11 +24,18 @@ import { activeDestinationId, bottomBarFor, overflowFor, type Role } from "./nav
  * ninguna parte, abre una hoja. Un enlace que no lleva a una URL rompe el
  * clic-medio, el "abrir en pestaña nueva" y la expectativa del lector de
  * pantalla.
+ *
+ * **El destino tocado se enciende en el acto** (`data-pending`), antes de que
+ * llegue la pantalla nueva. Se guarda junto con la ruta desde la que se tocó:
+ * cuando la ruta cambia, la marca deja de valer sola, sin un efecto que la
+ * limpie.
  */
 export function BottomBar({ role }: { role: Role }) {
   const pathname = usePathname();
   const activeId = activeDestinationId(pathname, role);
   const [openMore, setOpenMore] = useState(false);
+  const [tapped, setTapped] = useState<{ id: string; from: string } | null>(null);
+  const pendingId = tapped && tapped.from === pathname ? tapped.id : null;
 
   const main = bottomBarFor(role);
   const rest = overflowFor(role);
@@ -43,8 +50,12 @@ export function BottomBar({ role }: { role: Role }) {
             href={d.href}
             className="ui-bottombar__item"
             aria-current={d.id === activeId ? "page" : undefined}
+            data-pending={pendingId === d.id && d.id !== activeId ? "true" : undefined}
+            onClick={() => setTapped({ id: d.id, from: pathname })}
           >
-            <Icon name={d.icon} size={20} />
+            <span className="ui-bottombar__icon">
+              <Icon name={d.icon} size={20} />
+            </span>
             {d.label}
           </Link>
         ))}
@@ -59,12 +70,14 @@ export function BottomBar({ role }: { role: Role }) {
           data-current={activeInRest ? "true" : undefined}
           onClick={() => setOpenMore(true)}
         >
-          <Icon name="mas" size={20} />
+          <span className="ui-bottombar__icon">
+            <Icon name="mas" size={20} />
+          </span>
           Más
         </button>
       </nav>
 
-      <Panel open={openMore} onClose={() => setOpenMore(false)} title="Más">
+      <Panel open={openMore} onClose={() => setOpenMore(false)} title="Más" fit="content">
         <ul className="ui-list" style={{ margin: "-1rem" }}>
           {rest.map((d) => (
             <li key={d.id}>

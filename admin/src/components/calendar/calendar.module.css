@@ -116,8 +116,10 @@
   border-left: 1px solid var(--hair);
 }
 
-.mode:hover {
-  background: var(--color-ivory-deep);
+@media (hover: hover) {
+  .mode:hover {
+    background: var(--color-ivory-deep);
+  }
 }
 
 .mode input {
@@ -466,8 +468,10 @@
   cursor: pointer;
 }
 
-.slot:hover {
-  background: color-mix(in srgb, var(--color-gold) 8%, transparent);
+@media (hover: hover) {
+  .slot:hover {
+    background: color-mix(in srgb, var(--color-gold) 8%, transparent);
+  }
 }
 
 .slot:focus-visible {
@@ -482,8 +486,10 @@
   background-color: color-mix(in srgb, var(--color-gold) 6%, transparent);
 }
 
-.colTarget .slot:hover {
-  background: color-mix(in srgb, var(--color-gold) 18%, transparent);
+@media (hover: hover) {
+  .colTarget .slot:hover {
+    background: color-mix(in srgb, var(--color-gold) 18%, transparent);
+  }
 }
 
 /* --- Bandas de fondo ------------------------------------------------------ */
@@ -588,9 +594,11 @@
     transform var(--dur-1) var(--ease-out);
 }
 
-.event:hover {
-  box-shadow: 0 1px 3px rgba(28, 23, 20, 0.16);
-  z-index: 15;
+@media (hover: hover) {
+  .event:hover {
+    box-shadow: 0 1px 3px rgba(28, 23, 20, 0.16);
+    z-index: 15;
+  }
 }
 
 .event:focus-visible {
@@ -720,9 +728,11 @@
     display: block;
   }
 
-  .event:hover .resize::after,
-  .event:focus-within .resize::after {
-    opacity: 1;
+  @media (hover: hover) {
+    .event:hover .resize::after,
+    .event:focus-within .resize::after {
+      opacity: 1;
+    }
   }
 
   .eventDraggable {
@@ -938,8 +948,10 @@
   cursor: pointer;
 }
 
-.choice:hover {
-  background: var(--color-ivory-deep);
+@media (hover: hover) {
+  .choice:hover {
+    background: var(--color-ivory-deep);
+  }
 }
 
 .choice:has(input:checked) {
@@ -1100,8 +1112,10 @@
   transition: background-color var(--dur-1) var(--ease-out);
 }
 
-.listRow:hover {
-  background: var(--color-ivory-deep);
+@media (hover: hover) {
+  .listRow:hover {
+    background: var(--color-ivory-deep);
+  }
 }
 
 .listRow[aria-current] {
@@ -1411,9 +1425,11 @@
   cursor: pointer;
 }
 
-.stretch:hover {
-  color: var(--color-gold-dark);
-  background: color-mix(in srgb, var(--color-gold) 12%, var(--color-cream));
+@media (hover: hover) {
+  .stretch:hover {
+    color: var(--color-gold-dark);
+    background: color-mix(in srgb, var(--color-gold) 12%, var(--color-cream));
+  }
 }
 
 .stretch:focus-visible {

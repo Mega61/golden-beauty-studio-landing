@@ -48,6 +48,7 @@ export {
   type ListSlot,
 } from "./table-model";
 export { Panel, PanelInline } from "./Panel";
+export { DateStepper, DaySwipe, type StepperProps } from "./DateStepper";
 export {
   ToastProvider,
   useToast,

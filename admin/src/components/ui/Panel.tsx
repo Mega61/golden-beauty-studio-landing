@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { Icon } from "./Icon";
 
 /**
@@ -27,6 +33,15 @@ import { Icon } from "./Icon";
  *   referencia.
  * - **Bloquear el scroll de atrás.** `showModal()` no lo hace en iOS.
  *
+ * - **Arrastrar para cerrar** (solo la hoja del celular). Desde la manija o la
+ *   cabecera: la hoja sigue al dedo, el fondo se aclara a la par, y al soltar
+ *   cierra si bajó más de un cuarto de su alto o si se soltó con velocidad
+ *   (un "sacudón" corto cierra aunque haya bajado poco). Si no, vuelve a su
+ *   sitio. Una hoja con `dismissable={false}` se deja estirar con
+ *   resistencia y siempre vuelve: el gesto se reconoce, pero no tira trabajo.
+ *   El arrastre escribe `--drag` en el elemento y apaga la transición; al
+ *   soltar, la transición de CSS hace el resto (cerrar o volver).
+ *
  * Para el caso de ≥1440 px, donde el plan pide el panel persistente al lado de
  * la agenda, está `PanelInline`: el mismo cromo sin capa modal.
  */
@@ -43,6 +58,12 @@ export function Panel({
    * Escape: se pierde el trabajo en un gesto. La cuenta de servicio lo usa.
    */
   dismissable = true,
+  /**
+   * `content`: la hoja mide lo que trae (un menú, una confirmación) en vez de
+   * subir casi hasta arriba. Una hoja alta con cuatro renglones arriba y un
+   * hueco vacío abajo es una hoja que no sabe qué es.
+   */
+  fit = "full",
 }: {
   open: boolean;
   onClose: () => void;
@@ -51,10 +72,55 @@ export function Panel({
   footer?: ReactNode;
   closeLabel?: string;
   dismissable?: boolean;
+  fit?: "full" | "content";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const titleId = useId();
+  const drag = useRef<{ id: number; y0: number; t0: number; dy: number } | null>(null);
+
+  function onDragStart(e: ReactPointerEvent<HTMLElement>) {
+    const el = ref.current;
+    if (!el || e.button !== 0) return;
+    // Solo la hoja: en escritorio el panel es lateral y no se arrastra.
+    if (!window.matchMedia("(max-width: 47.999rem)").matches) return;
+    // Un toque en el botón de cerrar es un toque, no un arrastre.
+    if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) return;
+    drag.current = { id: e.pointerId, y0: e.clientY, t0: performance.now(), dy: 0 };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    el.dataset.dragging = "true";
+  }
+
+  function onDragMove(e: ReactPointerEvent<HTMLElement>) {
+    const el = ref.current;
+    const d = drag.current;
+    if (!el || !d || d.id !== e.pointerId) return;
+    const raw = e.clientY - d.y0;
+    // Hacia arriba no se va (la hoja ya está entera); sin permiso de cerrar,
+    // baja con resistencia: un tercio de lo que se movió el dedo.
+    const dy = Math.max(0, dismissable ? raw : raw / 3);
+    d.dy = dy;
+    el.style.setProperty("--drag", `${dy}px`);
+    el.style.setProperty("--backdrop-o", String(Math.max(0.25, 1 - dy / el.offsetHeight)));
+  }
+
+  function onDragEnd(e: ReactPointerEvent<HTMLElement>) {
+    const el = ref.current;
+    const d = drag.current;
+    if (!el || !d || d.id !== e.pointerId) return;
+    drag.current = null;
+    const velocity = d.dy / Math.max(1, performance.now() - d.t0); // px/ms
+    delete el.dataset.dragging;
+    const close = dismissable && (d.dy > el.offsetHeight * 0.25 || (velocity > 0.6 && d.dy > 24));
+    if (close) {
+      // `--drag` se queda hasta que la hoja se cierra: la salida arranca desde
+      // donde la dejó el dedo, no desde arriba.
+      onClose();
+    } else {
+      el.style.removeProperty("--drag");
+      el.style.removeProperty("--backdrop-o");
+    }
+  }
 
   useEffect(() => {
     const el = ref.current;
@@ -66,6 +132,13 @@ export function Panel({
       document.documentElement.style.overflow = "hidden";
     } else if (!open && el.open) {
       el.close();
+      // Para la próxima vez que abra: que entre desde abajo, no desde donde
+      // quedó el arrastre. Después de la salida, que dura `--dur-2`.
+      const t = window.setTimeout(() => {
+        el.style.removeProperty("--drag");
+        el.style.removeProperty("--backdrop-o");
+      }, 220);
+      return () => window.clearTimeout(t);
     }
   }, [open]);
 
@@ -80,7 +153,7 @@ export function Panel({
   return (
     <dialog
       ref={ref}
-      className="ui-panel"
+      className={fit === "content" ? "ui-panel ui-panel--fit" : "ui-panel"}
       aria-labelledby={titleId}
       onCancel={(e) => {
         // `cancel` es Escape. Con cambios sin guardar se ignora.
@@ -104,7 +177,23 @@ export function Panel({
         if (outside) onClose();
       }}
     >
-      <header className="ui-panel__head">
+      {/* La manija y la cabecera son la zona de arrastre. El cuerpo no: ahí
+          el dedo hace scroll. */}
+      <div
+        className="ui-panel__grip"
+        aria-hidden
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      />
+      <header
+        className="ui-panel__head"
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      >
         <h2 className="ui-panel__title" id={titleId}>
           {title}
         </h2>

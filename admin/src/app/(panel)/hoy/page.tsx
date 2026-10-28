@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import Link from "next/link";
 
-import { Icon, formatDateLong, formatTime } from "@/components/ui";
+import { DateStepper, DaySwipe, Icon, formatDateLong, formatTime } from "@/components/ui";
 import { unmarkedAppointments } from "@/lib/attendance";
 import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
@@ -70,6 +70,16 @@ function shiftDate(date: string, days: number): string {
  * Si la caja de un día anterior ya se cerró. Solo se pregunta para el pasado, y
  * si la base no contesta se calla: es un aviso, la regla vive en Caja.
  */
+/** "Hoy", "Ayer", "Hace 3 días": la segunda línea del paso de fecha. */
+function relativeDay(date: string, today: string): string {
+  const days = Math.round(
+    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86_400_000,
+  );
+  if (days === 0) return "Hoy";
+  if (days === 1) return "Ayer";
+  return `Hace ${days} días`;
+}
+
 async function dayAlreadyClosed(date: EaLocalDate): Promise<boolean> {
   try {
     return (await repositories(getDb()).dayCloses.findByDate(date)) !== undefined;
@@ -143,6 +153,10 @@ export default async function HoyPage({
         )
       : [];
 
+  const prevHref = `/hoy?fecha=${shiftDate(date, -1)}`;
+  // Mañana no se abre: desde ayer, "siguiente" es volver a hoy.
+  const nextHref = isToday ? null : shiftDate(date, 1) < today ? `/hoy?fecha=${shiftDate(date, 1)}` : "/hoy";
+
   return (
     <AppShell
       role={shellRole(session.role)}
@@ -157,51 +171,20 @@ export default async function HoyPage({
       }
     >
       <div style={{ display: "grid", gap: "1rem" }}>
-        <p
-          style={{
-            margin: 0,
-            fontSize: "var(--text-2xs)",
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-            color: "var(--color-ink-soft)",
-          }}
-        >
-          {formatDateLong(`${date} 00:00:00`)}
-          {isToday ? "" : " · día anterior"}
-          {verTodas ? "" : " · tus citas"}
-        </p>
-
         {/* Enlaces y no un control con estado, igual que en Caja: la pantalla
-            es un Server Component y navegar es lo que ya sabe hacer. */}
-        <nav
-          aria-label="Cambiar de día"
-          style={{ display: "flex", gap: "0.75rem", fontSize: "var(--text-2xs)", marginTop: "-0.5rem" }}
-        >
-          <Link href={`/hoy?fecha=${shiftDate(date, -1)}`}>← Día anterior</Link>
-          {isToday ? null : (
-            <>
-              {shiftDate(date, 1) < today ? (
-                <Link href={`/hoy?fecha=${shiftDate(date, 1)}`}>Día siguiente →</Link>
-              ) : null}
-              <Link href="/hoy">Volver a hoy</Link>
-            </>
-          )}
-        </nav>
+            es un Server Component y navegar es lo que ya sabe hacer. El futuro
+            no se abre: la flecha de la derecha se apaga en hoy. */}
+        <DateStepper
+          label={formatDateLong(`${date} 00:00:00`)}
+          sub={[relativeDay(date, today), verTodas ? null : "tus citas"].filter(Boolean).join(" · ")}
+          prevHref={prevHref}
+          nextHref={nextHref}
+          todayHref={isToday ? null : "/hoy"}
+        />
 
         {cajaCerrada ? (
-          <div
-            role="status"
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-warn-tint)",
-              border: "1px solid var(--color-warn-line)",
-              color: "var(--color-warn-ink)",
-            }}
-          >
-            <Icon name="caja" size={18} style={{ flex: "none", marginTop: 1 }} />
+          <div role="status" className="ui-callout ui-callout--warn">
+            <Icon name="caja" size={18} />
             <span>
               La caja de este día ya se cerró. Una cuenta que cierres ahora queda por fuera del
               cierre hasta que recepción la agregue desde{" "}
@@ -211,19 +194,8 @@ export default async function HoyPage({
         ) : null}
 
         {dbCaida === null ? null : (
-          <div
-            role="alert"
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-error-tint)",
-              border: "1px solid var(--color-error-line)",
-              color: "var(--color-error-ink)",
-            }}
-          >
-            <Icon name="alerta" size={18} style={{ flex: "none", marginTop: 1 }} />
+          <div role="alert" className="ui-callout ui-callout--error">
+            <Icon name="alerta" size={18} />
             <span>
               No se pudo leer la base del panel, así que no hay cuentas ni precios. Las cuentas que
               se escriban ahora quedan pendientes en el celular hasta que vuelva.
@@ -249,19 +221,8 @@ export default async function HoyPage({
         ) : null}
 
         {sinMarcar.length === 0 ? null : (
-          <div
-            role="status"
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-warn-tint)",
-              border: "1px solid var(--color-warn-line)",
-              color: "var(--color-warn-ink)",
-            }}
-          >
-            <Icon name="reloj" size={18} style={{ flex: "none", marginTop: 1 }} />
+          <div role="status" className="ui-callout ui-callout--warn">
+            <Icon name="reloj" size={18} />
             <span>
               <strong>
                 {sinMarcar.length === 1
@@ -277,20 +238,25 @@ export default async function HoyPage({
           </div>
         )}
 
-        <TodayList
-          appointments={appointments}
-          catalog={catalog}
-          scope={session.userId}
-          canCharge={canCharge}
-          canGiveCourtesy={canGiveCourtesy}
-          canSeeTotals={canSeeTotals}
-          canFixAfterClose={canFixAfterClose}
-          readOnly={eaCaido !== null}
-          action={cerrarCuenta}
-          combos={comboSource.combos}
-          checkFirstVisit={revisarPrimeraVisita}
-          isToday={isToday}
-        />
+        <DaySwipe
+          prevHref={prevHref}
+          nextHref={nextHref}
+        >
+          <TodayList
+            appointments={appointments}
+            catalog={catalog}
+            scope={session.userId}
+            canCharge={canCharge}
+            canGiveCourtesy={canGiveCourtesy}
+            canSeeTotals={canSeeTotals}
+            canFixAfterClose={canFixAfterClose}
+            readOnly={eaCaido !== null}
+            action={cerrarCuenta}
+            combos={comboSource.combos}
+            checkFirstVisit={revisarPrimeraVisita}
+            isToday={isToday}
+          />
+        </DaySwipe>
       </div>
     </AppShell>
   );
