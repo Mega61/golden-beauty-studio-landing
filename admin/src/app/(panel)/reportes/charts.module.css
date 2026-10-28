@@ -643,24 +643,28 @@
    Una sola fila, arriba de todo lo que scopea. Ni un filtro adentro de una
    tarjeta: si un gráfico necesitara su propio rango, sería otro tablero. */
 .filters {
-  align-items: center;
   border-bottom: 1px solid var(--hair);
+  display: grid;
+  gap: 0.75rem;
+  padding-bottom: 0.875rem;
+}
+
+.filterRow {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 0.75rem;
-  padding-bottom: 0.75rem;
 }
 
-.filterGroup {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.periodLabel {
-  color: var(--color-carbon);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  min-width: 12ch;
+@media (min-width: 48rem) {
+  .filters {
+    align-items: center;
+    grid-template-columns: minmax(0, 28rem) auto;
+    justify-content: space-between;
+  }
+  .filterRow {
+    order: 2;
+  }
 }
 
 .spacer {

@@ -27,10 +27,12 @@ import {
 import styles from "@/components/calendar/calendar.module.css";
 import { unmappedStatuses } from "@/components/calendar/status-map";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Panel, PanelInline } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { formatDateLong, formatTimeRange } from "@/components/ui/format";
+import { useConfirm } from "@/components/ui/Confirm";
 import { useToast } from "@/components/ui/Toast";
 import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
 import { WaSentLabels } from "@/components/ui/WaSentLabels";
@@ -129,6 +131,7 @@ export function AgendaClient({
   canConfirmByHand,
 }: AgendaClientProps) {
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const [mode, setMode] = useState<RangeMode>(initialMode);
   const [view, setView] = useState<AgendaView>(initialView);
@@ -588,10 +591,16 @@ export function AgendaClient({
     });
   };
 
-  const doCancel = (appointment: Appointment) => {
+  const doCancel = async (appointment: Appointment) => {
     // La única acción destructiva que **sí** confirma: cancelar notifica a la
     // clienta, y una notificación no se deshace (§ Interacción).
-    if (!globalThis.confirm("Cancelar la cita le avisa a quien reservó. ¿Seguro?")) return;
+    const ok = await confirm({
+      title: "¿Cancelar la cita?",
+      body: "Le llega un aviso a quien reservó, y ese aviso no se deshace.",
+      confirmLabel: "Cancelar la cita",
+      tone: "danger",
+    });
+    if (!ok) return;
 
     startSave(async () => {
       const result = await cancelAppointment(appointment.id, appointment.providerId ?? 0);
@@ -711,6 +720,15 @@ export function AgendaClient({
           ? "Cita de Agenda Pro"
           : "Cita";
 
+  const newAppointment = () =>
+    onPickSlot({
+      providerId: data.providers[0]?.id ?? 0,
+      // Con varios días a la vista, la cita nueva arranca hoy si hoy está
+      // entre ellos: en Semana, el lunes casi nunca es el día.
+      date: dates.includes(today) ? today : dates[0],
+      minute: window_.startMinute,
+    });
+
   return (
     <div className={styles.frame}>
       <RangeBar
@@ -727,38 +745,52 @@ export function AgendaClient({
         actions={
           <>
             <span className={styles.barSpacer} />
-            <Button size="sm" variant="ghost" onClick={() => globalThis.print()}>
-              Imprimir
-            </Button>
+            {/* Imprimir la hoja de ruta es cosa del mostrador: en el celular
+                no se ofrece. */}
+            <span className="ui-only-wide">
+              <Button size="sm" variant="ghost" onClick={() => globalThis.print()}>
+                Imprimir
+              </Button>
+            </span>
+            {/* En el celular queda el candado solo: con Lista y los tres
+                rangos, la palabra empujaba el botón a una tercera fila. */}
             <Button
               size="sm"
+              icon="candado"
+              aria-label="Bloquear"
               disabled={readOnly}
               onClick={() => {
                 setFormError(null);
                 setPanel({ kind: "block", date: dates[0], providerId: ownProviderId });
               }}
             >
-              Bloquear
+              <span className="ui-text-wide">Bloquear</span>
             </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={readOnly || data.providers.length === 0}
-              onClick={() =>
-                onPickSlot({
-                  providerId: data.providers[0]?.id ?? 0,
-                  // Con varios días a la vista, la cita nueva arranca hoy si hoy
-                  // está entre ellos: en Semana, el lunes casi nunca es el día.
-                  date: dates.includes(today) ? today : dates[0],
-                  minute: window_.startMinute,
-                })
-              }
-            >
-              Nueva cita
-            </Button>
+            <span className="ui-only-wide">
+              <Button
+                size="sm"
+                variant="primary"
+                icon="mas-signo"
+                disabled={readOnly || data.providers.length === 0}
+                onClick={newAppointment}
+              >
+                Nueva cita
+              </Button>
+            </span>
           </>
         }
       />
+
+      {/* En el celular, la acción principal flota donde llega el pulgar. */}
+      <button
+        type="button"
+        className="ui-fab"
+        disabled={readOnly || data.providers.length === 0}
+        onClick={newAppointment}
+      >
+        <Icon name="mas-signo" size={20} />
+        Nueva cita
+      </button>
 
       <Notices
         failure={failure}

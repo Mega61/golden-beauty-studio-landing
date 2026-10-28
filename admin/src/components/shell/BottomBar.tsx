@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { salir } from "@/app/(auth)/entrar/actions";
 import { Icon } from "../ui/Icon";
+import { FormPendingIcon } from "../ui/SubmitButton";
 import { Panel } from "../ui/Panel";
 import { activeDestinationId, bottomBarFor, overflowFor, type Role } from "./nav";
 
@@ -122,7 +123,7 @@ export function BottomBar({ role }: { role: Role }) {
                 data-interactive="true"
                 style={{ width: "100%", border: 0, background: "none", font: "inherit", textAlign: "left", cursor: "pointer" }}
               >
-                <Icon name="salir" size={20} style={{ flex: "none" }} />
+                <FormPendingIcon name="salir" />
                 <span className="ui-list__body">
                   <span className="ui-list__primary">Cerrar sesión</span>
                 </span>

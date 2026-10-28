@@ -3,6 +3,7 @@
 export { AppShell } from "./AppShell";
 export { PanelFrame } from "./PanelFrame";
 export { ScreenSkeleton } from "./ScreenSkeleton";
+export { TopbarBack } from "./TopbarBack";
 export { SideNav } from "./SideNav";
 export { BottomBar } from "./BottomBar";
 export { Wordmark } from "./Wordmark";

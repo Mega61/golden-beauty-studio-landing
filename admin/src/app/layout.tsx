@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
+import { ConfirmProvider } from "@/components/ui/Confirm";
 import { ToastProvider } from "@/components/ui/Toast";
 
 /**
@@ -75,7 +76,9 @@ export default function RootLayout({
         {/* El proveedor de toasts envuelve todo y vive fuera de `<main>`: si la
             región `aria-live` se desmontara al navegar, el anuncio se perdería
             justo cuando importa. */}
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </ToastProvider>
         <ServiceWorkerRegistrar />
       </body>
     </html>

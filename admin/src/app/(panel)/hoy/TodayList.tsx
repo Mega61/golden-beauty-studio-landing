@@ -10,7 +10,7 @@ import {
   StatusPill,
   WaSentLabels,
   formatCOP,
-  formatTimeRange,
+  formatTime,
   useToast,
 } from "@/components/ui";
 import { WhatsAppLink } from "@/components/ui/WhatsAppLink";
@@ -35,6 +35,7 @@ import { mapEaStatus } from "@/components/calendar/status-map";
 import { AttendanceControl } from "./AttendanceControl";
 import { canConfirm, type AttendanceMark } from "@/lib/attendance";
 import type { ComboComposition } from "@/lib/combos";
+import styles from "./hoy.module.css";
 
 /**
  * La lista del día y la orquestación de la cuenta.
@@ -245,21 +246,8 @@ export function TodayList({
   return (
     <div style={{ display: "grid", gap: "0.75rem" }}>
       {pendientes > 0 ? (
-        <div
-          role="status"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.625rem 0.75rem",
-            borderRadius: "var(--radius-md)",
-            background: "var(--color-warn-tint)",
-            border: "1px solid var(--color-warn-line)",
-            color: "var(--color-warn-ink)",
-            fontSize: "var(--text-xs)",
-          }}
-        >
-          <Icon name="alerta" size={16} style={{ flex: "none" }} />
+        <div role="status" className="ui-callout ui-callout--warn">
+          <Icon name="alerta" size={18} />
           <span style={{ flex: 1 }}>
             {pendientes === 1
               ? "1 cuenta pendiente de sincronizar."
@@ -346,150 +334,96 @@ function AppointmentCard({
   const congelada = finance.frozenByDayClose && !canFixAfterClose;
 
   return (
-    <article
-      className="ui-card"
-      style={{ display: "grid", gap: "0.625rem", padding: "0.875rem" }}
-    >
-      <header style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            className="ui-num"
-            style={{
-              margin: 0,
-              fontSize: "var(--text-2xs)",
-              color: "var(--color-ink-soft)",
-            }}
-          >
-            {formatTimeRange(appointment.start, appointment.end)} · {appointment.providerName}
-          </p>
-          <h3
-            style={{
-              margin: 0,
-              fontSize: "var(--text-md)",
-              fontWeight: 600,
-              color: "var(--color-carbon)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {appointment.customerName}
-          </h3>
-          <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
-            {appointment.bookedServiceName}
-          </p>
-          <WaSentLabels labels={appointment.waSent} />
-          {/* Para avisar que la técnica se atrasó o preguntar si ya viene,
-              sin salir de Hoy a buscar el número. */}
-          {appointment.customerPhone ? (
-            <div style={{ marginTop: "0.375rem" }}>
-              <WhatsAppLink
-                phone={appointment.customerPhone}
-                customerName={appointment.customerName}
-              />
-            </div>
-          ) : null}
-        </div>
+    <article className={`ui-card ${styles.card}`} data-closed={cerrada ? "true" : undefined}>
+      {/* La hora manda: es lo que se busca primero en la lista del día, así
+          que va arriba, grande y en cifras tabulares. El estado de la cita, a
+          su lado; el de la cuenta, abajo con las acciones. */}
+      <header className={styles.head}>
+        <p className={`ui-num ${styles.time}`}>
+          {formatTime(appointment.start)}
+          <span className={styles.until}>hasta {formatTime(appointment.end)}</span>
+        </p>
         {appointment.status === "" ? null : (
           <StatusPill status={mapEaStatus(appointment.status)} size="sm" />
         )}
       </header>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "0.5rem",
-          minHeight: "1.5rem",
-        }}
-      >
+      <div className={styles.who}>
+        <div className={styles.whoText}>
+          <h3 className={styles.name}>{appointment.customerName}</h3>
+          <p className={styles.service}>
+            {appointment.bookedServiceName}
+            <span aria-hidden> · </span>
+            {appointment.providerName}
+          </p>
+          <WaSentLabels labels={appointment.waSent} />
+        </div>
+        {/* Para avisar que la técnica se atrasó o preguntar si ya viene, sin
+            salir de Hoy a buscar el número. En su ícono: el número ya lo
+            tiene la ficha, y acá ocupaba una fila entera. */}
+        {appointment.customerPhone ? (
+          <WhatsAppLink
+            phone={appointment.customerPhone}
+            customerName={appointment.customerName}
+            showNumber={false}
+            withCall
+          />
+        ) : null}
+      </div>
+
+      <div className={styles.account}>
         {pending !== null ? (
           <>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.3125rem",
-                padding: "0.125rem 0.4375rem",
-                borderRadius: "999px",
-                background: "var(--color-warn-tint)",
-                border: "1px solid var(--color-warn-line)",
-                color: "var(--color-warn-ink)",
-                fontSize: "var(--text-2xs)",
-                fontWeight: 600,
-              }}
-            >
-              <span
-                aria-hidden
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: "var(--color-warn-ink)",
-                }}
-              />
+            <span className={`${styles.chip} ${styles.chipWarn}`}>
+              <span aria-hidden className={styles.chipDot} />
               pendiente de sincronizar
             </span>
-            <Button variant="ghost" icon="deshacer" onClick={onRetry}>
+            <Button variant="ghost" size="sm" icon="deshacer" onClick={onRetry}>
               Reintentar
             </Button>
           </>
         ) : cerrada ? (
           <>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.3125rem",
-                fontSize: "var(--text-2xs)",
-                fontWeight: 600,
-                color: "var(--color-st-completada-ink)",
-              }}
-            >
+            <span className={`${styles.chip} ${styles.chipOk}`}>
               <Icon name="check" size={14} /> cuenta cerrada
             </span>
             {finance.houseCourtesy ? (
-              <span style={{ fontSize: "var(--text-2xs)", fontWeight: 600, color: "var(--color-info-ink)" }}>
-                cortesía de la casa
-              </span>
+              <span className={`${styles.chip} ${styles.chipInfo}`}>cortesía de la casa</span>
             ) : canSeeTotals && finance.amountCharged !== null ? (
-              <span className="ui-num" style={{ fontWeight: 600 }}>
-                {formatCOP(finance.amountCharged)}
-              </span>
+              <span className={`ui-num ${styles.amount}`}>{formatCOP(finance.amountCharged)}</span>
             ) : null}
             {cambio ? <CambioTag /> : null}
           </>
         ) : (
-          <span style={{ fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
-            sin cuenta
-          </span>
+          <span className={styles.chip}>sin cuenta</span>
         )}
       </div>
 
-      <AttendanceControl
-        eaAppointmentId={appointment.eaAppointmentId}
-        start={appointment.start}
-        status={appointment.status}
-        closed={cerrada}
-        readOnly={readOnly}
-        onMarked={onAttendance}
-      />
+      <div className={styles.actions}>
+        <AttendanceControl
+          eaAppointmentId={appointment.eaAppointmentId}
+          start={appointment.start}
+          status={appointment.status}
+          closed={cerrada}
+          readOnly={readOnly}
+          onMarked={onAttendance}
+        />
 
-      <Button
-        // Mientras la cita esté por confirmar, el botón principal es
-        // "Confirmar cita": dos dorados en la misma tarjeta no dicen cuál va.
-        variant={
-          cerrada || pending !== null || canConfirm(appointment.status, cerrada)
-            ? "secondary"
-            : "primary"
-        }
-        block
-        onClick={onOpen}
-        icon={cerrada ? undefined : "caja"}
-      >
-        {readOnly || congelada ? "Ver cuenta" : cerrada ? "Editar cuenta" : "Cerrar servicio"}
-      </Button>
+        <Button
+          // Mientras la cita esté por confirmar, el botón principal es
+          // "Confirmar cita": dos dorados en la misma tarjeta no dicen cuál va.
+          variant={
+            cerrada || pending !== null || canConfirm(appointment.status, cerrada)
+              ? "secondary"
+              : "primary"
+          }
+          block
+          onClick={onOpen}
+          icon={cerrada ? undefined : "caja"}
+        >
+          {readOnly || congelada ? "Ver cuenta" : cerrada ? "Editar cuenta" : "Cerrar servicio"}
+        </Button>
+      </div>
     </article>
   );
 }

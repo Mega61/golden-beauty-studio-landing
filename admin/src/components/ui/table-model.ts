@@ -17,8 +17,10 @@
  *   usuaria buscaría para identificar la fila.
  * - `md` — desde 768 px (tabla con columnas prioritarias).
  * - `lg` — desde 1024 px (la tabla completa).
+ * - `lista` — nunca en la tabla: solo existe en la lista del celular (el
+ *   botón de WhatsApp en su ícono, cuando la tabla ya lo muestra con número).
  */
-export type ColumnFrom = "siempre" | "md" | "lg";
+export type ColumnFrom = "siempre" | "md" | "lg" | "lista";
 
 /** Qué papel juega la columna cuando la tabla se vuelve lista. */
 export type ListSlot = "primary" | "secondary" | "trailing" | "oculto";
@@ -47,7 +49,7 @@ export type Column<Row> = {
 
 export type Breakpoint = "sm" | "md" | "lg";
 
-const RANK: Record<ColumnFrom, number> = { siempre: 0, md: 1, lg: 2 };
+const RANK: Record<ColumnFrom, number> = { siempre: 0, md: 1, lg: 2, lista: 99 };
 const AT: Record<Breakpoint, number> = { sm: 0, md: 1, lg: 2 };
 
 /**

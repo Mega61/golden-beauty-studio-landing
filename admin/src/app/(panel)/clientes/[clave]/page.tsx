@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { EmptyState, ReadOnlyBand } from "@/components/ui";
-import { AppShell } from "@/components/shell";
+import { AppShell, TopbarBack } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
@@ -53,7 +53,7 @@ export default async function ClientaPage({
     // porque el panel le dijo que no estaba.
     if (result.failure) {
       return (
-        <AppShell role={navRole(session.role)} title="Clientes">
+        <AppShell role={navRole(session.role)} title="Clientes" back={<TopbarBack href="/clientes" label="Clientes" />}>
           <div style={{ display: "grid", gap: "0.75rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
             <ReadOnlyBand
               reason={result.failure.message}
@@ -72,7 +72,7 @@ export default async function ClientaPage({
   }
 
   return (
-    <AppShell role={navRole(session.role)} title="Clientes">
+    <AppShell role={navRole(session.role)} title="Clientes" back={<TopbarBack href="/clientes" label="Clientes" />}>
       <FichaClienta profile={result.profile} canGiveCourtesy={canGiveCourtesy} />
     </AppShell>
   );

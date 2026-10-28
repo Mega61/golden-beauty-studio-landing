@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Logotipo } from "@/components/shell/Wordmark";
 
-import { Button } from "@/components/ui";
+import { SubmitButton } from "@/components/ui";
 import { listTotpLoginCandidates, type TotpLoginCandidate } from "@/lib/auth";
 import { verifySession } from "@/lib/dal";
 import { DEV_LOGIN_ACCOUNTS, devLoginEnabled } from "@/lib/test-accounts";
@@ -119,9 +119,9 @@ export default async function EntrarPage({
             {(Object.keys(DEV_LOGIN_ACCOUNTS) as (keyof typeof DEV_LOGIN_ACCOUNTS)[]).map((role) => (
               <form key={role} action={entrarComoDev}>
                 <input type="hidden" name="role" value={role} />
-                <Button type="submit" variant="secondary" block>
+                <SubmitButton variant="secondary" block>
                   {DEV_LOGIN_ACCOUNTS[role].label}
-                </Button>
+                </SubmitButton>
               </form>
             ))}
           </div>
@@ -129,9 +129,9 @@ export default async function EntrarPage({
       ) : null}
 
       <form action={entrarConWorkspace}>
-        <Button type="submit" variant="primary" block>
+        <SubmitButton variant="primary" block>
           Entrar con la cuenta del estudio
-        </Button>
+        </SubmitButton>
       </form>
 
       {equipo.length > 0 ? (

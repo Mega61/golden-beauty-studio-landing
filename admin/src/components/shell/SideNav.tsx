@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { salir } from "@/app/(auth)/entrar/actions";
 import { Icon } from "../ui/Icon";
+import { FormPendingIcon } from "../ui/SubmitButton";
 import { Wordmark } from "./Wordmark";
 import { activeDestinationId, destinationsFor, type Role } from "./nav";
 
@@ -89,7 +90,7 @@ export function SideNav({ role, eaUrl }: { role: Role; eaUrl?: string | null }) 
           title="Cerrar sesión"
           aria-label="Cerrar sesión"
         >
-          <Icon name="salir" size={20} className="ui-nav__icon" />
+          <FormPendingIcon name="salir" className="ui-nav__icon" />
           <span className="ui-nav__label">Cerrar sesión</span>
         </button>
       </form>
