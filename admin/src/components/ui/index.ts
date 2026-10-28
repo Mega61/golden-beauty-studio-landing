@@ -33,6 +33,7 @@ export {
   TextArea,
   Select,
   Checkbox,
+  Switch,
   FormErrorSummary,
 } from "./Field";
 export { MoneyInput } from "./MoneyInput";

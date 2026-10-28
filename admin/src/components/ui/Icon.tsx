@@ -36,6 +36,7 @@ export type IconName =
   | "alerta"
   | "info"
   | "deshacer"
+  | "actualizar"
   | "candado"
   | "reloj"
   | "mensaje"
@@ -150,6 +151,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M4 9h9.5a5.5 5.5 0 0 1 0 11H8" />
       <path d="M7.5 5 3.5 9l4 4" />
+    </>
+  ),
+  actualizar: (
+    <>
+      <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+      <path d="M19.8 4.2v3.6h-3.6" />
     </>
   ),
   candado: (

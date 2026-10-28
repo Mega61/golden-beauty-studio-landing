@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 
-import { Button, Checkbox, Field } from "@/components/ui";
+import { Button, Switch, Field } from "@/components/ui";
 
 import {
   crearClienta,
@@ -323,7 +323,7 @@ export function CortesiaPorDefecto({
 
   return (
     <div style={{ display: "grid", gap: "0.125rem" }}>
-      <Checkbox
+      <Switch
         label="Cortesía de la casa por defecto"
         hint="Sus cuentas llegan marcadas como cortesía: no se cobran y la profesional cobra su comisión sobre el precio de lista. Se puede desmarcar en cada cuenta."
         checked={valor}

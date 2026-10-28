@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { SideNav } from "./SideNav";
 import { BottomBar } from "./BottomBar";
+import { PullToRefresh } from "./PullToRefresh";
 import type { Role } from "./nav";
 
 /**
@@ -46,6 +47,7 @@ export function PanelFrame({ role, children }: { role: Role; children: ReactNode
       <SideNav role={role} eaUrl={eaPublicUrl()} />
       {children}
       <BottomBar role={role} />
+      <PullToRefresh />
     </div>
   );
 }

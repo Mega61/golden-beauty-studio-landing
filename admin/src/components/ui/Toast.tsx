@@ -85,6 +85,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toast = useCallback((t: ToastInput) => {
     const id = ++seq.current;
+    haptic(t.tone);
     // Tres a la vez es el techo: más que eso tapa la barra inferior en un
     // celular y el cuarto mensaje entierra al primero antes de que se lea.
     setItems((xs) => [...xs.slice(-2), { ...t, id }]);
@@ -111,6 +112,21 @@ export function useToast(): ToastApi {
     throw new Error("useToast necesita un <ToastProvider> arriba en el árbol.");
   }
   return ctx;
+}
+
+/**
+ * Un toque en la mano cuando algo se guardó o falló, como las apps del
+ * sistema. Corto para lo que salió bien, doble para el error. Solo donde el
+ * navegador lo deja (Android); en iPhone `vibrate` no existe y no pasa nada.
+ * Los avisos neutros y de advertencia no vibran: si todo vibra, nada avisa.
+ */
+function haptic(tone: ToastTone | undefined) {
+  if (tone !== "ok" && tone !== "error") return;
+  try {
+    navigator.vibrate?.(tone === "ok" ? 10 : [18, 60, 18]);
+  } catch {
+    // Un navegador que lo bloquea (iframe, permisos) no rompe el aviso.
+  }
 }
 
 const DEFAULT_MS = 5000;

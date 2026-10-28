@@ -242,6 +242,9 @@
   }
 
   html {
+    /* Un solo "tirar para actualizar": el del panel (`PullToRefresh`), que
+       existe también en la app instalada, donde el del navegador no. */
+    overscroll-behavior-y: none;
     /* El destello gris de Android al tocar se reemplaza por el `:active` de
        cada control, que sí tiene la forma del control. */
     -webkit-tap-highlight-color: transparent;
@@ -1071,6 +1074,82 @@
   .ui-check[data-disabled="true"] {
     cursor: not-allowed;
     color: var(--color-ink-soft);
+  }
+
+  /* Interruptor (`Switch`): la fila entera es el área táctil, el texto a la
+     izquierda y la llave a la derecha. La perilla se desliza con la curva de
+     énfasis y el carril se tiñe de dorado al encender. */
+  .ui-switchrow {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    min-height: var(--hit);
+    padding-block: 0.5rem;
+    cursor: pointer;
+  }
+  .ui-switchrow[data-disabled="true"] {
+    cursor: not-allowed;
+    color: var(--color-ink-soft);
+  }
+  .ui-switchrow__text {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 0.125rem;
+  }
+  .ui-switchrow__label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-carbon);
+  }
+  .ui-switch {
+    appearance: none;
+    flex: none;
+    position: relative;
+    width: 3rem;
+    height: 1.75rem;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--color-ivory-deep);
+    box-shadow: inset 0 0 0 1px var(--hair-strong);
+    cursor: inherit;
+    transition:
+      background-color var(--dur-2) var(--ease-out),
+      box-shadow var(--dur-2) var(--ease-out);
+  }
+  .ui-switch::before {
+    content: "";
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 999px;
+    background: var(--color-white);
+    box-shadow:
+      0 1px 2px rgba(28, 23, 20, 0.18),
+      0 2px 6px rgba(28, 23, 20, 0.12);
+    transition: transform var(--dur-3) var(--ease-emphasis), width var(--dur-1) var(--ease-out);
+  }
+  .ui-switch:checked {
+    background: var(--color-gold-dark);
+    box-shadow: inset 0 0 0 1px var(--color-gold-dark);
+  }
+  .ui-switch:checked::before {
+    transform: translateX(1.25rem);
+  }
+  .ui-switchrow:active .ui-switch:not(:disabled)::before {
+    width: 1.625rem;
+  }
+  .ui-switchrow:active .ui-switch:checked:not(:disabled)::before {
+    transform: translateX(1rem);
+  }
+  .ui-switch:disabled {
+    opacity: 0.55;
+  }
+  .ui-switch:focus-visible {
+    outline: 2px solid var(--color-gold-dark);
+    outline-offset: 2px;
   }
 
   /* Resumen de errores al enviar un formulario largo. Recibe el foco al
@@ -2310,6 +2389,54 @@
     .ui-only-wide {
       display: contents;
     }
+  }
+
+  /* --- Tirar para actualizar (`PullToRefresh`) ------------------------
+     Una ficha redonda que baja desde debajo de la toolbar siguiendo al dedo,
+     con la flecha girando a la par; dorada cuando ya se puede soltar, y con
+     el spinner mientras el servidor contesta. */
+  .ui-ptr {
+    position: fixed;
+    z-index: 19;
+    top: var(--topbar-h);
+    left: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-left: -1.25rem;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(calc(var(--ptr, 0px) - 2.75rem));
+    transition:
+      transform var(--dur-3) var(--ease-emphasis),
+      opacity var(--dur-2) var(--ease-out);
+  }
+  .ui-ptr[data-shown="true"] {
+    opacity: 1;
+  }
+  /* Mientras el dedo tira, sin transición: la ficha va pegada al dedo. */
+  .ui-ptr[data-shown="true"]:not([data-refreshing="true"]) {
+    transition: opacity var(--dur-2) var(--ease-out);
+  }
+  .ui-ptr__puck {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-paper);
+    color: var(--color-ink-soft);
+    box-shadow: var(--shadow-pop);
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      color var(--dur-1) var(--ease-out);
+  }
+  .ui-ptr__puck > svg {
+    transform: rotate(var(--ptr-turn, 0deg));
+  }
+  .ui-ptr[data-ready="true"] .ui-ptr__puck,
+  .ui-ptr[data-refreshing="true"] .ui-ptr__puck {
+    background: var(--color-gold-dark);
+    color: var(--color-white);
   }
 
   /* --- Paso de fecha (`DateStepper`) ------------------------------------

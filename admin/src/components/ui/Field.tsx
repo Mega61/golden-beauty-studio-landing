@@ -145,6 +145,36 @@ export function Select({
 }
 
 /**
+ * Interruptor: una casilla con forma de llave de luz, para un ajuste que se
+ * aplica **en el acto** (avisos en este dispositivo, cortesía por defecto).
+ *
+ * La diferencia con `Checkbox` no es de estilo sino de contrato: una casilla
+ * es parte de un formulario que se guarda después; un interruptor ya hizo lo
+ * que dice al tocarlo. Por eso el texto va a la izquierda y la llave a la
+ * derecha, como en los ajustes del teléfono, y el control anuncia
+ * `role="switch"` (encendido / apagado, no marcado / sin marcar).
+ */
+export function Switch({
+  label,
+  hint,
+  disabled,
+  ...rest
+}: { label: ReactNode; hint?: string } & Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type" | "className" | "role"
+>) {
+  return (
+    <label className="ui-switchrow" data-disabled={disabled ? "true" : undefined}>
+      <span className="ui-switchrow__text">
+        <span className="ui-switchrow__label">{label}</span>
+        {hint ? <span className="ui-hint">{hint}</span> : null}
+      </span>
+      <input type="checkbox" role="switch" className="ui-switch" disabled={disabled} {...rest} />
+    </label>
+  );
+}
+
+/**
  * Casilla. Su etiqueta envuelve al control, así que el área táctil es toda la
  * fila y no solo el cuadrito de 18 px.
  */

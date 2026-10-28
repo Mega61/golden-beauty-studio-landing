@@ -69,6 +69,7 @@ export function EquipoVista({
             rows={view.members}
             rowKey={(row) => String(row.provider.id)}
             caption="Profesionales de la agenda"
+            listChevron
             empty={
               <EmptyState
                 icon="equipo"
