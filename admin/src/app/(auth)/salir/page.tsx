@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Button, ButtonLink } from "@/components/ui";
+import { ButtonLink, SubmitButton } from "@/components/ui";
 import { verifySession } from "@/lib/dal";
 import { salir } from "../entrar/actions";
 
@@ -42,9 +42,9 @@ export default async function SalirPage() {
             Estás entrada como <strong>{session.name}</strong> ({session.email}).
           </p>
           <form action={salir} style={{ display: "grid", gap: "0.5rem" }}>
-            <Button type="submit" variant="danger" block>
+            <SubmitButton variant="danger" block>
               Cerrar sesión
-            </Button>
+            </SubmitButton>
             <ButtonLink href="/" variant="ghost" block>
               Volver al panel
             </ButtonLink>

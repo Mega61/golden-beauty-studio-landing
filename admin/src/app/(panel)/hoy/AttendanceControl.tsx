@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore, useTransition } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { useConfirm } from "@/components/ui/Confirm";
 import { useToast } from "@/components/ui/Toast";
 import {
   attendanceView,
@@ -184,6 +185,7 @@ function MarcarAsistencia({
   pending: boolean;
   run: (mark: AttendanceMark) => void;
 }) {
+  const confirm = useConfirm();
   return (
     <div style={rowStyle} role="group" aria-label="¿Llegó la clienta?">
       <Button
@@ -195,18 +197,20 @@ function MarcarAsistencia({
       >
         Llegó
       </Button>
+      {/* Los dos con forma de botón: uno fantasma al lado de uno con borde se
+          leía como "una opción y un comentario", no como dos respuestas. */}
       <Button
-        variant="ghost"
+        variant="secondary"
+        icon="cerrar"
         disabled={pending}
-        onClick={() => {
-          if (
-            !globalThis.confirm(
-              "¿Marcar que la clienta no asistió? Cuenta en la inasistencia del estudio.",
-            )
-          ) {
-            return;
-          }
-          run("no-asistio");
+        onClick={async () => {
+          const ok = await confirm({
+            title: "¿Marcar que no asistió?",
+            body: "Cuenta en la inasistencia del estudio. Se puede deshacer desde esta misma tarjeta.",
+            confirmLabel: "No asistió",
+            tone: "danger",
+          });
+          if (ok) run("no-asistio");
         }}
         style={{ flex: 1, color: "var(--color-st-no-asistio-ink)" }}
       >

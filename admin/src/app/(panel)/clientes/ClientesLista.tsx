@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   DataTable,
   EmptyState,
+  Icon,
   ReadOnlyBand,
   formatPhoneCO,
   type Column,
@@ -93,6 +94,7 @@ export function ClientesLista({
           rowKey={(row) => keyOf(row)}
           caption="Clientes"
           empty={emptyFor(result)}
+          listChevron
         />
       </div>
 
@@ -100,7 +102,8 @@ export function ClientesLista({
         <nav className={styles.pager} aria-label="Páginas de clientes">
           {result.page > 1 ? (
             <Link className="ui-btn ui-btn--secondary ui-btn--sm" href={pageHref(result.page - 1)}>
-              ← Anteriores
+              <Icon name="chevron-izq" size={16} />
+              Anteriores
             </Link>
           ) : (
             <span />
@@ -111,7 +114,8 @@ export function ClientesLista({
           </span>
           {result.hasNext ? (
             <Link className="ui-btn ui-btn--secondary ui-btn--sm" href={pageHref(result.page + 1)}>
-              Siguientes →
+              Siguientes
+              <Icon name="chevron-der" size={16} />
             </Link>
           ) : (
             <span />
@@ -148,12 +152,33 @@ function clientColumns(): Array<Column<ResolvedClient>> {
       ),
     },
     {
+      // En el celular el número va en la segunda línea, como texto, y el
+      // botón de WhatsApp queda en su ícono a la derecha (`wa`): con el número
+      // adentro, el botón se comía media fila y el nombre —que es lo que se
+      // busca— quedaba apretado contra el borde.
+      key: "telefono-lista",
+      header: "Teléfono",
+      from: "lista",
+      listSlot: "secondary",
+      text: (row) => (row.phone ? formatPhoneCO(row.phone) : "Sin teléfono"),
+      render: (row) => (row.phone ? formatPhoneCO(row.phone) : "Sin teléfono"),
+    },
+    {
+      key: "wa",
+      header: "WhatsApp",
+      from: "lista",
+      listSlot: "trailing",
+      render: (row) =>
+        row.phone ? (
+          <WhatsAppLink phone={row.phone} customerName={row.name} showNumber={false} />
+        ) : null,
+    },
+    {
       key: "telefono",
       header: "Teléfono",
       from: "md",
-      // A la derecha y no en la segunda línea: la segunda línea es texto, y
-      // el teléfono acá es el botón para escribirle por WhatsApp.
-      listSlot: "trailing",
+      // En la tabla, el teléfono es el botón para escribirle por WhatsApp.
+      listSlot: "oculto",
       text: (row) => (row.phone ? formatPhoneCO(row.phone) : "Sin teléfono"),
       render: (row) =>
         row.phone ? (

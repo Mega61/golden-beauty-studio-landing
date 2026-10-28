@@ -33,6 +33,10 @@ import { Icon, type IconName } from "./Icon";
  * **pausa** con el puntero encima o con el foco dentro: un toast con Deshacer
  * que se va mientras alguien lo está tabulando es una acción destruida por el
  * reloj.
+ *
+ * Se va con movimiento: baja y se apaga en 160 ms antes de desmontarse, y se
+ * puede **deslizar de lado** para descartarlo, como una notificación del
+ * sistema. Deslizar no es Deshacer: solo lo quita de la vista.
  */
 
 export type ToastTone = "neutral" | "ok" | "warn" | "error";
@@ -81,6 +85,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toast = useCallback((t: ToastInput) => {
     const id = ++seq.current;
+    haptic(t.tone);
     // Tres a la vez es el techo: más que eso tapa la barra inferior en un
     // celular y el cuarto mensaje entierra al primero antes de que se lea.
     setItems((xs) => [...xs.slice(-2), { ...t, id }]);
@@ -109,19 +114,46 @@ export function useToast(): ToastApi {
   return ctx;
 }
 
+/**
+ * Un toque en la mano cuando algo se guardó o falló, como las apps del
+ * sistema. Corto para lo que salió bien, doble para el error. Solo donde el
+ * navegador lo deja (Android); en iPhone `vibrate` no existe y no pasa nada.
+ * Los avisos neutros y de advertencia no vibran: si todo vibra, nada avisa.
+ */
+function haptic(tone: ToastTone | undefined) {
+  if (tone !== "ok" && tone !== "error") return;
+  try {
+    navigator.vibrate?.(tone === "ok" ? 10 : [18, 60, 18]);
+  } catch {
+    // Un navegador que lo bloquea (iframe, permisos) no rompe el aviso.
+  }
+}
+
 const DEFAULT_MS = 5000;
 /** Con Deshacer se da más aire: hay que leer, decidir y apuntar al botón. */
 const UNDO_MS = 9000;
 
+/** Lo que dura la salida en CSS (`.ui-toast[data-leaving]`). */
+const LEAVE_MS = 160;
+
 function ToastRow({
   item,
-  onDismiss,
+  onDismiss: remove,
 }: {
   item: ToastItem;
   onDismiss: () => void;
 }) {
   const [paused, setPaused] = useState(false);
   const [undone, setUndone] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const swipe = useRef<{ id: number; x0: number; dx: number } | null>(null);
+
+  // Primero la salida, después el desmontaje. Sin esto el aviso se esfumaba
+  // en el acto y no quedaba claro si se fue o si nunca estuvo.
+  const onDismiss = useCallback(() => {
+    setLeaving(true);
+    window.setTimeout(remove, LEAVE_MS);
+  }, [remove]);
   const duration =
     item.duration ?? (item.undo ? UNDO_MS : item.tone === "error" ? 0 : DEFAULT_MS);
 
@@ -136,6 +168,46 @@ function ToastRow({
   return (
     <div
       className={`ui-toast${tone === "neutral" ? "" : ` ui-toast--${tone}`}`}
+      data-leaving={leaving ? "true" : undefined}
+      onPointerDown={(e) => {
+        if (e.pointerType === "mouse") return;
+        if ((e.target as HTMLElement).closest("button")) return;
+        swipe.current = { id: e.pointerId, x0: e.clientX, dx: 0 };
+        e.currentTarget.setPointerCapture(e.pointerId);
+        e.currentTarget.dataset.swiping = "true";
+        setPaused(true);
+      }}
+      onPointerMove={(e) => {
+        const s = swipe.current;
+        if (!s || s.id !== e.pointerId) return;
+        s.dx = e.clientX - s.x0;
+        e.currentTarget.style.setProperty("--swipe", `${s.dx}px`);
+        e.currentTarget.style.opacity = String(Math.max(0.2, 1 - Math.abs(s.dx) / 220));
+      }}
+      onPointerUp={(e) => {
+        const s = swipe.current;
+        if (!s || s.id !== e.pointerId) return;
+        swipe.current = null;
+        const node = e.currentTarget;
+        delete node.dataset.swiping;
+        node.style.opacity = "";
+        setPaused(false);
+        if (Math.abs(s.dx) > 80) {
+          // Sigue hacia el lado del dedo en vez de caer.
+          node.style.setProperty("--swipe", `${Math.sign(s.dx) * 120}%`);
+          node.style.setProperty("--leave-y", "0px");
+          onDismiss();
+        } else {
+          node.style.removeProperty("--swipe");
+        }
+      }}
+      onPointerCancel={(e) => {
+        swipe.current = null;
+        delete e.currentTarget.dataset.swiping;
+        e.currentTarget.style.removeProperty("--swipe");
+        e.currentTarget.style.opacity = "";
+        setPaused(false);
+      }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}

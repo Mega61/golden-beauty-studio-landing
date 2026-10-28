@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import {
   Card,
   CardHead,
@@ -46,10 +44,6 @@ export function FichaClienta({
           detailsHref={failure.transient ? undefined : "/diagnostico"}
         />
       ) : null}
-
-      <p style={{ margin: 0, fontSize: "var(--text-2xs)" }}>
-        <Link href="/clientes">← Clientes</Link>
-      </p>
 
       <Card padded={false}>
         <div style={{ padding: "1rem", display: "grid", gap: "0.75rem", gridTemplateColumns: "minmax(0, 1fr)" }}>

@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { DateStepper } from "@/components/ui/DateStepper";
+import { Icon } from "@/components/ui/Icon";
+
 import styles from "./charts.module.css";
 import {
   CADENCE_LABEL,
@@ -29,11 +32,12 @@ import {
  * `useRouter`, un estado que se desincroniza del historial, y un bundle para
  * hacer lo que un `<a>` hace solo.
  *
- * Y son `next/link` y no el `ButtonLink` del kit de A3: ese componente
- * renderiza un `<a>` pelado, y con `basePath: "/admin"` un `<a href="/reportes">`
- * apunta fuera del panel. `next/link` prefija el `basePath` solo — es la misma
- * razón por la que `SideNav` de A3 usa `Link`. Las clases del botón se aplican
- * igual, así que el gesto visual es el mismo.
+ * Son `next/link`: con `basePath: "/admin"` un `<a href="/reportes">` pelado
+ * apunta fuera del panel, y `Link` prefija el `basePath` solo.
+ *
+ * La cadencia es el control segmentado del kit (`.ui-seg`) y el periodo es el
+ * `DateStepper`, el mismo de Hoy y de Caja: moverse en el tiempo se ve igual en
+ * todo el panel, y las flechas hacen entrar el periodo nuevo desde su lado.
  *
  * ## Presets antes que un calendario
  *
@@ -55,48 +59,43 @@ export function PeriodFilter({
   const next = shiftPeriod(period, 1);
 
   return (
-    <nav aria-label="Periodo del reporte" className={styles.filters}>
-      <div className={styles.filterGroup} role="group" aria-label="Cadencia">
-        {CADENCES.map((cadence) => {
-          const active = cadence === period.cadence;
-          return (
-            <Link
-              aria-current={active ? "true" : undefined}
-              className={`ui-btn ui-btn--sm ${active ? "ui-btn--primary" : "ui-btn--ghost"}`}
-              href={periodHref({ ...period, cadence }, base)}
-              key={cadence}
-            >
-              {CADENCE_LABEL[cadence]}
-            </Link>
-          );
-        })}
-      </div>
+    <div className={styles.filters}>
+      <div className={styles.filterRow}>
+        <nav className="ui-seg" aria-label="Cadencia">
+          {CADENCES.map((cadence) => {
+            const active = cadence === period.cadence;
+            return (
+              <Link
+                aria-current={active ? "page" : undefined}
+                className="ui-seg__item"
+                href={periodHref({ ...period, cadence }, base)}
+                key={cadence}
+              >
+                {CADENCE_LABEL[cadence]}
+              </Link>
+            );
+          })}
+        </nav>
 
-      <div className={styles.filterGroup}>
-        <Link
-          aria-label={`Periodo anterior: ${previous.label}`}
-          className="ui-btn ui-btn--secondary ui-btn--sm"
-          href={periodHref(previous, base)}
-        >
-          ‹
-        </Link>
-        <span className={styles.periodLabel}>{period.label}</span>
-        <Link
-          aria-label={`Periodo siguiente: ${next.label}`}
-          className="ui-btn ui-btn--secondary ui-btn--sm"
-          href={periodHref(next, base)}
-        >
-          ›
+        <span className={styles.spacer} />
+
+        {/* Diagnóstico es la otra mitad de este paquete y es donde uno va
+            cuando un número de acá no cuadra. El enlace ahorra el viaje por el
+            menú. */}
+        <Link className="ui-btn ui-btn--ghost ui-btn--sm" href="/diagnostico">
+          <Icon name="diagnostico" size={16} />
+          Diagnóstico
         </Link>
       </div>
 
-      <span className={styles.spacer} />
-
-      {/* Diagnóstico es la otra mitad de este paquete y es donde uno va cuando
-          un número de acá no cuadra. El enlace ahorra el viaje por el menú. */}
-      <Link className="ui-btn ui-btn--ghost ui-btn--sm" href="/diagnostico">
-        Diagnóstico
-      </Link>
-    </nav>
+      <DateStepper
+        label={period.label}
+        prevHref={periodHref(previous, base)}
+        nextHref={periodHref(next, base)}
+        todayHref={null}
+        prevLabel={`Periodo anterior: ${previous.label}`}
+        nextLabel={`Periodo siguiente: ${next.label}`}
+      />
+    </div>
   );
 }

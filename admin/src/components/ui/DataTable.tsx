@@ -7,6 +7,7 @@ import {
 } from "./table-model";
 import { Skeleton } from "./Skeleton";
 import { EmptyState } from "./EmptyState";
+import { Icon } from "./Icon";
 
 /**
  * Tabla de datos que colapsa a lista de dos líneas.
@@ -40,6 +41,7 @@ export function DataTable<Row>({
   loading = false,
   loadingRows = 5,
   empty,
+  listChevron = false,
 }: {
   columns: ReadonlyArray<Column<Row>>;
   rows: ReadonlyArray<Row>;
@@ -54,6 +56,11 @@ export function DataTable<Row>({
   loadingRows?: number;
   /** El vacío enseña la interfaz. Sin esto se cae al genérico. */
   empty?: ReactNode;
+  /**
+   * En la lista del celular, un chevron al final de cada fila: "esto abre
+   * algo". Para las filas cuyo nombre es un enlace estirado a toda la fila.
+   */
+  listChevron?: boolean;
 }) {
   const md = visibleColumns(columns, "md");
   const lg = visibleColumns(columns, "lg");
@@ -111,6 +118,9 @@ export function DataTable<Row>({
                       </span>
                     ))}
                   </span>
+                ) : null}
+                {listChevron || interactive ? (
+                  <Icon name="chevron-der" size={18} className="ui-list__chev" />
                 ) : null}
               </RowShell>
             </li>

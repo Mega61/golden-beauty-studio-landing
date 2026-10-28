@@ -4,6 +4,7 @@ import {
   Card,
   CardHead,
   DataTable,
+  DateStepper,
   EmptyState,
   Icon,
   StatusPill,
@@ -107,40 +108,16 @@ export function CajaVista({ view }: { view: CajaView }) {
 function Fecha({ date, today }: { date: string; today: string }) {
   const anterior = shiftDate(date, -1);
   const siguiente = shiftDate(date, 1);
+  const isToday = date === today;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "baseline",
-        justifyContent: "space-between",
-        gap: "0.75rem",
-        flexWrap: "wrap",
-      }}
-    >
-      <p
-        style={{
-          margin: 0,
-          fontSize: "var(--text-2xs)",
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          color: "var(--color-ink-soft)",
-        }}
-      >
-        {formatDateLong(`${date} 00:00:00`)}
-        {date === today ? "" : " · día anterior"}
-      </p>
-      <nav
-        aria-label="Cambiar de día"
-        style={{ display: "flex", gap: "0.75rem", fontSize: "var(--text-2xs)" }}
-      >
-        <Link href={`/caja?fecha=${anterior}`}>← {anterior}</Link>
-        {date === today ? null : <Link href="/caja">Hoy</Link>}
-        {siguiente > today ? null : (
-          <Link href={`/caja?fecha=${siguiente}`}>{siguiente} →</Link>
-        )}
-      </nav>
-    </div>
+    <DateStepper
+      label={formatDateLong(`${date} 00:00:00`)}
+      sub={isToday ? "Hoy" : siguiente === today ? "Ayer" : "Día anterior"}
+      prevHref={`/caja?fecha=${anterior}`}
+      nextHref={isToday ? null : siguiente === today ? "/caja" : `/caja?fecha=${siguiente}`}
+      todayHref={isToday ? null : "/caja"}
+    />
   );
 }
 

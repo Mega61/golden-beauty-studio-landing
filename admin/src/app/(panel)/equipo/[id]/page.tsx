@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui";
-import { AppShell } from "@/components/shell";
+import { AppShell, TopbarBack } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
@@ -40,7 +40,7 @@ export default async function ProfesionalPage({
     // La agenda caída no es un 404: decir "no existe" haría que alguien creara
     // de nuevo una profesional que sí está.
     return (
-      <AppShell role={navRole(session.role)} title="Equipo">
+      <AppShell role={navRole(session.role)} title="Equipo" back={<TopbarBack href="/equipo" label="Equipo" />}>
         <EmptyState
           icon="alerta"
           title="No se pudo abrir la ficha"
@@ -53,7 +53,7 @@ export default async function ProfesionalPage({
   if (detail === null) notFound();
 
   return (
-    <AppShell role={navRole(session.role)} title="Equipo">
+    <AppShell role={navRole(session.role)} title="Equipo" back={<TopbarBack href="/equipo" label="Equipo" />}>
       <FichaProfesional detail={detail} puedeAdministrar={puedeAdministrar} />
     </AppShell>
   );

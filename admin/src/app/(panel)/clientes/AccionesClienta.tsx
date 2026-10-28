@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useState } from "react";
 
-import { Button, Checkbox, Field } from "@/components/ui";
+import { Button, Switch, Field, useToast } from "@/components/ui";
 
 import {
   crearClienta,
@@ -162,10 +162,19 @@ function valoresDe(formData: FormData): ValoresClienta {
 /** Alta de una clienta que entró caminando. Plegado hasta que se necesita. */
 export function NuevaClienta() {
   const [abierto, setAbierto] = useState(false);
+  const { toast } = useToast();
   const [estado, enviar, enviando] = useActionState<ClientActionResult | null, FormData>(
     async (_previo, formData) => {
       const result = await crearClienta(valoresDe(formData));
-      if (result.ok) setAbierto(false);
+      if (result.ok) {
+        // El éxito se dice en un aviso, desde acá y no con el estado de la
+        // acción: ese estado llega en la misma transición que la revalidación
+        // de la lista, y a veces esa transición no se confirmaba — el
+        // formulario se cerraba y el "quedó creada" no aparecía nunca. El
+        // aviso sale en el acto, con la escritura ya hecha.
+        setAbierto(false);
+        toast({ message: result.message, tone: "ok" });
+      }
       return result;
     },
     initial,
@@ -177,7 +186,7 @@ export function NuevaClienta() {
         <Button type="button" size="sm" onClick={() => setAbierto(true)}>
           Agregar cliente
         </Button>
-        <Resultado estado={estado} />
+        {estado?.ok ? null : <Resultado estado={estado} />}
       </div>
     );
   }
@@ -213,10 +222,19 @@ export function EditarClienta({
   valores: ValoresClienta;
 }) {
   const [abierto, setAbierto] = useState(false);
+  const { toast } = useToast();
   const [estado, enviar, enviando] = useActionState<ClientActionResult | null, FormData>(
     async (_previo, formData) => {
       const result = await editarClienta(eaCustomerId, valoresDe(formData));
-      if (result.ok) setAbierto(false);
+      if (result.ok) {
+        // El éxito se dice en un aviso, desde acá y no con el estado de la
+        // acción: ese estado llega en la misma transición que la revalidación
+        // de la lista, y a veces esa transición no se confirmaba — el
+        // formulario se cerraba y el "quedó creada" no aparecía nunca. El
+        // aviso sale en el acto, con la escritura ya hecha.
+        setAbierto(false);
+        toast({ message: result.message, tone: "ok" });
+      }
       return result;
     },
     initial,
@@ -228,7 +246,7 @@ export function EditarClienta({
         <Button type="button" size="sm" onClick={() => setAbierto(true)}>
           Corregir datos
         </Button>
-        <Resultado estado={estado} />
+        {estado?.ok ? null : <Resultado estado={estado} />}
       </div>
     );
   }
@@ -323,7 +341,7 @@ export function CortesiaPorDefecto({
 
   return (
     <div style={{ display: "grid", gap: "0.125rem" }}>
-      <Checkbox
+      <Switch
         label="Cortesía de la casa por defecto"
         hint="Sus cuentas llegan marcadas como cortesía: no se cobran y la profesional cobra su comisión sobre el precio de lista. Se puede desmarcar en cada cuenta."
         checked={valor}

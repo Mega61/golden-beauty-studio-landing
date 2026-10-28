@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { Card, CardHead, EmptyState, formatDuration } from "@/components/ui";
 
 import type { MemberDetail } from "./data";
@@ -28,10 +26,6 @@ export function FichaProfesional({
 
   return (
     <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
-      <p style={{ margin: 0, fontSize: "var(--text-2xs)" }}>
-        <Link href="/equipo">← Equipo</Link>
-      </p>
-
       <Card>
         <div style={{ display: "grid", gap: "0.5rem", gridTemplateColumns: "minmax(0, 1fr)" }}>
           <h2 style={{ margin: 0, fontSize: "var(--text-lg)", color: "var(--color-carbon)" }}>

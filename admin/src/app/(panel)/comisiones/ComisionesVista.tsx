@@ -1,13 +1,11 @@
-import Link from "next/link";
-
 import {
   Card,
   CardHead,
   DataTable,
+  DateStepper,
   EmptyState,
   Icon,
   formatCOP,
-  formatDateLong,
   formatDateShort,
   formatPesos,
   type Column,
@@ -106,43 +104,16 @@ function Quincena({ view }: { view: ComisionesView }) {
   const esActual = period.periodStart === current.periodStart;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "baseline",
-        justifyContent: "space-between",
-        gap: "0.75rem",
-        flexWrap: "wrap",
-      }}
-    >
-      <p
-        style={{
-          margin: 0,
-          fontSize: "var(--text-2xs)",
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          color: "var(--color-ink-soft)",
-        }}
-      >
-        {formatDateLong(`${period.periodStart} 00:00:00`)} –{" "}
-        {formatDateLong(`${period.periodEnd} 00:00:00`, true)}
-        {esActual ? " · en curso" : ""}
-      </p>
-      <nav
-        aria-label="Cambiar de quincena"
-        style={{ display: "flex", gap: "0.75rem", fontSize: "var(--text-2xs)" }}
-      >
-        <Link href={`/comisiones?quincena=${previous.periodStart}`}>
-          ← {formatDateShort(`${previous.periodStart} 00:00:00`)}
-        </Link>
-        {esActual ? null : <Link href="/comisiones">Esta quincena</Link>}
-        {next === null ? null : (
-          <Link href={`/comisiones?quincena=${next.periodStart}`}>
-            {formatDateShort(`${next.periodStart} 00:00:00`)} →
-          </Link>
-        )}
-      </nav>
-    </div>
+    <DateStepper
+      label={`${formatDateShort(`${period.periodStart} 00:00:00`)} – ${formatDateShort(`${period.periodEnd} 00:00:00`)}`}
+      sub={esActual ? `En curso · ${period.periodStart.slice(0, 4)}` : period.periodStart.slice(0, 4)}
+      prevHref={`/comisiones?quincena=${previous.periodStart}`}
+      nextHref={next === null ? null : `/comisiones?quincena=${next.periodStart}`}
+      todayHref={esActual ? null : "/comisiones"}
+      prevLabel="Quincena anterior"
+      nextLabel="Quincena siguiente"
+      todayLabel="Esta quincena"
+    />
   );
 }
 

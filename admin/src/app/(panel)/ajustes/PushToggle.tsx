@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Button, Checkbox, useToast } from "@/components/ui";
+import { Button, Switch, useToast } from "@/components/ui";
 import { isIos } from "@/components/pwa/install-hint";
 import { PANEL_BASE_PATH } from "@/lib/push/config";
 
@@ -211,7 +211,7 @@ export function PushToggle({
 
   return (
     <div style={{ display: "grid", gap: "0.75rem" }}>
-      <Checkbox
+      <Switch
         label={onlyOwn ? "Avisarme cuando me agenden una cita" : "Avisarme cuando alguien reserve en la página"}
         hint={
           onlyOwn

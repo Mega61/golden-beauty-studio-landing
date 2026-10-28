@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/shell";
+import { AppShell, PanelFrame } from "@/components/shell";
 import { ButtonLink } from "@/components/ui";
 import { requireSession } from "@/lib/dal";
 import { Gallery } from "./Gallery";
@@ -80,6 +80,7 @@ export default async function GaleriaPage({
   const role = parseRol(rol);
 
   return (
+    <PanelFrame role={role}>
     <AppShell
       role={role}
       title="Galería de componentes"
@@ -97,5 +98,6 @@ export default async function GaleriaPage({
     >
       <Gallery />
     </AppShell>
+    </PanelFrame>
   );
 }

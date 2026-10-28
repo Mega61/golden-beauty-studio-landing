@@ -50,6 +50,10 @@ const nextConfig: NextConfig = {
    * protección CSRF que esta opción viene a reconfigurar, no a apagar.
    */
   experimental: {
+    // `<ViewTransition>` de React animando la navegación: la pantalla que sale
+    // se desvanece y la que entra sube, con la barra inferior quieta. Ver
+    // `components/shell/AppShell.tsx`.
+    viewTransition: true,
     serverActions: {
       allowedOrigins: [
         "www.goldenbeautystudio.com.co",

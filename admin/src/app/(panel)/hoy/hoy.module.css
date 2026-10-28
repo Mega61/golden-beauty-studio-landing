@@ -1,0 +1,138 @@
+/* =============================================================================
+   La tarjeta de la cita en Hoy
+   =============================================================================
+
+   De arriba abajo, en el orden en que se lee en el mostrador: a qué hora, quién
+   y qué se hace, cómo va la cuenta, y qué hacer ahora. Antes la hora iba en 12
+   px gris sobre el nombre, el teléfono ocupaba una fila entera con el número
+   adentro, y "sin cuenta" era una línea suelta de texto chico. */
+
+.card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.875rem 0.875rem 1rem;
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+
+/* La cuenta cerrada se aquieta: ya no pide nada. */
+.card[data-closed="true"] {
+  background: color-mix(in srgb, var(--color-paper) 60%, var(--color-ivory));
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.time {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: var(--text-lg--line-height);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-carbon);
+}
+
+.until {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--color-ink-soft);
+}
+
+.who {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: -0.25rem;
+}
+
+.whoText {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.125rem;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  font-weight: 700;
+  color: var(--color-carbon);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service {
+  margin: 0;
+  color: var(--color-ink-soft);
+  text-wrap: pretty;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 1.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hair);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.1875rem 0.5rem;
+  border: 1px solid var(--chip-line, var(--hair-strong));
+  border-radius: var(--radius-sm);
+  background: var(--chip-tint, var(--color-ivory));
+  color: var(--chip-ink, var(--color-ink-soft));
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+
+.chipWarn {
+  --chip-tint: var(--color-warn-tint);
+  --chip-line: var(--color-warn-line);
+  --chip-ink: var(--color-warn-ink);
+}
+
+.chipOk {
+  --chip-tint: var(--color-ok-tint);
+  --chip-line: var(--color-ok-line);
+  --chip-ink: var(--color-ok-ink);
+}
+
+.chipInfo {
+  --chip-tint: var(--color-info-tint);
+  --chip-line: var(--color-info-line);
+  --chip-ink: var(--color-info-ink);
+}
+
+.chipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.amount {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-carbon);
+}
+
+.actions {
+  display: grid;
+  gap: 0.5rem;
+}

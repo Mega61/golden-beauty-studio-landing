@@ -13,6 +13,7 @@
 
 export { Icon, type IconName, type IconProps } from "./Icon";
 export { Button, ButtonLink, type ButtonProps, type ButtonVariant } from "./Button";
+export { SubmitButton, FormPendingIcon } from "./SubmitButton";
 export { StatusPill } from "./StatusPill";
 export { WaSentLabels } from "./WaSentLabels";
 export {
@@ -32,6 +33,7 @@ export {
   TextArea,
   Select,
   Checkbox,
+  Switch,
   FormErrorSummary,
 } from "./Field";
 export { MoneyInput } from "./MoneyInput";
@@ -48,6 +50,8 @@ export {
   type ListSlot,
 } from "./table-model";
 export { Panel, PanelInline } from "./Panel";
+export { ConfirmProvider, useConfirm, type ConfirmInput } from "./Confirm";
+export { DateStepper, DaySwipe, type StepperProps } from "./DateStepper";
 export {
   ToastProvider,
   useToast,
