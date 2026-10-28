@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { EmptyState, ReadOnlyBand } from "@/components/ui";
 import { AppShell, TopbarBack } from "@/components/shell";
@@ -7,6 +8,7 @@ import type { Role } from "@/components/shell/nav";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
 
+import { FichaFidelidad } from "../../fidelidad/FichaFidelidad";
 import { loadClientProfile } from "../data";
 import { FichaClienta } from "../FichaClienta";
 import { parseClientKeyParam } from "../identity";
@@ -42,9 +44,11 @@ export default async function ClientaPage({
   const key = parseClientKeyParam(clave);
   if (key === null) notFound();
 
-  const [result, canGiveCourtesy] = await Promise.all([
+  const [result, canGiveCourtesy, canSeeLoyalty, canRedeem] = await Promise.all([
     loadClientProfile(key),
     sessionCan("cortesia:otorgar"),
+    sessionCan("fidelidad:ver"),
+    sessionCan("fidelidad:canjear"),
   ]);
 
   if (!result.found) {
@@ -73,7 +77,19 @@ export default async function ClientaPage({
 
   return (
     <AppShell role={navRole(session.role)} title="Clientes" back={<TopbarBack href="/clientes" label="Clientes" />}>
-      <FichaClienta profile={result.profile} canGiveCourtesy={canGiveCourtesy} />
+      <FichaClienta
+        profile={result.profile}
+        canGiveCourtesy={canGiveCourtesy}
+        fidelidad={
+          canSeeLoyalty ? (
+            // Stampee es otro servicio: la ficha no lo espera. La tarjeta de
+            // sellos llega cuando llega.
+            <Suspense fallback={null}>
+              <FichaFidelidad phone={result.profile.client.phone} canRedeem={canRedeem} />
+            </Suspense>
+          ) : null
+        }
+      />
     </AppShell>
   );
 }

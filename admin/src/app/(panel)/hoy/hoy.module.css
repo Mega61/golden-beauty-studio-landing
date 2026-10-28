@@ -136,3 +136,16 @@
   display: grid;
   gap: 0.5rem;
 }
+
+/* El aviso de Stampee bajo el servicio: "Premio listo" / "Le falta 1 sello". */
+.loyalty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.375rem;
+  align-items: center;
+  margin: 0.25rem 0 0;
+}
+.loyaltyReward {
+  font-size: var(--text-2xs);
+  color: var(--color-ink-soft);
+}

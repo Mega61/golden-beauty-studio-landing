@@ -278,6 +278,14 @@ export function isAllowedIdentity(
  *   sería un conflicto directo —la cortesía le paga comisión sobre un trabajo
  *   que nadie cobró— y por eso no alcanza ni a mantener una cortesía que ya
  *   existe: tocarla, en cualquier sentido, es de la dueña.
+ * - `fidelidad:ver` — la pantalla de Fidelidad: las tarjetas de sellos de
+ *   Stampee de toda la clientela, por campaña. Es una lista de clientas, así
+ *   que va con quien ve Clientes. El chip "premio listo" de Hoy no la necesita:
+ *   la técnica tiene que enterarse de que a su clienta le toca el premio.
+ * - `fidelidad:canjear` — marcar en Stampee que el premio de una tarjeta llena
+ *   ya se aplicó. Es trabajo de mostrador, como en el kiosko de Stampee: la
+ *   dueña y recepción. La técnica no, porque el premio es un descuento sobre
+ *   su propio servicio.
  */
 export type Capability =
   | "cuenta:cerrar-propia"
@@ -303,7 +311,9 @@ export type Capability =
   | "avisos:mis-citas"
   | "pauta:registrar"
   | "clientes:exportar"
-  | "cortesia:otorgar";
+  | "cortesia:otorgar"
+  | "fidelidad:ver"
+  | "fidelidad:canjear";
 
 /**
  * Contexto que hace variar una fila de la matriz.
@@ -353,6 +363,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "pauta:registrar",
     "clientes:exportar",
     "cortesia:otorgar",
+    "fidelidad:ver",
+    "fidelidad:canjear",
   ]),
 
   // Recepción. Opera el día completo y cierra la caja, pero no corrige después
@@ -376,6 +388,9 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "avisos:reservas-web",
     // Si recepción también atiende (tiene columna), se entera de lo suyo.
     "avisos:mis-citas",
+    // Las tarjetas de sellos y el canje del premio: mostrador, como Stampee.
+    "fidelidad:ver",
+    "fidelidad:canjear",
   ]),
 
   // La técnica. Su alcance es su propio día, sus propias cuentas y su propia

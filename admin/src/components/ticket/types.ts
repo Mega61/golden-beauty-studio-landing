@@ -103,6 +103,12 @@ export type TodayAppointment = {
    * muestra: no es el estado de la cita. Ausente = nada, o no se pudo leer.
    */
   waSent?: readonly WaSentLabel[];
+  /**
+   * La tarjeta de sellos de Stampee, solo cuando dice algo para hoy: premio
+   * listo o a uno-dos sellos. Ausente = nada que avisar, o Stampee no respondió
+   * a tiempo. Se cruza por celular en `hoy/page.tsx`.
+   */
+  loyalty?: { stage: "lista" | "cerca"; remaining: number; rewardName: string };
   finance: TicketFinanceView;
 };
 

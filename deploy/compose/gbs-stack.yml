@@ -38,6 +38,7 @@
 #                             (INGEST_SINCE = primer día de caja del panel, YYYY-MM-DD;
 #                              obligatoria con INGEST_URL. Ver lib/ingest-client.ts)
 #   VAPID_PUBLIC_KEY          VAPID_PRIVATE_KEY      VAPID_SUBJECT   (opcionales: avisos push)
+#   STAMPEE_API_URL           STAMPEE_API_KEY        STAMPEE_APP_URL (opcionales: Fidelidad)
 #   WHATSAPP_TOKEN            WHATSAPP_PHONE_NUMBER_ID                (opcionales: WhatsApp automático)
 #   WHATSAPP_APP_SECRET       WHATSAPP_VERIFY_TOKEN                   (webhook de estado de Meta)
 #   WHATSAPP_GRAPH_VERSION    WHATSAPP_TEMPLATE_LANG                  (opcionales, con valor por defecto)
@@ -154,6 +155,11 @@ services:
       TOTP_ENC_KEY: ${TOTP_ENC_KEY}
 
       INGEST_URL: ${INGEST_URL}
+      # Fidelidad (Stampee). Sin URL + llave, la pantalla lo dice y Hoy y la
+      # ficha salen sin sellos. STAMPEE_APP_URL es solo para el link a la tarjeta.
+      STAMPEE_API_URL: ${STAMPEE_API_URL:-}
+      STAMPEE_API_KEY: ${STAMPEE_API_KEY:-}
+      STAMPEE_APP_URL: ${STAMPEE_APP_URL:-}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
       INGEST_SINCE: ${INGEST_SINCE:-}
 

@@ -29,10 +29,13 @@ import type { HistoryEntry } from "./history";
 export function FichaClienta({
   profile,
   canGiveCourtesy = false,
+  fidelidad,
 }: {
   profile: ClientProfile;
   /** `cortesia:otorgar`: solo la dueña cambia la cortesía por defecto. */
   canGiveCourtesy?: boolean;
+  /** La tarjeta de sellos de Stampee (`fidelidad/FichaFidelidad.tsx`), ya armada. */
+  fidelidad?: React.ReactNode;
 }) {
   const { client, history, historyPartial, failure } = profile;
 
@@ -149,6 +152,8 @@ export function FichaClienta({
       </Card>
 
       <Resumen profile={profile} />
+
+      {fidelidad}
 
       <Card padded={false}>
         <CardHead title="Historia" />
