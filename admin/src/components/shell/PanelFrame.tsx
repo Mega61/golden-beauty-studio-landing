@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { SideNav } from "./SideNav";
 import { BottomBar } from "./BottomBar";
 import { PullToRefresh } from "./PullToRefresh";
+import { NavProgress } from "./NavProgress";
 import type { Role } from "./nav";
 
 /**
@@ -48,6 +49,10 @@ export function PanelFrame({ role, children }: { role: Role; children: ReactNode
       {children}
       <BottomBar role={role} />
       <PullToRefresh />
+      {/* `useSearchParams` pide un límite de Suspense propio. */}
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
     </div>
   );
 }

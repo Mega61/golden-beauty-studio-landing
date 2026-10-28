@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, type ReactNode } from "react";
-import { Icon } from "./Icon";
+import { NAV_START_EVENT } from "../shell/NavProgress";
+import { Icon, type IconName } from "./Icon";
 
 /**
  * Moverse en el tiempo: día anterior, el día que se está viendo, día
@@ -101,8 +102,22 @@ function StepLink({
       title={label}
       transitionTypes={[dir === "back" ? "nav-back" : "nav-forward"]}
     >
-      <Icon name={icon} size={20} />
+      <ArrowGlyph icon={icon} />
     </Link>
+  );
+}
+
+/**
+ * La flecha, o un spinner mientras llega el día que se pidió. Algunas
+ * pantallas no tienen esqueleto de ruta (ver `loading-boundaries.test.ts`), y
+ * sin esto la flecha tocada no decía nada hasta que el servidor contestaba.
+ */
+function ArrowGlyph({ icon }: { icon: IconName }) {
+  const { pending } = useLinkStatus();
+  return pending ? (
+    <span className="ui-spinner" style={{ width: 18, height: 18 }} aria-hidden />
+  ) : (
+    <Icon name={icon} size={20} />
   );
 }
 
@@ -191,6 +206,7 @@ export function DaySwipe({
         if (!s.locked || Math.abs(s.dx) < 72) return;
         const href = s.dx > 0 ? prevHref : nextHref;
         if (!href) return;
+        window.dispatchEvent(new Event(NAV_START_EVENT));
         router.push(href, { transitionTypes: [s.dx > 0 ? "nav-back" : "nav-forward"] });
       }}
       onPointerCancel={() => {

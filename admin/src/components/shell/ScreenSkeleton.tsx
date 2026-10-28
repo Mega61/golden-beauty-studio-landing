@@ -14,8 +14,13 @@ import { AppShell } from "./AppShell";
  *
  * - `cards`: Hoy, Recordatorios — fecha y una pila de tarjetas.
  * - `agenda`: la barra de fecha y la grilla.
- * - `list`: Clientes, Servicios, Equipo — buscador y filas.
- * - `stats`: Caja, Comisiones, Reportes, Diagnóstico, Ajustes — cifras.
+ * - `list`: buscador y filas.
+ * - `stats`: Diagnóstico, Ajustes — cifras.
+ *
+ * ⚠ Caja, Clientes, Comisiones, Equipo, Reportes y Servicios **no** usan
+ * esto: tienen formularios con `useActionState`, y con un `loading.tsx` en la
+ * misma ruta la transición de la acción puede no confirmarse nunca (el botón
+ * gira para siempre). Ver `app/(panel)/loading-boundaries.test.ts`.
  *
  * Tres tarjetas o seis filas y no más: es lo que cabe en un celular sin
  * desplazar. Un esqueleto más largo que el contenido real es una promesa que

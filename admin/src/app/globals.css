@@ -2392,6 +2392,47 @@
     }
   }
 
+  /* --- Progreso de navegación (`NavProgress`) --------------------------
+     Una raya dorada de 2 px arriba de todo, que avanza rápido al principio y
+     se frena (nunca llega sola al final: no sabe cuánto falta). Al llegar la
+     pantalla se apaga. */
+  .ui-navprogress {
+    position: fixed;
+    z-index: 70;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--color-gold-dark);
+    transform-origin: left center;
+    transform: scaleX(0);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      transform var(--dur-2) var(--ease-out);
+  }
+  .ui-navprogress[data-active="true"] {
+    opacity: 1;
+    animation: ui-navprogress 2.4s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+  }
+  @keyframes ui-navprogress {
+    from {
+      transform: scaleX(0.05);
+    }
+    to {
+      transform: scaleX(0.85);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Sin avance: una raya quieta que aparece y se va sigue diciendo
+       "cargando". El `*` de arriba deja la animación en un cuadro. */
+    .ui-navprogress[data-active="true"] {
+      transform: scaleX(1);
+      opacity: 0.6;
+    }
+  }
+
   /* --- Tirar para actualizar (`PullToRefresh`) ------------------------
      Una ficha redonda que baja desde debajo de la toolbar siguiendo al dedo,
      con la flecha girando a la par; dorada cuando ya se puede soltar, y con
