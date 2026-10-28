@@ -600,21 +600,17 @@ function Cierre({ view, bloquean }: { view: CajaView; bloquean: number }) {
           </p>
         )}
 
-        {/* El cierre solo desde tablet o escritorio (§ Navegación y pantallas).
-            En el celular la pantalla sigue siendo útil —los pendientes son lo
-            que se consulta de pie— y solo se dice dónde está el botón. */}
-        <div className="ui-only-sm">
-          <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
-            El cierre del día se hace desde la tablet o el computador.
-          </p>
-        </div>
-        <div className="ui-only-md">
+        {/* El cierre se puede hacer desde el celular (pedido de la dueña,
+            2026-10-24). Lo que lo hace seguro es la confirmación con el
+            resumen de `CierreDelDia`, no el tamaño de la pantalla. */}
+        <div>
           {dayClose === null ? (
             <>
               <CierreDelDia
                 fecha={date}
                 bloqueado={bloquean > 0 || review.blockers.length > 0}
                 cuentas={review.totals.count}
+                totales={review.totals}
               />
               {/* Un control deshabilitado sin el motivo al lado obliga a
                   adivinar. El motivo está arriba, en la lista de pendientes,
