@@ -58,26 +58,36 @@ self.addEventListener("push", (event) => {
   const confirmUrl = inPanel(data.confirmUrl) ? data.confirmUrl : null;
 
   event.waitUntil(
-    self.registration.showNotification(data.title || "Golden · Panel", {
-      body: data.body || "",
-      icon: ICON,
-      badge: BADGE,
-      tag: data.tag || undefined,
-      // Si llega otra con la misma etiqueta, que vuelva a sonar.
-      renotify: Boolean(data.tag),
-      // Corto y doble: se nota en el bolsillo sin parecer una llamada.
-      vibrate: [90, 60, 90],
-      timestamp: Date.now(),
-      // Android y escritorio muestran los botones; iOS los ignora y tocar el
-      // aviso sigue abriendo la agenda del día.
-      actions: confirmUrl
-        ? [
-            { action: "confirmar", title: "Escribirle por WhatsApp" },
-            { action: "agenda", title: "Ver en la agenda" },
-          ]
-        : [],
-      data: { url, confirmUrl },
-    }),
+    Promise.all([
+      // Con el panel abierto, la agenda se vuelve a pedir ya (`AgendaClient`
+      // escucha "gbs:push"): el aviso dice que algo cambió, y la grilla en
+      // pantalla no puede quedarse 30 s diciendo lo contrario.
+      self.clients
+        .matchAll({ type: "window", includeUncontrolled: true })
+        .then((windows) => {
+          for (const client of windows) client.postMessage({ type: "gbs:push", tag: data.tag || null });
+        }),
+      self.registration.showNotification(data.title || "Golden · Panel", {
+        body: data.body || "",
+        icon: ICON,
+        badge: BADGE,
+        tag: data.tag || undefined,
+        // Si llega otra con la misma etiqueta, que vuelva a sonar.
+        renotify: Boolean(data.tag),
+        // Corto y doble: se nota en el bolsillo sin parecer una llamada.
+        vibrate: [90, 60, 90],
+        timestamp: Date.now(),
+        // Android y escritorio muestran los botones; iOS los ignora y tocar el
+        // aviso sigue abriendo la agenda del día.
+        actions: confirmUrl
+          ? [
+              { action: "confirmar", title: "Escribirle por WhatsApp" },
+              { action: "agenda", title: "Ver en la agenda" },
+            ]
+          : [],
+        data: { url, confirmUrl },
+      }),
+    ]),
   );
 });
 

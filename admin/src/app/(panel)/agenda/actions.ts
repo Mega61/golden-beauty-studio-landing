@@ -8,6 +8,7 @@ import { appointmentPlannedServiceRepository, stationRepository } from "@/db/rep
 
 import type { GridProvider } from "@/lib/calendar-layout";
 import { MAX_PLANNED_EXTRAS } from "@/lib/combos";
+import { mapEaStatus } from "@/components/calendar/status-map";
 import {
   allowingOutsideHours,
   checkConflicts,
@@ -19,7 +20,12 @@ import {
 import { requireOwnProvider, requireSession } from "@/lib/dal";
 import { createEaClient, type EaClient } from "@/lib/ea/client";
 import { providerWorkingPlanExceptions } from "@/lib/ea/mapping";
-import { notifyPanelBooking } from "@/lib/push/send";
+import {
+  notifyAppointmentCancelled,
+  notifyAppointmentChange,
+  notifyPanelBooking,
+  snapshotForPush,
+} from "@/lib/push/send";
 import { whatsappConfigured } from "@/lib/whatsapp/config";
 import { sendAppointmentConfirmation } from "@/lib/whatsapp/confirmation";
 import { EaApiError } from "@/lib/ea/errors";
@@ -163,6 +169,10 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
       ...(input.status !== undefined ? { status: input.status } : {}),
     };
 
+    // Cómo estaba, para que el aviso diga qué cambió ("jue 10 a. m. → vie 3 p. m.").
+    // Una lectura más solo si los avisos están prendidos; nunca lanza.
+    const before = input.id === undefined ? null : await snapshotForPush(input.id);
+
     const saved =
       input.id === undefined
         ? await client.appointments.create(body)
@@ -206,18 +216,17 @@ export async function saveAppointment(input: AppointmentWrite): Promise<WriteRes
       );
     }
 
-    // La profesional de la columna se entera en el celular, salvo que se la
-    // haya agendado ella misma (`avisos:mis-citas`). Después de responder y
-    // sin poder tumbar nada, como la confirmación.
+    // El resto del equipo se entera en el celular: dueña y recepción de todo,
+    // la profesional de lo de su columna (y de lo que salió de ella), nadie de
+    // lo que hizo una misma. Después de responder y sin poder tumbar nada, como
+    // la confirmación. Un cambio espera unos segundos por si llega "Deshacer"
+    // (`lib/push/coalesce.ts`).
+    const actor = { userId: session.userId, name: session.name };
+    const appointmentId = saved.id;
     if (input.id === undefined) {
-      const appointmentId = saved.id;
-      after(() =>
-        notifyPanelBooking({
-          appointmentId,
-          providerId: input.providerId,
-          actorUserId: session.userId,
-        }),
-      );
+      after(() => notifyPanelBooking({ appointmentId, providerId: input.providerId, actor }));
+    } else {
+      after(() => notifyAppointmentChange({ appointmentId, before, actor }));
     }
 
     revalidatePath("/agenda");
@@ -269,7 +278,14 @@ export async function cancelAppointment(
   providerId: number,
   status = "Cancelada",
 ): Promise<WriteResult> {
-  return setAppointmentStatus(id, providerId, status);
+  const result = await setAppointmentStatus(id, providerId, status);
+  if (result.status === "ok" && mapEaStatus(status) === "cancelada") {
+    // `setAppointmentStatus` ya pasó por el DAL; esto solo lee quién fue.
+    const session = await requireSession();
+    const actor = { userId: session.userId, name: session.name };
+    after(() => notifyAppointmentCancelled({ appointmentId: id, actor }));
+  }
+  return result;
 }
 
 /**

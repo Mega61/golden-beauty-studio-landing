@@ -9,7 +9,7 @@ import { PANEL_BASE_PATH } from "@/lib/push/config";
 import type { PushActionResult } from "./actions";
 
 /**
- * El interruptor "Avisarme cuando alguien reserve en la página", **para este
+ * El interruptor de los avisos de la agenda, **para este
  * dispositivo**.
  *
  * El estado verdadero lo tiene el navegador (`pushManager.getSubscription()`),
@@ -141,7 +141,7 @@ export function PushToggle({
     }
     setEndpoint(sub.endpoint);
     setState("prendido");
-    toast({ message: "Listo. Te avisamos en este dispositivo cuando alguien reserve.", tone: "ok" });
+    toast({ message: "Listo. Te avisamos en este dispositivo cuando algo cambie en la agenda.", tone: "ok" });
   }
 
   async function turnOff() {
@@ -212,11 +212,11 @@ export function PushToggle({
   return (
     <div style={{ display: "grid", gap: "0.75rem" }}>
       <Switch
-        label={onlyOwn ? "Avisarme cuando me agenden una cita" : "Avisarme cuando alguien reserve en la página"}
+        label={onlyOwn ? "Avisarme de mis citas" : "Avisarme de las citas nuevas, cambios y cancelaciones"}
         hint={
           onlyOwn
             ? "Solo en este dispositivo, y solo tus citas. El aviso dice el servicio, el nombre, el día y la hora. Nunca el teléfono de la clienta."
-            : "Solo en este dispositivo. El aviso dice el servicio, el nombre, el día y la hora, y con quién. Nunca el teléfono de quien reserva."
+            : "Solo en este dispositivo. El aviso dice el servicio, el nombre, el día y la hora, con quién y quién hizo el cambio. Nunca el teléfono de la clienta."
         }
         checked={state === "prendido"}
         disabled={busy || state === "bloqueado"}

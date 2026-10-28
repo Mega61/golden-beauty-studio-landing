@@ -37,6 +37,12 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 /** `admin` en la base es "recepción" en la navegación. Ver la cabecera. */
+function parseAppointmentParam(raw: string | undefined): number | null {
+  if (raw === undefined || !/^\d{1,10}$/.test(raw)) return null;
+  const id = Number(raw);
+  return id > 0 ? id : null;
+}
+
 function navRole(role: UserRole): Role {
   return role === "admin" ? "reception" : role;
 }
@@ -45,7 +51,7 @@ export default async function AgendaPage({
   searchParams,
 }: {
   // En Next 16 los parámetros de la petición son asíncronos.
-  searchParams: Promise<{ rango?: string; dia?: string; vista?: string }>;
+  searchParams: Promise<{ rango?: string; dia?: string; vista?: string; cita?: string }>;
 }) {
   const params = await searchParams;
   const today = todayInStudio();
@@ -106,6 +112,9 @@ export default async function AgendaPage({
         canWrite={result.session.role !== "staff" || result.session.eaProviderId !== null}
         whatsappConfirmation={whatsappConfigured()}
         canConfirmByHand={canConfirmByHand}
+        // `?cita=` lo pone el enlace de un aviso push: abre el detalle de esa
+        // cita apenas aparece en los datos.
+        openAppointmentId={parseAppointmentParam(params.cita)}
       />
     </AppShell>
   );

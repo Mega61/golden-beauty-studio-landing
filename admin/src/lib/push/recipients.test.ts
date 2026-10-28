@@ -19,56 +19,111 @@ const sub = (id: number, who: string) => ({
 
 const SUBS = [sub(1, "duena"), sub(2, "recepcion"), sub(3, "daniela"), sub(4, "lina"), sub(5, "exempleada")];
 
-const ids = (r: { general: { id: number }[]; own: { id: number }[] }) => ({
+type Ids = { general: { id: number }[]; own: { id: number }[]; left: { id: number }[] };
+const ids = (r: Ids) => ({
   general: r.general.map((s) => s.id),
   own: r.own.map((s) => s.id),
+  left: r.left.map((s) => s.id),
 });
 
 describe("bookingRecipients", () => {
   it("una reserva web en la columna de Daniela: general a dueña y recepción, propio a Daniela", () => {
-    expect(
-      ids(bookingRecipients({ subscriptions: SUBS, allowlist: ALLOWLIST, providerId: 5, source: "web" })),
-    ).toEqual({ general: [1, 2], own: [3] });
+    expect(ids(bookingRecipients({ subscriptions: SUBS, allowlist: ALLOWLIST, providerId: 5 }))).toEqual({
+      general: [1, 2],
+      own: [3],
+      left: [],
+    });
   });
 
   it("nunca le avisa a la técnica de la columna de otra", () => {
-    const r = bookingRecipients({ subscriptions: SUBS, allowlist: ALLOWLIST, providerId: 5, source: "panel" });
-    expect(r.own.map((s) => s.email)).toEqual(["daniela@goldenbeautystudio.com.co"]);
+    const r = bookingRecipients({ subscriptions: SUBS, allowlist: ALLOWLIST, providerId: 5 });
+    expect([...r.own, ...r.left].map((s) => s.email)).toEqual(["daniela@goldenbeautystudio.com.co"]);
   });
 
-  it("una cita del panel no manda el general, y no le avisa a quien la agendó", () => {
+  it("una cita del panel que agendó recepción: a la dueña y a Daniela, no a recepción", () => {
     expect(
       ids(
         bookingRecipients({
           subscriptions: SUBS,
           allowlist: ALLOWLIST,
           providerId: 5,
-          source: "panel",
-          actorUserId: "u-daniela",
+          actorUserIds: ["u-recepcion"],
         }),
       ),
-    ).toEqual({ general: [], own: [] });
+    ).toEqual({ general: [1], own: [3], left: [] });
   });
 
-  it("la dueña que atiende: por la página le basta el general; desde el panel, el propio", () => {
+  it("la técnica que se agenda a sí misma: se enteran dueña y recepción, ella no", () => {
     expect(
-      ids(bookingRecipients({ subscriptions: SUBS, allowlist: ALLOWLIST, providerId: 4, source: "web" })),
-    ).toEqual({ general: [1, 2], own: [] });
+      ids(
+        bookingRecipients({
+          subscriptions: SUBS,
+          allowlist: ALLOWLIST,
+          providerId: 5,
+          actorUserIds: ["u-daniela"],
+        }),
+      ),
+    ).toEqual({ general: [1, 2], own: [], left: [] });
+  });
+
+  it("la dueña que atiende recibe el general y no además el propio", () => {
     expect(
       ids(
         bookingRecipients({
           subscriptions: SUBS,
           allowlist: ALLOWLIST,
           providerId: 4,
-          source: "panel",
-          actorUserId: "u-recepcion",
+          actorUserIds: ["u-recepcion"],
         }),
       ),
-    ).toEqual({ general: [], own: [1] });
+    ).toEqual({ general: [1], own: [], left: [] });
+  });
+
+  it("una cita que pasa de Daniela a Lina: Lina la recibe, Daniela se entera de que salió", () => {
+    expect(
+      ids(
+        bookingRecipients({
+          subscriptions: SUBS,
+          allowlist: ALLOWLIST,
+          providerId: 6,
+          previousProviderId: 5,
+          actorUserIds: ["u-duena"],
+        }),
+      ),
+    ).toEqual({ general: [2], own: [4], left: [3] });
+  });
+
+  it("sin cambio de columna nadie recibe «salió»", () => {
+    const r = bookingRecipients({
+      subscriptions: SUBS,
+      allowlist: ALLOWLIST,
+      providerId: 5,
+      previousProviderId: 5,
+    });
+    expect(r.left).toEqual([]);
+    expect(r.own.map((s) => s.id)).toEqual([3]);
+  });
+
+  it("ninguno de los que hicieron cambios juntados recibe el aviso", () => {
+    expect(
+      ids(
+        bookingRecipients({
+          subscriptions: SUBS,
+          allowlist: ALLOWLIST,
+          providerId: 5,
+          actorUserIds: ["u-recepcion", "u-duena"],
+        }),
+      ),
+    ).toEqual({ general: [], own: [3], left: [] });
   });
 
   it("quien ya no está en Equipo no recibe nada", () => {
-    const r = bookingRecipients({ subscriptions: SUBS, allowlist: ALLOWLIST, providerId: 5, source: "web" });
-    expect([...r.general, ...r.own].map((s) => s.id)).not.toContain(5);
+    const r = bookingRecipients({
+      subscriptions: SUBS,
+      allowlist: ALLOWLIST,
+      providerId: 5,
+      previousProviderId: 6,
+    });
+    expect([...r.general, ...r.own, ...r.left].map((s) => s.id)).not.toContain(5);
   });
 });

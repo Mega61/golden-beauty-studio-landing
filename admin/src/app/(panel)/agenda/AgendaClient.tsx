@@ -102,6 +102,8 @@ export type AgendaClientProps = {
    * confirmación por WhatsApp" en el detalle de la cita.
    */
   canConfirmByHand: boolean;
+  /** Cita a abrir al entrar (`?cita=`, desde el enlace de un aviso push). */
+  openAppointmentId?: number | null;
 };
 
 /** Cada cuánto se vuelve a pedir el rango visible. */
@@ -129,6 +131,7 @@ export function AgendaClient({
   canWrite,
   whatsappConfirmation,
   canConfirmByHand,
+  openAppointmentId = null,
 }: AgendaClientProps) {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -233,6 +236,36 @@ export function AgendaClient({
       document.removeEventListener("visibilitychange", tick);
     };
   }, [refresh]);
+
+  // Un aviso push llegó con el panel abierto: algo cambió en la agenda, así que
+  // se pide ya en vez de esperar al siguiente sondeo. El service worker manda
+  // el mensaje (`public/sw.js`); el aviso del sistema sale igual.
+  useEffect(() => {
+    const sw = typeof navigator === "undefined" ? undefined : navigator.serviceWorker;
+    if (sw === undefined) return;
+    const onMessage = (event: MessageEvent) => {
+      const message = event.data as { type?: unknown } | null;
+      if (message?.type === "gbs:push") void refresh();
+    };
+    sw.addEventListener("message", onMessage);
+    return () => sw.removeEventListener("message", onMessage);
+  }, [refresh]);
+
+  // `?cita=` (el enlace de un aviso): abre el detalle de esa cita una vez, en
+  // cuanto está en los datos, y se borra de la URL para que recargar o
+  // compartir el enlace de la agenda no la vuelva a abrir. Si la cita no está
+  // —cancelada, o de una columna que quien mira no ve— se abre solo el día.
+  const toOpen = useRef(openAppointmentId);
+  useEffect(() => {
+    const id = toOpen.current;
+    if (id === null) return;
+    toOpen.current = null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("cita");
+    window.history.replaceState(null, "", url.toString());
+    const appointment = data.appointments.find((a) => a.id === id);
+    if (appointment) setPanel({ kind: "detail", appointment });
+  }, [data.appointments]);
 
   // La URL sigue al estado sin volver al servidor: `history.replaceState` deja
   // el enlace compartible y no dispara una navegación que pediría los mismos
