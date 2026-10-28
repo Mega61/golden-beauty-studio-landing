@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildCancelPayload,
+  buildChangePayload,
   buildNewBookingPayload,
   buildOwnBookingPayload,
+  buildPanelBookingPayload,
+  diffAppointment,
+  type AppointmentState,
+  type ChangeNotice,
   relativeDayLabel,
   shortCustomerName,
   type NewBookingNotice,
@@ -18,12 +24,12 @@ const BASE: NewBookingNotice = {
 };
 
 describe("buildNewBookingPayload", () => {
-  it("arma título, cuerpo y enlace a la agenda del día", () => {
+  it("arma título, cuerpo y enlace a la cita en la agenda", () => {
     const p = buildNewBookingPayload(BASE, "2026-10-15", "/admin");
     expect(p).toEqual({
       title: "Nueva reserva ✨",
       body: "Semipermanente manos\nLaura M. · sáb 17 oct 3:30 p. m. con Lina",
-      url: "/admin/agenda?dia=2026-10-17",
+      url: "/admin/agenda?dia=2026-10-17&cita=812",
       tag: "reserva-812",
       confirmUrl: "/admin/confirmar/812",
     });
@@ -80,7 +86,7 @@ describe("buildNewBookingPayload", () => {
 
   it("el basePath con barra final no duplica la barra", () => {
     expect(buildNewBookingPayload(BASE, "2026-10-15", "/admin/").url).toBe(
-      "/admin/agenda?dia=2026-10-17",
+      "/admin/agenda?dia=2026-10-17&cita=812",
     );
   });
 
@@ -126,7 +132,7 @@ describe("buildOwnBookingPayload", () => {
     const payload = buildOwnBookingPayload(notice, "2026-10-24", "/admin");
     expect(payload.title).toBe("Nueva cita en tu agenda ✨");
     expect(payload.body).toBe("Esculpidas en acrílico y Semipermanente pies\nLaura María M. · mañana 10 a. m.");
-    expect(payload.url).toBe("/admin/agenda?dia=2026-10-25");
+    expect(payload.url).toBe("/admin/agenda?dia=2026-10-25&cita=144");
     expect(payload.tag).toBe("reserva-144");
   });
 
@@ -136,5 +142,154 @@ describe("buildOwnBookingPayload", () => {
     expect(all).not.toContain("3001234567");
     expect(all).not.toMatch(/\$\s?\d/);
     expect(payload.confirmUrl).toBeUndefined();
+  });
+});
+
+describe("buildPanelBookingPayload", () => {
+  it("dice con quién y quién la agendó, sin el botón de WhatsApp", () => {
+    const p = buildPanelBookingPayload({ ...BASE, actorName: "Paula Gómez" }, "2026-10-17", "/admin");
+    expect(p.title).toBe("Nueva cita ✨");
+    expect(p.body).toBe("Semipermanente manos\nLaura M. · hoy 3:30 p. m. con Lina · por Paula");
+    expect(p.url).toBe("/admin/agenda?dia=2026-10-17&cita=812");
+    expect(p.confirmUrl).toBeUndefined();
+  });
+
+  it("sin nombre de quien la agendó, no inventa un «por»", () => {
+    const p = buildPanelBookingPayload({ ...BASE, actorName: null }, "2026-10-17", "/admin");
+    expect(p.body).not.toContain("por");
+  });
+});
+
+const STATE: AppointmentState = {
+  start: "2026-10-23 10:00:00",
+  end: "2026-10-23 11:00:00",
+  providerId: 5,
+  serviceId: 12,
+  customerId: 90,
+  extraServiceIds: [31],
+  cancelled: false,
+};
+
+describe("diffAppointment", () => {
+  it("nada que avisar si quedó igual (mover y deshacer)", () => {
+    expect(diffAppointment(STATE, { ...STATE, extraServiceIds: [31] })).toBeNull();
+  });
+
+  it("los adicionales en otro orden no son un cambio", () => {
+    const a = { ...STATE, extraServiceIds: [31, 32] };
+    expect(diffAppointment(a, { ...STATE, extraServiceIds: [32, 31] })).toBeNull();
+  });
+
+  it("distingue mover, reasignar y editar", () => {
+    expect(diffAppointment(STATE, { ...STATE, start: "2026-10-24 15:00:00", end: "2026-10-24 16:00:00" })).toEqual({
+      moved: true,
+      reassigned: false,
+      edited: true,
+    });
+    expect(diffAppointment(STATE, { ...STATE, providerId: 6 })).toEqual({
+      moved: false,
+      reassigned: true,
+      edited: false,
+    });
+    expect(diffAppointment(STATE, { ...STATE, extraServiceIds: [] })).toEqual({
+      moved: false,
+      reassigned: false,
+      edited: true,
+    });
+  });
+
+  it("sin el antes, avisa como cambio genérico en vez de callar", () => {
+    expect(diffAppointment(null, STATE)).toEqual({ moved: false, reassigned: false, edited: true });
+  });
+});
+
+describe("buildChangePayload", () => {
+  const notice: ChangeNotice = {
+    appointmentId: 812,
+    serviceName: "Semipermanente manos",
+    customerFirstName: "Laura",
+    customerLastName: "Martínez",
+    start: "2026-10-24 15:00:00",
+    providerName: "Lina",
+    previousProviderName: "Daniela",
+    previousStart: "2026-10-23 10:00:00",
+    actorName: "Paula Gómez",
+  };
+  const moved = { moved: true, reassigned: false, edited: false };
+  const today = "2026-10-22";
+
+  it("equipo: la hora de antes y la de ahora, con quién y quién la movió", () => {
+    const p = buildChangePayload("team", moved, notice, today, "/admin");
+    expect(p.title).toBe("Cita movida");
+    expect(p.body).toBe(
+      "Semipermanente manos\nLaura M. · mañana 10 a. m. → sáb 24 oct 3 p. m. · con Lina · por Paula",
+    );
+    expect(p.url).toBe("/admin/agenda?dia=2026-10-24&cita=812");
+    expect(p.tag).toBe("reserva-812");
+  });
+
+  it("dentro del mismo día no repite el día", () => {
+    const p = buildChangePayload(
+      "own",
+      moved,
+      { ...notice, start: "2026-10-23 15:00:00" },
+      today,
+      "/admin",
+    );
+    expect(p.title).toBe("Se movió una cita tuya");
+    expect(p.body).toBe("Semipermanente manos\nLaura M. · mañana 10 a. m. → 3 p. m.");
+  });
+
+  it("reasignada: el equipo ve de quién a quién", () => {
+    const p = buildChangePayload("team", { moved: false, reassigned: true, edited: false }, notice, today, "/admin");
+    expect(p.title).toBe("Cita reasignada");
+    expect(p.body).toContain("ahora con Lina (antes Daniela)");
+  });
+
+  it("reasignada: para la que la recibe es una cita nueva", () => {
+    const p = buildChangePayload("own", { moved: false, reassigned: true, edited: false }, notice, today, "/admin");
+    expect(p.title).toBe("Nueva cita en tu agenda ✨");
+    expect(p.body).not.toContain("Daniela");
+  });
+
+  it("la que la pierde: ni a quién pasó ni el enlace a la cita, que ya no ve", () => {
+    const p = buildChangePayload("left", { moved: true, reassigned: true, edited: false }, notice, today, "/admin");
+    expect(p.title).toBe("Una cita salió de tu agenda");
+    expect(p.body).toBe("Semipermanente manos\nLaura M. · mañana 10 a. m.");
+    expect(p.body).not.toContain("Lina");
+    expect(p.url).toBe("/admin/agenda?dia=2026-10-23");
+  });
+
+  it("solo editada (servicio, duración): «Cita modificada» con la hora de ahora", () => {
+    const p = buildChangePayload("team", { moved: false, reassigned: false, edited: true }, notice, today, "/admin");
+    expect(p.title).toBe("Cita modificada");
+    expect(p.body).toContain("sáb 24 oct 3 p. m.");
+    expect(p.body).not.toContain("→");
+  });
+
+  it("nunca lleva teléfono ni precio", () => {
+    const smuggled = { ...notice, phone: "+573001234567", price: "$45.000" } as ChangeNotice;
+    for (const audience of ["team", "own", "left"] as const) {
+      const all = JSON.stringify(buildChangePayload(audience, moved, smuggled, today, "/admin"));
+      expect(all).not.toContain("3001234567");
+      expect(all).not.toMatch(/\$\s?\d/);
+    }
+  });
+});
+
+describe("buildCancelPayload", () => {
+  const notice = { ...BASE, actorName: "Andrea" };
+
+  it("equipo: con quién era y quién la canceló", () => {
+    const p = buildCancelPayload("team", notice, "2026-10-16", "/admin");
+    expect(p.title).toBe("Cita cancelada");
+    expect(p.body).toBe("Semipermanente manos\nLaura M. · mañana 3:30 p. m. con Lina · por Andrea");
+    expect(p.tag).toBe("reserva-812");
+  });
+
+  it("técnica: sin con quién ni quién", () => {
+    const p = buildCancelPayload("own", notice, "2026-10-16", "/admin");
+    expect(p.title).toBe("Se canceló una cita tuya");
+    expect(p.body).toBe("Semipermanente manos\nLaura M. · mañana 3:30 p. m.");
   });
 });

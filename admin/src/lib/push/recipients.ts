@@ -1,20 +1,24 @@
 import { can, findAllowedEntry, type AllowedIdentity } from "@/lib/auth-policy";
 
 /**
- * A quién le llega el aviso de una cita nueva. Puro: entra la lista de
+ * A quién le llega el aviso de algo que pasó con una cita: reserva web, cita
+ * creada desde el panel, cambio o cancelación. Puro: entra la lista de
  * suscripciones y la allowlist, sale quién recibe qué.
  *
- * Dos avisos distintos para la misma cita:
+ * Tres avisos distintos para la misma cita:
  *
- * - **general** (`avisos:reservas-web`): solo por las reservas de la página, a
- *   dueña y recepción. Nombra a la técnica: es agenda de todo el equipo.
- * - **propio** (`avisos:mis-citas`): a quien es la columna de la cita, venga
- *   de la página o del panel. Nunca a otra persona — la técnica no puede
- *   enterarse por la pantalla de bloqueo de la clienta de otra.
+ * - **general** (`avisos:reservas-web`): dueña y recepción, que ven la agenda
+ *   de todo el equipo. Nombra a la técnica.
+ * - **propio** (`avisos:mis-citas`): a quien es la columna de la cita **ahora**.
+ *   Nunca a otra persona — la técnica no puede enterarse por la pantalla de
+ *   bloqueo de la clienta de otra.
+ * - **salió** (`avisos:mis-citas`): a quien era la columna **antes**, cuando un
+ *   cambio se la pasó a otra. Se entera de que ya no la tiene, y de nada más.
  *
  * Y tres reglas de sentido común:
  *
- * - Quien agendó la cita no recibe aviso de lo que acaba de hacer.
+ * - Quien hizo el cambio no recibe aviso de lo que acaba de hacer. Son varias
+ *   personas cuando los cambios se juntan (mover y "Deshacer" de otra).
  * - Un dispositivo que ya recibe el general no recibe además el propio: sería
  *   el mismo aviso dos veces.
  * - El rol y la columna se leen de la allowlist **de hoy**, no de cuando se
@@ -28,31 +32,36 @@ export function bookingRecipients<S extends PushRecipient>(input: {
   allowlist: readonly AllowedIdentity[];
   /** La columna de la cita. `null` = sin técnica: nadie recibe el propio. */
   providerId: number | null;
-  /** `web` = la página; `panel` = alguien del equipo desde la agenda. */
-  source: "web" | "panel";
-  /** Quien la agendó desde el panel. */
-  actorUserId?: string | null;
-}): { general: S[]; own: S[] } {
+  /** La columna de antes, si un cambio la movió a otra. */
+  previousProviderId?: number | null;
+  /** Quienes hicieron lo que se avisa. Vacío para una reserva de la página. */
+  actorUserIds?: readonly string[];
+}): { general: S[]; own: S[]; left: S[] } {
   const general: S[] = [];
   const own: S[] = [];
+  const left: S[] = [];
+  const actors = new Set(input.actorUserIds ?? []);
+  const previous =
+    input.previousProviderId !== undefined && input.previousProviderId !== input.providerId
+      ? input.previousProviderId
+      : null;
 
   for (const sub of input.subscriptions) {
-    if (input.actorUserId && sub.userId === input.actorUserId) continue;
+    if (actors.has(sub.userId)) continue;
     const entry = findAllowedEntry(sub.email, input.allowlist);
     if (entry === null) continue;
 
-    if (input.source === "web" && can(entry.role, "avisos:reservas-web")) {
+    if (can(entry.role, "avisos:reservas-web")) {
       general.push(sub);
       continue;
     }
-    if (
-      input.providerId !== null &&
-      entry.ea_provider_id === input.providerId &&
-      can(entry.role, "avisos:mis-citas")
-    ) {
+    if (!can(entry.role, "avisos:mis-citas") || entry.ea_provider_id === null) continue;
+    if (input.providerId !== null && entry.ea_provider_id === input.providerId) {
       own.push(sub);
+    } else if (previous !== null && entry.ea_provider_id === previous) {
+      left.push(sub);
     }
   }
 
-  return { general, own };
+  return { general, own, left };
 }

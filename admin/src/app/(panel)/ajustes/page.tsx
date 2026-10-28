@@ -45,14 +45,12 @@ export default async function AjustesPage() {
       <div style={{ display: "grid", gap: "1rem", maxWidth: "40rem" }}>
         {showPush ? (
           <Card padded={false}>
-            <CardHead title="Avisos de reservas" />
+            <CardHead title="Avisos de la agenda" />
             <div style={{ padding: "1rem", display: "grid", gap: "0.75rem" }}>
               <p style={{ margin: 0, color: "var(--color-ink-soft)" }}>
                 {onlyOwn
-                  ? "Cuando te agendan una cita —por la página o desde el panel— te llega una notificación al momento, y al tocarla se abre la agenda en ese día."
-                  : session.eaProviderId !== null
-                    ? "Cuando alguien reserva desde la página te llega una notificación al momento, y también cuando te agendan una cita a ti desde el panel. Al tocarla se abre la agenda en ese día."
-                    : "Cuando alguien reserva desde la página te llega una notificación al momento, y al tocarla se abre la agenda en ese día."}
+                  ? "Te llega una notificación cuando te agendan una cita —por la página o desde el panel—, cuando alguien más mueve o cancela una de las tuyas, y cuando una pasa a otra profesional. Al tocarla se abre la cita en la agenda."
+                  : "Te llega una notificación cuando alguien reserva desde la página, y cuando alguien del equipo agenda, mueve o cancela una cita desde el panel (de lo que hagas tú, no). Al tocarla se abre la cita en la agenda."}
               </p>
               <PushToggle
                 onlyOwn={onlyOwn}

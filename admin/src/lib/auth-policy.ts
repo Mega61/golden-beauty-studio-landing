@@ -243,7 +243,9 @@ export function isAllowedIdentity(
  *   Corta todos los avisos futuros de esa persona, incluidos los automáticos,
  *   así que es de quien atiende el WhatsApp del estudio y queda en bitácora.
  * - `avisos:reservas-web` — recibir en el celular una notificación push cada
- *   vez que alguien reserva desde la página. El aviso nombra a la clienta, el
+ *   vez que alguien reserva desde la página, y cada vez que otra persona del
+ *   equipo agenda, mueve, reasigna o cancela una cita desde el panel (el nombre
+ *   se quedó de cuando solo era lo primero). El aviso nombra a la clienta, el
  *   servicio, la hora **y la técnica**: es un pedazo de la agenda de todo el
  *   equipo. Por eso va con `agenda:ver-todas` y **no es de la técnica**: ella ve
  *   su columna, no la de las demás, y un aviso en su pantalla de bloqueo con la
@@ -252,8 +254,9 @@ export function isAllowedIdentity(
  *   propio filtro por `ea_provider_id`, no esta abierta a un rol más — y es
  *   `avisos:mis-citas`.
  * - `avisos:mis-citas` — recibir en el celular un aviso cuando agendan una
- *   cita **en la columna propia**: por la página o desde el panel, salvo la que
- *   una misma se agenda. Lo tienen los tres roles, pero solo llega a quien
+ *   cita **en la columna propia** (por la página o desde el panel), cuando la
+ *   mueven, la cambian o la cancelan, y cuando pasa a otra columna — salvo lo
+ *   que una misma hace. Lo tienen los tres roles, pero solo llega a quien
  *   tiene `ea_provider_id`, y el filtro va en el envío (`lib/push/send.ts`):
  *   una cita de la columna 4 avisa a quien es la 4 y a nadie más. Es como la
  *   técnica se entera de lo suyo sin ver la agenda de las demás.

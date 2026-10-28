@@ -162,9 +162,10 @@ ve en **Reportes** («Cómo se pagó · historial de Agenda Pro») y en la ficha
 1. En el celular, abrir `https://www.goldenbeautystudio.com.co/admin` e iniciar sesión.
 2. **iPhone:** Safari → Compartir → **Agregar a inicio** (iOS 16.4 o más; sin esto, iOS no permite
    avisos). **Android:** Chrome ofrece "Instalar".
-3. Abrir el panel **desde el ícono**, ir a **Ajustes** → "Avisarme cuando alguien reserve en la
-   página" → permitir → **Probar aviso**.
-4. Repetir en el celular de recepción si aplica.
+3. Abrir el panel **desde el ícono**, ir a **Ajustes** → "Avisarme de las citas nuevas, cambios y
+   cancelaciones" → permitir → **Probar aviso**.
+4. Repetir en el celular de recepción si aplica, y en el de cada técnica ("Avisarme de mis citas";
+   su fila de Equipo tiene que tener la profesional de EA vinculada).
 
 ## 7. WhatsApp automático (cuando Meta lo apruebe)
 
