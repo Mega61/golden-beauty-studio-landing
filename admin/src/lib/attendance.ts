@@ -129,6 +129,23 @@ export function canConfirm(status: string | null | undefined, closed: boolean | 
   return closed !== true && mapEaStatus(status) === "reservada";
 }
 
+/**
+ * ¿Se puede abrir una cuenta nueva para esta cita? No si está **cancelada**: no
+ * hubo servicio, no se cobró nada, y Caja ya no la espera (`reviewDay()` la
+ * salta). Antes Hoy le dejaba el "Cerrar servicio" dorado como a cualquier otra
+ * y pedía cerrar en $0 algo que nunca pasó.
+ *
+ * Una cuenta que ya estaba cerrada sigue abriéndose (para verla o corregirla):
+ * la cita se canceló después de cobrar, y esa plata existe. Si sí se cobró algo
+ * por una cancelada, primero se le cambia el estado en la agenda.
+ *
+ * "No asistió" sí se puede cerrar: es la corrección de "al final sí vino", y
+ * cerrar la deja `Completada` (`statusAfterClose()`).
+ */
+export function canOpenAccount(status: string | null | undefined, closed: boolean | null): boolean {
+  return closed === true || mapEaStatus(status) !== "cancelada";
+}
+
 export type AttendancePlan =
   /** `status: null` = ya estaba así; no hay nada que escribir. */
   | { ok: true; status: string | null }
