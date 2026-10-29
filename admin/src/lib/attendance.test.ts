@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canConfirm,
+  canOpenAccount,
   attendanceOutcome,
   attendanceView,
   attendanceWindowOpen,
@@ -253,5 +254,24 @@ describe("unmarkedAppointments", () => {
       { id: 5, end: "2026-10-16 09:00:00", status: "Cancelada", closed: false },
     ];
     expect(unmarkedAppointments(rows, "2026-10-16 12:00:00").map((row) => row.id)).toEqual([1]);
+  });
+});
+
+describe("canOpenAccount", () => {
+  it("una cancelada sin cuenta no pide cierre", () => {
+    expect(canOpenAccount("Cancelada", false)).toBe(false);
+    expect(canOpenAccount("Cancelled", null)).toBe(false);
+  });
+
+  it("una cancelada con la cuenta ya cerrada se sigue pudiendo ver y corregir", () => {
+    expect(canOpenAccount("Cancelada", true)).toBe(true);
+  });
+
+  it("lo demás se cierra como siempre, incluida la inasistencia (al final sí vino)", () => {
+    expect(canOpenAccount("Reservada", false)).toBe(true);
+    expect(canOpenAccount("Confirmada", false)).toBe(true);
+    expect(canOpenAccount("Completada", false)).toBe(true);
+    expect(canOpenAccount("No asistió", false)).toBe(true);
+    expect(canOpenAccount("", false)).toBe(true);
   });
 });

@@ -34,6 +34,7 @@ import {
 } from "@/components/ticket/draft";
 import type { CloseTicketInput, CloseTicketResult } from "@/components/ticket/types";
 import type { PaymentMethod } from "@/db/types";
+import { canOpenAccount } from "@/lib/attendance";
 import { marcarCompletadaAlCerrar } from "./attendance";
 import { loadCatalogForClose } from "./catalog-server";
 import { detectFirstVisit, type FirstVisitStatus } from "./first-visit";
@@ -265,6 +266,15 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
       existing.is_house_courtesy === 1
         ? "Esta cuenta es una cortesía de la casa. Solo la dueña la puede cambiar."
         : "Solo la dueña puede cerrar una cuenta como cortesía de la casa.",
+    );
+  }
+
+  // Una cancelada no se cobra: la pantalla ya no ofrece el botón, pero un
+  // borrador viejo en la cola del celular o una pantalla abierta desde antes de
+  // cancelar todavía pueden llegar. Definitivo, no reintentable.
+  if (!canOpenAccount(appointment.status, existing.closed_at !== null)) {
+    return rechazo(
+      "La cita está cancelada, así que no hay cuenta que cerrar. Si sí se cobró algo, cámbiale el estado en la agenda primero.",
     );
   }
 

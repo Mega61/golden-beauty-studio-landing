@@ -33,7 +33,7 @@ import {
 } from "@/components/ticket";
 import { mapEaStatus } from "@/components/calendar/status-map";
 import { AttendanceControl } from "./AttendanceControl";
-import { canConfirm, type AttendanceMark } from "@/lib/attendance";
+import { canConfirm, canOpenAccount, type AttendanceMark } from "@/lib/attendance";
 import type { ComboComposition } from "@/lib/combos";
 import styles from "./hoy.module.css";
 
@@ -332,9 +332,15 @@ function AppointmentCard({
     appointment.bookedServiceId !== null &&
     finance.performedServiceId !== appointment.bookedServiceId;
   const congelada = finance.frozenByDayClose && !canFixAfterClose;
+  // Cancelada y sin cuenta: no hubo servicio, no hay nada que cobrar ni que
+  // pedir. La tarjeta se queda (es parte del día) pero aquietada y sin botón.
+  const cobrable = canOpenAccount(appointment.status, cerrada);
 
   return (
-    <article className={`ui-card ${styles.card}`} data-closed={cerrada ? "true" : undefined}>
+    <article
+      className={`ui-card ${styles.card}`}
+      data-closed={cerrada || !cobrable ? "true" : undefined}
+    >
       {/* La hora manda: es lo que se busca primero en la lista del día, así
           que va arriba, grande y en cifras tabulares. El estado de la cita, a
           su lado; el de la cuenta, abajo con las acciones. */}
@@ -395,8 +401,10 @@ function AppointmentCard({
             ) : null}
             {cambio ? <CambioTag /> : null}
           </>
-        ) : (
+        ) : cobrable ? (
           <span className={styles.chip}>sin cuenta</span>
+        ) : (
+          <span className={styles.chip}>cancelada · no se cobra</span>
         )}
       </div>
 
@@ -410,20 +418,22 @@ function AppointmentCard({
           onMarked={onAttendance}
         />
 
-        <Button
-          // Mientras la cita esté por confirmar, el botón principal es
-          // "Confirmar cita": dos dorados en la misma tarjeta no dicen cuál va.
-          variant={
-            cerrada || pending !== null || canConfirm(appointment.status, cerrada)
-              ? "secondary"
-              : "primary"
-          }
-          block
-          onClick={onOpen}
-          icon={cerrada ? undefined : "caja"}
-        >
-          {readOnly || congelada ? "Ver cuenta" : cerrada ? "Editar cuenta" : "Cerrar servicio"}
-        </Button>
+        {cobrable ? (
+          <Button
+            // Mientras la cita esté por confirmar, el botón principal es
+            // "Confirmar cita": dos dorados en la misma tarjeta no dicen cuál va.
+            variant={
+              cerrada || pending !== null || canConfirm(appointment.status, cerrada)
+                ? "secondary"
+                : "primary"
+            }
+            block
+            onClick={onOpen}
+            icon={cerrada ? undefined : "caja"}
+          >
+            {readOnly || congelada ? "Ver cuenta" : cerrada ? "Editar cuenta" : "Cerrar servicio"}
+          </Button>
+        ) : null}
       </div>
     </article>
   );
