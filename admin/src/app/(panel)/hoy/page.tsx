@@ -4,7 +4,7 @@ import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import Link from "next/link";
 
-import { DateStepper, DaySwipe, Icon, formatDateLong, formatTime } from "@/components/ui";
+import { DateStepper, DaySwipe, Icon, formatCOP, formatDateLong, formatTime } from "@/components/ui";
 import { unmarkedAppointments } from "@/lib/attendance";
 import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
@@ -14,6 +14,9 @@ import type { UserRole } from "@/db/types";
 import { loadComboCompositions } from "@/lib/combo-source";
 import { hoyCardShare, pendingShares } from "@/lib/stampee/card-share";
 import { loadLoyaltyWithin } from "@/lib/stampee/client";
+import { loadUnclosedDays } from "@/jobs/unclosed-days";
+import { relativeDayLabel } from "@/lib/push/payload";
+import { unclosedTotal, type UnclosedDay } from "@/lib/unclosed-days";
 import { activeRows, clientsForPhone, leadingCard } from "@/lib/stampee/model";
 import { cerrarCuenta, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
@@ -83,6 +86,19 @@ function relativeDay(date: string, today: string): string {
   return `Hace ${days} días`;
 }
 
+/**
+ * Los días anteriores con cuentas cobradas que no llegaron a un cierre de caja
+ * (`lib/unclosed-days.ts`). Esa plata no viaja al CRM ni a Actual hasta que se
+ * cierre el día. Es un aviso: si la base no contesta, se calla.
+ */
+async function unclosedDaysSafe(): Promise<UnclosedDay[]> {
+  try {
+    return await loadUnclosedDays({ db: getDb() });
+  } catch {
+    return [];
+  }
+}
+
 async function dayAlreadyClosed(date: EaLocalDate): Promise<boolean> {
   try {
     return (await repositories(getDb()).dayCloses.findByDate(date)) !== undefined;
@@ -102,7 +118,7 @@ export default async function HoyPage({
   const fecha = parseFecha((await searchParams).fecha, today);
   const isToday = fecha === today;
 
-  const [verTodas, canCharge, canSeeTotals, canFixAfterClose, canRemind, canGiveCourtesy] =
+  const [verTodas, canCharge, canSeeTotals, canFixAfterClose, canRemind, canGiveCourtesy, canCloseDay] =
     await Promise.all([
       sessionCan("agenda:ver-todas"),
       sessionCan("cuenta:cobrar"),
@@ -110,13 +126,14 @@ export default async function HoyPage({
       sessionCan("cuenta:corregir-tras-cierre"),
       sessionCan("recordatorios:enviar"),
       sessionCan("cortesia:otorgar"),
+      sessionCan("caja:cerrar-dia"),
     ]);
 
   // El acceso a Recordatorios va acá con su conteo porque Hoy es la pantalla
   // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
   // que la pasada diaria no dependa de acordarse. Si la carga falla, el acceso
   // sale sin número —nunca tumba Hoy por un dato accesorio.
-  const [{ date, appointments: citas, catalog, problems }, pendingReminders, comboSource, cajaCerrada, loyalty] = await Promise.all([
+  const [{ date, appointments: citas, catalog, problems }, pendingReminders, comboSource, cajaCerrada, loyalty, unclosedDays] = await Promise.all([
     loadToday(session, { verTodas, date: fecha }),
     // Recordatorios **y** reservas nuevas por confirmar: los dos son mensajes
     // que salen del mismo botón de la misma pantalla.
@@ -139,6 +156,8 @@ export default async function HoyPage({
     // "Premio listo" / "le falta 1 sello" en la tarjeta de la cita. Es un
     // detalle: con Stampee lento o caído Hoy sale igual, sin sellos.
     loadLoyaltyWithin(1_500),
+    // Solo para quien puede cerrar la caja: a la técnica no le toca.
+    canCloseDay ? unclosedDaysSafe() : Promise.resolve([]),
   ]);
 
   // La tarjeta de sellos por mandar: el CRM la crea en silencio y Stampee no
@@ -228,6 +247,31 @@ export default async function HoyPage({
           nextHref={nextHref}
           todayHref={isToday ? null : "/hoy"}
         />
+
+        {unclosedDays.length === 0 ? null : (
+          <div role="alert" className="ui-callout ui-callout--error">
+            <Icon name="caja" size={18} />
+            <span>
+              <strong>
+                {unclosedDays.length === 1
+                  ? "Hay un día con cuentas cobradas fuera de un cierre de caja"
+                  : `Hay ${unclosedDays.length} días con cuentas cobradas fuera de un cierre de caja`}
+              </strong>
+              {" — "}
+              {unclosedDays.map((day, i) => (
+                <span key={day.date}>
+                  {i > 0 ? " · " : null}
+                  <Link href={`/caja?fecha=${day.date}`}>{relativeDayLabel(day.date, today)}</Link>
+                  {` (${day.accounts === 1 ? "1 cuenta" : `${day.accounts} cuentas`}${
+                    day.kind === "por-fuera" ? ", por agregar al cierre" : ""
+                  })`}
+                </span>
+              ))}
+              . Son {formatCOP(unclosedTotal(unclosedDays))} que no llegan a Actual hasta que se
+              cierre el día en Caja.
+            </span>
+          </div>
+        )}
 
         {cajaCerrada ? (
           <div role="status" className="ui-callout ui-callout--warn">

@@ -65,3 +65,18 @@ export function bookingRecipients<S extends PushRecipient>(input: {
 
   return { general, own, left };
 }
+
+/**
+ * A quién le llega el aviso de días de caja sin cerrar: a quien puede
+ * arreglarlo (`caja:cerrar-dia`, dueña y recepción). A la técnica no: ella
+ * cierra sus cuentas, el cierre del día no es suyo.
+ */
+export function cashCloseRecipients<S extends PushRecipient>(input: {
+  subscriptions: readonly S[];
+  allowlist: readonly AllowedIdentity[];
+}): S[] {
+  return input.subscriptions.filter((sub) => {
+    const entry = findAllowedEntry(sub.email, input.allowlist);
+    return entry !== null && can(entry.role, "caja:cerrar-dia");
+  });
+}

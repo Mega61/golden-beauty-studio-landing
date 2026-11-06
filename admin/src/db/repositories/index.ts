@@ -83,6 +83,7 @@ export { customerSettingRepository } from "./customer-setting";
 export { dayCloseRepository } from "./day-close";
 export {
   JOB_CRM_VISITS,
+  JOB_UNCLOSED_DAYS,
   JOB_DAY_CLOSE_PUSH,
   JOB_RECONCILE,
   JOB_WHATSAPP_REMINDERS,
