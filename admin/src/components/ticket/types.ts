@@ -109,6 +109,13 @@ export type TodayAppointment = {
    * a tiempo. Se cruza por celular en `hoy/page.tsx`.
    */
   loyalty?: { stage: "lista" | "cerca"; remaining: number; rewardName: string };
+  /**
+   * La tarjeta de sellos, una vez cerrada la cuenta (`hoyCardShare()` en
+   * `lib/stampee/card-share.ts`): `enviar` = tiene tarjeta y nadie se la ha
+   * mandado; `manana` = todavía no tiene, el CRM la crea esta noche. Ausente =
+   * ya se la mandaron, la cuenta sigue abierta, o quien mira no manda tarjetas.
+   */
+  cardShare?: { state: "enviar"; cardId: string } | { state: "manana" };
   finance: TicketFinanceView;
 };
 

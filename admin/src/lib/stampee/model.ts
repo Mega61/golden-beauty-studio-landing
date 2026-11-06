@@ -90,6 +90,8 @@ export type LoyaltyCard = {
   remaining: number;
   gifted: { welcome: number; winBack: number };
   fromVisits: number;
+  /** ISO. Cuándo se emitió (`issued`). `null` si su historia no lo trae. */
+  issuedAt: string | null;
   /** ISO. Último sello por visita (`stamp_add`). */
   lastVisitAt: string | null;
   /** ISO o `YYYY-MM-DD`. Cuándo se aplicó el premio. */
@@ -198,6 +200,7 @@ export function summarizeCard(
     remaining,
     gifted: { welcome, winBack },
     fromVisits: Math.max(card.stamps - welcome - winBack, 0),
+    issuedAt: issuedAt === null ? null : new Date(issuedAt).toISOString(),
     lastVisitAt: lastVisitAt === null ? null : new Date(lastVisitAt).toISOString(),
     redeemedAt:
       redeemedAt !== null

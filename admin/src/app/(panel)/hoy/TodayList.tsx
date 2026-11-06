@@ -32,6 +32,7 @@ import {
   type TodayAppointment,
 } from "@/components/ticket";
 import { mapEaStatus } from "@/components/calendar/status-map";
+import { ShareCardButton } from "../fidelidad/ShareCardButton";
 import { AttendanceControl } from "./AttendanceControl";
 import { canConfirm, canOpenAccount, type AttendanceMark } from "@/lib/attendance";
 import type { ComboComposition } from "@/lib/combos";
@@ -364,6 +365,13 @@ function AppointmentCard({
           </p>
           <WaSentLabels labels={appointment.waSent} />
           {appointment.loyalty ? <LoyaltyChip loyalty={appointment.loyalty} /> : null}
+          {appointment.cardShare?.state === "manana" ? (
+            <p className={styles.loyalty}>
+              <span className={styles.loyaltyReward}>
+                Su tarjeta de sellos llega mañana: se la mandas desde Fidelidad.
+              </span>
+            </p>
+          ) : null}
         </div>
         {/* Para avisar que la técnica se atrasó o preguntar si ya viene, sin
             salir de Hoy a buscar el número. En su ícono: el número ya lo
@@ -417,6 +425,10 @@ function AppointmentCard({
           readOnly={readOnly}
           onMarked={onAttendance}
         />
+
+        {appointment.cardShare?.state === "enviar" ? (
+          <ShareCardButton cardId={appointment.cardShare.cardId} sent={false} size="md" block />
+        ) : null}
 
         {cobrable ? (
           <Button

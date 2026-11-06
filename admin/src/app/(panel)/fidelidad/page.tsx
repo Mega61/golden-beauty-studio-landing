@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
 import { EmptyState, Icon } from "@/components/ui";
+import { getDb } from "@/db/client";
+import { stampeeCardShareRepository } from "@/db/repositories";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
+import { cardShareLink, pendingShares } from "@/lib/stampee/card-share";
 import { loadLoyalty } from "@/lib/stampee/client";
 import { activeRows } from "@/lib/stampee/model";
 
@@ -33,7 +36,19 @@ function navRole(role: UserRole): Role {
 
 export default async function FidelidadPage() {
   const session = await requireCapability("fidelidad:ver");
-  const [result, canRedeem] = await Promise.all([loadLoyalty(), sessionCan("fidelidad:canjear")]);
+  const [result, canRedeem, sentIds] = await Promise.all([
+    loadLoyalty(),
+    sessionCan("fidelidad:canjear"),
+    // A quién ya se le mandó la tarjeta. Si la base no responde, los botones
+    // siguen (dicen "Enviar") y la lista de pendientes no sale: mejor no pedir
+    // nada que pedir cien tarjetas que ya se mandaron.
+    stampeeCardShareRepository(getDb())
+      .listSentCardIds()
+      .catch((error) => {
+        console.error("[fidelidad] no se pudo leer a quién ya se le mandó la tarjeta", error);
+        return null;
+      }),
+  ]);
 
   if (!result.ok) {
     return (
@@ -48,7 +63,12 @@ export default async function FidelidadPage() {
   }
 
   const { data, stale } = result;
-  const rows: FidelidadRow[] = activeRows(data).map(({ client, card }) => {
+  const sent = sentIds ?? new Set<string>();
+  const active = activeRows(data);
+  const pending = new Set(
+    sentIds === null ? [] : pendingShares(active, sentIds, new Date()).map(({ card }) => card.id),
+  );
+  const rows: FidelidadRow[] = active.map(({ client, card }) => {
     const e164 = normalizePhoneE164(client.mobile);
     return {
       key: card.id,
@@ -56,6 +76,11 @@ export default async function FidelidadPage() {
       mobile: client.mobile,
       fichaHref: e164 ? `/clientes/${e164.slice(1)}` : null,
       cardUrl: data.cardBaseUrl ? `${data.cardBaseUrl}/${card.uniqueId}` : null,
+      share:
+        cardShareLink({ phone: client.mobile, customerName: client.name, card, cardBaseUrl: data.cardBaseUrl }) ===
+        null
+          ? null
+          : { sent: sent.has(card.id), pending: pending.has(card.id) },
       card,
     };
   });
