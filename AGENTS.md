@@ -120,6 +120,7 @@ Agenda Pro se apagó el 2026-10-24 y con él el scraper nocturno del CRM (`agend
 - **`INGEST_SINCE` es el corte.** Obligatoria con `INGEST_URL`. Un cierre anterior —del paralelo, cuando la plata también se registraba en Agenda Pro— no se empuja nunca, ni con Reintentar, ni sus ajustes: duplicaría ingresos que Actual no puede deduplicar.
 - **Visitas → CRM, win-back y Stampee.** El reconcile nocturno (`jobs/crm-visits.ts`) manda las citas de EA desde el corte (7 días atrás, 60 adelante) a `…/api/ingest/panel-visits`; el CRM recalcula el win-back y sincroniza Stampee. Cuenta cerrada = visita hecha; no asistió = cancelada. Queda en `job_run` como `crm-visitas`.
 - **Cortesías:** las decide la casilla de la cuenta, no la lista `COURTESY_PHONES` de `actual-sync` — las filas del panel se saltan esa lista.
+- **Un día cobrado y sin cerrar es plata que no viaja, y el panel lo grita.** Cerrar la cuenta no manda nada: el push va por cierre. Del 27 al 31 de octubre de 2026 quedaron ocho cuentas cobradas sin cierre y nadie se enteró. Hoy, a dueña y recepción (`caja:cerrar-dia`), muestra en rojo los días anteriores con cuentas cerradas fuera de un cierre —sin cierre, o cerradas después de él— con el enlace a `/caja?fecha=…`; y el reconcile nocturno manda un aviso push a esas mismas personas, una vez por día mientras quede alguno (`jobs/unclosed-days.ts`, reglas puras en `lib/unclosed-days.ts`, `job_run` como `caja-sin-cerrar`). Desde `INGEST_SINCE`, nunca hoy. El contenedor `admin-reconcile` necesita las `VAPID_*` para eso.
 
 ## Panel de administración (`/admin`)
 

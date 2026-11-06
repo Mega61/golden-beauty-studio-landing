@@ -21,6 +21,8 @@ export const JOB_DAY_CLOSE_PUSH = "day-close-push";
 export const JOB_WHATSAPP_REMINDERS = "whatsapp-recordatorios";
 /** El push nocturno de visitas al CRM (`jobs/crm-visits.ts`). */
 export const JOB_CRM_VISITS = "crm-visitas";
+/** El aviso nocturno de días de caja sin cerrar (`jobs/unclosed-days.ts`). */
+export const JOB_UNCLOSED_DAYS = "caja-sin-cerrar";
 
 /**
  * `summary` es `VARCHAR(500)`.

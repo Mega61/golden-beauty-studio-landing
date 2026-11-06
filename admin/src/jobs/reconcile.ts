@@ -18,6 +18,7 @@ import { ingestConfigFromEnv } from "@/lib/ingest-client";
 
 import { runAttendanceBackfill, summarizeAttendanceBackfill } from "./attendance-backfill";
 import { pushCrmVisits, recordCrmVisits, summarizeCrmVisits } from "./crm-visits";
+import { pushUnclosedDays, summarizeUnclosedDaysPush } from "./unclosed-days";
 
 import {
   createServicePriceCache,
@@ -392,6 +393,12 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<Reconc
     // Después de la asistencia, para que una "Completada" escrita esta noche
     // llegue al CRM como visita hecha.
     await pushVisitsToCrm(db, ea, env);
+    // Al final: avisa de la plata cobrada que no llegó a un cierre de caja.
+    // Mejor esfuerzo y nunca lanza, como lo anterior.
+    const unclosed = await pushUnclosedDays({ db, env });
+    const line = `reconcile: ${summarizeUnclosedDaysPush(unclosed)}`;
+    if (unclosed.state === "fallo") console.error(line);
+    else console.log(line);
     return report;
   } finally {
     await db.destroy();

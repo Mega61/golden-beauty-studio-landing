@@ -3,6 +3,7 @@ import "server-only";
 import webpush from "web-push";
 
 import { getDb } from "@/db/client";
+import type { Db } from "@/db";
 import { allowedUserRepository, repositories } from "@/db/repositories";
 import type { DeliverableSubscription } from "@/db/repositories";
 import { instantToEaDate } from "@/lib/ea";
@@ -24,7 +25,7 @@ import {
   type NewBookingNotice,
   type PushPayload,
 } from "./payload";
-import { bookingRecipients } from "./recipients";
+import { bookingRecipients, cashCloseRecipients } from "./recipients";
 import { classifyPushError, classifyPushStatus, planPrune, type PushOutcome } from "./prune";
 
 /**
@@ -76,11 +77,15 @@ async function sendOne(
 /**
  * Manda `payload` a cada suscripción y aplica la poda en tres escrituras.
  * Devuelve cuántas lo aceptaron.
+ *
+ * `db` va explícita desde los jobs: un proceso corto que abre el singleton de
+ * `getDb()` no termina nunca, porque el pool queda vivo.
  */
 async function deliver(
   subs: readonly DeliverableSubscription[],
   payload: PushPayload,
   vapid: VapidConfig,
+  db: Db = getDb(),
 ): Promise<number> {
   const outcomes = await Promise.all(
     subs.map(async (s) => ({
@@ -98,7 +103,7 @@ async function deliver(
   }
 
   const plan = planPrune(outcomes);
-  const repo = repositories(getDb()).pushSubscriptions;
+  const repo = repositories(db).pushSubscriptions;
   const now = new Date();
   await Promise.all([
     repo.markSuccess(plan.success, now),
@@ -462,6 +467,28 @@ async function sendCancellation(
       : deliver(general, buildCancelPayload("team", notice, today, PANEL_BASE_PATH), vapid),
     own.length === 0 ? 0 : deliver(own, buildCancelPayload("own", notice, today, PANEL_BASE_PATH), vapid),
   ]);
+}
+
+/**
+ * Un aviso para quienes cierran la caja (`caja:cerrar-dia`). Lo usa el job de
+ * días sin cerrar, que corre fuera de Next con su propia conexión: por eso
+ * recibe `db` y las llaves en vez de leerlas del proceso.
+ *
+ * Devuelve cuántos dispositivos lo aceptaron. Puede lanzar: quien llama lo
+ * registra en `job_run`.
+ */
+export async function notifyCashClosers(
+  db: Db,
+  payload: PushPayload,
+  vapid: VapidConfig,
+): Promise<number> {
+  const [subscriptions, allowlist] = await Promise.all([
+    repositories(db).pushSubscriptions.listDeliverable(),
+    allowedUserRepository(db).list(),
+  ]);
+  const recipients = cashCloseRecipients({ subscriptions, allowlist });
+  if (recipients.length === 0) return 0;
+  return deliver(recipients, payload, vapid, db);
 }
 
 /**
