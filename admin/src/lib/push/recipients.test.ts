@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AllowedIdentity } from "@/lib/auth-policy";
 
-import { bookingRecipients } from "./recipients";
+import { bookingRecipients, cashCloseRecipients } from "./recipients";
 
 const ALLOWLIST: AllowedIdentity[] = [
   { email: "duena@goldenbeautystudio.com.co", role: "owner", ea_provider_id: 4 },
@@ -125,5 +125,11 @@ describe("bookingRecipients", () => {
       previousProviderId: 6,
     });
     expect([...r.general, ...r.own, ...r.left].map((s) => s.id)).not.toContain(5);
+  });
+});
+
+describe("cashCloseRecipients", () => {
+  it("días sin cerrar: a dueña y recepción, nunca a una técnica ni a quien salió de Equipo", () => {
+    expect(cashCloseRecipients({ subscriptions: SUBS, allowlist: ALLOWLIST }).map((s) => s.id)).toEqual([1, 2]);
   });
 });

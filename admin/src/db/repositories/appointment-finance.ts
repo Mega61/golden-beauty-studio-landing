@@ -121,6 +121,26 @@ export function appointmentFinanceRepository(db: Db) {
         .execute();
     },
 
+    /**
+     * Las cuentas cerradas del rango que no quedaron en ningún cierre de caja.
+     *
+     * Es la plata que no viaja: el push a ingest va por cierre, así que una
+     * cuenta cobrada sin cierre nunca llega al CRM ni a Actual. Alimenta el
+     * aviso de días sin cerrar (`lib/unclosed-days.ts`).
+     */
+    async listClosedOutsideDayClose(from: Date, to: Date): Promise<AppointmentFinance[]> {
+      return db
+        .selectFrom("appointment_finance")
+        .selectAll()
+        .where("appointment_start_at", ">=", from)
+        .where("appointment_start_at", "<", to)
+        .where("closed_at", "is not", null)
+        .where("day_close_id", "is", null)
+        .orderBy("appointment_start_at")
+        .orderBy("id")
+        .execute();
+    },
+
     /** Las cuentas congeladas por un cierre. La unidad de push a ingest. */
     async listByDayClose(dayCloseId: number): Promise<AppointmentFinance[]> {
       return db

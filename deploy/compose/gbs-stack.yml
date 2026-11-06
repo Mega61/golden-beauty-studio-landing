@@ -419,6 +419,12 @@ services:
       INGEST_URL: ${INGEST_URL}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
       INGEST_SINCE: ${INGEST_SINCE:-}
+      # El aviso de días de caja sin cerrar (`jobs/unclosed-days.ts`) sale de
+      # acá, al final de la noche. Las mismas llaves que el panel; sin ellas el
+      # aviso no sale y lo dice `job_run`.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     deploy:
       resources:
         limits:
