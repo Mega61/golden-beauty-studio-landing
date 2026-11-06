@@ -5,10 +5,13 @@ import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 
 import { getDb } from "@/db/client";
-import { auditLogRepository } from "@/db/repositories";
+import { auditLogRepository, stampeeCardShareRepository } from "@/db/repositories";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { instantToEaDate } from "@/lib/ea";
-import { redeemCard } from "@/lib/stampee/client";
+import { cardShareLink } from "@/lib/stampee/card-share";
+import { loadLoyalty, redeemCard } from "@/lib/stampee/client";
+
+import type { SendOutcome } from "../recordatorios/open-whatsapp";
 
 export type RedeemActionResult = { ok: boolean; message: string };
 
@@ -63,5 +66,60 @@ export async function aplicarPremio(cardId: string): Promise<RedeemActionResult>
     }
     console.error("[fidelidad] el canje falló", error);
     return { ok: false, message: "No se pudo aplicar el premio. Intenta de nuevo." };
+  }
+}
+
+/**
+ * "Enviar tarjeta": anota que se le mandó a la clienta el link de su tarjeta de
+ * sellos y devuelve el chat de WhatsApp con el mensaje ya escrito.
+ *
+ * El link lo arma el servidor desde la tarjeta que Stampee tiene, no el
+ * navegador: el número y el nombre son los de Stampee, que es a quien
+ * pertenece la tarjeta. La fila va **antes** de abrir WhatsApp, como en los
+ * recordatorios manuales; si después no se le da "enviar", el panel no se
+ * entera, y el botón queda como "Reenviar" para eso.
+ */
+export async function enviarTarjeta(cardId: string): Promise<SendOutcome> {
+  try {
+    const session = await requireCapability("fidelidad:ver");
+    const parsed = CardId.safeParse(cardId);
+    if (!parsed.success) return { ok: false, message: "Esa tarjeta no se reconoce." };
+
+    const loyalty = await loadLoyalty();
+    if (!loyalty.ok) return { ok: false, message: loyalty.message };
+    const owner = loyalty.data.clients.find((c) => c.cards.some((card) => card.id === parsed.data));
+    const card = owner?.cards.find((c) => c.id === parsed.data);
+    if (!owner || !card) return { ok: false, message: "Esa tarjeta ya no está en Stampee." };
+
+    const url = cardShareLink({
+      phone: owner.mobile,
+      customerName: owner.name,
+      card,
+      cardBaseUrl: loyalty.data.cardBaseUrl,
+    });
+    if (url === null) {
+      return {
+        ok: false,
+        message: loyalty.data.cardBaseUrl
+          ? `${owner.name} no tiene un celular usable en Stampee.`
+          : "Falta STAMPEE_APP_URL en el panel: no hay link de tarjeta para mandar.",
+      };
+    }
+
+    const shares = stampeeCardShareRepository(getDb());
+    const already = (await shares.listSentCardIds()).has(parsed.data);
+    await shares.markSent(parsed.data, session.userId, new Date());
+
+    revalidatePath("/fidelidad");
+    revalidatePath("/hoy");
+    revalidatePath("/clientes", "layout");
+    return { ok: true, url, already, sentLabel: "Tarjeta enviada" };
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ForbiddenError) {
+      return { ok: false, message: "Mandar la tarjeta es de la dueña o de recepción." };
+    }
+    console.error("[fidelidad] no se pudo anotar el envío de la tarjeta", error);
+    return { ok: false, message: "No se pudo preparar el mensaje. Intenta de nuevo." };
   }
 }

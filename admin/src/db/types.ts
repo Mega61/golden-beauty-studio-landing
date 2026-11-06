@@ -797,6 +797,16 @@ export interface AppointmentPlannedServiceTable {
   created_at: Generated<Date>;
 }
 
+/**
+ * Las tarjetas de sellos de Stampee cuyo link ya se le mandó a la clienta por
+ * WhatsApp (migración `029`). Sin FK: la tarjeta vive en Stampee.
+ */
+export interface StampeeCardShareTable {
+  stampee_card_id: string;
+  sent_by_user_id: AuthId | null;
+  sent_at: Date;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -828,6 +838,7 @@ export interface Database {
   ad_spend: AdSpendTable;
   customer_setting: CustomerSettingTable;
   appointment_planned_service: AppointmentPlannedServiceTable;
+  stampee_card_share: StampeeCardShareTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;

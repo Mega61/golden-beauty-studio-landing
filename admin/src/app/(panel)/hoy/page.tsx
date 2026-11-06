@@ -12,11 +12,12 @@ import { instantToEaDate, instantToEaLocal, isEaLocalDate, type EaLocalDate } fr
 import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
 import { loadComboCompositions } from "@/lib/combo-source";
+import { hoyCardShare, pendingShares } from "@/lib/stampee/card-share";
 import { loadLoyaltyWithin } from "@/lib/stampee/client";
 import { loadUnclosedDays } from "@/jobs/unclosed-days";
 import { relativeDayLabel } from "@/lib/push/payload";
 import { unclosedTotal, type UnclosedDay } from "@/lib/unclosed-days";
-import { clientsForPhone, leadingCard } from "@/lib/stampee/model";
+import { activeRows, clientsForPhone, leadingCard } from "@/lib/stampee/model";
 import { cerrarCuenta, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
 import { loadConfirmations, pendingConfirmations } from "../recordatorios/confirmations-data";
@@ -159,18 +160,46 @@ export default async function HoyPage({
     canCloseDay ? unclosedDaysSafe() : Promise.resolve([]),
   ]);
 
+  // La tarjeta de sellos por mandar: el CRM la crea en silencio y Stampee no
+  // se la manda a nadie (`lib/stampee/card-share.ts`). Solo para quien la
+  // puede mandar; sin la base, no se dice nada en vez de pedirlas todas.
+  const sentCardIds =
+    loyalty?.ok && (await sessionCan("fidelidad:ver"))
+      ? await repositories(getDb())
+          .stampeeCardShares.listSentCardIds()
+          .catch(() => null)
+      : null;
+
   const appointments = citas.map((appointment) => {
     if (!loyalty?.ok) return appointment;
-    const card = leadingCard(
-      clientsForPhone(loyalty.data, appointment.customerPhone).flatMap((client) => client.cards),
-    );
-    return card && (card.stage === "lista" || card.stage === "cerca")
-      ? {
-          ...appointment,
-          loyalty: { stage: card.stage, remaining: card.remaining, rewardName: card.rewardName },
-        }
-      : appointment;
+    const cards = clientsForPhone(loyalty.data, appointment.customerPhone).flatMap((client) => client.cards);
+    const card = leadingCard(cards);
+    const share =
+      sentCardIds === null
+        ? null
+        : hoyCardShare({
+            closed: appointment.finance.closedAt !== null,
+            cards,
+            leading: card,
+            sent: sentCardIds,
+            phone: appointment.customerPhone,
+            customerName: appointment.customerName,
+            cardBaseUrl: loyalty.data.cardBaseUrl,
+          });
+    return {
+      ...appointment,
+      ...(card && (card.stage === "lista" || card.stage === "cerca")
+        ? { loyalty: { stage: card.stage, remaining: card.remaining, rewardName: card.rewardName } }
+        : {}),
+      ...(share === null
+        ? {}
+        : { cardShare: share.state === "enviar" ? { state: share.state, cardId: share.cardId } : share }),
+    };
   });
+  const tarjetasPorEnviar =
+    loyalty?.ok && sentCardIds !== null
+      ? pendingShares(activeRows(loyalty.data), sentCardIds, new Date()).length
+      : 0;
 
   const eaCaido = problems.find((p) => p.source === "ea") ?? null;
   const dbCaida = problems.find((p) => p.source === "db") ?? null;
@@ -281,6 +310,22 @@ export default async function HoyPage({
                   : `WhatsApp: ${pendingReminders} mensajes pendientes`}
           </Link>
         ) : null}
+
+        {tarjetasPorEnviar === 0 ? null : (
+          <div role="status" className="ui-callout ui-callout--warn">
+            <Icon name="regalo" size={18} />
+            <span>
+              <strong>
+                {tarjetasPorEnviar === 1
+                  ? "1 tarjeta de sellos sin enviar"
+                  : `${tarjetasPorEnviar} tarjetas de sellos sin enviar`}
+              </strong>
+              {" — "}
+              clientas que todavía no saben que la tienen. Mándalas desde{" "}
+              <Link href="/fidelidad">Fidelidad</Link>.
+            </span>
+          </div>
+        )}
 
         {sinMarcar.length === 0 ? null : (
           <div role="status" className="ui-callout ui-callout--warn">

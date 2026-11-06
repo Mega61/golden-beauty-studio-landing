@@ -25,6 +25,7 @@ import { legacyAppointmentRepository } from "./legacy-appointment";
 import { legacyPaymentRepository } from "./legacy-payment";
 import { pushSubscriptionRepository } from "./push-subscription";
 import { serviceMapRepository } from "./service-map";
+import { stampeeCardShareRepository } from "./stampee-card-share";
 import { staffTotpRepository } from "./staff-totp";
 import { stationRepository } from "./station";
 import { waMessageRepository } from "./wa-message";
@@ -51,6 +52,7 @@ export function repositories(db: Db) {
     legacyPayments: legacyPaymentRepository(db),
     pushSubscriptions: pushSubscriptionRepository(db),
     serviceMap: serviceMapRepository(db),
+    stampeeCardShares: stampeeCardShareRepository(db),
     staffTotp: staffTotpRepository(db),
     stations: stationRepository(db),
     waMessages: waMessageRepository(db),
@@ -94,6 +96,7 @@ export { legacyPaymentRepository } from "./legacy-payment";
 export { pushSubscriptionRepository } from "./push-subscription";
 export type { DeliverableSubscription, PushSubscriptionInput } from "./push-subscription";
 export { serviceMapRepository } from "./service-map";
+export { stampeeCardShareRepository } from "./stampee-card-share";
 export { staffTotpRepository } from "./staff-totp";
 export { stationRepository } from "./station";
 export { waMessageRepository } from "./wa-message";

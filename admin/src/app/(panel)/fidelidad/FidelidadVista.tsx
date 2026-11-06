@@ -9,6 +9,7 @@ import type { CampaignStats, LoyaltyCard } from "@/lib/stampee/model";
 
 import styles from "./fidelidad.module.css";
 import { RedeemButton } from "./RedeemButton";
+import { ShareCardButton } from "./ShareCardButton";
 
 export type FidelidadRow = {
   key: string;
@@ -18,6 +19,11 @@ export type FidelidadRow = {
   fichaHref: string | null;
   /** La tarjeta pública en Stampee, como la ve la clienta. */
   cardUrl: string | null;
+  /**
+   * El botón "Enviar tarjeta" por WhatsApp; `null` sin celular usable o sin
+   * `STAMPEE_APP_URL`. `pending`: tarjeta reciente que nadie le ha mandado.
+   */
+  share: { sent: boolean; pending: boolean } | null;
   card: LoyaltyCard;
 };
 
@@ -51,6 +57,7 @@ export function FidelidadVista({
   const [campaign, setCampaign] = useState<string>("todas");
 
   const listas = rows.filter((r) => r.card.stage === "lista");
+  const porEnviar = rows.filter((r) => r.share?.pending);
   const cerca = rows.filter((r) => r.card.stage === "cerca");
   const withCards = campaigns.filter((c) => c.active > 0 || c.canjeadas > 0 || c.enabled);
 
@@ -73,8 +80,26 @@ export function FidelidadVista({
         <Kpi etiqueta="Premio listo" valor={listas.length} tono={listas.length > 0 ? "ok" : undefined} nota="tarjeta llena, sin aplicar" />
         <Kpi etiqueta="A punto" valor={cerca.length} tono={cerca.length > 0 ? "warn" : undefined} nota="les faltan 1 o 2 sellos" />
         <Kpi etiqueta="Tarjetas activas" valor={rows.length} />
+        {porEnviar.length === 0 ? null : (
+          <Kpi etiqueta="Por enviar" valor={porEnviar.length} tono="warn" nota="tarjetas nuevas sin mandar" />
+        )}
         <Kpi etiqueta="Premios aplicados" valor={redeemedTotal} nota="desde que empezó Stampee" />
       </div>
+
+      {porEnviar.length === 0 ? null : (
+        <Card padded={false}>
+          <CardHead title="Tarjetas por enviar" />
+          <p className={styles.lead}>
+            El CRM les creó la tarjeta la noche después de su visita, pero Stampee no se la manda a
+            nadie: si no se la enviamos, no saben que la tienen.
+          </p>
+          <ul className={styles.list}>
+            {porEnviar.map((row) => (
+              <Fila key={row.key} row={row} canRedeem={false} />
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card padded={false}>
         <CardHead title="Premio listo para aplicar" />
@@ -209,6 +234,7 @@ function Fila({ row, canRedeem }: { row: FidelidadRow; canRedeem: boolean }) {
         {canRedeem && card.stage === "lista" ? (
           <RedeemButton cardId={card.id} customerName={row.clientName} rewardName={card.rewardName} />
         ) : null}
+        {row.share ? <ShareCardButton cardId={card.id} sent={row.share.sent} /> : null}
         {row.cardUrl ? (
           <a
             className="ui-btn ui-btn--ghost ui-btn--sm"
