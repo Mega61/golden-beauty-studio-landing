@@ -85,8 +85,8 @@ function resolveStorage(): DraftStorage | null {
  * Traduce el resultado de la Server Action al vocabulario de la cola.
  *
  * `retryable` lo decide el servidor y no este archivo: solo él sabe si el
- * problema fue "la base no contestó" (se reintenta) o "esta cuenta ya está en
- * un cierre diario" (no se reintenta nunca).
+ * problema fue "la base no contestó" (se reintenta) o "esta cuenta ya llegó a
+ * Actual y solo la dueña la corrige" (no se reintenta nunca).
  */
 function outcomeOf(result: CloseTicketResult): SendOutcome {
   if (result.ok) return { status: "ok" };

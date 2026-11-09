@@ -10,6 +10,7 @@ import type {
 import type { CommissionRuleInput } from "@/lib/commission";
 import { parseEaLocalDate, type EaLocalDate } from "@/lib/ea";
 
+import type { PendingCharge } from "@/lib/pending-charges";
 import {
   CommissionRunError,
   fortnightBlockers,
@@ -810,14 +811,14 @@ describe("fortnightBlockers", () => {
   function assessment(over: Partial<FortnightAssessment> = {}): FortnightAssessment {
     return {
       period: QUINCENA,
-      missingDayCloses: [],
+      unbilled: [],
       flaggedEntries: 0,
       open: false,
       ...over,
     };
   }
 
-  it("con la quincena cerrada, todo cerrado y nada marcado, no bloquea nada", () => {
+  it("con la quincena terminada, todo cobrado y nada marcado, no bloquea nada", () => {
     expect(fortnightBlockers(assessment())).toEqual([]);
   });
 
@@ -827,14 +828,29 @@ describe("fortnightBlockers", () => {
     ]);
   });
 
-  it("devuelve los días sin cierre de caja, no una frase", () => {
+  it("devuelve las citas sin cobrar como días y cuenta, no como frase", () => {
     // El bloqueo viaja como dato: la frase la arma la pantalla, que es la que
     // sabe escribir "viernes 4 de septiembre". El motor corre también en un
     // cron y no tiene por qué conocer ese formato.
-    const días = [parseEaLocalDate("2026-09-04"), parseEaLocalDate("2026-09-07")];
-    expect(fortnightBlockers(assessment({ missingDayCloses: días }))).toEqual([
-      { kind: "sin-cierre", days: días },
-    ]);
+    const pendiente = (id: number, date: string): PendingCharge => ({
+      date: parseEaLocalDate(date),
+      eaAppointmentId: id,
+      kind: "sin-cobrar",
+      customerName: "Clienta",
+      providerName: "Lina",
+      message: "Sin cobrar",
+    });
+    expect(
+      fortnightBlockers(
+        assessment({
+          unbilled: [pendiente(3, "2026-09-07"), pendiente(1, "2026-09-04"), pendiente(2, "2026-09-04")],
+        }),
+      ),
+    ).toEqual([{ kind: "sin-cobrar", days: ["2026-09-04", "2026-09-07"], count: 3 }]);
+  });
+
+  it("sin agenda bloquea: no se sabe si quedó alguna sin cobrar", () => {
+    expect(fortnightBlockers(assessment({ unbilled: null }))).toEqual([{ kind: "sin-agenda" }]);
   });
 
   it("bloquea por los renglones sin regla, con su cuenta", () => {
@@ -848,10 +864,10 @@ describe("fortnightBlockers", () => {
       fortnightBlockers(
         assessment({
           open: true,
-          missingDayCloses: [parseEaLocalDate("2026-09-04")],
+          unbilled: null,
           flaggedEntries: 2,
         }),
       ).map((blocker) => blocker.kind),
-    ).toEqual(["en-curso", "sin-cierre", "sin-regla"]);
+    ).toEqual(["en-curso", "sin-agenda", "sin-regla"]);
   });
 });

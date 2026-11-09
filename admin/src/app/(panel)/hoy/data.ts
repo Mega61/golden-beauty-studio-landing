@@ -93,7 +93,7 @@ function financeViewOf(
       varianceReason: "",
       houseCourtesy: false,
       closedAt: null,
-      frozenByDayClose: false,
+      syncedToActual: false,
       snapshot: null,
       snapshotSource: null,
       items: [],
@@ -122,7 +122,7 @@ function financeViewOf(
     varianceReason: row.variance_reason ?? "",
     houseCourtesy: row.is_house_courtesy === 1,
     closedAt: row.closed_at === null ? null : instantToEaLocal(row.closed_at),
-    frozenByDayClose: row.day_close_id !== null,
+    syncedToActual: row.pushed_to_ingest_at !== null,
     snapshot: row.service_price_snapshot,
     snapshotSource: row.snapshot_source,
   };

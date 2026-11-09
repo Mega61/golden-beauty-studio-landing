@@ -28,13 +28,12 @@ import type { IngestPayment } from "@/lib/ingest-payload";
 import { houseCourtesyTicket, type TicketItemInput } from "@/lib/ticket";
 
 import {
-  fortnightDays,
   fortnightOf,
   markFortnightPaid,
   markFortnightReviewed,
   runFortnight,
 } from "./commission-run";
-import { closeDay, recordAdjustment, retryDayPush, type DayAppointment } from "./day-close";
+import { recordAdjustment, retryDayPush, syncDay, type DayAppointment } from "./day-close";
 
 /**
  * Cortesía de la casa contra un **MySQL real**: lo que decide la base y no el
@@ -247,17 +246,16 @@ describe.skipIf(!canRunDbTests())(
         async () => {
           const id = await sembrarCuenta(db, { eaAppointmentId: 5001, cortesia: true });
           await runFortnight({ db }, { period: QUINCENA, actorUserId: OWNER_ID, now: DESPUES });
-          await cerrarTodosLosDias(db);
 
           expect(
             await markFortnightReviewed(
-              { db },
+              { db, loadRange: async () => [] },
               { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
             ),
           ).toMatchObject({ ok: true });
           expect(
             await markFortnightPaid(
-              { db },
+              { db, loadRange: async () => [] },
               { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
             ),
           ).toMatchObject({ ok: true });
@@ -297,7 +295,7 @@ describe.skipIf(!canRunDbTests())(
 
     // ── El cierre del día ───────────────────────────────────────────────
 
-    describe("el cierre del día", () => {
+    describe("la sincronización del día", () => {
       it(
         "congela la cortesía, no la suma y no le manda nada al CRM",
         async () => {
@@ -315,14 +313,13 @@ describe.skipIf(!canRunDbTests())(
             ingest: fakeIngest(ingest),
           };
 
-          const result = await closeDay(deps, { date: DIA, closedBy: OWNER_ID, now: OCHO_PM });
-          if (!result.ok) throw new Error(`no cerró: ${JSON.stringify(result)}`);
+          const result = await syncDay(deps, { date: DIA, now: OCHO_PM });
+          if (result.state !== "sincronizado") throw new Error(`no sincronizó: ${JSON.stringify(result)}`);
           expect(result.totals).toMatchObject({
             ingreso: 210_000,
             efectivo: 210_000,
             tips: 10_000,
             count: 1,
-            cortesias: 1,
           });
           expect(result.push).toMatchObject({ state: "hecho", sent: 1 });
 
@@ -365,11 +362,14 @@ describe.skipIf(!canRunDbTests())(
             ingest: fakeIngest(ingest),
           };
 
-          const result = await closeDay(deps, { date: DIA, closedBy: OWNER_ID, now: OCHO_PM });
-          if (!result.ok) throw new Error(`no cerró: ${JSON.stringify(result)}`);
-          expect(result.totals).toMatchObject({ ingreso: 0, count: 0, cortesias: 1 });
+          const result = await syncDay(deps, { date: DIA, now: OCHO_PM });
+          if (result.state !== "sincronizado") throw new Error(`no sincronizó: ${JSON.stringify(result)}`);
+          expect(result.totals).toMatchObject({ ingreso: 0, count: 0 });
           expect(result.push).toEqual({ state: "vacio" });
           expect(ingest.lotes).toEqual([]);
+          // Nada que mandar es estar al día: el cierre no queda en la cola de
+          // reintento para siempre, ni sale en Caja como "no llegó al CRM".
+          expect(await repositories(db).dayCloses.listPendingPush()).toEqual([]);
         },
         TEST_TIMEOUT,
       );
@@ -384,7 +384,7 @@ describe.skipIf(!canRunDbTests())(
             loadAppointments: async () => [cita(102)],
             ingest: fakeIngest(ingest),
           };
-          await closeDay(deps, { date: DIA, closedBy: OWNER_ID, now: OCHO_PM });
+          await syncDay(deps, { date: DIA, now: OCHO_PM });
 
           const ajuste = await recordAdjustment(deps, {
             eaAppointmentId: 102,
@@ -515,15 +515,4 @@ async function sembrarCuenta(
     closed_at: start,
   });
   return row.id;
-}
-
-async function cerrarTodosLosDias(db: Kysely<Database>): Promise<void> {
-  const { dayCloses } = repositories(db);
-  for (const day of fortnightDays(QUINCENA)) {
-    await dayCloses.insert({
-      close_date: day,
-      closed_by: OWNER_ID,
-      closed_at: eaLocalToInstant(dt(`${day} 20:00:00`)),
-    });
-  }
 }

@@ -134,6 +134,7 @@ function fila(over: Record<string, unknown> = {}): Record<string, unknown> {
     appointment_start_at: new Date("2026-10-14T15:00:00Z"),
     closed_at: null,
     day_close_id: null,
+    pushed_to_ingest_at: null,
     ...over,
   };
 }

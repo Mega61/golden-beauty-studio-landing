@@ -20,7 +20,7 @@ import { CASOS, fixtureComisionesView, parseCaso } from "./fixtures";
  *
  * | Caso | Qué se ve |
  * | --- | --- |
- * | `bloqueada` (default) | Dos días de caja sin cerrar y un renglón sin regla: la revisión bloqueada, y una cuenta cerrada sin comisión |
+ * | `bloqueada` (default) | Dos citas atendidas sin cobrar y un renglón sin regla: la revisión bloqueada, y una cuenta cerrada sin comisión |
  * | `lista` | Todo revisado: el botón de pagar, con su confirmación en el sitio |
  * | `pagada` | La quincena de una técnica cerrada, la de la otra en borrador |
  * | `vacia` | La quincena sin calcular |

@@ -445,7 +445,7 @@ describe("ingestPushCheck", () => {
   it("verde sin pendientes", () => {
     const result = ingestPushCheck({ lastPush: ago(HOUR), pending: 0, now: NOW });
     expect(result.level).toBe("ok");
-    expect(result.detail).toContain("por cierre diario");
+    expect(result.detail).toContain("sale solo cada noche");
   });
 
   it("amarillo con pendientes, y dice que esa plata no está en Actual", () => {

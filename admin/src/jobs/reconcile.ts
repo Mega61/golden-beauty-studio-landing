@@ -14,11 +14,17 @@ import {
 
 import { syncComboTable, type ComboSyncResult } from "@/lib/combo-source";
 
-import { ingestConfigFromEnv } from "@/lib/ingest-client";
+import { createIngestClient, ingestConfigFromEnv } from "@/lib/ingest-client";
+import {
+  labelDayPayments,
+  loadDayAppointments,
+  loadRangeAppointments,
+} from "@/app/(panel)/caja/data";
 
 import { runAttendanceBackfill, summarizeAttendanceBackfill } from "./attendance-backfill";
 import { pushCrmVisits, recordCrmVisits, summarizeCrmVisits } from "./crm-visits";
-import { pushUnclosedDays, summarizeUnclosedDaysPush } from "./unclosed-days";
+import { runAndRecordNightlySync } from "./nightly-sync";
+import { pushPendingCharges, summarizePendingChargesPush } from "./pending-charges";
 
 import {
   createServicePriceCache,
@@ -393,11 +399,25 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<Reconc
     // Después de la asistencia, para que una "Completada" escrita esta noche
     // llegue al CRM como visita hecha.
     await pushVisitsToCrm(db, ea, env);
-    // Al final: avisa de la plata cobrada que no llegó a un cierre de caja.
-    // Mejor esfuerzo y nunca lanza, como lo anterior.
-    const unclosed = await pushUnclosedDays({ db, env });
-    const line = `reconcile: ${summarizeUnclosedDaysPush(unclosed)}`;
-    if (unclosed.state === "fallo") console.error(line);
+    // La caja: lo cobrado sale solo para el CRM y Actual, sin que nadie
+    // cierre el día. Antes del `actual-sync` de las 06:30. Nunca lanza.
+    const config = ingestConfigFromEnv(env);
+    const sync = await runAndRecordNightlySync(
+      {
+        db,
+        loadAppointments: loadDayAppointments(ea),
+        ingest: config === null ? null : createIngestClient(config),
+        labelPayments: labelDayPayments(ea),
+      },
+      { env },
+    );
+    if (sync.startsWith("⚠")) console.error(`reconcile: ${sync}`);
+    else console.log(`reconcile: ${sync}`);
+    // Al final: avisa de las citas de la semana que quedaron sin cobrar —lo
+    // único que la sincronización no puede hacer sola—. Mejor esfuerzo.
+    const pending = await pushPendingCharges({ db, loadRange: loadRangeAppointments(ea), env });
+    const line = `reconcile: ${summarizePendingChargesPush(pending)}`;
+    if (pending.state === "fallo") console.error(line);
     else console.log(line);
     return report;
   } finally {

@@ -18,30 +18,34 @@ describe("describeBlocker", () => {
     );
   });
 
-  it("nombra el día suelto sin cierre de caja", () => {
-    expect(describeBlocker({ kind: "sin-cierre", days: ["2026-09-04"] })).toBe(
-      "El viernes 4 de septiembre no tiene cierre de caja.",
+  it("nombra la cita suelta sin cobrar y su día", () => {
+    expect(describeBlocker({ kind: "sin-cobrar", days: ["2026-09-04"], count: 1 })).toBe(
+      "Queda una cita atendida sin cobrar en el periodo: el viernes 4 de septiembre.",
     );
   });
 
   it("lista hasta tres días y cuenta el resto", () => {
     expect(
-      describeBlocker({ kind: "sin-cierre", days: ["2026-09-01", "2026-09-02", "2026-09-03"] }),
+      describeBlocker({ kind: "sin-cobrar", days: ["2026-09-01", "2026-09-02", "2026-09-03"], count: 4 }),
     ).toBe(
-      "3 días del periodo no tienen cierre de caja: martes 1 de septiembre, " +
+      "Quedan 4 citas atendidas sin cobrar en el periodo: martes 1 de septiembre, " +
         "miércoles 2 de septiembre, jueves 3 de septiembre.",
     );
 
-    // Con quince días sin cerrar, nombrarlos todos es un párrafo que nadie lee.
     expect(
       describeBlocker({
-        kind: "sin-cierre",
+        kind: "sin-cobrar",
         days: ["2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-07"],
+        count: 5,
       }),
     ).toBe(
-      "5 días del periodo no tienen cierre de caja: martes 1 de septiembre, " +
-        "miércoles 2 de septiembre, jueves 3 de septiembre y 2 más.",
+      "Quedan 5 citas atendidas sin cobrar en el periodo: martes 1 de septiembre, " +
+        "miércoles 2 de septiembre, jueves 3 de septiembre y 2 días más.",
     );
+  });
+
+  it("sin agenda no afirma que esté todo cobrado", () => {
+    expect(describeBlocker({ kind: "sin-agenda" })).toContain("No se pudo leer la agenda");
   });
 
   it("distingue singular y plural en los renglones marcados", () => {

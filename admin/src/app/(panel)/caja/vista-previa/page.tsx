@@ -13,25 +13,25 @@ import { CASOS, fixtureCajaView, parseCaso } from "./fixtures";
  * Existe por lo mismo que `/admin/agenda/vista-previa` y `/admin/hoy/demo`: la
  * pantalla se revisa a 390, 768 y 1440 px, y para pintar un día con pendientes
  * de verdad hacen falta EA, MySQL y una jornada sembrada. El estado que hay que
- * poder mirar —**la lista de pendientes con el cierre bloqueado**— es
- * justamente el que no se puede provocar a mano en una base limpia.
+ * poder mirar —**la lista de pendientes**— es justamente el que no se puede
+ * provocar a mano en una base limpia.
  *
  * Los cuatro casos, con `?caso=`:
  *
  * | Caso | Qué se ve |
  * | --- | --- |
- * | `pendientes` (default) | Una cita atendida sin cuenta y una cuenta sin método: el cierre bloqueado por los dos motivos |
- * | `limpio` | Nada pendiente y el botón de cerrar habilitado |
- * | `cerrado` | El día ya cerrado, su lote sin empujar, y un cierre anterior también pendiente |
- * | `sin-agenda` | EA sin responder: solo lectura, cuentas visibles, cierre bloqueado |
+ * | `pendientes` (default) | Una cita atendida sin cobrar y una cuenta sin método; el resto sale esta noche |
+ * | `limpio` | Nada pendiente, todo listo para salir esta noche |
+ * | `sincronizado` | Casi todo ya en Actual, una cuenta tardía por salir, y un día anterior cuyo envío falló |
+ * | `sin-agenda` | EA sin responder: las cuentas se ven y se sincronizan igual |
  *
  * **No sale a producción.** Son cuentas y clientas inventadas, y en la pantalla
  * con la que se decide si la caja cuadra un dato falso indistinguible de uno
  * verdadero es exactamente el error que no se puede cometer. `notFound()` en
  * producción lo deja fuera.
  *
- * Los botones **no están cableados a nada distinto** de la pantalla real: son
- * los mismos de `CajaAcciones`, así que apretarlos llama a la Server Action de
+ * El botón **no está cableado a nada distinto** de la pantalla real: es el
+ * mismo de `CajaAcciones`, así que apretarlo llama a la Server Action de
  * verdad y ésta rebota por permisos o por configuración. Se dibuja el control,
  * no se simula la escritura — un botón de mentira no prueba nada del real.
  */
@@ -62,17 +62,6 @@ export default async function VistaPreviaPage({
     <AppShell
       role="reception"
       title="Caja (banco de pruebas)"
-      readOnly={
-        elegido === "sin-agenda"
-          ? {
-              reason:
-                // Sin punto final y sin "así que": `ReadOnlyBand` cierra la
-                // frase por su cuenta con ", así que por ahora no se puede
-                // crear ni modificar nada".
-                "No se pudo leer la agenda y el cierre del día queda bloqueado",
-            }
-          : undefined
-      }
     >
       <div style={{ display: "grid", gap: "1rem" }}>
         <nav

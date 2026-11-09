@@ -21,8 +21,14 @@ export const JOB_DAY_CLOSE_PUSH = "day-close-push";
 export const JOB_WHATSAPP_REMINDERS = "whatsapp-recordatorios";
 /** El push nocturno de visitas al CRM (`jobs/crm-visits.ts`). */
 export const JOB_CRM_VISITS = "crm-visitas";
-/** El aviso nocturno de días de caja sin cerrar (`jobs/unclosed-days.ts`). */
+/**
+ * El aviso nocturno de citas de días anteriores sin cobrar
+ * (`jobs/unclosed-days.ts`). El nombre es de cuando avisaba de días de caja sin
+ * cerrar; se conserva para no partir el historial de `job_run`.
+ */
 export const JOB_UNCLOSED_DAYS = "caja-sin-cerrar";
+/** La sincronización nocturna de la caja con el CRM (`jobs/nightly-sync.ts`). */
+export const JOB_CASH_SYNC = "caja-sincronizacion";
 
 /**
  * `summary` es `VARCHAR(500)`.

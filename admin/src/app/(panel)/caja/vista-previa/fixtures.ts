@@ -1,15 +1,15 @@
 import { parseEaLocalDate, parseEaLocalDateTime, type EaLocalDateTime } from "@/lib/ea";
 import { reviewDay, type DayAccount, type DayAppointment } from "@/jobs/day-close";
 
-import type { CajaView } from "../data";
+import { unsyncedOf, type CajaView } from "../data";
 
 /**
  * Días de mentira para revisar la pantalla de Caja sin EA ni cuentas reales.
  *
- * Los tres casos que hay que poder mirar de a 390, 768 y 1440 px son estados
- * distintos de la misma pantalla, y el del medio es el que importa: **la lista
- * de pendientes con el cierre bloqueado**. Un día limpio se ve bien por
- * accidente.
+ * Los casos que hay que poder mirar de a 390, 768 y 1440 px son estados
+ * distintos de la misma pantalla, y el que importa es **la lista de
+ * pendientes**: una cita sin cobrar y una cuenta sin método, con el resto del
+ * día listo para salir. Un día limpio se ve bien por accidente.
  *
  * La revisión **pasa por `reviewDay()`**, no por un `DayReview` escrito a mano.
  * Un fixture que fabricara los `issues` directamente podría mostrar una
@@ -17,7 +17,7 @@ import type { CajaView } from "../data";
  * revisando es un dibujo, no la pantalla.
  */
 
-export const CASOS = ["pendientes", "limpio", "cerrado", "sin-agenda"] as const;
+export const CASOS = ["pendientes", "limpio", "sincronizado", "sin-agenda"] as const;
 export type Caso = (typeof CASOS)[number];
 
 export function parseCaso(raw: string | undefined): Caso {
@@ -26,7 +26,7 @@ export function parseCaso(raw: string | undefined): Caso {
 
 const DIA = parseEaLocalDate("2026-09-03");
 
-/** Las 7:40 p. m. del día del estudio: la hora en que se cierra la caja. */
+/** Las 7:40 p. m. del día del estudio, después de la última cita. */
 const AHORA = new Date("2026-09-04T00:40:00Z");
 
 function wall(time: string): EaLocalDateTime {
@@ -96,7 +96,7 @@ const CITAS: DayAppointment[] = [
   cita(107, "19:30:00", "21:00:00", "Juliana Arango", "Lina", "Confirmada"),
 ];
 
-/** Todas cerradas y con método: el día se puede cerrar. */
+/** Todas cobradas y con método: nada pendiente. */
 const CUENTAS_LIMPIAS: DayAccount[] = [
   cuenta(1, 101, 180_000, "efectivo", 20_000),
   cuenta(2, 102, 240_000, "transferencia"),
@@ -106,10 +106,10 @@ const CUENTAS_LIMPIAS: DayAccount[] = [
 ];
 
 export function fixtureCajaView(caso: Caso): CajaView {
-  const cerrado = caso === "cerrado";
+  const sincronizado = caso === "sincronizado";
 
-  // El caso con pendientes: a la 103 nadie le cerró la cuenta y la 105 quedó
-  // cobrada sin método. Las dos bloquean, por motivos distintos.
+  // El caso con pendientes: a la 103 nadie le cobró y la 105 quedó cobrada sin
+  // método. Las demás del día salen igual esta noche.
   const cuentas =
     caso === "pendientes"
       ? [
@@ -118,7 +118,13 @@ export function fixtureCajaView(caso: Caso): CajaView {
           cuenta(4, 105, 320_000, null, 15_000),
           cuenta(5, 106, 150_000, "otro"),
         ]
-      : CUENTAS_LIMPIAS.map((c) => (cerrado ? { ...c, dayCloseId: 12, pushedToIngestAt: c.pushedToIngestAt } : c));
+      : CUENTAS_LIMPIAS.map((c, i) =>
+          // Sincronizado: todas ya en Actual menos la última, que se cobró
+          // después de la sincronización y sale esta noche.
+          sincronizado && i < CUENTAS_LIMPIAS.length - 1
+            ? { ...c, dayCloseId: 12, pushedToIngestAt: AHORA }
+            : c,
+        );
 
   const review = reviewDay({
     date: DIA,
@@ -131,8 +137,8 @@ export function fixtureCajaView(caso: Caso): CajaView {
     date: DIA,
     today: DIA,
     review,
-    late: [],
-    dayClose: cerrado
+    unsynced: unsyncedOf(review),
+    dayClose: sincronizado
       ? {
           id: 12,
           close_date: DIA,
@@ -141,13 +147,13 @@ export function fixtureCajaView(caso: Caso): CajaView {
           total_otro: review.totals.otro,
           total_tips: review.totals.tips,
           appointment_count: review.totals.count,
-          closed_by: "usr_demo",
+          closed_by: null,
           closed_at: AHORA,
-          pushed_to_ingest_at: null,
+          pushed_to_ingest_at: AHORA,
           created_at: AHORA,
         }
       : null,
-    pendingPush: cerrado
+    pendingPush: sincronizado
       ? [
           {
             id: 11,
@@ -157,15 +163,13 @@ export function fixtureCajaView(caso: Caso): CajaView {
             total_otro: 0,
             total_tips: 25_000,
             appointment_count: 4,
-            closed_by: "usr_demo",
+            closed_by: null,
             closed_at: AHORA,
             pushed_to_ingest_at: null,
             created_at: AHORA,
           },
         ]
       : [],
-    // El push apagado es el estado real de hoy: la ruta JSON de pagos todavía
-    // no existe en el CRM (ver `lib/ingest-client.ts`).
-    pushEnabled: caso === "cerrado",
+    pushEnabled: true,
   };
 }

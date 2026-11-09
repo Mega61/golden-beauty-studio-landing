@@ -103,7 +103,7 @@ const SIN_CUENTA = {
   varianceReason: "",
   houseCourtesy: false,
   closedAt: null,
-  frozenByDayClose: false,
+  syncedToActual: false,
   snapshot: null,
   snapshotSource: null,
   items: [],

@@ -61,7 +61,7 @@ export const DESTINATIONS: readonly Destination[] = [
     href: "/caja",
     icon: "caja",
     // La técnica cierra la cuenta de sus propias citas desde Hoy, pero no ve
-    // los totales del día ni hace el cierre diario.
+    // los totales del día.
     roles: NO_STAFF,
     bottom: 3,
   },

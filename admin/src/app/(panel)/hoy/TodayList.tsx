@@ -293,7 +293,7 @@ export function TodayList({
           canCharge={canCharge}
           canGiveCourtesy={canGiveCourtesy}
           courtesyFromDefault={current.houseCourtesyDefault && current.finance.closedAt === null}
-          readOnly={readOnly || (current.finance.frozenByDayClose && !canFixAfterClose)}
+          readOnly={readOnly || (current.finance.syncedToActual && !canFixAfterClose)}
           saving={saving}
           dirty={isDirty(draft, baseline)}
           pending={outbox.pending.get(current.eaAppointmentId) ?? null}
@@ -332,7 +332,7 @@ function AppointmentCard({
     finance.performedServiceId !== null &&
     appointment.bookedServiceId !== null &&
     finance.performedServiceId !== appointment.bookedServiceId;
-  const congelada = finance.frozenByDayClose && !canFixAfterClose;
+  const congelada = finance.syncedToActual && !canFixAfterClose;
   // Cancelada y sin cuenta: no hubo servicio, no hay nada que cobrar ni que
   // pedir. La tarjeta se queda (es parte del día) pero aquietada y sin botón.
   const cobrable = canOpenAccount(appointment.status, cerrada);

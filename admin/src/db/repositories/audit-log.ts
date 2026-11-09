@@ -66,6 +66,28 @@ export function auditLogRepository(db: Db) {
         .execute();
     },
 
+    /**
+     * Las entidades que tuvieron una acción desde `since`, sin repetir.
+     *
+     * La usa la sincronización nocturna para encontrar las cuentas con ajustes
+     * registrados, y de ahí los que todavía no llegaron a Actual.
+     */
+    async listEntityIdsWithAction(
+      entity: string,
+      action: string,
+      since: Date,
+    ): Promise<string[]> {
+      const rows = await db
+        .selectFrom("audit_log")
+        .select("entity_id")
+        .distinct()
+        .where("entity", "=", entity)
+        .where("action", "=", action)
+        .where("created_at", ">=", since)
+        .execute();
+      return rows.map((row) => row.entity_id);
+    },
+
     /** "Qué hizo esta persona en el periodo", para la revisión de la quincena. */
     async listByActor(
       actorUserId: AuthId,

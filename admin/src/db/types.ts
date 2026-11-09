@@ -333,7 +333,11 @@ export interface DayCloseTable {
   total_otro: Generated<Cop>;
   total_tips: Generated<Cop>;
   appointment_count: Generated<number>;
-  closed_by: AuthId;
+  /**
+   * `null` = lo armó la sincronización nocturna (migración `030`). Desde
+   * 2026-11-09 es el caso normal: nadie cierra el día a mano.
+   */
+  closed_by: AuthId | null;
   closed_at: SqlDateTime;
   pushed_to_ingest_at: SqlDateTime | null;
   created_at: CreatedAt;

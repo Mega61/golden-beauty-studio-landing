@@ -471,7 +471,7 @@ async function sendCancellation(
 
 /**
  * Un aviso para quienes cierran la caja (`caja:cerrar-dia`). Lo usa el job de
- * días sin cerrar, que corre fuera de Next con su propia conexión: por eso
+ * citas sin cobrar, que corre fuera de Next con su propia conexión: por eso
  * recibe `db` y las llaves en vez de leerlas del proceso.
  *
  * Devuelve cuántos dispositivos lo aceptaron. Puede lanzar: quien llama lo
