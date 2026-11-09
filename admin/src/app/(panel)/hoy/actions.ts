@@ -19,6 +19,7 @@ import {
   validateHouseCourtesyClose,
   validateTicketClose,
 } from "@/lib/ticket";
+import { recordEditAdjustment, refreshDayCloseTotals } from "@/jobs/day-close";
 import { upsertAppointmentFinance } from "@/jobs/snapshot";
 import {
   DRAFT_VERSION,
@@ -89,6 +90,15 @@ import { detectFirstVisit, type FirstVisitStatus } from "./first-visit";
  * reintenta. El `PUT` sí sincroniza el evento de Google (cuyo contenido no
  * cambia), y EA avisa por correo "la cita cambió" a la clienta si tiene correo
  * y a la técnica si tiene sus notificaciones de EA prendidas.
+ *
+ * ## Corregir una cuenta que ya se sincronizó
+ *
+ * Se puede, y es el mismo botón. Lo único distinto pasa por debajo: la
+ * diferencia de lo cobrado queda como `ticket.adjust` en la bitácora y la
+ * sincronización de la noche la manda a Actual como movimiento aparte, porque
+ * Actual no cambia el monto de algo ya importado. Corregir una cuenta así es
+ * de la dueña (`cuenta:corregir-tras-cierre`), y la propina no viaja en el
+ * ajuste.
  *
  * ## Cortesía de la casa
  *
@@ -278,12 +288,13 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     );
   }
 
-  if (existing.day_close_id !== null) {
-    // Después del cierre diario los números ya salieron hacia Strapi y Actual
-    // Budget, y editarlos en sitio los desincroniza en silencio. La corrección
-    // es un **ajuste** con su propio motivo, y esa pantalla es de C3/D1: acá se
-    // rechaza de frente en vez de escribir algo que nadie va a poder conciliar.
-    return rechazo("Esta cuenta ya entró al cierre del día. Corregirla exige un ajuste.");
+  // Una cuenta que ya llegó a Actual **se puede corregir** (desde 2026-11-09;
+  // antes exigía un ajuste aparte desde Caja). La diferencia viaja sola como
+  // ajuste en la sincronización de la noche (`recordEditAdjustment()`), así que
+  // acá solo se decide quién puede y qué no tiene arreglo por ese camino.
+  const synced = existing.pushed_to_ingest_at !== null;
+  if (synced && !can(session.role, "cuenta:corregir-tras-cierre")) {
+    return rechazo("Esta cuenta ya se sincronizó con Actual. Solo la dueña la puede corregir.");
   }
 
   // --- Los renglones, valorados acá ---------------------------------------
@@ -385,6 +396,22 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     throw error;
   }
 
+  if (synced && (existing.amount_charged ?? 0) !== totals.amountCharged) {
+    // Un ajuste sale con el método de la cuenta y nunca de una cortesía
+    // (`buildIngestAdjustment()`): sin esto quedaría registrado un ajuste que
+    // no puede viajar, y Actual se quedaría con la cifra vieja sin que nadie lo
+    // note.
+    if (houseCourtesy) {
+      return rechazo(
+        "Esta cuenta ya llegó a Actual con su cobro, así que ya no se puede volver cortesía. " +
+          "Corrige el total y escribe el motivo.",
+      );
+    }
+    if (payments.length === 0) {
+      return rechazo("Esta cuenta ya llegó a Actual: para corregir el total elige el método de pago.");
+    }
+  }
+
   const paidAt = payments.length === 0 ? null : (existing.appointment_start_at ?? now);
 
   const rows: Omit<NewAppointmentFinanceItem, "appointment_finance_id">[] = totals.lines.map(
@@ -483,11 +510,29 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
         reason: varianceReasonCode,
         at: now,
       });
+      // Si la cuenta ya había llegado a Actual, la diferencia queda como
+      // ajuste en la misma transacción: la corrección y su ajuste son una sola
+      // cosa, o ninguna.
+      if (synced) {
+        await recordEditAdjustment(trx, {
+          financeId,
+          before: existing.amount_charged ?? 0,
+          after: totals.amountCharged,
+          actorUserId: session.userId,
+          now,
+        });
+      }
     });
   } catch (error) {
     unstable_rethrow(error);
     console.error("[hoy] no se pudo guardar la cuenta", error);
     return masTarde("No se pudo guardar. Queda pendiente y se reintenta solo.");
+  }
+
+  // Una cuenta que ya estaba en el cierre de su día cambia los totales que
+  // Caja muestra para cuadrar el cajón. Mejor esfuerzo: la cuenta ya quedó.
+  if (existing.day_close_id !== null) {
+    await refreshDayCloseTotals(db, existing.day_close_id);
   }
 
   await marcarCompletadaAlCerrar(ea, appointment);

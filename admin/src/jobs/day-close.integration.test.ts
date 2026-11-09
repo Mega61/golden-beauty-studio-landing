@@ -20,28 +20,29 @@ import { IngestError, toStrapiPayment, type IngestClient } from "@/lib/ingest-cl
 import type { IngestPayment } from "@/lib/ingest-payload";
 
 import {
-  attachLateAccounts,
-  closeDay,
   recordAdjustment,
+  recordEditAdjustment,
   retryAdjustmentPush,
   retryDayPush,
+  syncDay,
   type DayAppointment,
   type DayCloseDeps,
 } from "./day-close";
+import { runNightlySync, summarizeNightlySync } from "./nightly-sync";
 
 /**
- * Capa 2 de C3: el cierre diario contra un **MySQL real**.
+ * Capa 2 de C3: la sincronización de la caja contra un **MySQL real**.
  *
  * Lo que se verifica acá no se puede verificar con un doble del driver, porque
  * lo que decide es la base:
  *
- * - **La compuerta.** Que el día no cierre con una cita atendida sin cuenta, y
- *   que cuando no cierra **no haya escrito nada**: ni fila `day_close`, ni
- *   `day_close_id` en las cuentas.
- * - **La idempotencia.** `uq_day_close_date` es lo que hace que un día se
- *   cierre una sola vez; sin un MySQL de verdad, "cerrar dos veces no duplica"
- *   sería una afirmación sobre un `if`. Y el push tampoco se repite, porque la
- *   marca `pushed_to_ingest_at` es una columna, no una variable.
+ * - **Sin compuerta.** Que lo cobrado viaje aunque quede una cita sin cobrar o
+ *   una cuenta sin método, y que lo incompleto se quede afuera sin frenar al
+ *   resto.
+ * - **La idempotencia.** `uq_day_close_date` es lo que hace que un día tenga
+ *   una sola fila aunque se sincronice dos veces a la vez; sin un MySQL de
+ *   verdad, "no duplica" sería una afirmación sobre un `if`. Y el push tampoco
+ *   se repite, porque la marca `pushed_to_ingest_at` es una columna.
  * - **El camino de ajuste.** Que una corrección posterior al cierre entre como
  *   renglón nuevo con su propio `imported_id` —nunca reescribiendo el
  *   original— y que reintentar su push mande **el mismo** id y no el siguiente.
@@ -101,26 +102,6 @@ function idsRecibidos(estado: IngestEstado): string[] {
   return estado.lotes.flat().map((p) => toStrapiPayment(p).tx_id);
 }
 
-/**
- * Una barrera de `n` participantes: nadie sigue hasta que llegaron todos.
- *
- * Es cómo se prueba una carrera sin depender del azar del planificador. Un test
- * de concurrencia que pasa "casi siempre" no prueba nada: el día que la carrera
- * se pierda de verdad, en producción, este test habrá estado verde.
- */
-function enBarrera(n: number): () => Promise<void> {
-  let llegaron = 0;
-  let abrir: () => void = () => {};
-  const puerta = new Promise<void>((resolve) => {
-    abrir = resolve;
-  });
-  return async () => {
-    llegaron += 1;
-    if (llegaron >= n) abrir();
-    await puerta;
-  };
-}
-
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
 function cita(over: Partial<DayAppointment> & { eaAppointmentId: number }): DayAppointment {
@@ -174,56 +155,12 @@ describe.skipIf(!canRunDbTests())(
 
     // ── La compuerta ───────────────────────────────────────────────────────
 
-    describe("la compuerta", () => {
+    describe("sincronizar un día", () => {
       it(
-        "no cierra el día con una cita atendida sin cuenta, y no escribe nada",
+        "manda lo cobrado aunque quede una cita sin cobrar, y crea el cierre solo",
         async () => {
-          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true });
-          await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: false });
-
-          const result = await closeDay(
-            deps([cita({ eaAppointmentId: 1 }), cita({ eaAppointmentId: 2 })]),
-            { date: DIA, closedBy: OWNER_ID, now: OCHO_PM },
-          );
-
-          expect(result.ok).toBe(false);
-          if (result.ok) throw new Error("no debería haber cerrado");
-          if (result.reason !== "compuerta") throw new Error("debería ser la compuerta");
-          expect(result.review.issues.filter((issue) => issue.blocks)).toHaveLength(1);
-
-          // Y lo que importa: **nada quedó escrito**. Un `day_close` a medio
-          // hacer sería peor que no haber cerrado, porque congelaría cuentas
-          // que después nadie puede corregir sin un ajuste.
-          expect(await cierres(db)).toHaveLength(0);
-          const filas = await cuentas(db);
-          expect(filas.every((f) => f.day_close_id === null)).toBe(true);
-          expect(ingest.lotes).toHaveLength(0);
-        },
-        TEST_TIMEOUT,
-      );
-
-      it(
-        "no cierra con una cuenta cerrada sin método de pago",
-        async () => {
-          // Sin método esa plata no entra a ninguna columna del cierre, y
-          // `buildIngestPayment()` la rechazaría a mitad del push.
-          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, metodo: null });
-
-          const result = await closeDay(deps([cita({ eaAppointmentId: 1 })]), {
-            date: DIA,
-            closedBy: OWNER_ID,
-            now: OCHO_PM,
-          });
-
-          expect(result.ok).toBe(false);
-          expect(await cierres(db)).toHaveLength(0);
-        },
-        TEST_TIMEOUT,
-      );
-
-      it(
-        "cierra cuando la lista de pendientes está vacía",
-        async () => {
+          // Lo que la compuerta impedía: una cita sin cuenta ya no retiene la
+          // plata de las demás.
           await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
           await sembrarCuenta(db, {
             eaAppointmentId: 2,
@@ -232,15 +169,13 @@ describe.skipIf(!canRunDbTests())(
             metodo: "transferencia",
             propina: 20_000,
           });
+          await sembrarCuenta(db, { eaAppointmentId: 3, cerrada: false });
 
-          const result = await closeDay(
-            deps([cita({ eaAppointmentId: 1 }), cita({ eaAppointmentId: 2 })]),
-            { date: DIA, closedBy: OWNER_ID, now: OCHO_PM },
-          );
+          const result = await syncDay(deps([]), { date: DIA, now: OCHO_PM });
 
-          expect(result.ok).toBe(true);
-          if (!result.ok) throw new Error("debería haber cerrado");
-          expect(result.created).toBe(true);
+          expect(result.state).toBe("sincronizado");
+          if (result.state !== "sincronizado") throw new Error("debería haber sincronizado");
+          expect(result.attached).toBe(2);
           expect(result.push.state).toBe("hecho");
 
           const [cierre] = await cierres(db);
@@ -251,37 +186,72 @@ describe.skipIf(!canRunDbTests())(
             total_otro: 0,
             total_tips: 20_000,
             appointment_count: 2,
-            closed_by: OWNER_ID,
+            // Nadie lo firmó: lo armó la sincronización.
+            closed_by: null,
           });
           expect(cierre.pushed_to_ingest_at).toBeInstanceOf(Date);
 
-          // Las cuentas quedaron congeladas bajo su cierre y marcadas como
-          // empujadas: es lo que hace que corregirlas exija un ajuste.
           const filas = await cuentas(db);
-          expect(filas.every((f) => f.day_close_id === cierre.id)).toBe(true);
-          expect(filas.every((f) => f.pushed_to_ingest_at !== null)).toBe(true);
-
+          expect(filas.find((f) => f.ea_appointment_id === 3)?.day_close_id).toBeNull();
+          expect(
+            filas.filter((f) => f.ea_appointment_id !== 3).every((f) => f.pushed_to_ingest_at !== null),
+          ).toBe(true);
           expect(idsRecibidos(ingest)).toEqual(["ea-appt:1", "ea-appt:2"]);
         },
         TEST_TIMEOUT,
       );
 
       it(
-        "un día sin cuentas cerradas cierra con lote vacío y no manda nada",
+        "una cuenta sin método de pago se salta sola y no frena a las demás",
         async () => {
-          const result = await closeDay(deps([]), {
-            date: DIA,
-            closedBy: OWNER_ID,
-            now: OCHO_PM,
-          });
+          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
+          await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: true, monto: 90_000, metodo: null });
 
-          expect(result.ok).toBe(true);
-          if (!result.ok) throw new Error("debería haber cerrado");
-          expect(result.push.state).toBe("vacio");
+          const result = await syncDay(deps([]), { date: DIA, now: OCHO_PM });
+
+          expect(result.state).toBe("sincronizado");
+          expect(result.skipped).toEqual([
+            { eaAppointmentId: 2, message: "Falta el método de pago" },
+          ]);
+          expect(idsRecibidos(ingest)).toEqual(["ea-appt:1"]);
+          const filas = await cuentas(db);
+          expect(filas.find((f) => f.ea_appointment_id === 2)?.day_close_id).toBeNull();
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "un día sin nada cobrado no crea cierre ni manda nada",
+        async () => {
+          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: false });
+
+          const result = await syncDay(deps([]), { date: DIA, now: OCHO_PM });
+
+          expect(result.state).toBe("nada");
+          expect(await cierres(db)).toHaveLength(0);
           expect(ingest.lotes).toHaveLength(0);
-          // Un lote vacío no se manda, así que tampoco se marca como empujado:
-          // no hay nada que haya llegado.
-          expect((await cierres(db))[0].pushed_to_ingest_at).toBeNull();
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "no necesita la agenda: con EA caído sincroniza igual",
+        async () => {
+          // Antes, sin EA no se cerraba el día. La plata está en `gbs_admin`, y
+          // mandar lo cobrado no depende de saber qué más hubo.
+          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
+
+          const result = await syncDay(
+            {
+              db,
+              loadAppointments: () => Promise.reject(new Error("EA no responde")),
+              ingest: fakeIngest(ingest),
+            },
+            { date: DIA, now: OCHO_PM },
+          );
+
+          expect(result.state).toBe("sincronizado");
+          expect(idsRecibidos(ingest)).toEqual(["ea-appt:1"]);
         },
         TEST_TIMEOUT,
       );
@@ -289,115 +259,71 @@ describe.skipIf(!canRunDbTests())(
 
     // ── Idempotencia ───────────────────────────────────────────────────────
 
-    describe("cerrar dos veces", () => {
+    describe("sincronizar dos veces", () => {
       it(
-        "no duplica el day_close ni el push",
+        "no duplica el cierre, ni los totales, ni el push",
         async () => {
           await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
-          const dia = deps([cita({ eaAppointmentId: 1 })]);
-          const input = { date: DIA, closedBy: OWNER_ID, now: OCHO_PM };
+          const input = { date: DIA, now: OCHO_PM };
 
-          const primero = await closeDay(dia, input);
-          const segundo = await closeDay(dia, input);
+          const primero = await syncDay(deps([]), input);
+          const segundo = await syncDay(deps([]), input);
 
-          expect(primero.ok && primero.created).toBe(true);
-          // El segundo no crea nada y lo dice: el día ya estaba cerrado.
-          expect(segundo.ok && segundo.created).toBe(false);
-          if (!segundo.ok) throw new Error("el segundo cierre debería ser un no-op");
-          expect(segundo.push.state).toBe("ya");
-          expect(primero.ok && segundo.dayCloseId).toBe(
-            primero.ok ? primero.dayCloseId : -1,
-          );
-
-          expect(await cierres(db)).toHaveLength(1);
-          // **Un solo movimiento en el CRM.** Si el push se repitiera, Actual
-          // Budget deduplicaría por `imported_id` y no pasaría nada — pero la
-          // segunda petición ni se manda, que es lo correcto.
+          expect(primero.state).toBe("sincronizado");
+          expect(segundo.state).toBe("nada");
+          const filas = await cierres(db);
+          expect(filas).toHaveLength(1);
+          expect(filas[0].total_efectivo).toBe(180_000);
+          expect(filas[0].appointment_count).toBe(1);
           expect(ingest.lotes).toHaveLength(1);
-          expect(idsRecibidos(ingest)).toEqual(["ea-appt:1"]);
         },
         TEST_TIMEOUT,
       );
 
       it(
-        "dos cierres concurrentes dejan una sola fila",
+        "dos sincronizaciones concurrentes dejan una sola fila",
         async () => {
-          // Dos personas apretando el botón a la vez. La idempotencia la cuida
-          // `uq_day_close_date`, no un `SELECT` previo: entre consultar y
-          // escribir hay una ventana, y dos peticiones simultáneas la
-          // encuentran.
-          //
-          // La carrera se fuerza con una barrera en `loadAppointments`, que
-          // `closeDay()` llama **después** de consultar si el día ya está
-          // cerrado. Sin ella el test dependería del azar del planificador:
-          // con las dos llamadas serializadas la segunda vería la fila de la
-          // primera y tomaría el camino idempotente normal, que es otro caso y
-          // ya tiene su test.
+          // La nocturna y un "Sincronizar ahora" a la vez. La idempotencia la
+          // cuida `uq_day_close_date`: la que pierde el INSERT vuelve a
+          // empezar y encuentra la fila de la otra.
           await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
 
-          const barrera = enBarrera(2);
-          const dia: DayCloseDeps = {
-            db,
-            loadAppointments: async () => {
-              await barrera();
-              return [cita({ eaAppointmentId: 1 })];
-            },
-            ingest: fakeIngest(ingest),
-          };
-          const input = { date: DIA, closedBy: OWNER_ID, now: OCHO_PM };
+          const results = await Promise.all([
+            syncDay(deps([]), { date: DIA, now: OCHO_PM }),
+            syncDay(deps([]), { date: DIA, now: OCHO_PM }),
+          ]);
 
-          const [a, b] = await Promise.all([closeDay(dia, input), closeDay(dia, input)]);
-
-          expect(a.ok && b.ok).toBe(true);
-          expect(await cierres(db)).toHaveLength(1);
-          // Exactamente uno de los dos creó la fila.
-          expect([a.ok && a.created, b.ok && b.created].filter(Boolean)).toHaveLength(1);
-
-          // Y **un solo lote sale hacia el CRM**. La que pierde el INSERT no
-          // empuja: los `imported_id` serían los mismos y Actual Budget no
-          // duplicaría, pero la ruta de ingest del CRM está sin verificar y no
-          // se puede afirmar que sea idempotente.
-          expect(ingest.lotes).toHaveLength(1);
-          expect(idsRecibidos(ingest)).toEqual(["ea-appt:1"]);
-          // La perdedora no empuja: dice "pendiente" si la ganadora todavía
-          // está mandando, o "ya" si terminó antes de que la perdedora leyera
-          // la fila. Las dos son ciertas; cuál sale depende del planificador, y
-          // exigir una sola dejaba la imagen del panel sin construir al azar.
-          const perdedor = [a, b].find((r) => r.ok && !r.created);
-          expect(["pendiente", "ya"]).toContain(perdedor?.ok && perdedor.push.state);
+          expect(results.some((r) => r.state === "sincronizado")).toBe(true);
+          const filas = await cierres(db);
+          expect(filas).toHaveLength(1);
+          expect(filas[0].total_efectivo).toBe(180_000);
+          expect(filas[0].appointment_count).toBe(1);
+          // Los `tx_id` son los mismos en cualquier caso: aunque las dos
+          // llamadas llegaran a mandar, Strapi y Actual deduplican por ellos.
+          expect(new Set(idsRecibidos(ingest))).toEqual(new Set(["ea-appt:1"]));
         },
         TEST_TIMEOUT,
       );
 
       it(
-        "el día queda cerrado aunque el push falle, y el reintento manda el mismo lote",
+        "si el push falla, la cuenta queda en el cierre y la siguiente corrida la manda",
         async () => {
           await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
           ingest.modo = "caido";
 
-          const result = await closeDay(deps([cita({ eaAppointmentId: 1 })]), {
-            date: DIA,
-            closedBy: OWNER_ID,
-            now: OCHO_PM,
+          const result = await syncDay(deps([]), { date: DIA, now: OCHO_PM });
+          expect(result.state === "sincronizado" && result.push).toMatchObject({
+            state: "fallo",
+            retryable: true,
           });
-
-          expect(result.ok).toBe(true);
-          if (!result.ok) throw new Error("debería haber cerrado");
-          expect(result.push).toMatchObject({ state: "fallo", retryable: true });
           expect((await cierres(db))[0].pushed_to_ingest_at).toBeNull();
 
-          // Y aparece en la cola de pendientes, que es lo que hace que un push
-          // fallido no sea igual a no haber empujado.
           const pendientes = await repositories(db).dayCloses.listPendingPush();
           expect(pendientes.map((p) => p.close_date)).toEqual([DIA]);
 
           ingest.modo = "ok";
-          const reintento = await retryDayPush(deps([cita({ eaAppointmentId: 1 })]), {
-            date: DIA,
-            now: OCHO_PM,
-          });
-
-          expect(reintento.state).toBe("hecho");
+          const reintento = await syncDay(deps([]), { date: DIA, now: OCHO_PM });
+          expect(reintento.state === "sincronizado" && reintento.push.state).toBe("hecho");
           expect(idsRecibidos(ingest)).toEqual(["ea-appt:1"]);
           expect((await cierres(db))[0].pushed_to_ingest_at).toBeInstanceOf(Date);
         },
@@ -405,21 +331,13 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
-        "con el push apagado el día se cierra igual y queda pendiente",
+        "con el push apagado las cuentas quedan listas y pendientes",
         async () => {
-          // Hoy el contrato del cuerpo no está verificado contra el CRM. Cerrar
-          // la caja del estudio no puede depender de eso.
           await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
 
-          const result = await closeDay(deps([cita({ eaAppointmentId: 1 })], false), {
-            date: DIA,
-            closedBy: OWNER_ID,
-            now: OCHO_PM,
-          });
+          const result = await syncDay(deps([], false), { date: DIA, now: OCHO_PM });
 
-          expect(result.ok).toBe(true);
-          if (!result.ok) throw new Error("debería haber cerrado");
-          expect(result.push.state).toBe("apagado");
+          expect(result.state === "sincronizado" && result.push.state).toBe("apagado");
           expect(await cierres(db)).toHaveLength(1);
           expect((await cierres(db))[0].pushed_to_ingest_at).toBeNull();
         },
@@ -427,24 +345,14 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
-        "una fila congelada que ya no puede viajar frena el push sin marcarlo",
+        "una fila que ya no puede viajar frena el push sin marcarlo",
         async () => {
-          // La compuerta no deja cerrar un día con una cuenta sin método, pero
-          // la fila se puede corromper **después** del cierre (una edición por
-          // SQL, un bug de otra pantalla). El lote se arma desde la base, así
-          // que el push tiene que fallar **antes** de mandar nada: media docena
-          // de transacciones en Actual y un error a la mitad es un estado del
-          // que hay que salir a mano.
+          // La fila se puede corromper **después** de entrar al cierre (una
+          // edición por SQL, un bug de otra pantalla). El lote se arma desde la
+          // base, así que el push tiene que fallar antes de mandar nada.
           await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
-          await closeDay(deps([cita({ eaAppointmentId: 1 })], false), {
-            date: DIA,
-            closedBy: OWNER_ID,
-            now: OCHO_PM,
-          });
+          await syncDay(deps([], false), { date: DIA, now: OCHO_PM });
 
-          // Se le quita el método a la fila ya congelada. Hay que borrar el
-          // pago, no vaciar la columna del encabezado: la columna es un shim de
-          // rollback y nadie la lee.
           const [congelada] = await db
             .selectFrom("appointment_finance")
             .select("id")
@@ -455,13 +363,8 @@ describe.skipIf(!canRunDbTests())(
             .where("appointment_finance_id", "=", congelada.id)
             .execute();
 
-          const outcome = await retryDayPush(deps([cita({ eaAppointmentId: 1 })]), {
-            date: DIA,
-            now: OCHO_PM,
-          });
+          const outcome = await retryDayPush(deps([]), { date: DIA, now: OCHO_PM });
 
-          // Definitivo, no reintentable: no lo arregla el tiempo, lo arregla
-          // corregir la fila.
           expect(outcome).toMatchObject({ state: "fallo", retryable: false });
           expect(ingest.lotes).toHaveLength(0);
           expect((await cierres(db))[0].pushed_to_ingest_at).toBeNull();
@@ -470,57 +373,23 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
-        "sin agenda el día no se cierra y no se escribe nada",
-        async () => {
-          // `loadAppointments` que lanza = EA caído. La única forma de saber qué
-          // citas hubo es preguntárselo a EA; cerrar a ciegas empujaría un día
-          // al que le falta la mitad, y Actual no actualiza montos.
-          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
-
-          const result = await closeDay(
-            {
-              db,
-              loadAppointments: () => Promise.reject(new Error("EA no responde")),
-              ingest: fakeIngest(ingest),
-            },
-            { date: DIA, closedBy: OWNER_ID, now: OCHO_PM },
-          );
-
-          expect(result.ok).toBe(false);
-          if (result.ok) throw new Error("no debería haber cerrado");
-          if (result.reason !== "compuerta") throw new Error("debería ser la compuerta");
-          expect(result.review.blockers.join(" ")).toContain("agenda no responde");
-          expect(await cierres(db)).toHaveLength(0);
-          expect(ingest.lotes).toHaveLength(0);
-        },
-        TEST_TIMEOUT,
-      );
-
-      it(
         "un error que no es del CRM se propaga en vez de disfrazarse de push fallido",
         async () => {
-          // Un `IngestError` es "el CRM dijo no". Cualquier otra cosa —un bug
-          // nuestro, un `TypeError`— tiene que reventar: tratarla como push
-          // fallido dejaría el día en la cola de reintento para siempre,
-          // reintentando un error que no está del otro lado.
           await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
 
           await expect(
-            closeDay(
+            syncDay(
               {
                 db,
-                loadAppointments: async () => [cita({ eaAppointmentId: 1 })],
-                ingest: {
-                  push: () => Promise.reject(new TypeError("bug nuestro")),
-                },
+                loadAppointments: async () => [],
+                ingest: { push: () => Promise.reject(new TypeError("bug nuestro")) },
               },
-              { date: DIA, closedBy: OWNER_ID, now: OCHO_PM },
+              { date: DIA, now: OCHO_PM },
             ),
           ).rejects.toThrow(TypeError);
 
-          // El día quedó cerrado —la transacción del cierre ya había
-          // commiteado— y sin marca de push, que es el estado correcto: el
-          // reintento lo agarra.
+          // Las cuentas ya quedaron en el cierre y sin marca de push: la
+          // siguiente corrida lo reintenta.
           expect(await cierres(db)).toHaveLength(1);
           expect((await cierres(db))[0].pushed_to_ingest_at).toBeNull();
         },
@@ -528,7 +397,7 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
-        "reintentar un día que no está cerrado no inventa un cierre",
+        "reintentar un día sin cierre no inventa uno",
         async () => {
           const outcome = await retryDayPush(deps([]), { date: DIA, now: OCHO_PM });
           expect(outcome.state).toBe("sin-cierre");
@@ -538,25 +407,21 @@ describe.skipIf(!canRunDbTests())(
       );
     });
 
-    // ── Ajustes posteriores al cierre ──────────────────────────────────────
+    // ── La sesión que se olvidó ────────────────────────────────────────────
 
-    describe("la cuenta que se cerró después del cierre", () => {
-      /** Día cerrado y empujado con una cuenta de $180.000 en efectivo. */
-      async function diaCerrado(): Promise<void> {
+    describe("la cuenta que se cobró después de sincronizar", () => {
+      /** Día sincronizado con una cuenta de $180.000 en efectivo. */
+      async function diaSincronizado(): Promise<void> {
         await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
-        await closeDay(deps([cita({ eaAppointmentId: 1 })]), {
-          date: DIA,
-          closedBy: OWNER_ID,
-          now: OCHO_PM,
-        });
+        await syncDay(deps([]), { date: DIA, now: OCHO_PM });
         ingest.lotes = [];
       }
 
       it(
-        "se agrega al cierre, suma a sus totales y viaja sola",
+        "entra al cierre del día, suma a sus totales y viaja sola",
         async () => {
-          await diaCerrado();
-          // La cita que se registró al día siguiente y se cerró desde Hoy.
+          await diaSincronizado();
+          // La sesión que se olvidó y se cobró días después, desde Hoy.
           await sembrarCuenta(db, {
             eaAppointmentId: 2,
             cerrada: true,
@@ -566,18 +431,12 @@ describe.skipIf(!canRunDbTests())(
             hora: "15:00:00",
           });
 
-          const result = await attachLateAccounts(deps([]), {
-            date: DIA,
-            actorUserId: OWNER_ID,
-            now: OCHO_PM,
-          });
+          const result = await syncDay(deps([]), { date: DIA, now: OCHO_PM });
 
-          expect(result.ok).toBe(true);
-          if (!result.ok) throw new Error("debería haber agregado la cuenta");
-          expect(result.attached).toBe(1);
-          expect(result.push.state).toBe("hecho");
-          // Solo la tardía: la original ya había salido, y re-mandarla
-          // pisaría su monto en Strapi si tuvo un ajuste.
+          expect(result.state === "sincronizado" && result.attached).toBe(1);
+          expect(result.state === "sincronizado" && result.push.state).toBe("hecho");
+          // Solo la nueva: la original ya había salido, y re-mandarla pisaría
+          // su monto en Strapi si tuvo un ajuste.
           expect(idsRecibidos(ingest)).toEqual(["ea-appt:2"]);
 
           const [cierre] = await cierres(db);
@@ -595,18 +454,14 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
-        "si el CRM no contesta, el cierre vuelve a la cola y el reintento manda solo la tardía",
+        "si el CRM no contesta, el cierre vuelve a la cola y el reintento manda solo la nueva",
         async () => {
-          await diaCerrado();
+          await diaSincronizado();
           await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: true, monto: 90_000, hora: "15:00:00" });
 
           ingest.modo = "caido";
-          const result = await attachLateAccounts(deps([]), {
-            date: DIA,
-            actorUserId: OWNER_ID,
-            now: OCHO_PM,
-          });
-          expect(result.ok && result.push.state).toBe("fallo");
+          const result = await syncDay(deps([]), { date: DIA, now: OCHO_PM });
+          expect(result.state === "sincronizado" && result.push.state).toBe("fallo");
 
           const pendientes = await repositories(db).dayCloses.listPendingPush();
           expect(pendientes.map((c) => c.close_date)).toEqual([DIA]);
@@ -618,45 +473,165 @@ describe.skipIf(!canRunDbTests())(
         },
         TEST_TIMEOUT,
       );
+    });
 
+    // ── La corrección desde Hoy de una cuenta que ya viajó ─────────────────
+
+    describe("corregir una cuenta que ya llegó a Actual", () => {
       it(
-        "una tardía sin método de pago no se agrega, y no se escribe nada",
+        "deja la diferencia como ajuste y la sincronización la manda con llave propia",
         async () => {
-          await diaCerrado();
-          await sembrarCuenta(db, {
-            eaAppointmentId: 2,
+          const financeId = await sembrarCuenta(db, {
+            eaAppointmentId: 1,
             cerrada: true,
-            monto: 90_000,
-            metodo: null,
-            hora: "15:00:00",
+            monto: 180_000,
+          });
+          await syncDay(deps([]), { date: DIA, now: OCHO_PM });
+          ingest.lotes = [];
+
+          // Lo que hace Hoy al guardar: la cuenta con su nuevo monto y, en la
+          // misma transacción, el ajuste por la diferencia.
+          await db.transaction().execute(async (trx) => {
+            await repositories(trx).appointmentFinance.update(financeId, { amount_charged: 200_000 });
+            await trx
+              .updateTable("appointment_payment")
+              .set({ amount: 200_000 })
+              .where("appointment_finance_id", "=", financeId)
+              .execute();
+            await recordEditAdjustment(trx, {
+              financeId,
+              before: 180_000,
+              after: 200_000,
+              actorUserId: OWNER_ID,
+              now: OCHO_PM,
+            });
           });
 
-          const result = await attachLateAccounts(deps([]), {
-            date: DIA,
-            actorUserId: OWNER_ID,
-            now: OCHO_PM,
-          });
+          const outcome = await retryAdjustmentPush(deps([]), { eaAppointmentId: 1, now: OCHO_PM });
+          expect(outcome.state).toBe("hecho");
+          expect(idsRecibidos(ingest)).toEqual(["ea-appt:1:adj1"]);
+          expect(ingest.lotes[0][0].amount).toBe(20_000);
 
-          expect(result).toMatchObject({ ok: false, reason: "incompleta" });
-          const [cierre] = await cierres(db);
-          expect(cierre.appointment_count).toBe(1);
-          const filas = await cuentas(db);
-          expect(filas.find((f) => f.ea_appointment_id === 2)?.day_close_id).toBeNull();
-          expect(ingest.lotes).toEqual([]);
+          // Reintentar no lo vuelve a mandar.
+          const otra = await retryAdjustmentPush(deps([]), { eaAppointmentId: 1, now: OCHO_PM });
+          expect(otra.state).toBe("vacio");
         },
         TEST_TIMEOUT,
       );
 
       it(
-        "sin cierre del día no hay nada tardío",
+        "sin cambio de monto no deja ajuste",
         async () => {
-          await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: true });
-          const result = await attachLateAccounts(deps([]), {
-            date: DIA,
+          const financeId = await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 180_000 });
+          const sequence = await recordEditAdjustment(db, {
+            financeId,
+            before: 180_000,
+            after: 180_000,
             actorUserId: OWNER_ID,
             now: OCHO_PM,
           });
-          expect(result).toMatchObject({ ok: false, reason: "sin-cierre" });
+          expect(sequence).toBeNull();
+        },
+        TEST_TIMEOUT,
+      );
+    });
+
+    // ── La noche ───────────────────────────────────────────────────────────
+
+    describe("la sincronización de la noche", () => {
+      const NOCHE = eaLocalToInstant(dt("2026-09-06 03:45:00"));
+      const env = { INGEST_SINCE: "2026-09-01" };
+
+      it(
+        "sincroniza cada día anterior con plata nueva, deja hoy quieto y no repite",
+        async () => {
+          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 100_000, fecha: "2026-09-03" });
+          await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: true, monto: 50_000, fecha: "2026-09-05" });
+          await sembrarCuenta(db, { eaAppointmentId: 3, cerrada: false, fecha: "2026-09-05" });
+          // Hoy: todavía se puede corregir gratis, no se manda.
+          await sembrarCuenta(db, { eaAppointmentId: 4, cerrada: true, monto: 70_000, fecha: "2026-09-06" });
+          // Antes del corte: entró por Agenda Pro, no se manda nunca.
+          await sembrarCuenta(db, { eaAppointmentId: 5, cerrada: true, monto: 90_000, fecha: "2026-08-30" });
+
+          const report = await runNightlySync(deps([]), { env, now: NOCHE });
+
+          expect(report.days.map((day) => day.date)).toEqual(["2026-09-03", "2026-09-05"]);
+          expect(idsRecibidos(ingest).sort()).toEqual(["ea-appt:1", "ea-appt:2"]);
+          expect(summarizeNightlySync(report)).toContain("2 cuenta(s) en 2 día(s)");
+
+          // La segunda corrida de la misma noche no encuentra nada.
+          const otra = await runNightlySync(deps([]), { env, now: NOCHE });
+          expect(otra.days).toEqual([]);
+          expect(ingest.lotes).toHaveLength(2);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "la sesión olvidada que se cobra días después sale la noche siguiente",
+        async () => {
+          await sembrarCuenta(db, { eaAppointmentId: 1, cerrada: true, monto: 100_000, fecha: "2026-09-03" });
+          await runNightlySync(deps([]), { env, now: NOCHE });
+          ingest.lotes = [];
+
+          await sembrarCuenta(db, { eaAppointmentId: 2, cerrada: true, monto: 60_000, fecha: "2026-09-03", hora: "15:00:00" });
+          const report = await runNightlySync(deps([]), {
+            env,
+            now: eaLocalToInstant(dt("2026-09-08 03:45:00")),
+          });
+
+          expect(report.days.map((day) => day.date)).toEqual(["2026-09-03"]);
+          expect(idsRecibidos(ingest)).toEqual(["ea-appt:2"]);
+          const [cierre] = await cierres(db);
+          expect(cierre.total_efectivo).toBe(160_000);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
+        "manda el ajuste de una cuenta corregida desde Hoy después de viajar",
+        async () => {
+          const financeId = await sembrarCuenta(db, {
+            eaAppointmentId: 1,
+            cerrada: true,
+            monto: 100_000,
+            fecha: "2026-09-03",
+          });
+          await runNightlySync(deps([]), { env, now: NOCHE });
+          ingest.lotes = [];
+
+          await db.transaction().execute(async (trx) => {
+            await repositories(trx).appointmentFinance.update(financeId, { amount_charged: 90_000 });
+            await trx
+              .updateTable("appointment_payment")
+              .set({ amount: 90_000 })
+              .where("appointment_finance_id", "=", financeId)
+              .execute();
+            await recordEditAdjustment(trx, {
+              financeId,
+              before: 100_000,
+              after: 90_000,
+              actorUserId: OWNER_ID,
+              now: NOCHE,
+            });
+          });
+
+          const report = await runNightlySync(deps([]), {
+            env,
+            now: eaLocalToInstant(dt("2026-09-07 03:45:00")),
+          });
+          expect(report.adjustments).toMatchObject([{ eaAppointmentId: 1, outcome: { state: "hecho" } }]);
+          expect(idsRecibidos(ingest)).toEqual(["ea-appt:1:adj1"]);
+          expect(ingest.lotes[0][0].amount).toBe(-10_000);
+
+          // Y no lo vuelve a mandar.
+          ingest.lotes = [];
+          const otra = await runNightlySync(deps([]), {
+            env,
+            now: eaLocalToInstant(dt("2026-09-08 03:45:00")),
+          });
+          expect(otra.adjustments).toEqual([]);
+          expect(ingest.lotes).toEqual([]);
         },
         TEST_TIMEOUT,
       );
@@ -670,11 +645,7 @@ describe.skipIf(!canRunDbTests())(
           cerrada: true,
           monto: 180_000,
         });
-        await closeDay(deps([cita({ eaAppointmentId: 1 })]), {
-          date: DIA,
-          closedBy: OWNER_ID,
-          now: OCHO_PM,
-        });
+        await syncDay(deps([cita({ eaAppointmentId: 1 })]), { date: DIA, now: OCHO_PM });
         ingest.lotes = [];
         return financeId;
       }
@@ -1041,11 +1012,13 @@ async function sembrarCuenta(
     propina?: number;
     metodo?: "efectivo" | "transferencia" | "otro" | null;
     hora?: string;
+    /** El día de la cita. Por defecto, `DIA`. */
+    fecha?: string;
   },
 ): Promise<number> {
   const { appointmentFinance, appointmentFinanceItems, appointmentPayments } =
     repositories(db);
-  const start = eaLocalToInstant(dt(`2026-09-03 ${opts.hora ?? "09:00:00"}`));
+  const start = eaLocalToInstant(dt(`${opts.fecha ?? DIA} ${opts.hora ?? "09:00:00"}`));
   const monto = opts.monto ?? 180_000;
   const metodo = opts.metodo === undefined ? "efectivo" : opts.metodo;
 

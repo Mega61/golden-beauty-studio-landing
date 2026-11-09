@@ -372,7 +372,7 @@ export function SalesFrames({ data }: { data: Data }) {
  * Agenda Pro, del periodo y de cada mes (`legacy-payments.ts`).
  *
  * Solo aparece si el periodo tiene pagos de Agenda Pro: después del corte la
- * caja del panel ya dice cómo entró la plata (Cierre del día), y una tarjeta
+ * caja del panel ya dice cómo entró la plata (Cuadre del día), y una tarjeta
  * vacía de "historial" sería ruido. La serie por mes va completa, con el mes
  * del periodo resaltado, porque la pregunta "¿cuándo dejó de entrar efectivo?"
  * no se contesta con un solo mes.
@@ -519,8 +519,8 @@ export function DailyReports({ data }: { data: Data }) {
   return (
     <>
     <ChartFrame
-      title="Cierre del día"
-      decision="¿Cuadra la caja? ¿Puedo cerrar? — el reparto por método tiene que coincidir con lo que hay en el cajón y en la cuenta."
+      title="Cuadre del día"
+      decision="¿Cuadra la caja? — el reparto por método tiene que coincidir con lo que hay en el cajón y en la cuenta."
       scope={legacyExcluded(
         data,
         "esa caja se cerró en Agenda Pro y su plata ya está en Actual Budget. Sus ventas están en «Ventas y citas del periodo».",

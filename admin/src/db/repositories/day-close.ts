@@ -4,9 +4,9 @@ import { toId, type Db } from "./shared";
 /**
  * El cierre diario.
  *
- * Los totales llegan calculados desde `lib/`; acá se guardan. La compuerta —
- * no se cierra el día con una cita completada sin cuenta — tampoco vive acá:
- * es una decisión sobre citas de EA, y se toma antes de llamar a `insert`.
+ * Desde 2026-11-09 la fila la arma la sincronización nocturna (`syncDay()`),
+ * no una persona: es el contenedor del lote de un día y de sus totales. Los
+ * totales llegan calculados desde `jobs/day-close.ts`; acá se guardan.
  */
 export function dayCloseRepository(db: Db) {
   return {
@@ -28,11 +28,9 @@ export function dayCloseRepository(db: Db) {
     },
 
     /**
-     * Un día se cierra una sola vez: `uq_day_close_date` lo garantiza y este
-     * método deja que el choque salga como error en vez de atraparlo. Un
-     * segundo cierre del mismo día no es una condición de carrera a absorber
-     * en silencio — es alguien apretando el botón dos veces, y merece ver que
-     * el día ya estaba cerrado.
+     * Una fila por día: `uq_day_close_date` lo garantiza y este método deja
+     * que el choque salga como error. `syncDay()` lo atrapa y sigue con la
+     * fila que ganó.
      */
     async insert(row: NewDayClose): Promise<number> {
       const result = await db
@@ -72,24 +70,38 @@ export function dayCloseRepository(db: Db) {
     },
 
     /**
-     * Suma a un cierre las cuentas que se cerraron después de él, y lo deja
-     * **sin empujar**: lo que se agregó todavía no llegó al CRM, y así el
-     * cierre vuelve a la lista de reintento hasta que llegue.
+     * Deja el cierre **sin empujar**: se le sumaron cuentas que todavía no
+     * llegaron al CRM, y así vuelve a la lista de reintento hasta que lleguen.
      */
-    async addLateAccounts(
+    async markUnpushed(id: number): Promise<void> {
+      await db
+        .updateTable("day_close")
+        .set({ pushed_to_ingest_at: null })
+        .where("id", "=", id)
+        .execute();
+    },
+
+    /**
+     * Reescribe los totales de un cierre con lo que hoy tienen sus cuentas.
+     *
+     * Desde que la cuenta se puede corregir desde Hoy después del cierre
+     * (2026-11-09), los totales guardados se recalculan en vez de sumarse: son
+     * lo que Caja muestra para cuadrar el cajón, no lo que viajó a Actual —eso
+     * lo dicen el lote y sus ajustes—. **No toca `pushed_to_ingest_at`.**
+     */
+    async setTotals(
       id: number,
       totals: { efectivo: number; transferencia: number; otro: number; tips: number; count: number },
     ): Promise<void> {
       await db
         .updateTable("day_close")
-        .set((eb) => ({
-          total_efectivo: eb("total_efectivo", "+", totals.efectivo),
-          total_transferencia: eb("total_transferencia", "+", totals.transferencia),
-          total_otro: eb("total_otro", "+", totals.otro),
-          total_tips: eb("total_tips", "+", totals.tips),
-          appointment_count: eb("appointment_count", "+", totals.count),
-          pushed_to_ingest_at: null,
-        }))
+        .set({
+          total_efectivo: totals.efectivo,
+          total_transferencia: totals.transferencia,
+          total_otro: totals.otro,
+          total_tips: totals.tips,
+          appointment_count: totals.count,
+        })
         .where("id", "=", id)
         .execute();
     },

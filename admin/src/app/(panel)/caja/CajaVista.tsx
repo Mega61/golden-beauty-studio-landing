@@ -17,18 +17,27 @@ import {
 import { mapEaStatus } from "@/components/calendar/status-map";
 import type { DayAccount, DayIssue, DayTotals } from "@/jobs/day-close";
 
-import { AgregarTardias, CierreDelDia, ReintentarPush } from "./CajaAcciones";
+import { SincronizarAhora } from "./CajaAcciones";
 import type { CajaView } from "./data";
 
 /**
- * **Caja** — el día completo: pendientes, totales por método y el cierre.
+ * **Caja** — el día completo: lo que quedó sin cobrar, el cuadre del cajón y
+ * qué ya llegó a Actual.
  *
- * ## El orden de la pantalla es la funcionalidad
+ * ## No hay cierre del día
  *
- * Los pendientes van **arriba**, antes de los totales. No es jerarquía visual
- * por gusto: la lista de pendientes *es* la compuerta del cierre hecha visible,
- * y vaciarla es el trabajo de la recepción. Un total del día arriba y los
- * pendientes al fondo invitaría a leer una cifra que todavía está incompleta.
+ * Hasta 2026-11-09 esta pantalla tenía un botón "Cerrar el día" que era lo
+ * único que mandaba la plata a Actual, y que no se podía apretar mientras
+ * quedara una cita sin cuenta. Ya no: cobrar en Hoy es el único paso, y lo
+ * cobrado sale solo cada noche (`jobs/nightly-sync.ts`). Esta pantalla quedó
+ * para **mirar**: cuadrar el efectivo contra el cajón, ver qué falta cobrar y
+ * saber qué ya está en Actual. "Sincronizar ahora" existe para no esperar a
+ * la noche, no porque haga falta.
+ *
+ * ## El orden de la pantalla
+ *
+ * Lo pendiente va **arriba**: es lo único de la pantalla que pide hacer algo,
+ * y se hace desde Hoy, no desde acá.
  *
  * ## Por qué no hay ningún gráfico
  *
@@ -42,21 +51,11 @@ import type { CajaView } from "./data";
  *
  * La cifra grande usa `--text-xl` (24 px) y no los ≥48 px que sugiere la skill,
  * porque la escala tipográfica de este panel es cerrada y 48 px no existe en
- * ella; el sistema de diseño manda sobre el default de la skill. Va con figuras
- * proporcionales —sin `.ui-num`— que es lo correcto para un número solo;
- * `tabular-nums` queda para las columnas de las tablas, donde los dígitos tienen
- * que alinearse.
- *
- * ## En móvil se consulta, no se cierra
- *
- * El plan lo fija: "el cierre solo desde tablet o escritorio". Pero **la lista
- * de pendientes se consulta desde el celular** a media tarde, así que la
- * pantalla entera funciona a 390 px y lo único que desaparece es el botón, con
- * una línea que dice dónde está.
+ * ella; el sistema de diseño manda sobre el default de la skill.
  */
 export function CajaVista({ view }: { view: CajaView }) {
-  const { review, dayClose, pendingPush, pushEnabled, date, today } = view;
-  const bloquean = review.issues.filter((i) => i.blocks);
+  const { review, pendingPush, pushEnabled, date, today } = view;
+  const pendientes = review.issues.filter((i) => i.blocks);
   const enCurso = review.issues.filter((i) => !i.blocks);
 
   // El único cruce entre `easyappointments` y `gbs_admin`: no hay JOIN posible
@@ -72,21 +71,16 @@ export function CajaVista({ view }: { view: CajaView }) {
 
       <Pendientes
         date={date}
-        bloquean={bloquean}
+        pendientes={pendientes}
         enCurso={enCurso}
-        cerrado={dayClose !== null}
-        bloqueadoAparte={review.blockers.length > 0}
+        sinAgenda={review.appointments === null}
       />
 
-      {view.late.length === 0 ? null : (
-        <Tardias date={date} accounts={view.late} nombres={nombres} />
-      )}
-
-      <Totales totals={review.totals} cerrado={dayClose !== null} />
+      <Totales totals={review.totals} />
 
       <Cerradas accounts={review.closed} nombres={nombres} />
 
-      <Cierre view={view} bloquean={bloquean.length} />
+      <Sincronizacion view={view} />
 
       {pendingPush.length === 0 ? null : (
         <SinEmpujar rows={pendingPush} pushEnabled={pushEnabled} />
@@ -100,9 +94,7 @@ export function CajaVista({ view }: { view: CajaView }) {
 /**
  * El día que se está mirando, y cómo moverse.
  *
- * Existe porque el reintento del push tiene que poder apuntar a ayer: un cierre
- * que salió pero cuyo push falló se arregla desde su propio día, no desde hoy.
- * Son enlaces y no un control con estado — la pantalla es un Server Component y
+ * Para mirar —y cuadrar— un día anterior. Son enlaces y no un control con estado — la pantalla es un Server Component y
  * navegar es lo que ya sabe hacer.
  */
 function Fecha({ date, today }: { date: string; today: string }) {
@@ -181,46 +173,38 @@ const ISSUE_COLUMNS: ReadonlyArray<Column<DayIssue>> = [
 
 function Pendientes({
   date,
-  bloquean,
+  pendientes,
   enCurso,
-  cerrado,
-  bloqueadoAparte,
+  sinAgenda,
 }: {
   date: string;
-  bloquean: readonly DayIssue[];
+  pendientes: readonly DayIssue[];
   enCurso: readonly DayIssue[];
-  cerrado: boolean;
-  /**
-   * Hay un impedimento que **no** es una cuenta pendiente: la agenda no
-   * responde, un total quedó negativo.
-   *
-   * Sin esto el vacío decía "el día se puede cerrar" justo debajo de la banda
-   * que dice que no. Dos frases contradictorias en la misma pantalla y la que
-   * el ojo lee primero es la equivocada.
-   */
-  bloqueadoAparte: boolean;
+  /** EA no respondió: no se sabe qué citas hubo, y "nada pendiente" mentiría. */
+  sinAgenda: boolean;
 }) {
   return (
     <Card padded={false}>
       <CardHead
         title={
-          bloquean.length === 0
-            ? "Nada pendiente"
-            : `${bloquean.length} ${bloquean.length === 1 ? "cuenta pendiente" : "cuentas pendientes"}`
+          sinAgenda
+            ? "Pendientes"
+            : pendientes.length === 0
+              ? "Nada pendiente"
+              : `${pendientes.length} ${pendientes.length === 1 ? "pendiente" : "pendientes"}`
         }
       />
       <div style={{ padding: "0 1rem 1rem" }}>
-        {bloquean.length === 0 ? (
+        {sinAgenda ? (
+          <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
+            La agenda no respondió, así que no se puede saber si quedó alguna cita sin cobrar. Lo
+            cobrado se ve abajo y se sincroniza igual.
+          </p>
+        ) : pendientes.length === 0 ? (
           <EmptyState
             icon="check"
-            title={cerrado ? "El día está cerrado" : "Todas las cuentas del día están cerradas"}
-            body={
-              cerrado
-                ? "Las cuentas de este día ya están congeladas bajo su cierre. Corregir una exige un ajuste."
-                : bloqueadoAparte
-                  ? "No queda ninguna cita atendida sin cuenta, pero el cierre sigue bloqueado por otro motivo: está explicado abajo, en Cierre del día."
-                  : "No queda ninguna cita atendida sin cuenta. El día se puede cerrar."
-            }
+            title="Todo lo atendido está cobrado"
+            body="No queda ninguna cita atendida sin cuenta. Lo cobrado llega solo a Actual."
           />
         ) : (
           <>
@@ -231,17 +215,15 @@ function Pendientes({
                 color: "var(--color-ink-soft)",
               }}
             >
-              {cerrado
-                ? "El día ya se cerró, pero estas citas quedaron sin cuenta. Ciérrala desde "
-                : "Mientras quede una, el día no se puede cerrar. Cada una se resuelve desde "}
-              <Link href={`/hoy?fecha=${date}`}>Hoy, en este día</Link>
-              {cerrado ? ", y después agrégala al cierre acá." : ", cerrando su cuenta."}
+              No frenan nada: lo demás del día ya viaja solo. Cada una se resuelve desde{" "}
+              <Link href={`/hoy?fecha=${date}`}>Hoy, en este día</Link>, y en cuanto se cobre sale
+              en la próxima sincronización.
             </p>
             <DataTable
               columns={ISSUE_COLUMNS}
-              rows={bloquean}
+              rows={pendientes}
               rowKey={(row) => String(row.eaAppointmentId)}
-              caption="Citas atendidas sin cuenta cerrada"
+              caption="Citas atendidas sin cobrar o con la cuenta incompleta"
             />
           </>
         )}
@@ -268,10 +250,10 @@ function Pendientes({
 
 // ── Totales ─────────────────────────────────────────────────────────────────
 
-function Totales({ totals, cerrado }: { totals: DayTotals; cerrado: boolean }) {
+function Totales({ totals }: { totals: DayTotals }) {
   return (
     <Card padded={false}>
-      <CardHead title={cerrado ? "Totales del cierre" : "Totales de lo cerrado" } />
+      <CardHead title="Cuadre del día" />
       <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.875rem" }}>
         <div>
           <p
@@ -329,8 +311,8 @@ function Totales({ totals, cerrado }: { totals: DayTotals; cerrado: boolean }) {
             <Icon name="alerta" size={16} style={{ flex: "none", marginTop: 1 }} />
             <span>
               <strong className="ui-num">{formatCOP(totals.sinMetodo)}</strong> cobrados sin método
-              de pago asignado. Esa plata no entra a ninguna columna y el día no cierra hasta que
-              alguien la registre.
+              de pago asignado. Esa plata no entra a ninguna columna ni viaja a Actual hasta que
+              alguien elija el método desde Hoy.
             </span>
           </p>
         )}
@@ -442,14 +424,11 @@ function accountColumns(
   },
   {
     key: "push",
-    header: "En el CRM",
-    from: "lg",
+    header: "En Actual",
+    from: "md",
     listSlot: "oculto",
-    // Una cortesía no viaja al CRM: no hubo plata. "No" la haría ver pendiente.
-    render: (row) =>
-      row.houseCourtesy === true ? "No aplica" : row.pushedToIngestAt === null ? "No" : "Sí",
-    text: (row) =>
-      row.houseCourtesy === true ? "No aplica" : row.pushedToIngestAt === null ? "No" : "Sí",
+    render: (row) => syncLabel(row),
+    text: (row) => syncLabel(row),
   },
   // `formatPesos` y no `formatCOP` en las columnas: el encabezado ya dice que
   // la columna es plata, y repetir el `$` treinta veces solo agrega ruido.
@@ -476,6 +455,18 @@ function accountColumns(
   ];
 }
 
+/**
+ * Si la cuenta ya viajó. "Esta noche" y no "No": una cuenta cobrada que todavía
+ * no salió no está atrasada, está esperando su turno. Una cortesía no viaja —no
+ * hubo plata—, y una cuenta sin método no puede viajar hasta que se complete.
+ */
+function syncLabel(row: DayAccount): string {
+  if (row.houseCourtesy === true) return "No aplica";
+  if (row.pushedToIngestAt !== null) return "Sí";
+  if (row.payments.length === 0) return "Falta el método";
+  return "Esta noche";
+}
+
 function Cerradas({
   accounts,
   nombres,
@@ -485,17 +476,17 @@ function Cerradas({
 }) {
   return (
     <Card padded={false}>
-      <CardHead title="Cuentas cerradas" />
+      <CardHead title="Cuentas cobradas" />
       <div style={{ padding: "0 1rem 1rem" }}>
         <DataTable
           columns={accountColumns(nombres)}
           rows={accounts}
           rowKey={(row) => String(row.financeId)}
-          caption="Cuentas cerradas del día"
+          caption="Cuentas cobradas del día"
           empty={
             <EmptyState
               icon="caja"
-              title="Todavía no hay ninguna cuenta cerrada"
+              title="Todavía no hay ninguna cuenta cobrada"
               body="Las cuentas las cierra cada profesional desde Hoy, al terminar el servicio. Acá aparecen a medida que entran."
             />
           }
@@ -505,134 +496,57 @@ function Cerradas({
   );
 }
 
-// ── Cuentas tardías ─────────────────────────────────────────────────────────
+// ── Sincronización ──────────────────────────────────────────────────────────
 
 /**
- * Cuentas cerradas después del cierre del día.
+ * Qué del día ya está en Actual, y qué sale esta noche.
  *
- * Una cita que se registró tarde y se cerró desde Hoy navegando a su día. Hasta
- * que se agregan, no están en los totales del cierre ni llegaron al CRM — así
- * que no se esconden en la tabla de cerradas: tienen su tarjeta y su botón.
+ * El botón no es un cierre: manda lo que ya está cobrado, igual que la noche.
+ * Se ofrece solo si hay algo que mandar.
  */
-function Tardias({
-  date,
-  accounts,
-  nombres,
-}: {
-  date: string;
-  accounts: readonly DayAccount[];
-  nombres: ReadonlyMap<number, string>;
-}) {
-  return (
-    <Card padded={false}>
-      <CardHead
-        title={
-          accounts.length === 1
-            ? "1 cuenta cerrada después del cierre"
-            : `${accounts.length} cuentas cerradas después del cierre`
-        }
-      />
-      <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.75rem" }}>
-        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
-          Todavía no cuentan en los totales del cierre ni llegaron al CRM. Agregarlas las suma al
-          cierre de este día y las envía; las cuentas que ya habían salido no se vuelven a mandar.
-        </p>
-        <DataTable
-          columns={accountColumns(nombres)}
-          rows={accounts}
-          rowKey={(row) => String(row.financeId)}
-          caption="Cuentas cerradas después del cierre del día"
-        />
-        <AgregarTardias fecha={date} cuentas={accounts.length} />
-      </div>
-    </Card>
-  );
-}
-
-// ── El cierre ───────────────────────────────────────────────────────────────
-
-function Cierre({ view, bloquean }: { view: CajaView; bloquean: number }) {
-  const { dayClose, review, pushEnabled, date, cutover } = view;
-  // Un día de antes del corte nunca se empuja: su plata entró por Agenda Pro.
+function Sincronizacion({ view }: { view: CajaView }) {
+  const { review, unsynced, pushEnabled, date, cutover } = view;
+  // Un día de antes del corte nunca se envía: su plata entró por Agenda Pro.
   const antesDelCorte = cutover != null && date < cutover;
+  const enviadas = review.closed.filter(
+    (account) => account.houseCourtesy !== true && account.pushedToIngestAt !== null,
+  ).length;
+  const listas = unsynced.filter((account) => account.payments.length > 0).length;
 
   return (
     <Card padded={false}>
-      <CardHead title="Cierre del día" />
+      <CardHead title="Actual Budget" />
       <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.75rem" }}>
-        {review.blockers.map((blocker) => (
-          <p
-            key={blocker}
-            role="alert"
-            style={{
-              margin: 0,
-              display: "flex",
-              gap: "0.5rem",
-              padding: "0.625rem 0.75rem",
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-error-tint)",
-              border: "1px solid var(--color-error-line)",
-              color: "var(--color-error-ink)",
-              fontSize: "var(--text-xs)",
-            }}
-          >
-            <Icon name="alerta" size={16} style={{ flex: "none", marginTop: 1 }} />
-            <span>{blocker}</span>
-          </p>
-        ))}
-
-        {dayClose === null ? null : (
-          <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
-            Cerrado el {formatDateLong(`${date} 00:00:00`)}.{" "}
-            {antesDelCorte
-              ? "Es anterior al corte de Agenda Pro: esa plata entró a Actual por allá y no se manda."
-              : dayClose.pushed_to_ingest_at === null
-                ? "El lote todavía no llegó al CRM."
-                : "El lote ya se empujó al CRM."}
-          </p>
-        )}
+        <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-carbon)" }}>
+          {antesDelCorte
+            ? "Este día es anterior al corte de Agenda Pro: esa plata entró a Actual por allá y no se manda."
+            : review.closed.length === 0
+              ? "Todavía no hay nada cobrado en este día."
+              : listas === 0
+                ? enviadas === 0
+                  ? "No hay cuentas que enviar."
+                  : "Todo lo cobrado de este día ya está en Actual."
+                : `${enviadas === 0 ? "" : `${enviadas} ${enviadas === 1 ? "cuenta ya está" : "cuentas ya están"} en Actual. `}${
+                    listas === 1 ? "1 cuenta sale" : `${listas} cuentas salen`
+                  } solas esta noche.`}
+        </p>
+        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
+          No hay que cerrar el día. Si corriges una cuenta que ya está en Actual, la diferencia viaja
+          sola como ajuste.
+        </p>
 
         {pushEnabled ? null : (
           <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
-            El push al CRM está apagado (falta <code>INGEST_URL</code>). El día se cierra igual y el
-            lote queda pendiente: cuando la variable esté puesta, se empuja con el mismo lote y las
-            mismas llaves.
+            El envío al CRM está apagado (falta <code>INGEST_URL</code>). Las cuentas quedan listas y
+            salen con las mismas llaves cuando se configure.
           </p>
         )}
 
-        {/* El cierre se puede hacer desde el celular (pedido de la dueña,
-            2026-10-24). Lo que lo hace seguro es la confirmación con el
-            resumen de `CierreDelDia`, no el tamaño de la pantalla. */}
-        <div>
-          {dayClose === null ? (
-            <>
-              <CierreDelDia
-                fecha={date}
-                bloqueado={bloquean > 0 || review.blockers.length > 0}
-                cuentas={review.totals.count}
-                totales={review.totals}
-              />
-              {/* Un control deshabilitado sin el motivo al lado obliga a
-                  adivinar. El motivo está arriba, en la lista de pendientes,
-                  pero "arriba" no es "acá". */}
-              {bloquean === 0 ? null : (
-                <p
-                  style={{
-                    margin: "0.5rem 0 0",
-                    fontSize: "var(--text-xs)",
-                    color: "var(--color-ink-soft)",
-                  }}
-                >
-                  {bloquean === 1
-                    ? "Falta una cuenta por resolver."
-                    : `Faltan ${bloquean} cuentas por resolver.`}
-                </p>
-              )}
-            </>
-          ) : dayClose.pushed_to_ingest_at === null && pushEnabled && !antesDelCorte ? (
-            <ReintentarPush fecha={date} />
-          ) : null}
-        </div>
+        {listas === 0 || antesDelCorte || !pushEnabled ? null : (
+          <div>
+            <SincronizarAhora fecha={date} cuentas={listas} />
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -641,11 +555,12 @@ function Cierre({ view, bloquean }: { view: CajaView; bloquean: number }) {
 // ── Cierres que no llegaron al CRM ──────────────────────────────────────────
 
 /**
- * Días ya cerrados cuyo lote no llegó a ingest.
+ * Días cuyo envío al CRM falló.
  *
- * Un push que falló en silencio es exactamente igual a no haber empujado, así
- * que se muestra acá y no solo en Diagnóstico: quien cierra la caja es quien va
- * a notar que un día falta en Actual Budget.
+ * La sincronización de cada noche los reintenta sola, con las mismas llaves.
+ * Se muestran igual porque un envío que falló en silencio es exactamente igual
+ * a no haber enviado, y quien mira Caja es quien va a notar que un día falta
+ * en Actual Budget.
  */
 function SinEmpujar({
   rows,
@@ -656,12 +571,12 @@ function SinEmpujar({
 }) {
   return (
     <Card padded={false}>
-      <CardHead title="Cierres que no llegaron al CRM" />
+      <CardHead title="Días que no llegaron al CRM" />
       <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.5rem" }}>
         <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
           {pushEnabled
-            ? "Reintentar manda el mismo lote con las mismas llaves: no puede duplicar movimientos."
-            : "El push está apagado. Estos días esperan a que INGEST_URL esté configurada."}
+            ? "Se reintentan solos cada noche con las mismas llaves, así que no pueden duplicar movimientos. Desde su día también se pueden sincronizar ahora."
+            : "El envío está apagado. Estos días esperan a que INGEST_URL esté configurada."}
         </p>
         <ul style={{ margin: 0, paddingLeft: "1.125rem", fontSize: "var(--text-sm)" }}>
           {rows.map((row) => (

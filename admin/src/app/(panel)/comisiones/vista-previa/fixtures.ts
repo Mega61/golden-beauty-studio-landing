@@ -205,13 +205,30 @@ export function fixtureComisionesView(caso: Caso): ComisionesView {
     NOMBRES,
   );
 
-  // La compuerta se arma con la misma función que en producción: dos días sin
-  // cierre de caja y el renglón marcado del retoque.
+  // La compuerta se arma con la misma función que en producción: dos citas sin
+  // cobrar y el renglón marcado del retoque.
   const assessment = {
     period: QUINCENA,
-    missingDayCloses:
+    unbilled:
       caso === "bloqueada"
-        ? [parseEaLocalDate("2026-09-04"), parseEaLocalDate("2026-09-11")]
+        ? [
+            {
+              date: parseEaLocalDate("2026-09-04"),
+              eaAppointmentId: 901,
+              kind: "sin-cobrar" as const,
+              customerName: "Clienta de prueba",
+              providerName: "Lina",
+              message: "Sin cobrar",
+            },
+            {
+              date: parseEaLocalDate("2026-09-11"),
+              eaAppointmentId: 902,
+              kind: "sin-cobrar" as const,
+              customerName: "Otra clienta",
+              providerName: "Lina",
+              message: "Sin cobrar",
+            },
+          ]
         : [],
     flaggedEntries: caso === "bloqueada" ? 1 : 0,
     open: false,

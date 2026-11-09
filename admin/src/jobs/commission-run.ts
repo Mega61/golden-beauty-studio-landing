@@ -23,8 +23,8 @@ import {
   type LineAssignment,
 } from "@/lib/commission";
 import { FULL_BASIS_POINTS } from "@/lib/combo-allocation";
-import { mapEaStatus } from "@/components/calendar/status-map";
-import type { DayAppointmentSource } from "./day-close";
+import type { PendingCharge } from "@/lib/pending-charges";
+import { loadPendingCharges, type DayRangeSource } from "./pending-charges";
 import {
   commissionBasesOf,
   computeTicketTotals,
@@ -738,11 +738,11 @@ function entryKey(itemId: number, eaProviderId: number): string {
 export type CommissionRunDeps = {
   db: Db;
   /**
-   * Las citas de un día, de EA. Opcional: con ella, la compuerta deja pasar un
-   * día sin cierre en el que **no hubo nada que cerrar** (ninguna cita, o solo
-   * canceladas e inasistencias). Sin ella, todo día sin cierre bloquea.
+   * Las citas de un rango de días, de EA. La compuerta la usa para saber si
+   * quedó alguna cita atendida sin cobrar en la quincena. Sin ella —o si EA no
+   * responde— la quincena no se puede revisar: no se sabe.
    */
-  loadAppointments?: DayAppointmentSource;
+  loadRange?: DayRangeSource;
 };
 
 export type FortnightRunRow = {
@@ -1023,8 +1023,11 @@ export async function runFortnight(
 
 export type FortnightAssessment = {
   period: CommissionPeriod;
-  /** Días del periodo, ya pasados, sin cierre diario. */
-  missingDayCloses: EaLocalDate[];
+  /**
+   * Citas ya pasadas del periodo, atendidas y sin cuenta. `null` = no se
+   * pudo saber (EA no respondió).
+   */
+  unbilled: PendingCharge[] | null;
   /** Entradas del periodo sin regla aplicable: cero **marcado**. */
   flaggedEntries: number;
   /** `true` = la quincena todavía no terminó. */
@@ -1043,8 +1046,10 @@ export type FortnightAssessment = {
 export type FortnightBlocker =
   /** La quincena no ha terminado. */
   | { kind: "en-curso"; until: string }
-  /** Días ya pasados del periodo sin cierre de caja. */
-  | { kind: "sin-cierre"; days: readonly string[] }
+  /** Citas atendidas del periodo sin cobrar, y en qué días. */
+  | { kind: "sin-cobrar"; days: readonly string[]; count: number }
+  /** No se pudo leer la agenda: no se sabe si quedó alguna sin cobrar. */
+  | { kind: "sin-agenda" }
   /** Renglones sin regla aplicable: ceros marcados. */
   | { kind: "sin-regla"; count: number };
 
@@ -1052,15 +1057,13 @@ export type FortnightBlocker =
  * Por qué esta quincena todavía no se puede revisar.
  *
  * Es la compuerta del plan: "no se puede marcar como revisada mientras queden
- * cuentas sin cerrar o días sin cerrar en el periodo". **El bloqueo es la
- * funcionalidad** — es lo único que hace aceptable que pagar sea irreversible.
+ * cuentas sin cerrar en el periodo". **El bloqueo es la funcionalidad** — es
+ * lo único que hace aceptable que pagar sea irreversible.
  *
- * De los dos bloqueos que el plan nombra acá solo se comprueba uno, y no es un
- * olvido: "cuentas sin cerrar" ya lo garantiza el cierre diario, que no deja
- * cerrar un día con una cita atendida sin cuenta. Si los quince días están
- * cerrados, no quedan cuentas sin cerrar; y preguntárselo otra vez exigiría
- * consultar los estados de cita a EA, que es justamente de lo que la
- * liquidación no debería depender.
+ * Hasta 2026-11-09 se comprobaba con los cierres de caja: un día cerrado
+ * garantizaba que no quedaban citas sin cuenta. Ya no hay cierre de caja, así
+ * que se pregunta lo que de verdad importa —¿quedó alguna cita atendida sin
+ * cobrar?— con una lectura a EA para toda la quincena.
  */
 export function fortnightBlockers(
   assessment: FortnightAssessment,
@@ -1071,8 +1074,14 @@ export function fortnightBlockers(
     blockers.push({ kind: "en-curso", until: assessment.period.periodEnd });
   }
 
-  if (assessment.missingDayCloses.length > 0) {
-    blockers.push({ kind: "sin-cierre", days: assessment.missingDayCloses });
+  if (assessment.unbilled === null) {
+    blockers.push({ kind: "sin-agenda" });
+  } else if (assessment.unbilled.length > 0) {
+    blockers.push({
+      kind: "sin-cobrar",
+      days: [...new Set(assessment.unbilled.map((charge) => charge.date))].sort(),
+      count: assessment.unbilled.length,
+    });
   }
 
   if (assessment.flaggedEntries > 0) {
@@ -1082,7 +1091,7 @@ export function fortnightBlockers(
   return blockers;
 }
 
-/** Lee de la base lo que la compuerta necesita. */
+/** Lee de la base —y de EA— lo que la compuerta necesita. */
 export async function assessFortnight(
   deps: CommissionRunDeps,
   input: { period: CommissionPeriod; now?: Date },
@@ -1092,58 +1101,34 @@ export async function assessFortnight(
   const { period } = input;
   const repos = repositories(deps.db);
 
-  const [closes, flagged] = await Promise.all([
-    repos.dayCloses.listByDateRange(period.periodStart, period.periodEnd),
+  // Solo los días que ya pasaron: una cita de hoy todavía se está cobrando, y
+  // listarla convertiría la compuerta en ruido durante toda la quincena.
+  const yesterday = shiftDay(today, -1);
+  const till = period.periodEnd < yesterday ? period.periodEnd : yesterday;
+
+  const [flagged, unbilled] = await Promise.all([
     repos.commissionEntries.listUnmatchedInPeriod(period.periodStart, period.periodEnd),
+    deps.loadRange === undefined
+      ? Promise.resolve(null)
+      : loadPendingCharges({
+          db: deps.db,
+          loadRange: deps.loadRange,
+          from: period.periodStart as EaLocalDate,
+          till: till as EaLocalDate,
+          now,
+        }),
   ]);
-
-  const closed = new Set(closes.map((row) => row.close_date));
-
-  // Un día que todavía no llegó no puede tener cierre, y listarlo como
-  // faltante convertiría la compuerta en ruido durante toda la quincena.
-  const sinCierre = fortnightDays(period).filter((day) => day < today && !closed.has(day));
 
   return {
     period,
-    missingDayCloses: await dropDaysWithNothingToClose(sinCierre, deps.loadAppointments),
+    // Solo las citas sin cuenta: a una cuenta cobrada sin método de pago le
+    // falta un dato de caja, no de comisión —la base es lo cobrado, y eso ya
+    // está—. Frenar la quincena por eso sería frenar el pago de la técnica por
+    // un dato que no lo cambia.
+    unbilled: unbilled === null ? null : unbilled.filter((charge) => charge.kind === "sin-cobrar"),
     flaggedEntries: flagged.length,
     open: period.periodEnd >= today,
   };
-}
-
-/**
- * Saca de los días sin cierre los que no tenían nada que cerrar.
- *
- * Un domingo sin citas no tiene caja, y exigirle un cierre obligaba a abrir
- * Caja día por día solo para apretar un botón sobre nada. La compuerta existe
- * para que ninguna cita atendida quede sin cuenta; un día sin citas —o solo
- * con canceladas e inasistencias, que `reviewDay()` tampoco espera cobrar— no
- * puede esconder una.
- *
- * Si EA no responde, el día **se queda** como faltante: la dirección segura es
- * pedir un cierre de más, no pagar una quincena con una cuenta sin cerrar.
- */
-async function dropDaysWithNothingToClose(
-  days: EaLocalDate[],
-  loadAppointments: DayAppointmentSource | undefined,
-): Promise<EaLocalDate[]> {
-  if (loadAppointments === undefined || days.length === 0) return days;
-
-  const required = await Promise.all(
-    days.map(async (day) => {
-      try {
-        const citas = await loadAppointments(day);
-        return citas.some((cita) => {
-          const token = mapEaStatus(cita.status);
-          return token !== "cancelada" && token !== "no-asistio";
-        });
-      } catch {
-        return true;
-      }
-    }),
-  );
-
-  return days.filter((_, index) => required[index]);
 }
 
 // ── Los dos estados que faltan ──────────────────────────────────────────────

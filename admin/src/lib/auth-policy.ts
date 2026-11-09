@@ -214,11 +214,12 @@ export function isAllowedIdentity(
  * - `cuenta:cobrar` — registrar el método de pago. Para `staff` depende de
  *   `TICKET_STAFF_COBRA`: en un estudio de dos personas la técnica cobra; con
  *   recepción de planta, no.
- * - `cuenta:corregir-tras-cierre` — tocar una cuenta después del cierre diario,
- *   que genera un ajuste. Solo `owner`: en ese momento los números ya salieron
- *   hacia Strapi y Actual Budget.
+ * - `cuenta:corregir-tras-cierre` — corregir una cuenta que ya se sincronizó
+ *   con Actual; la diferencia viaja sola como ajuste. Solo `owner`: los
+ *   números ya salieron hacia Strapi y Actual Budget.
  * - `caja:ver` — totales del día y cuentas de las demás.
- * - `caja:cerrar-dia` — el cierre diario.
+ * - `caja:cerrar-dia` — "Sincronizar ahora" en Caja y el aviso de citas sin
+ *   cobrar. El nombre es de cuando existía el cierre diario (hasta 2026-11-09).
  * - `reportes:ver` — el set de reportes de la dueña.
  * - `agenda:ver-todas` — la grilla completa, no solo la columna propia.
  * - `liquidacion:ver-propia` — su liquidación y su ticket promedio.

@@ -674,10 +674,9 @@ export function whatsappCheck(input: {
  * El último push a ingest.
  *
  * Éste **no** es un proxy: `day_close.pushed_to_ingest_at` se escribe cuando el
- * push efectivamente ocurre, y el push es por **cierre diario** y no por cita
- * — Actual Budget deduplica por `imported_id` y no actualiza el monto de una
- * transacción ya importada, así que empujar por cita dejaría a Actual con la
- * cifra vieja para siempre ante cualquier corrección intradía.
+ * push efectivamente ocurre. Desde 2026-11-09 el push lo hace la sincronización
+ * nocturna (`jobs/nightly-sync.ts`), no un "Cerrar el día": un pendiente acá es
+ * un día cuyo envío falló y que la noche siguiente va a reintentar.
  */
 export function ingestPushCheck(input: {
   lastPush: Date | null;
@@ -687,12 +686,12 @@ export function ingestPushCheck(input: {
 }): Check {
   return {
     id: "ingest",
-    title: "El cierre diario llegó a ingest",
+    title: "La caja llegó a ingest",
     level: input.pending === 0 ? "ok" : "warn",
     detail:
       input.pending === 0
-        ? "No hay cierres pendientes de empujar. El push es por cierre diario, no por cita: así una corrección intradía sale gratis."
-        : `${input.pending} cierre${input.pending === 1 ? "" : "s"} sin empujar a ingest. Mientras no se empuje, esa plata no está en Actual Budget. Una corrección posterior al cierre viaja como una fila de ajuste con id propio.`,
+        ? "No hay días pendientes de enviar. Lo cobrado sale solo cada noche, no por cita: así una corrección del mismo día sale gratis."
+        : `${input.pending} día${input.pending === 1 ? "" : "s"} sin llegar a ingest. Mientras no llegue, esa plata no está en Actual Budget; la sincronización de cada noche lo reintenta sola. Una corrección posterior viaja como una fila de ajuste con id propio.`,
     figure: `${input.pending} pendiente${input.pending === 1 ? "" : "s"}`,
     lastSeen: relativeAge(input.lastPush, input.now),
   };

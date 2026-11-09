@@ -61,8 +61,11 @@ export type TicketFinanceView = {
   houseCourtesy: boolean;
   /** Hora de pared del cierre de la cuenta. `null` = sigue abierta. */
   closedAt: string | null;
-  /** La cuenta ya entró a un cierre diario: solo `owner`, y como ajuste. */
-  frozenByDayClose: boolean;
+  /**
+   * La cuenta ya llegó a Actual. Se puede corregir, pero solo la dueña: la
+   * diferencia viaja sola como ajuste en la sincronización de la noche.
+   */
+  syncedToActual: boolean;
   /** Precio de lista congelado al agendar. */
   snapshot: Cop | null;
   snapshotSource: SnapshotSource | null;

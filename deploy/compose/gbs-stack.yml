@@ -413,14 +413,15 @@ services:
       RECONCILE_LOOKBACK_DAYS: ${RECONCILE_LOOKBACK_DAYS:-7}
       RECONCILE_LOOKAHEAD_DAYS: ${RECONCILE_LOOKAHEAD_DAYS:-60}
       RECONCILE_AT: ${RECONCILE_AT:-03:45}
-      # Las visitas al CRM (win-back y Stampee) salen de acá cada noche, a la
-      # ruta hermana de la de pagos (`/ingest/panel-visits`). Mismas variables
-      # que el panel; sin INGEST_URL el paso se salta y lo dice el log.
+      # La plata (`jobs/nightly-sync.ts`: lo cobrado de cada día, sin cierre
+      # manual) y las visitas al CRM (win-back y Stampee) salen de acá cada
+      # noche, a `/ingest/payments` y `/ingest/panel-visits`. Mismas variables
+      # que el panel; sin INGEST_URL los dos pasos se saltan y lo dice el log.
       INGEST_URL: ${INGEST_URL}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
       INGEST_SINCE: ${INGEST_SINCE:-}
-      # El aviso de días de caja sin cerrar (`jobs/unclosed-days.ts`) sale de
-      # acá, al final de la noche. Las mismas llaves que el panel; sin ellas el
+      # El aviso de citas sin cobrar (`jobs/pending-charges.ts`) sale de acá,
+      # al final de la noche. Las mismas llaves que el panel; sin ellas el
       # aviso no sale y lo dice `job_run`.
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}

@@ -15,7 +15,7 @@ import {
 import type { CommissionPeriod } from "@/lib/commission";
 import { EaApiError, instantToEaDate, isEaLocalDate } from "@/lib/ea";
 import { createCachedEaClient, createEaClient } from "@/lib/ea/client";
-import { loadDayAppointments } from "../caja/data";
+import { loadRangeAppointments } from "../caja/data";
 
 import {
   buildSettlements,
@@ -180,7 +180,7 @@ export async function loadComisionesView(
   // Una técnica sin provider no tiene liquidación que mirar, y el filtro por
   // `undefined` traería las de todas: la respuesta segura es no consultar.
   if (input.unlinked === true) {
-    const assessment = await assessFortnight({ db, loadAppointments: loadDayAppointments(createCachedEaClient()) }, { period, now });
+    const assessment = await assessFortnight({ db, loadRange: loadRangeAppointments(createCachedEaClient()) }, { period, now });
     return {
       period,
       current,
@@ -212,7 +212,7 @@ export async function loadComisionesView(
     ),
     repos.commissionRuns.listByPeriod(period.periodStart, period.periodEnd),
     repos.commissionEntries.listClosedWithoutCommission(from, to),
-    assessFortnight({ db, loadAppointments: loadDayAppointments(createCachedEaClient()) }, { period, now }),
+    assessFortnight({ db, loadRange: loadRangeAppointments(createCachedEaClient()) }, { period, now }),
     loadNames(),
   ]);
 

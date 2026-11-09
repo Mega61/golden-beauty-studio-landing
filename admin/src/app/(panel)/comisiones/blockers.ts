@@ -27,21 +27,21 @@ export function describeBlocker(blocker: FortnightBlocker): string {
     case "en-curso":
       return `La quincena termina el ${dia(blocker.until)} y todavía está en curso.`;
 
-    case "sin-cierre": {
+    case "sin-cobrar": {
+      const citas = blocker.count === 1 ? "Queda una cita atendida sin cobrar" : `Quedan ${blocker.count} citas atendidas sin cobrar`;
       const days = blocker.days;
-      if (days.length === 1) {
-        return `El ${dia(days[0])} no tiene cierre de caja.`;
-      }
-      // Con quince días sin cerrar, nombrarlos todos convierte el aviso en un
-      // párrafo que nadie lee. Tres y el resto contado dicen lo mismo y se
-      // leen de un vistazo; la lista completa está en Caja, que es donde se
-      // resuelve.
+      // Con muchos días, nombrarlos todos convierte el aviso en un párrafo que
+      // nadie lee. Tres y el resto contado dicen lo mismo; la lista completa
+      // está en Caja, día por día, y se cobran desde Hoy.
       const listados = days.slice(0, MAX_DIAS_LISTADOS).map(dia).join(", ");
       const resto = days.length - MAX_DIAS_LISTADOS;
       return resto > 0
-        ? `${days.length} días del periodo no tienen cierre de caja: ${listados} y ${resto} más.`
-        : `${days.length} días del periodo no tienen cierre de caja: ${listados}.`;
+        ? `${citas} en el periodo: ${listados} y ${resto} días más.`
+        : `${citas} en el periodo: ${days.length === 1 ? "el " : ""}${listados}.`;
     }
+
+    case "sin-agenda":
+      return "No se pudo leer la agenda para comprobar que todas las citas de la quincena estén cobradas. Vuelve a intentar en un momento.";
 
     case "sin-regla":
       return blocker.count === 1

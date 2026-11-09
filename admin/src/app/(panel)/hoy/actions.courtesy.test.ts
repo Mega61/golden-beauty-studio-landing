@@ -59,7 +59,7 @@ function fakeRepos() {
     appointmentFinanceItems: {
       replaceForFinance: record("appointmentFinanceItems.replaceForFinance"),
     },
-    auditLog: { append: record("auditLog.append") },
+    auditLog: { append: record("auditLog.append"), listForEntity: async () => [] },
   };
 }
 
@@ -123,6 +123,7 @@ function fila(over: Record<string, unknown> = {}): Record<string, unknown> {
     appointment_start_at: new Date("2026-09-08T14:00:00Z"),
     closed_at: null,
     day_close_id: null,
+    pushed_to_ingest_at: null,
     ...over,
   };
 }
@@ -293,10 +294,65 @@ describe("cerrarCuenta — la cortesía de la dueña", () => {
     expect(audit?.args[0]).toMatchObject({ action: "ticket.update" });
   });
 
-  it("después del cierre del día no se toca, ni siquiera para la dueña", async () => {
-    existing = fila({ day_close_id: 12, closed_at: new Date(), amount_charged: 210_000 });
+  it("una cuenta que ya llegó a Actual con su cobro no se vuelve cortesía", async () => {
+    // El ajuste a la baja no podría viajar: `buildIngestAdjustment()` no
+    // ajusta cortesías. Se rechaza antes de escribir nada.
+    existing = fila({
+      day_close_id: 12,
+      closed_at: new Date(),
+      amount_charged: 210_000,
+      pushed_to_ingest_at: new Date(),
+    });
     const result = await cerrarCuenta(entrada());
     expect(result).toMatchObject({ ok: false, retryable: false });
     expect(writes).toEqual([]);
+  });
+
+  it("la técnica no corrige una cuenta que ya llegó a Actual", async () => {
+    session = TECNICA;
+    existing = fila({
+      day_close_id: 12,
+      closed_at: new Date(),
+      amount_charged: 180_000,
+      pushed_to_ingest_at: new Date(),
+    });
+    const result = await cerrarCuenta(entrada({ houseCourtesy: false }));
+    expect(result).toMatchObject({ ok: false, retryable: false });
+    expect(writes).toEqual([]);
+  });
+
+  it("la dueña corrige una cuenta que ya llegó a Actual y la diferencia queda como ajuste", async () => {
+    // Antes del 2026-11-09 esto se rechazaba: "corregirla exige un ajuste".
+    // Ahora se edita como cualquier cuenta y el ajuste sale solo.
+    existing = fila({
+      day_close_id: 12,
+      closed_at: new Date(),
+      amount_charged: 180_000,
+      pushed_to_ingest_at: new Date(),
+    });
+    const result = await cerrarCuenta(
+      entrada({ houseCourtesy: false, payments: [{ method: "efectivo", amount: 210_000 }] }),
+    );
+    expect(result).toMatchObject({ ok: true, amountCharged: 210_000 });
+    const ajuste = writes.find(
+      (w) => w.what === "auditLog.append" && (w.args[0] as { action: string }).action === "ticket.adjust",
+    );
+    expect(ajuste?.args[0]).toMatchObject({
+      entity: "appointment_finance",
+      after: { amount_charged: 210_000, sequence: 1, delta: 30_000 },
+    });
+  });
+
+  it("antes de la sincronización se corrige sin ajuste", async () => {
+    existing = fila({ day_close_id: 12, closed_at: new Date(), amount_charged: 180_000 });
+    const result = await cerrarCuenta(
+      entrada({ houseCourtesy: false, payments: [{ method: "efectivo", amount: 210_000 }] }),
+    );
+    expect(result).toMatchObject({ ok: true, amountCharged: 210_000 });
+    expect(
+      writes.some(
+        (w) => w.what === "auditLog.append" && (w.args[0] as { action: string }).action === "ticket.adjust",
+      ),
+    ).toBe(false);
   });
 });

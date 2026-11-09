@@ -30,7 +30,7 @@ import type { ProviderSettlement, SettlementAppointment } from "./settlement";
  * bajar para leer un número que ya estaba calculado.
  *
  * Lo que queda **arriba de la cifra** son los bloqueos, cuando hay: una
- * quincena con tres días de caja sin cerrar no se puede pagar, y enterarse de
+ * quincena con tres citas atendidas sin cobrar no se puede pagar, y enterarse de
  * eso después de leer el total es enterarse tarde.
  *
  * ## Por qué no hay ningún gráfico

@@ -67,9 +67,9 @@ export function bookingRecipients<S extends PushRecipient>(input: {
 }
 
 /**
- * A quién le llega el aviso de días de caja sin cerrar: a quien puede
+ * A quién le llega el aviso de citas sin cobrar: a quien puede
  * arreglarlo (`caja:cerrar-dia`, dueña y recepción). A la técnica no: ella
- * cierra sus cuentas, el cierre del día no es suyo.
+ * cobra sus cuentas, la caja del día no es suya.
  */
 export function cashCloseRecipients<S extends PushRecipient>(input: {
   subscriptions: readonly S[];

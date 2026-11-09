@@ -12,6 +12,7 @@ import {
   type Database,
 } from "@/db";
 import type { AuthId, Cop } from "@/db/types";
+import type { DayAppointment } from "./day-close";
 import {
   canRunDbTests,
   skipReason,
@@ -28,7 +29,6 @@ import {
   assessFortnight,
   fortnightBlockers,
   fortnightBounds,
-  fortnightDays,
   fortnightOf,
   markFortnightPaid,
   markFortnightReviewed,
@@ -354,7 +354,7 @@ describe.skipIf(!canRunDbTests())(
       }, TEST_TIMEOUT);
 
       it(
-        "no deja revisar mientras falten cierres de caja o queden renglones marcados",
+        "no deja revisar sin saber si todo está cobrado, ni con renglones marcados",
         async () => {
           // La regla global vence el 9: el retoque del 10 queda sin regla. Desde
           // que el renglón manual comisiona, es la forma de tener uno marcado.
@@ -374,14 +374,14 @@ describe.skipIf(!canRunDbTests())(
           expect(sinCierres.ok).toBe(false);
           if (sinCierres.ok) throw new Error("no debería haber revisado");
           expect(sinCierres.reason).toBe("compuerta");
-          // Quince días sin cierre y un renglón sin regla: los dos motivos.
+          // Sin agenda no se sabe si quedó una cita sin cobrar, y hay un
+          // renglón sin regla: los dos motivos.
           expect(sinCierres.blockers).toHaveLength(2);
 
-          // Con los quince días cerrados sigue faltando el renglón marcado: la
-          // marca es un bloqueo, no un adorno.
-          await cerrarTodosLosDias(db);
+          // Con la agenda leída y todo cobrado sigue faltando el renglón
+          // marcado: la marca es un bloqueo, no un adorno.
           const conMarca = await markFortnightReviewed(
-            { db },
+            { db, loadRange: agendaVacia },
             { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
           );
           expect(conMarca.ok).toBe(false);
@@ -396,7 +396,7 @@ describe.skipIf(!canRunDbTests())(
         async () => {
           await runFortnight({ db }, { period: QUINCENA, actorUserId: OWNER_ID, now: DESPUES });
           const result = await markFortnightPaid(
-            { db },
+            { db, loadRange: agendaVacia },
             { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
           );
           expect(result).toMatchObject({ ok: false, reason: "sin-revisar" });
@@ -419,9 +419,8 @@ describe.skipIf(!canRunDbTests())(
           const assessment = await assessFortnight({ db }, { period: QUINCENA, now: enCurso });
 
           expect(assessment.open).toBe(true);
-          // Los días que todavía no llegaron no cuentan como faltantes: hasta
-          // el 9 hay nueve días pasados, y solo ésos pueden tener cierre.
-          expect(assessment.missingDayCloses).toEqual(fortnightDays(QUINCENA).slice(0, 9));
+          // Sin agenda no se sabe nada de las citas: `null`, no "ninguna".
+          expect(assessment.unbilled).toBeNull();
           expect(fortnightBlockers(assessment)[0]).toEqual({
             kind: "en-curso",
             until: "2026-09-15",
@@ -431,19 +430,12 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
-        "un día sin nada que cerrar no pide cierre de caja",
+        "bloquea solo por citas atendidas sin cobrar, no por días sin caja",
         async () => {
-          // El 13 no hubo citas, el 14 solo una cancelada y una inasistencia;
-          // el 15 sí tuvo una atendida. Del 1 al 12 se cerraron.
-          const { dayCloses } = repositories(db);
-          for (const day of fortnightDays(QUINCENA).slice(0, 12)) {
-            await dayCloses.insert({
-              close_date: day,
-              closed_by: OWNER_ID,
-              closed_at: eaLocalToInstant(dt(`${day} 20:00:00`)),
-            });
-          }
-          const citaCon = (id: number, status: string, day: string) => ({
+          // El 13 no hubo citas, el 14 solo una cancelada y una inasistencia,
+          // el 15 una atendida que nadie cobró. Las cuentas sembradas de la
+          // quincena están cobradas y no aparecen en la agenda: no cuentan.
+          const citaCon = (id: number, status: string, day: string): DayAppointment => ({
             eaAppointmentId: id,
             status,
             start: dt(`${day} 10:00:00`),
@@ -451,30 +443,36 @@ describe.skipIf(!canRunDbTests())(
             customerName: "Clienta",
             providerName: "Lina",
           });
-          const porDia: Record<string, ReturnType<typeof citaCon>[]> = {
-            "2026-09-13": [],
-            "2026-09-14": [citaCon(1, "Cancelada", "2026-09-14"), citaCon(2, "No asistió", "2026-09-14")],
-            "2026-09-15": [citaCon(3, "Reservada", "2026-09-15")],
-          };
+          const citas = [
+            citaCon(1, "Cancelada", "2026-09-14"),
+            citaCon(2, "No asistió", "2026-09-14"),
+            citaCon(3, "Reservada", "2026-09-15"),
+          ];
 
           const assessment = await assessFortnight(
-            { db, loadAppointments: async (day) => porDia[day] ?? [] },
+            { db, loadRange: async () => citas },
             { period: QUINCENA, now: DESPUES },
           );
-          expect(assessment.missingDayCloses).toEqual(["2026-09-15"]);
+          expect(assessment.unbilled?.map((charge) => [charge.date, charge.eaAppointmentId])).toEqual([
+            ["2026-09-15", 3],
+          ]);
+          expect(fortnightBlockers(assessment)).toEqual([
+            { kind: "sin-cobrar", days: ["2026-09-15"], count: 1 },
+          ]);
 
-          // Si EA no responde, el día se sigue pidiendo: un cierre de más es
-          // mejor que pagar con una cuenta sin cerrar.
+          // Si EA no responde, no se sabe: bloquea. Pagar es irreversible y
+          // "no sé" no es "todo cobrado".
           const sinEa = await assessFortnight(
             {
               db,
-              loadAppointments: async () => {
+              loadRange: async () => {
                 throw new Error("EA no responde");
               },
             },
             { period: QUINCENA, now: DESPUES },
           );
-          expect(sinEa.missingDayCloses).toEqual(["2026-09-13", "2026-09-14", "2026-09-15"]);
+          expect(sinEa.unbilled).toBeNull();
+          expect(fortnightBlockers(sinEa)).toContainEqual({ kind: "sin-agenda" });
         },
         TEST_TIMEOUT,
       );
@@ -483,7 +481,6 @@ describe.skipIf(!canRunDbTests())(
         "paga, congela las entradas y deja de recalcular",
         async () => {
           await runFortnight({ db }, { period: QUINCENA, actorUserId: OWNER_ID, now: DESPUES });
-          await cerrarTodosLosDias(db);
 
           // Sara es la que tiene el renglón marcado; Lina no. Se revisa la de
           // Lina, que es la que se paga en este test.
@@ -503,13 +500,13 @@ describe.skipIf(!canRunDbTests())(
             .execute();
 
           const revisada = await markFortnightReviewed(
-            { db },
+            { db, loadRange: agendaVacia },
             { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
           );
           expect(revisada).toMatchObject({ ok: true, already: false });
 
           const pagada = await markFortnightPaid(
-            { db },
+            { db, loadRange: agendaVacia },
             { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
           );
           expect(pagada).toMatchObject({ ok: true, already: false });
@@ -602,7 +599,7 @@ describe.skipIf(!canRunDbTests())(
 
           expect(
             await markFortnightReviewed(
-              { db },
+              { db, loadRange: agendaVacia },
               { period: QUINCENA, eaProviderId: SARA, actorUserId: OWNER_ID, now: DESPUES },
             ),
           ).toMatchObject({ ok: false, reason: "pagada" });
@@ -610,7 +607,7 @@ describe.skipIf(!canRunDbTests())(
           // Pagar de nuevo no falla, pero tampoco vuelve a hacer nada.
           expect(
             await markFortnightPaid(
-              { db },
+              { db, loadRange: agendaVacia },
               { period: QUINCENA, eaProviderId: SARA, actorUserId: OWNER_ID, now: DESPUES },
             ),
           ).toMatchObject({ ok: true, already: true });
@@ -626,13 +623,13 @@ describe.skipIf(!canRunDbTests())(
           // de los tests fija el instante para poder afirmar sobre fechas.
           expect(
             await markFortnightReviewed(
-              { db },
+              { db, loadRange: agendaVacia },
               { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID },
             ),
           ).toMatchObject({ ok: false, reason: "sin-liquidacion" });
           expect(
             await markFortnightPaid(
-              { db },
+              { db, loadRange: agendaVacia },
               { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID },
             ),
           ).toMatchObject({ ok: false, reason: "sin-liquidacion" });
@@ -644,7 +641,6 @@ describe.skipIf(!canRunDbTests())(
         "revisar dos veces es idempotente",
         async () => {
           await runFortnight({ db }, { period: QUINCENA, actorUserId: OWNER_ID, now: DESPUES });
-          await cerrarTodosLosDias(db);
           await db
             .updateTable("commission_entry")
             .set({ commission_rule_id: 1 })
@@ -652,12 +648,12 @@ describe.skipIf(!canRunDbTests())(
             .execute();
 
           await markFortnightReviewed(
-            { db },
+            { db, loadRange: agendaVacia },
             { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
           );
           expect(
             await markFortnightReviewed(
-              { db },
+              { db, loadRange: agendaVacia },
               { period: QUINCENA, eaProviderId: LINA, actorUserId: OWNER_ID, now: DESPUES },
             ),
           ).toMatchObject({ ok: true, already: true });
@@ -754,7 +750,7 @@ describe.skipIf(!canRunDbTests())(
             at: DESPUES,
           });
           await markFortnightPaid(
-            { db },
+            { db, loadRange: agendaVacia },
             { period: QUINCENA, eaProviderId: SARA, actorUserId: OWNER_ID, now: DESPUES },
           );
 
@@ -1143,14 +1139,11 @@ async function sembrarQuincenaDeReferencia(db: Kysely<Database>): Promise<void> 
   });
 }
 
-/** Los quince días del periodo, cerrados. Es la compuerta de la revisión. */
-async function cerrarTodosLosDias(db: Kysely<Database>): Promise<void> {
-  const { dayCloses } = repositories(db);
-  for (const day of fortnightDays(QUINCENA)) {
-    await dayCloses.insert({
-      close_date: day,
-      closed_by: OWNER_ID,
-      closed_at: eaLocalToInstant(dt(`${day} 20:00:00`)),
-    });
-  }
+/**
+ * Una agenda sin citas para todo el rango. Con ella la compuerta sabe que no
+ * quedó ninguna cita atendida sin cobrar —las cuentas sembradas están todas
+ * cerradas— y deja pasar la revisión si no hay otro motivo.
+ */
+async function agendaVacia(): Promise<DayAppointment[]> {
+  return [];
 }

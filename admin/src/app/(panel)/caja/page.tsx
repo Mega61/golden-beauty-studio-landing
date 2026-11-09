@@ -9,18 +9,20 @@ import { CajaVista } from "./CajaVista";
 import { loadCajaView } from "./data";
 
 /**
- * `/admin/caja` — el día completo y su cierre.
+ * `/admin/caja` — el día completo: pendientes, cuadre y qué ya está en Actual.
+ * No hay cierre del día: lo cobrado sale solo cada noche.
  *
  * ## Una técnica no llega acá
  *
  * `caja:ver` es de la dueña y de la recepción. La técnica cierra la cuenta de
- * sus propias citas desde Hoy, pero no ve los totales del día, ni las cuentas
- * de las demás, ni hace el cierre. La compuerta es `requireCapability()` —el
+ * sus propias citas desde Hoy, pero no ve los totales del día ni las cuentas
+ * de las demás. La compuerta es `requireCapability()` —el
  * DAL— y no que el destino "Caja" no aparezca en su navegación: esconder un
  * enlace no es un permiso, porque la URL se puede escribir a mano.
  *
- * `caja:cerrar-dia` se comprueba aparte, dentro de las Server Actions. Que el
- * botón se dibuje es cosmética; que la escritura ocurra, no.
+ * `caja:cerrar-dia` (sincronizar ahora) se comprueba aparte, dentro de la
+ * Server Action. Que el botón se dibuje es cosmética; que la escritura ocurra,
+ * no.
  *
  * ## El shell se monta acá
  *
@@ -29,8 +31,8 @@ import { loadCajaView } from "./data";
  *
  * ## Sin caché
  *
- * Es la pantalla con la que se decide si la caja cuadra. Una versión servida de
- * caché diría que faltan tres cuentas que ya se cerraron, o al revés.
+ * Es la pantalla con la que se cuadra el cajón. Una versión servida de caché
+ * diría que faltan tres cuentas que ya se cobraron, o al revés.
  */
 
 export const metadata: Metadata = {
@@ -56,28 +58,11 @@ export default async function CajaPage({
 
   const view = await loadCajaView(fecha);
 
-  // EA sin responder no es una pantalla de error: la plata está en `gbs_admin`,
-  // que sí contestó, y las cuentas del día se pueden ver igual. Lo que no se
-  // puede es cerrar — sin la agenda no hay forma de saber qué citas hubo — y
-  // eso lo dice el bloqueo que trae la revisión.
-  const sinAgenda = view.review.blockers.length > 0 && view.dayClose === null;
-
+  // EA sin responder no es una pantalla de error ni de solo lectura: la plata
+  // está en `gbs_admin`, que sí contestó, y se sincroniza igual. Lo único que
+  // no se sabe es qué citas quedaron sin cobrar, y eso lo dice Pendientes.
   return (
-    <AppShell
-      role={navRole(session.role)}
-      title="Caja"
-      readOnly={
-        sinAgenda
-          ? {
-              reason:
-                // Sin punto final y sin "así que": `ReadOnlyBand` cierra la
-                // frase por su cuenta con ", así que por ahora no se puede
-                // crear ni modificar nada".
-                "No se pudo leer la agenda y el cierre del día queda bloqueado",
-            }
-          : undefined
-      }
-    >
+    <AppShell role={navRole(session.role)} title="Caja">
       <CajaVista view={view} />
     </AppShell>
   );

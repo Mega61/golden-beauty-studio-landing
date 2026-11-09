@@ -26,25 +26,32 @@ import {
 } from "@/lib/ingest-payload";
 
 /**
- * El cierre diario: la compuerta, los totales y el push a ingest.
+ * La caja del día: los pendientes, los totales y el envío a ingest.
  *
- * ## La compuerta es la funcionalidad
+ * ## No hay cierre del día (desde 2026-11-09)
  *
- * "Se cobra el mismo día, siempre" no es un supuesto contable, es una regla que
- * el panel **impone**: `paid_at` cae en la fecha de la cita y base caja = base
- * servicio. Se implementa como compuerta y no como confianza —
- * **no se puede cerrar el día si queda una cita atendida sin cuenta cerrada** —
- * y la lista de pendientes de Caja es esa compuerta hecha visible. Cerrar el
- * día es el acto que la vacía.
+ * Hasta esa fecha la plata solo salía cuando alguien apretaba "Cerrar el día",
+ * y el día no cerraba mientras quedara una cita atendida sin cuenta. A la
+ * dueña ese modelo no le servía: un día sin cerrar era plata que no llegaba, y
+ * una sesión olvidada después del cierre exigía un ajuste aparte. Ahora
+ * cobrar en Hoy es el único paso: `syncDay()` manda lo cobrado y completo de un
+ * día —la noche siguiente, desde `jobs/nightly-sync.ts`, o con "Sincronizar
+ * ahora"— y lo que falta no frena al resto. `reviewDay()` sigue existiendo,
+ * pero como **lista de pendientes**, no como compuerta: alimenta Caja, el
+ * aviso de citas sin cobrar y la compuerta de comisiones.
  *
- * ## El push va por cierre diario, nunca por cita
+ * `paid_at` sigue cayendo en la fecha de la cita: una sesión cobrada una
+ * semana tarde entra a la caja de su día.
+ *
+ * ## El envío va por día y de noche, nunca al cobrar cada cuenta
  *
  * Actual Budget deduplica por `imported_id` y **no actualiza** el monto de una
  * transacción ya importada. Empujar al cerrar cada cuenta dejaría a Actual con
  * la cifra vieja para siempre si alguien corrige un ticket a las 3 p. m., sin
- * error visible en ninguna parte. Empujando al cierre del día las correcciones
- * intradía salen gratis, y una corrección **posterior** al cierre viaja como
- * ajuste con id propio (`recordAdjustment()`), nunca reescribiendo el original.
+ * error visible en ninguna parte. Enviando de noche, las correcciones del mismo
+ * día salen gratis, y una corrección **posterior** —hecha desde Hoy como
+ * cualquier edición— viaja como ajuste con id propio (`recordEditAdjustment()`),
+ * nunca reescribiendo el original.
  *
  * ## Dónde vive la llave de idempotencia, exactamente
  *
@@ -59,8 +66,8 @@ import {
  * ## Qué está y qué no está en este archivo
  *
  * Está la orquestación y las dos funciones puras que el plan pide que existan
- * en un solo lugar: `reviewDay()` (la compuerta) y `summarizeDayTotals()` (los
- * totales por método). **No está ninguna forma de cuerpo de Strapi**: los
+ * en un solo lugar: `reviewDay()` (los pendientes) y `summarizeDayTotals()`
+ * (los totales por método). **No está ninguna forma de cuerpo de Strapi**: los
  * movimientos los arma `lib/ingest-payload.ts` y los manda
  * `lib/ingest-client.ts`, que es el único que conoce la URL, el header y el
  * sobre.
@@ -92,7 +99,7 @@ export type DayAccount = FinanceForIngest & {
 };
 
 /**
- * Una cita del día según EA, reducida a lo que la compuerta necesita.
+ * Una cita del día según EA, reducida a lo que la lista de pendientes necesita.
  *
  * La carga la hace quien llama (`(panel)/caja/data.ts`), no este módulo: el
  * cruce entre `easyappointments` y `gbs_admin` es en memoria porque se leen con
@@ -262,7 +269,7 @@ export function totalsOf(row: DayClose): DayTotals {
   };
 }
 
-// ── La compuerta ────────────────────────────────────────────────────────────
+// ── Los pendientes ──────────────────────────────────────────────────────────
 
 /**
  * Lo que le falta al día.
@@ -331,18 +338,19 @@ export type ReviewDayInput = {
 };
 
 /**
- * La compuerta, como función pura.
+ * Los pendientes del día, como función pura.
  *
- * Está acá y no dentro de la Server Action por la razón de siempre: es la
- * decisión que separa "la caja cuadra" de "faltan tres cuentas y nadie se
- * enteró", y una decisión así se testea con una tabla de casos, no probándola a
- * mano una vez.
+ * Está acá y no dentro de una pantalla por la razón de siempre: es la decisión
+ * que separa "todo lo atendido está cobrado" de "faltan tres cuentas y nadie se
+ * enteró", y una decisión así se testea con una tabla de casos.
  *
- * **Si EA no respondió, el día no se cierra.** No es cautela genérica: la única
- * forma de saber qué citas hubo es preguntárselo a EA. Cerrar a ciegas armaría
- * el lote con las cuentas que sí existen y empujaría un día al que le falta la
- * mitad — y como Actual no actualiza montos, esa mitad no se puede agregar
- * después sin ajustes uno por uno.
+ * Ya no frena nada (desde 2026-11-09): `canClose` y `blocks` siguen diciendo
+ * si el día está completo, y eso lo leen Caja, el aviso de citas sin cobrar y
+ * la compuerta de comisiones. El envío a Actual no depende de esto —una cita
+ * olvidada que se cobra después entra en la sincronización siguiente—.
+ *
+ * Si EA no respondió no se sabe qué citas hubo: `blockers` lo dice, y nadie
+ * puede afirmar que el día está completo.
  */
 export function reviewDay(input: ReviewDayInput): DayReview {
   const { date, appointments, accounts, now } = input;
@@ -484,15 +492,13 @@ export function blockingIssues(review: DayReview): DayIssue[] {
 /**
  * De dónde salen las citas del día.
  *
- * Entra como función y no como cliente de EA para que `closeDay()` no tenga que
- * saber cómo se piden las relaciones (`with=service,provider,customer` viene en
- * snake_case y necesita el decodificador de A1), y para que el test de capa 2
- * pueda inyectar un día entero sin levantar un EA.
+ * Entra como función y no como cliente de EA para que `loadReview()` no tenga
+ * que saber cómo se piden las relaciones (`with=service,provider,customer`
+ * viene en snake_case y necesita el decodificador de A1), y para que el test
+ * de capa 2 pueda inyectar un día entero sin levantar un EA.
  *
- * **`closeDay()` la vuelve a llamar aunque la pantalla ya la haya llamado.** La
- * compuerta se evalúa en el servidor, en el momento del cierre, con los datos
- * de ese momento: entre que se pintó la pantalla y que alguien apretó el botón
- * pudo cerrarse una cuenta, o aparecer una cita.
+ * `syncDay()` no la usa: mandar lo cobrado no depende de saber qué más hubo, y
+ * por eso la sincronización corre igual con EA caído.
  */
 export type DayAppointmentSource = (
   date: EaLocalDate,
@@ -558,150 +564,248 @@ export type PushOutcome =
   | { state: "pendiente" }
   | { state: "fallo"; message: string; retryable: boolean };
 
-export type CloseDayResult =
-  | { ok: false; reason: "compuerta"; review: DayReview }
-  | { ok: false; reason: "lote"; message: string }
+/** Una cuenta cobrada que la sincronización no pudo mandar, y por qué. */
+export type SkippedAccount = {
+  eaAppointmentId: number;
+  message: string;
+};
+
+export type SyncDayResult =
+  /** No había nada cobrado sin sincronizar ni ningún push pendiente. */
+  | { state: "nada"; skipped: SkippedAccount[] }
   | {
-      ok: true;
+      state: "sincronizado";
       dayCloseId: number;
-      /** `false` = el día ya estaba cerrado y no se creó una segunda fila. */
-      created: boolean;
+      /** Cuentas que esta llamada sumó al cierre del día. */
+      attached: number;
+      /** Cuentas cobradas que no viajaron: les falta algo que se arregla desde Hoy. */
+      skipped: SkippedAccount[];
       totals: DayTotals;
       push: PushOutcome;
     };
 
 /**
- * Cerrar el día.
+ * **Sincronizar un día con el CRM.** Reemplaza al "Cerrar el día" manual.
  *
- * ## Idempotente por diseño, en los dos niveles
+ * ## Por qué ya no hay compuerta
  *
- * 1. **El `day_close`.** Se busca el del día *antes* de evaluar la compuerta.
- *    Si ya existe, no se inserta otra fila y no se vuelve a juzgar el día — está
- *    cerrado. Lo que sí se hace es continuar al push, porque el caso normal de
- *    apretar el botón dos veces es "el primer intento cerró pero el push falló".
- *    `uq_day_close_date` cubre además la carrera de dos personas apretando a la
- *    vez: el segundo INSERT choca y se resuelve leyendo el que ganó.
- * 2. **El push.** Si la fila ya tiene `pushed_to_ingest_at`, no se manda de
- *    nuevo. Y si se mandara, el lote llevaría los mismos `imported_id` y ni
- *    Strapi ni Actual crearían un movimiento nuevo.
+ * Hasta 2026-11-09 la plata solo salía cuando alguien cerraba el día, y el día
+ * no cerraba mientras quedara una cita sin cuenta. En la práctica eso
+ * significaba que una sola cita olvidada retenía la plata de todas las demás,
+ * y que el día se cerraba —o no— según alguien se acordara. La dueña pidió lo
+ * contrario: cobrar es el único paso, y lo demás pasa solo.
  *
- * ## El lote se arma antes de escribir
+ * Así que esta función toma **lo que ya está cobrado y completo** y lo manda.
+ * Lo que falta no frena al resto:
  *
- * `buildDayClosePayments()` corre **antes** del INSERT. Si una sola cuenta del
- * día está mal, no queda un `day_close` a medio hacer: no se escribió nada.
+ * - Una cita sin cuenta no entra: no tiene plata. Cuando alguien la cobre —hoy
+ *   o dentro de una semana— la próxima corrida la recoge, con la fecha de la
+ *   cita como fecha de caja.
+ * - Una cuenta cobrada a la que le falta algo (el método de pago, una cortesía
+ *   con plata adentro) se salta y se devuelve en `skipped`, para que el aviso
+ *   la nombre. Las demás del día viajan igual.
+ *
+ * ## La fila `day_close` sigue existiendo
+ *
+ * Como contenedor del lote y de sus totales, no como un acto de alguien: la
+ * primera corrida que encuentra plata en un día crea la fila (`closed_by =
+ * NULL`, migración `030`) y las siguientes le suman las cuentas que aparezcan.
+ * Los totales se **recalculan** desde las cuentas en vez de sumarse, así que
+ * correr esto dos veces no los duplica.
+ *
+ * ## El push sigue siendo uno por cuenta, una sola vez
+ *
+ * `runPush()` manda solo las cuentas sin `pushed_to_ingest_at`. Una cuenta que
+ * se corrige **después** de haber viajado no se vuelve a mandar: la corrección
+ * sale como ajuste con llave propia (`recordEditAdjustment()`), porque Actual
+ * no actualiza montos ya importados.
+ *
+ * ## Cuándo corre
+ *
+ * Cada noche, desde el reconcile (`jobs/nightly-sync.ts`), antes de que el CRM
+ * pase los pagos a Actual. Hasta entonces una cuenta se corrige gratis desde
+ * Hoy: no salió nada todavía. Caja ofrece además "Sincronizar ahora".
  */
-export async function closeDay(
+export async function syncDay(
   deps: DayCloseDeps,
-  input: { date: EaLocalDate; closedBy: AuthId; now?: Date },
-): Promise<CloseDayResult> {
+  input: { date: EaLocalDate; now?: Date },
+): Promise<SyncDayResult> {
   const now = input.now ?? new Date();
   const repos = repositories(deps.db);
+  const [dayStart, dayEnd] = dayBounds(input.date);
+
+  const rows = (await repos.appointmentFinance.listByStartRange(dayStart, dayEnd)).filter(
+    (row) => row.closed_at !== null && row.day_close_id === null,
+  );
+  const { ready, skipped } = splitReady(await withPayments(repos, rows));
 
   const existing = await repos.dayCloses.findByDate(input.date);
-  if (existing !== undefined) {
+
+  if (ready.length === 0) {
+    // Nada nuevo, pero un cierre que quedó sin llegar al CRM se reintenta acá:
+    // es la misma noche y el mismo lote, con las mismas llaves.
+    if (existing === undefined || existing.pushed_to_ingest_at !== null) {
+      return { state: "nada", skipped };
+    }
     return {
-      ok: true,
+      state: "sincronizado",
       dayCloseId: existing.id,
-      created: false,
+      attached: 0,
+      skipped,
       totals: totalsOf(existing),
       push: await pushClose(deps, existing, now),
     };
   }
 
-  const review = await loadReview(deps, input.date, now);
-  if (!review.canClose) return { ok: false, reason: "compuerta", review };
-
-  // La última compuerta antes de que la cifra salga del panel. Un `imported_id`
-  // repetido en el mismo lote, un método que el enum de Strapi no acepta, una
-  // fecha de caja inválida: todo eso lanza acá, con el día todavía sin cerrar.
-  //
-  // **Este `catch` no tiene test y no se le puede escribir uno**: `reviewDay()`
-  // ya bloquea cada condición que haría lanzar a `buildDayClosePayments()`
-  // sobre `review.closed`, y la que queda —dos movimientos con la misma llave—
-  // la impide `uq_af_ea_appointment`. Se conserva porque las dos funciones
-  // pueden divergir, y el modo de falla que evita es "medio día empujado a
-  // Actual Budget y un error a la mitad", del que hay que salir a mano. La
-  // versión alcanzable de esta misma guarda sí está testeada, en `pushClose()`:
-  // ahí el lote se arma desde la base y una fila corrompida después del cierre
-  // llega hasta acá.
-  try {
-    buildDayClosePayments(review.closed);
-  } catch (error) {
-    if (error instanceof IngestPayloadError) {
-      return { ok: false, reason: "lote", message: error.message };
-    }
-    throw error;
-  }
-
-  const { totals, closed } = review;
-
   let dayCloseId: number;
-  let created: boolean;
-
   try {
     dayCloseId = await deps.db.transaction().execute(async (trx) => {
       const tx = repositories(trx);
-      const id = await tx.dayCloses.insert({
-        close_date: input.date,
-        total_efectivo: totals.efectivo,
-        total_transferencia: totals.transferencia,
-        total_otro: totals.otro,
-        total_tips: totals.tips,
-        appointment_count: totals.count,
-        closed_by: input.closedBy,
-        closed_at: now,
-      });
+      const id =
+        existing?.id ??
+        (await tx.dayCloses.insert({
+          close_date: input.date,
+          closed_by: null,
+          closed_at: now,
+        }));
 
-      // Congelar las cuentas bajo su cierre. Desde acá, corregirlas exige un
-      // ajuste: los números ya son los que salieron —o van a salir— hacia
-      // Strapi y Actual Budget.
       await tx.appointmentFinance.attachToDayClose(
-        closed.map((a) => a.financeId),
+        ready.map((account) => account.financeId),
         id,
       );
+      await recomputeTotals(trx, id);
+      // Lo que se acaba de sumar todavía no salió: el cierre vuelve a quedar
+      // pendiente de push, y así lo ve la cola de reintento si el push falla.
+      if (existing !== undefined && existing.pushed_to_ingest_at !== null) {
+        await tx.dayCloses.markUnpushed(id);
+      }
 
       await tx.auditLog.append({
-        actorUserId: input.closedBy,
-        action: "day.close",
+        actorUserId: null,
+        action: "day.sync",
         entity: "day_close",
         entityId: id,
-        after: { date: input.date, ...totals, accounts: closed.length },
+        after: {
+          date: input.date,
+          accounts: ready.map((account) => account.eaAppointmentId),
+          skipped: skipped.map((account) => account.eaAppointmentId),
+        },
         at: now,
       });
 
       return id;
     });
-    created = true;
   } catch (error) {
-    if (!isDuplicateKeyError(error)) throw error;
-    // Dos personas apretaron el botón a la vez. El día se cerró una sola vez,
-    // que es lo correcto; esta llamada se queda con el que ganó.
-    const winner = await repos.dayCloses.findByDate(input.date);
-    if (winner === undefined) throw error;
-    return {
-      ok: true,
-      dayCloseId: winner.id,
-      created: false,
-      totals: totalsOf(winner),
-      // **Esta llamada no empuja.** La que ganó el INSERT ya está en eso, y
-      // mandar el mismo lote por dos conexiones a la vez es la única forma de
-      // duplicar movimientos que las llaves no cubren: dependería de que la
-      // ruta de ingest del CRM sea idempotente, y eso está sin verificar. Si
-      // la ganadora falla, el día queda sin marca y el reintento lo agarra.
-      push:
-        winner.pushed_to_ingest_at === null
-          ? { state: "pendiente" }
-          : { state: "ya", at: winner.pushed_to_ingest_at },
-    };
+    // Dos sincronizaciones del mismo día a la vez (la nocturna y un
+    // "Sincronizar ahora"): `uq_day_close_date` deja una sola fila. La que
+    // perdió el INSERT vuelve a empezar y encuentra la fila de la otra.
+    if (existing === undefined && isDuplicateKeyError(error)) {
+      return syncDay(deps, { date: input.date, now });
+    }
+    throw error;
   }
 
   const row = await repos.dayCloses.findById(dayCloseId);
-  const push =
-    row === undefined
-      ? ({ state: "fallo", message: "El cierre desapareció entre dos consultas.", retryable: true } as const)
-      : await pushClose(deps, row, now);
+  if (row === undefined) {
+    return {
+      state: "sincronizado",
+      dayCloseId,
+      attached: ready.length,
+      skipped,
+      totals: summarizeDayTotals(ready),
+      push: { state: "fallo", message: "El cierre desapareció entre dos consultas.", retryable: true },
+    };
+  }
 
-  return { ok: true, dayCloseId, created, totals, push };
+  return {
+    state: "sincronizado",
+    dayCloseId,
+    attached: ready.length,
+    skipped,
+    totals: totalsOf(row),
+    push: await pushClose(deps, row, now),
+  };
+}
+
+/**
+ * Separa las cuentas que pueden viajar de las que no.
+ *
+ * Una por una, y no el lote entero de un golpe: con la compuerta, una cuenta
+ * mal hecha frenaba el día completo. Acá frena solo a sí misma.
+ */
+function splitReady(accounts: readonly DayAccount[]): {
+  ready: DayAccount[];
+  skipped: SkippedAccount[];
+} {
+  const ready: DayAccount[] = [];
+  const skipped: SkippedAccount[] = [];
+
+  for (const account of accounts) {
+    const falta = missingOf(account);
+    if (falta !== null) {
+      skipped.push({ eaAppointmentId: account.eaAppointmentId, message: falta });
+      continue;
+    }
+    try {
+      buildDayClosePayments([account]);
+    } catch (error) {
+      if (!(error instanceof IngestPayloadError)) throw error;
+      skipped.push({ eaAppointmentId: account.eaAppointmentId, message: error.message });
+      continue;
+    }
+    const totals = summarizeDayTotals([account]);
+    if (totals.efectivo < 0 || totals.transferencia < 0 || totals.otro < 0) {
+      skipped.push({
+        eaAppointmentId: account.eaAppointmentId,
+        message: "La cuenta quedó con un pago en negativo",
+      });
+      continue;
+    }
+    ready.push(account);
+  }
+
+  return { ready, skipped };
+}
+
+/**
+ * Reescribe los totales de un cierre desde sus cuentas.
+ *
+ * Recalcular y no sumar: así una corrida repetida, o una cuenta corregida
+ * desde Hoy después de entrar al cierre, dejan la fila con lo que de verdad
+ * tienen las cuentas.
+ */
+async function recomputeTotals(db: Db, dayCloseId: number): Promise<DayTotals> {
+  const repos = repositories(db);
+  const totals = summarizeDayTotals(
+    await withPayments(repos, await repos.appointmentFinance.listByDayClose(dayCloseId)),
+  );
+  // El CHECK de `day_close` no acepta negativos. Solo se llega acá con una
+  // cuenta corregida a la baja por debajo de cero en un método, que es un
+  // error de la cuenta y no del cierre: el total queda en cero y la cuenta se
+  // ve en Caja con su cifra real.
+  await repos.dayCloses.setTotals(dayCloseId, {
+    efectivo: Math.max(0, totals.efectivo),
+    transferencia: Math.max(0, totals.transferencia),
+    otro: Math.max(0, totals.otro),
+    tips: Math.max(0, totals.tips),
+    count: totals.count,
+  });
+  return totals;
+}
+
+/**
+ * Los totales de un cierre, después de que una de sus cuentas se corrigió.
+ *
+ * La llama Hoy al guardar una cuenta que ya estaba en un cierre. **Mejor
+ * esfuerzo**: los totales son para cuadrar el cajón en Caja, no lo que viajó a
+ * Actual, y un fallo acá no puede deshacer una cuenta ya guardada.
+ */
+export async function refreshDayCloseTotals(db: Db, dayCloseId: number): Promise<void> {
+  try {
+    await recomputeTotals(db, dayCloseId);
+  } catch (error) {
+    console.error("[caja] no se pudieron recalcular los totales del cierre", error);
+  }
 }
 
 /** La revisión del día, con la plata y la agenda ya cruzadas. */
@@ -719,8 +823,8 @@ export async function loadReview(
   try {
     appointments = await deps.loadAppointments(date);
   } catch (error) {
-    // No se propaga: un día sin agenda igual tiene que poder verse, con la
-    // compuerta bloqueada y el motivo escrito. El detalle va al log.
+    // No se propaga: un día sin agenda igual tiene que poder verse, con el
+    // motivo escrito. El detalle va al log.
     console.error("[caja] no se pudieron leer las citas del día", error);
   }
 
@@ -754,6 +858,18 @@ async function withPayments(
   }
 
   return rows.map((row) => toDayAccount(row, byFinance.get(row.id) ?? []));
+}
+
+/**
+ * Las cuentas cuyo inicio cae en `[from, to)`, con sus pagos.
+ *
+ * Para quien mira varios días de un golpe (el aviso de citas sin cobrar, la
+ * compuerta de comisiones): una consulta para todo el rango en vez de una por
+ * día.
+ */
+export async function loadAccountsInRange(db: Db, from: Date, to: Date): Promise<DayAccount[]> {
+  const repos = repositories(db);
+  return withPayments(repos, await repos.appointmentFinance.listByStartRange(from, to));
 }
 
 /** Los dos instantes que delimitan un día del estudio. `to` exclusivo. */
@@ -876,7 +992,17 @@ async function runPush(
     throw error;
   }
 
-  if (payments.length === 0) return { state: "vacio" };
+  if (payments.length === 0) {
+    // Nada que mandar —un día de solo cortesías— es estar al día. Sin la
+    // marca, el cierre volvería cada noche a la cola de reintento y saldría en
+    // Caja como "no llegó al CRM", cuando no había nada que llegara.
+    await deps.db.transaction().execute(async (trx) => {
+      const tx = repositories(trx);
+      await tx.dayCloses.markPushed(row.id, now);
+      await tx.appointmentFinance.markPushed(row.id, now);
+    });
+    return { state: "vacio" };
+  }
   if (deps.ingest === null) return { state: "apagado" };
   if (beforeCutover(deps.ingest, row.close_date)) {
     return { state: "antes-del-corte", since: deps.ingest.since as EaLocalDate };
@@ -942,131 +1068,64 @@ export async function retryDayPush(
   return pushClose(deps, row, now);
 }
 
-// ── Cuentas cerradas después del cierre ─────────────────────────────────────
-
-/**
- * Las cuentas del día que se cerraron **después** de que el día se cerró.
- *
- * Pasa cuando una cita se agenda tarde —se olvidó, o se registró al día
- * siguiente— y su cuenta se cierra desde Hoy navegando a ese día. Mientras no
- * estén en el cierre no viajan al CRM ni cuentan en sus totales, así que Caja
- * las muestra y ofrece agregarlas. Sin cierre no hay nada tardío: son cuentas
- * normales del día.
- */
-export function lateAccountsOf(review: DayReview, dayClose: DayClose | null): DayAccount[] {
-  if (dayClose === null) return [];
-  return review.closed.filter((account) => account.dayCloseId === null);
-}
-
-export type AttachLateResult =
-  | { ok: false; reason: "sin-cierre" | "vacio" | "incompleta" | "lote"; message: string }
-  | { ok: true; attached: number; totals: DayTotals; push: PushOutcome };
-
-/**
- * Agregar a un cierre ya hecho las cuentas que se cerraron después.
- *
- * No reabre el día ni re-juzga la compuerta: el día sigue cerrado una sola vez
- * (`uq_day_close_date`). Lo que hace es lo mismo que el cierre hizo con las
- * demás cuentas, para éstas: las congela bajo el cierre, suma sus totales a la
- * fila `day_close` y las empuja. El push manda **solo** las que no habían
- * salido (`runPush()`), cada una con su `tx_id` de siempre — no es un ajuste,
- * porque nunca se había empujado nada de esa cita.
- *
- * Una cuenta tardía incompleta (sin método de pago, cortesía con cobro) no se
- * agrega: es la misma regla de la compuerta, y agregarla congelaría una cifra
- * que todavía hay que arreglar desde Hoy.
- */
-export async function attachLateAccounts(
-  deps: DayCloseDeps,
-  input: { date: EaLocalDate; actorUserId: AuthId; now?: Date },
-): Promise<AttachLateResult> {
-  const now = input.now ?? new Date();
-  const repos = repositories(deps.db);
-
-  const dayClose = await repos.dayCloses.findByDate(input.date);
-  if (dayClose === undefined) {
-    return {
-      ok: false,
-      reason: "sin-cierre",
-      message: "Ese día todavía no está cerrado: las cuentas entran con el cierre normal.",
-    };
-  }
-
-  const [dayStart, dayEnd] = dayBounds(input.date);
-  const rows = (await repos.appointmentFinance.listByStartRange(dayStart, dayEnd)).filter(
-    (row) => row.closed_at !== null && row.day_close_id === null,
-  );
-  if (rows.length === 0) {
-    return { ok: false, reason: "vacio", message: "No hay cuentas tardías que agregar." };
-  }
-
-  const late = await withPayments(repos, rows);
-
-  for (const account of late) {
-    const falta = missingOf(account);
-    if (falta !== null) {
-      return {
-        ok: false,
-        reason: "incompleta",
-        message: `La cita #${account.eaAppointmentId} no se puede agregar: ${falta.toLowerCase()}. Corrígela desde Hoy.`,
-      };
-    }
-  }
-
-  try {
-    buildDayClosePayments(late);
-  } catch (error) {
-    if (error instanceof IngestPayloadError) {
-      return { ok: false, reason: "lote", message: error.message };
-    }
-    throw error;
-  }
-
-  const totals = summarizeDayTotals(late);
-  if (totals.efectivo < 0 || totals.transferencia < 0 || totals.otro < 0) {
-    return {
-      ok: false,
-      reason: "incompleta",
-      message: "Algún total por método quedó negativo. Revisa las cuentas antes de agregarlas.",
-    };
-  }
-
-  await deps.db.transaction().execute(async (trx) => {
-    const tx = repositories(trx);
-    await tx.appointmentFinance.attachToDayClose(
-      late.map((account) => account.financeId),
-      dayClose.id,
-    );
-    await tx.dayCloses.addLateAccounts(dayClose.id, totals);
-    await tx.auditLog.append({
-      actorUserId: input.actorUserId,
-      action: "day.attach-late",
-      entity: "day_close",
-      entityId: dayClose.id,
-      before: totalsOf(dayClose),
-      after: {
-        date: input.date,
-        added: totals,
-        accounts: late.map((account) => account.eaAppointmentId),
-      },
-      at: now,
-    });
-  });
-
-  const fresh = await repos.dayCloses.findById(dayClose.id);
-  const push: PushOutcome =
-    fresh === undefined
-      ? { state: "fallo", message: "El cierre desapareció entre dos consultas.", retryable: true }
-      : await pushClose(deps, fresh, now);
-
-  return { ok: true, attached: late.length, totals, push };
-}
-
 // ── Ajustes posteriores al cierre ───────────────────────────────────────────
 
 /** Acciones de la bitácora que llevan la cuenta de los ajustes. */
-const ADJUST_ACTION = "ticket.adjust";
+export const ADJUST_ACTION = "ticket.adjust";
 const ADJUST_PUSH_ACTION = "ingest.adjust";
+
+/** El motivo que queda en la bitácora cuando el ajuste sale de editar la cuenta. */
+export const EDIT_ADJUSTMENT_REASON = "Corrección de la cuenta desde Hoy";
+
+/**
+ * **Una cuenta que ya llegó a Actual se corrigió desde Hoy.**
+ *
+ * Antes de 2026-11-09 eso estaba prohibido ("esta cuenta ya entró al cierre
+ * del día, corregirla exige un ajuste"). Ahora la cuenta se edita como
+ * cualquier otra, y esto es lo que hace que Actual se entere: deja en la
+ * bitácora un `ticket.adjust` con la diferencia entre lo cobrado antes y
+ * después. La sincronización nocturna lo encuentra (`pendingAdjustments()`) y
+ * lo manda con su propia llave —`ea-appt:<id>:adj<n>`—, igual que un ajuste a
+ * mano.
+ *
+ * **Corre dentro de la transacción que guarda la cuenta**, con `db` siendo esa
+ * transacción: una cuenta corregida sin su ajuste sería plata que Actual nunca
+ * se entera que cambió, y un ajuste sin la corrección sería plata inventada.
+ *
+ * No agrega un renglón `manual` como `recordAdjustment()`: acá los renglones
+ * de la cuenta ya se reescribieron enteros con la corrección, y el monto
+ * cobrado ya es el nuevo. Solo la propina no viaja: un ajuste lleva propina
+ * cero (`buildIngestAdjustment()`), así que un cambio de propina después de la
+ * sincronización queda en el panel y no en Actual.
+ *
+ * Devuelve la secuencia, o `null` si el monto no cambió.
+ */
+export async function recordEditAdjustment(
+  db: Db,
+  input: {
+    financeId: number;
+    before: Cop;
+    after: Cop;
+    actorUserId: AuthId;
+    now: Date;
+  },
+): Promise<number | null> {
+  const delta = input.after - input.before;
+  if (delta === 0) return null;
+
+  const sequence = (await countAdjustments(db, input.financeId)) + 1;
+  await repositories(db).auditLog.append({
+    actorUserId: input.actorUserId,
+    action: ADJUST_ACTION,
+    entity: "appointment_finance",
+    entityId: input.financeId,
+    before: { amount_charged: input.before },
+    after: { amount_charged: input.after, sequence, delta, source: "hoy" },
+    reason: EDIT_ADJUSTMENT_REASON,
+    at: input.now,
+  });
+  return sequence;
+}
 
 export type AdjustmentResult =
   | { ok: false; reason: "sin-cuenta" | "sin-cierre" | "cero" | "lote"; message: string }
