@@ -5,6 +5,8 @@ import type { EaLocalDate, EaLocalDateTime } from "@/lib/ea";
 import {
   addCalendarDays,
   DEFAULT_WINBACK_TEMPLATE,
+  displayPhone,
+  filterWinback,
   formatDayMonth,
   renderWinbackMessage,
   selectWinbackCandidates,
@@ -133,5 +135,47 @@ describe("selectWinbackCandidates", () => {
       sent: new Map(),
     });
     expect(pending.map((p) => p.phone)).toEqual(["+57b", "+57c", "+57a"]);
+  });
+});
+
+describe("filterWinback", () => {
+  const row = (phone: string, name: string, daysAway: number, visits: number, cameBack?: boolean) => ({
+    phone,
+    firstName: name,
+    lastName: "Gómez",
+    lastAttended: at("2026-08-01 10:00:00"),
+    hasUpcoming: false,
+    visits,
+    daysAway,
+    sent: cameBack === undefined ? null : { sentAt: at("2026-11-01 10:00:00"), cameBack },
+  });
+  const rows = [row("+573001112222", "Ána", 50, 2), row("+573009998888", "Bea", 120, 5), row("+573005554444", "Carla", 400, 1)];
+
+  it("busca por nombre sin tildes y por tramo del celular", () => {
+    expect(filterWinback(rows, { query: "ana" }).map((r) => r.firstName)).toEqual(["Ána"]);
+    expect(filterWinback(rows, { query: "999 888" }).map((r) => r.firstName)).toEqual(["Bea"]);
+    expect(filterWinback(rows, { query: "gomez" })).toHaveLength(3);
+  });
+
+  it("filtra por meses sin venir", () => {
+    expect(filterWinback(rows, { query: "", range: "1-3" }).map((r) => r.firstName)).toEqual(["Ána"]);
+    expect(filterWinback(rows, { query: "", range: "3-6" }).map((r) => r.firstName)).toEqual(["Bea"]);
+    expect(filterWinback(rows, { query: "", range: "6+" }).map((r) => r.firstName)).toEqual(["Carla"]);
+  });
+
+  it("ordena", () => {
+    expect(filterWinback(rows, { query: "", sort: "visitas" }).map((r) => r.firstName)).toEqual(["Bea", "Ána", "Carla"]);
+    expect(filterWinback(rows, { query: "", sort: "antigua" }).map((r) => r.firstName)).toEqual(["Carla", "Bea", "Ána"]);
+    expect(filterWinback(rows, { query: "", sort: "nombre" }).map((r) => r.firstName)).toEqual(["Ána", "Bea", "Carla"]);
+  });
+
+  it("separa las que volvieron de las que esperan", () => {
+    const sent = [row("+571", "A", 10, 1, true), row("+572", "B", 10, 1, false)];
+    expect(filterWinback(sent, { query: "", outcome: "volvieron" }).map((r) => r.firstName)).toEqual(["A"]);
+    expect(filterWinback(sent, { query: "", outcome: "esperando" }).map((r) => r.firstName)).toEqual(["B"]);
+  });
+
+  it("muestra el celular legible", () => {
+    expect(displayPhone("+573001234567")).toBe("300 123 4567");
   });
 });

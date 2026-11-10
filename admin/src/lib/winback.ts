@@ -208,3 +208,82 @@ export function selectWinbackCandidates(input: {
   sent.sort((a, b) => (a.sent!.sentAt < b.sent!.sentAt ? 1 : -1));
   return { pending, sent };
 }
+
+// ── Filtros de la pantalla ──────────────────────────────────────────────────
+
+export type WinbackRange = "todas" | "1-3" | "3-6" | "6+";
+export type WinbackSort = "visitas" | "reciente" | "antigua" | "nombre";
+export type WinbackOutcome = "todas" | "volvieron" | "esperando";
+
+export const WINBACK_RANGES: readonly { value: WinbackRange; label: string }[] = [
+  { value: "todas", label: "Todas" },
+  { value: "1-3", label: "1–3 meses" },
+  { value: "3-6", label: "3–6 meses" },
+  { value: "6+", label: "+6 meses" },
+];
+export const WINBACK_SORTS: readonly { value: WinbackSort; label: string }[] = [
+  { value: "visitas", label: "Más visitas primero" },
+  { value: "reciente", label: "Se fue hace menos" },
+  { value: "antigua", label: "Se fue hace más" },
+  { value: "nombre", label: "Nombre (A–Z)" },
+];
+export const WINBACK_OUTCOMES: readonly { value: WinbackOutcome; label: string }[] = [
+  { value: "todas", label: "Todas" },
+  { value: "esperando", label: "Esperando" },
+  { value: "volvieron", label: "Volvieron" },
+];
+
+const fold = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+/** Nombre o cualquier tramo del celular (con o sin +57). */
+export function matchesQuery(person: Pick<WinbackPerson, "firstName" | "lastName" | "phone">, query: string): boolean {
+  const q = query.trim();
+  if (q === "") return true;
+  const digits = q.replace(/\D/g, "");
+  if (digits.length >= 3 && person.phone.replace(/\D/g, "").includes(digits)) return true;
+  return fold(`${person.firstName} ${person.lastName}`).includes(fold(q));
+}
+
+const inRange = (days: number, range: WinbackRange) =>
+  range === "todas" ||
+  (range === "1-3" && days < 90) ||
+  (range === "3-6" && days >= 90 && days < 180) ||
+  (range === "6+" && days >= 180);
+
+/** Las filas que muestra la pantalla, con la búsqueda, el filtro y el orden puestos. */
+export function filterWinback(
+  rows: readonly WinbackCandidate[],
+  opts: { query: string; range?: WinbackRange; sort?: WinbackSort; outcome?: WinbackOutcome },
+): WinbackCandidate[] {
+  const out = rows.filter(
+    (p) =>
+      matchesQuery(p, opts.query) &&
+      inRange(p.daysAway, opts.range ?? "todas") &&
+      (opts.outcome === undefined ||
+        opts.outcome === "todas" ||
+        (opts.outcome === "volvieron") === Boolean(p.sent?.cameBack)),
+  );
+  const name = (p: WinbackCandidate) => fold(`${p.firstName} ${p.lastName}`.trim() || p.phone);
+  switch (opts.sort) {
+    case "visitas":
+      return out.sort((a, b) => b.visits - a.visits || a.daysAway - b.daysAway);
+    case "reciente":
+      return out.sort((a, b) => a.daysAway - b.daysAway);
+    case "antigua":
+      return out.sort((a, b) => b.daysAway - a.daysAway);
+    case "nombre":
+      return out.sort((a, b) => name(a).localeCompare(name(b), "es"));
+    default:
+      return out;
+  }
+}
+
+/** `+573001234567` → `300 123 4567`. */
+export function displayPhone(e164: string): string {
+  const d = e164.replace(/\D/g, "").slice(-10);
+  return d.length === 10 ? `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}` : e164;
+}

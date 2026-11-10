@@ -1,0 +1,224 @@
+/* Recuperar clientas. Misma gramática que Fidelidad: tarjetas, filas con borde
+   fino, herramientas arriba de la lista. Todo con `min-width: 0` para que
+   nada empuje la página de lado en un celular. */
+
+.page {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.intro {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+  min-width: 0;
+}
+
+.lead {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  max-width: 68ch;
+}
+
+.kpis {
+  display: grid;
+  gap: 0.75rem;
+  /* Siempre una fila: son tres números cortos, y en el celular un 2 + 1 se ve roto. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.kpi {
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  min-width: 0;
+}
+.kpi[data-tone="ok"] {
+  border-color: var(--color-ok-line);
+  background: var(--color-ok-tint);
+}
+.kpiLabel {
+  font-size: var(--text-2xs);
+  overflow-wrap: anywhere;
+  color: var(--color-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kpiValue {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-carbon);
+}
+
+/* ── Herramientas ────────────────────────────────────────────────────── */
+
+.tools {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--hair);
+  min-width: 0;
+}
+.toolsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+}
+.toolsRow :global(.ui-seg) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.toolsRow :global(.ui-select) {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 12rem;
+  max-width: 16rem;
+}
+.count {
+  margin: 0;
+  font-size: var(--text-2xs);
+  color: var(--color-ink-soft);
+}
+
+/* ── Filas ───────────────────────────────────────────────────────────── */
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--hair);
+}
+.list > .row:first-child {
+  border-top: 0;
+}
+.rowMain {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1 1 15rem;
+}
+.rowHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.5rem;
+  align-items: baseline;
+  min-width: 0;
+}
+.name {
+  font-weight: 600;
+  color: var(--color-carbon);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+a.name:hover {
+  text-decoration: underline;
+}
+.phone {
+  font-size: var(--text-2xs);
+  color: var(--color-ink-soft);
+}
+.meta {
+  margin: 0;
+  font-size: var(--text-2xs);
+  color: var(--color-ink-soft);
+}
+.pill {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  color: var(--color-ink-soft);
+}
+.pill[data-tone="ok"] {
+  border-color: var(--color-ok-line);
+  background: var(--color-ok-tint);
+  color: var(--color-ok-ink);
+}
+.rowActions {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+  flex: none;
+}
+.empty {
+  margin: 0;
+  padding: 1rem;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.more {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--hair);
+}
+
+/* ── Configuración (dentro del panel lateral) ────────────────────────── */
+
+.form {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.form :global(.ui-textarea),
+.form :global(.ui-input),
+.form :global(.ui-select) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.pair {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
+}
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.field {
+  font: inherit;
+  font-size: var(--text-2xs);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.field:hover {
+  border-color: var(--color-gold-dark);
+}
+.preview {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--color-ivory);
+  border: 1px solid var(--hair);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  /* Los links largos (tarjeta, reserva con UTM) parten en cualquier lado en
+     vez de empujar el panel hacia la derecha. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
