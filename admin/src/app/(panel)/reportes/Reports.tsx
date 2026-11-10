@@ -52,7 +52,7 @@ import { loadReports } from "./data";
 import { legacyNoShowInputs, salesReport, salesSeries, salesTotal } from "./legacy-blend";
 import { legacyPaymentReport } from "./legacy-payments";
 import { occupancyByProvider, slotLabel, SLOTS, type SlotId } from "./occupancy";
-import { AcquisitionFrame, DemandFrame } from "./PautaReports";
+import { AcquisitionFrame, ChannelsFrame, DemandFrame } from "./PautaReports";
 import { SERIES, statusColor } from "./palette";
 import { axisTicks, deltaAgainst, formatRate, NOT_MEASURABLE } from "./scale";
 
@@ -1228,6 +1228,7 @@ export function MonthlyReports({
       {/* --- Pauta: demanda y costo por clienta nueva --------------------- */}
       <DemandFrame data={data} />
       <AcquisitionFrame canEdit={canEditAdSpend} data={data} visits={visits.visits} />
+      <ChannelsFrame data={data} visits={visits.visits} />
 
       {/* --- Inasistencia ------------------------------------------------- */}
       <ChartFrame

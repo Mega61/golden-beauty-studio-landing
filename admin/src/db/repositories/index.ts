@@ -17,6 +17,7 @@ import { auditLogRepository } from "./audit-log";
 import { comboRepository } from "./combo";
 import { commissionEntryRepository } from "./commission-entry";
 import { commissionRuleRepository } from "./commission-rule";
+import { bookingAttributionRepository } from "./booking-attribution";
 import { commissionRunRepository } from "./commission-run";
 import { customerSettingRepository } from "./customer-setting";
 import { dayCloseRepository } from "./day-close";
@@ -41,6 +42,7 @@ export function repositories(db: Db) {
     appointmentPayments: appointmentPaymentRepository(db),
     appointmentPlannedServices: appointmentPlannedServiceRepository(db),
     auditLog: auditLogRepository(db),
+    bookingAttributions: bookingAttributionRepository(db),
     combos: comboRepository(db),
     commissionEntries: commissionEntryRepository(db),
     commissionRules: commissionRuleRepository(db),
@@ -98,6 +100,7 @@ export { pushSubscriptionRepository } from "./push-subscription";
 export type { DeliverableSubscription, PushSubscriptionInput } from "./push-subscription";
 export { serviceMapRepository } from "./service-map";
 export { stampeeCardShareRepository } from "./stampee-card-share";
+export { bookingAttributionRepository } from "./booking-attribution";
 export { staffTotpRepository } from "./staff-totp";
 export { stationRepository } from "./station";
 export { waMessageRepository } from "./wa-message";
