@@ -7,7 +7,9 @@ function bool(v: string | undefined, fallback: boolean): boolean {
   return normalized === "true" || normalized === "1" || normalized === "on";
 }
 
-const DEFAULT_SITE_URL = "https://goldenbeautystudio.com.co";
+// `www.` because that is the host production serves: the bare domain redirects
+// to it, and a canonical pointing at the redirecting host splits the index.
+const DEFAULT_SITE_URL = "https://www.goldenbeautystudio.com.co";
 const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_SITE_URL;
 const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 

@@ -39,7 +39,8 @@
  * `customer_setting`) y `027` (el motivo de variación `promo`, para las promos
  * que la cuenta aplica sola al cerrarse) y `029` (`stampee_card_share`, a quién
  * ya se le mandó el link de su tarjeta de sellos) y `030` (`day_close.closed_by`
- * acepta `NULL`: el cierre lo arma la sincronización nocturna).
+ * acepta `NULL`: el cierre lo arma la sincronización nocturna) y `031`
+ * (`booking_attribution`, de dónde llegó cada reserva hecha desde la página).
  * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
  * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
  * detecta que alguien editó una migración ya aplicada.
@@ -77,6 +78,7 @@ import { migration as m027 } from "./027-variance-promo";
 import { migration as m028 } from "./028-appointment-planned-service";
 import { migration as m029 } from "./029-stampee-card-share";
 import { migration as m030 } from "./030-day-close-system";
+import { migration as m031 } from "./031-booking-attribution";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -109,6 +111,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m028,
   m029,
   m030,
+  m031,
 ];
 
 /**
@@ -146,6 +149,7 @@ export const EXPECTED_TABLES: readonly string[] = [
   "customer_setting",
   "appointment_planned_service",
   "stampee_card_share",
+  "booking_attribution",
   // Infraestructura
   "schema_migration",
 ];

@@ -8,6 +8,7 @@ import { resolveDescription } from "@/lib/seo";
 import { getDictionary, hasLocale, locales, type Locale } from "./dictionaries";
 import Preconnect from "./_components/Preconnect";
 import MetaPixel from "./_components/MetaPixel";
+import AttributionCapture from "./_components/AttributionCapture";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -136,6 +137,7 @@ export default async function LangLayout({
     >
       <body className="min-h-full bg-ivory text-ink">
         <Preconnect />
+        <AttributionCapture />
         {children}
       </body>
       {siteConfig.gaId ? <GoogleAnalytics gaId={siteConfig.gaId} /> : null}

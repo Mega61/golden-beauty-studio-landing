@@ -35,6 +35,7 @@ import type {
   AppointmentPayment,
   Cop,
 } from "@/db/types";
+import type { BookingAttribution } from "@/lib/booking-attribution";
 import { instantToEaLocal, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea";
 import type { Interval } from "@/lib/metrics";
 
@@ -118,6 +119,11 @@ export type ReportData = {
    * respondió —, que **no** es lo mismo que "no hay inversión anotada" (`[]`).
    */
   adSpend: AdSpendEntry[] | null;
+  /**
+   * De dónde llegó cada reserva web del periodo (`booking_attribution`, `031`).
+   * `null` = no se pudo leer (la migración no está o la base no respondió).
+   */
+  bookingAttributions: Map<number, BookingAttribution> | null;
   stations: number;
   /** Jornada del estudio y de cada técnica, ya expandidas. */
   studioWindow: DayWindow;
@@ -417,6 +423,34 @@ export async function loadReports(
     }
   }
 
+  // --- Origen de las reservas web -----------------------------------------
+  //
+  // Igual que la pauta: aparte, para que sin la `031` el resto siga en pie.
+  let bookingAttributions: Map<number, BookingAttribution> | null = null;
+  if (db !== null) {
+    try {
+      const rows = await repositories(db).bookingAttributions.listByAppointments(
+        appointments.map((appointment) => appointment.id),
+      );
+      bookingAttributions = new Map(
+        [...rows].map(([id, row]) => [
+          id,
+          {
+            source: row.utm_source,
+            medium: row.utm_medium,
+            campaign: row.utm_campaign,
+            content: row.utm_content,
+            referrerHost: row.referrer_host,
+            landingPath: row.landing_path,
+            clickId: row.click_id,
+          },
+        ]),
+      );
+    } catch (error) {
+      console.error("[reportes] no se pudo leer booking_attribution", error);
+    }
+  }
+
   // --- Pagos del historial de Agenda Pro -------------------------------
   //
   // Aparte, por la misma razón que `ad_spend`: sin la `025` aplicada los demás
@@ -530,6 +564,7 @@ export async function loadReports(
     commissionEntries,
     courtesyCommissions,
     adSpend,
+    bookingAttributions,
     stations,
     studioWindow,
     providerWindows,

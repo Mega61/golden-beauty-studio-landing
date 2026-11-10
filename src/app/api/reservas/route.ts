@@ -78,6 +78,10 @@ export async function POST(req: NextRequest) {
     lastName: text(body.lastName),
     phone: text(body.phone),
     notes: text(body.notes) || null,
+    // Where the visitor came from. The panel validates it and never lets it
+    // fail a booking.
+    attribution:
+      typeof body.attribution === "object" && body.attribution !== null ? body.attribution : null,
   };
 
   try {

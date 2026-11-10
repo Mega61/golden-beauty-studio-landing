@@ -1,6 +1,9 @@
 import { after, NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { getDb } from "@/db/client";
+import { bookingAttributionRepository } from "@/db/repositories";
+import { parseAttribution } from "@/lib/booking-attribution";
 import { createEaClient } from "@/lib/ea/client";
 import { isEaLocalDate } from "@/lib/ea/datetime";
 import { EaApiError } from "@/lib/ea/errors";
@@ -50,6 +53,8 @@ export async function POST(req: NextRequest) {
   const lastName = str(raw.lastName);
   const phone = str(raw.phone);
   const notes = str(raw.notes);
+  // De dónde llegó. Nunca invalida la reserva: un campo raro se descarta.
+  const attribution = parseAttribution(raw.attribution);
   const providerId =
     raw.providerId === null || raw.providerId === undefined || raw.providerId === ""
       ? null
@@ -111,6 +116,17 @@ export async function POST(req: NextRequest) {
             },
           }),
         );
+        // El origen (utm / referente) también va después del 201: si la tabla
+        // no está o la base tarda, la reserva ya existe y eso es lo que importa.
+        if (attribution !== null) {
+          after(() =>
+            bookingAttributionRepository(getDb())
+              .record(result.appointmentId, attribution)
+              .catch((error: unknown) => {
+                console.error("[public/booking/reservar] no se pudo guardar el origen", result.appointmentId, error);
+              }),
+          );
+        }
         // La confirmación por WhatsApp, por el mismo camino: después del 201,
         // y sin poder tumbarlo. `whatsappConfirmation` le dice a la landing si
         // va a intentarse, para que la pantalla de éxito no prometa un mensaje

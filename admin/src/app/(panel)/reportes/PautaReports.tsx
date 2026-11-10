@@ -16,10 +16,12 @@
 import { Fragment } from "react";
 
 import { formatCOP } from "@/components/ui";
-import type { VisitRecord } from "@/lib/metrics";
+import { BOOKING_CHANNEL_LABEL } from "@/lib/booking-attribution";
+import { splitCustomers, type VisitRecord } from "@/lib/metrics";
 
 import { acquisitionReport, AD_CHANNEL_LABEL } from "./acquisition";
 import { AdSpendForm } from "./AdSpendForm";
+import { channelReport } from "./channels";
 import { BarRows, ChartFrame, Heatmap, StatTile, TileRow, type HeatCell } from "./Charts";
 import styles from "./charts.module.css";
 import { DataView } from "./DataView";
@@ -355,6 +357,100 @@ export function AcquisitionFrame({
       ) : null}
 
       {canEdit ? <AdSpendForm defaultMonth={report.months[0] ?? ""} /> : null}
+    </ChartFrame>
+  );
+}
+
+// ── De dónde llegan las reservas web ────────────────────────────────────────
+
+export function ChannelsFrame({
+  data,
+  visits,
+}: {
+  data: ReportData;
+  /** La misma unión EA + legacy de «Costo por primera visita». */
+  visits: readonly VisitRecord[];
+}) {
+  const { newCustomers } = splitCustomers(visits, {
+    from: data.period.from,
+    to: data.period.to,
+  });
+
+  const report = channelReport({
+    appointments: data.appointments,
+    attributions: data.bookingAttributions ?? new Map(),
+    finance: data.finance,
+    newCustomers: new Set(newCustomers),
+  });
+
+  const note =
+    data.bookingAttributions === null
+      ? {
+          tone: "info" as const,
+          text: (
+            <>
+              <strong>No se pudo leer el origen de las reservas.</strong> Falta aplicar la migración 031
+              (<code>booking_attribution</code>) o la base no respondió.
+            </>
+          ),
+        }
+      : {
+          tone: "info" as const,
+          text: (
+            <>
+              Solo las reservas hechas desde la página traen origen, y solo desde que se empezó a medir
+              (noviembre de 2026). Para separar la bio de Instagram de Google Maps, cada link publicado
+              tiene que llevar su <code>utm_source</code>: sin eso, una visita de Maps se ve como
+              «Google (búsqueda)» y una de WhatsApp como «Directo».
+            </>
+          ),
+        };
+
+  const max = Math.max(1, ...report.rows.map((row) => row.bookings));
+
+  return (
+    <ChartFrame
+      title="De dónde llegan las reservas web"
+      decision="Qué canal trae reservas de verdad (no clics): dónde poner la bio, el link de Maps y la pauta."
+      note={note}
+      table={
+        <DataView
+          caption="Reservas web por canal en el periodo"
+          columns={[
+            { header: "Canal", cell: (row) => BOOKING_CHANNEL_LABEL[row.channel] },
+            { header: "Reservas", numeric: true, cell: (row) => String(row.bookings) },
+            { header: "Primera visita", numeric: true, cell: (row) => String(row.firstVisits) },
+            { header: "Cobrado", numeric: true, cell: (row) => money(row.paid) },
+          ]}
+          rowKey={(row) => row.channel}
+          rows={report.rows}
+        />
+      }
+    >
+      <TileRow>
+        <StatTile label="Reservas web" value={String(report.webBookings)} />
+        <StatTile
+          label="Sin origen"
+          value={String(report.withoutOrigin)}
+          deltaNote="Agendadas desde el panel (WhatsApp, llamada) o antes de medir"
+        />
+      </TileRow>
+
+      {report.rows.length > 0 ? (
+        <BarRows
+          axis={axisTicks(max, (value) => String(value))}
+          data={report.rows.map((row) => ({
+            id: row.channel,
+            name: BOOKING_CHANNEL_LABEL[row.channel],
+            value: row.bookings,
+            display: plural(row.bookings, "reserva", "reservas"),
+            meta:
+              row.firstVisits > 0
+                ? plural(row.firstVisits, "primera visita", "primeras visitas")
+                : undefined,
+          }))}
+        />
+      ) : null}
     </ChartFrame>
   );
 }

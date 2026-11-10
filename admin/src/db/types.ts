@@ -811,6 +811,24 @@ export interface StampeeCardShareTable {
   sent_at: Date;
 }
 
+/**
+ * De dónde llegó una reserva hecha desde la página (migración `031`): los
+ * `utm_*` y el dominio referente, crudos. El canal lo decide
+ * `lib/booking-attribution.ts` al leer.
+ */
+export interface BookingAttributionTable {
+  ea_appointment_id: number;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  referrer_host: string | null;
+  landing_path: string | null;
+  /** `fbclid` / `gclid` / … : solo cuál vino, nunca el valor. */
+  click_id: string | null;
+  created_at: Generated<Date>;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -843,6 +861,7 @@ export interface Database {
   customer_setting: CustomerSettingTable;
   appointment_planned_service: AppointmentPlannedServiceTable;
   stampee_card_share: StampeeCardShareTable;
+  booking_attribution: BookingAttributionTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -874,6 +893,8 @@ export type WaMessageUpdate = Updateable<WaMessageTable>;
 export type PushSubscriptionRow = Selectable<PushSubscriptionTable>;
 
 export type AdSpendRow = Selectable<AdSpendTable>;
+
+export type BookingAttributionRow = Selectable<BookingAttributionTable>;
 
 export type CustomerSetting = Selectable<CustomerSettingTable>;
 

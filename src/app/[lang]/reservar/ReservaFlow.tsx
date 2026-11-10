@@ -5,6 +5,7 @@ import Image from "next/image";
 import { AnimatePresence, LazyMotion, MotionConfig, animate, domAnimation, m } from "motion/react";
 import type { Locale } from "../dictionaries";
 import { trackEvent, trackMeta } from "@/lib/analytics";
+import { currentAttribution } from "@/lib/attribution";
 import { newEventId } from "@/lib/meta-events";
 import {
   addMinutes,
@@ -980,6 +981,8 @@ export default function ReservaFlow({
           eventId,
           value: totalCOP,
           serviceSlug: service.slug ?? null,
+          // Where this visit came from (bio, Maps, an ad…). The panel stores it.
+          attribution: currentAttribution(),
         }),
       });
 

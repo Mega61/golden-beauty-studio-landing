@@ -488,6 +488,25 @@ export function previewData(cadence: Cadence, anchor: EaLocalDate): ReportData {
       { month, channel: "meta", amountCop: 1_150_000 },
       { month, channel: "google", amountCop: 250_000 },
     ],
+    // Dos de cada tres citas vinieron de la página, repartidas en los canales
+    // que más se ven: la bio, Maps y una búsqueda sin UTM.
+    bookingAttributions: new Map(
+      inPeriod
+        .map((row) => appointmentOf(row, month).id)
+        .filter((_, index) => index % 3 !== 2)
+        .map((id, index) => [
+          id,
+          {
+            source: ["instagram", "google", null][index % 3] ?? null,
+            medium: ["bio", "maps", null][index % 3] ?? null,
+            campaign: null,
+            content: null,
+            referrerHost: index % 3 === 2 ? "www.google.com" : null,
+            landingPath: "/es/bio",
+            clickId: null,
+          },
+        ]),
+    ),
     stations: 2,
     studioWindow: { open: studioOpen, breaks: studioBreaks },
     providerWindows,
