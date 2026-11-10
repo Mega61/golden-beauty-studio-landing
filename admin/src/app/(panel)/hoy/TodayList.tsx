@@ -220,8 +220,14 @@ export function TodayList({
       return;
     }
 
+    // "Sin conexión" solo si de verdad no llegó. Si el servidor contestó, su
+    // mensaje dice qué pasó; antes un error de la base salía como "sin
+    // conexión" y nadie lo iba a buscar al log.
     toast({
-      message: "Sin conexión. La cuenta quedó guardada acá y se manda sola.",
+      message:
+        outcome.offline === true
+          ? "Sin conexión. La cuenta quedó guardada acá y se manda sola."
+          : outcome.message,
       tone: "warn",
     });
     close();

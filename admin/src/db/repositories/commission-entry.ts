@@ -2,6 +2,7 @@ import type {
   BasisPoints,
   CommissionEntry,
   CommissionEntryStatus,
+  CommissionRunStatus,
   Cop,
   FinanceItemKind,
   NewCommissionEntry,
@@ -311,6 +312,33 @@ export function commissionEntryRepository(db: Db) {
         .orderBy("ce.id")
         .execute();
       return rows.map((row) => ({ eaAppointmentId: row.ea_appointment_id, amount: row.amount }));
+    },
+
+    /**
+     * Las comisiones de los renglones de una cuenta, con el estado de su
+     * liquidación (`null` si todavía no la recoge ninguna).
+     *
+     * Es lo que `cerrarCuenta()` mira antes de reescribir los renglones: el
+     * `fk_ce_item` es RESTRICT, así que un renglón con comisión no se puede
+     * borrar, y la Action tiene que saber si la comisión es un borrador que se
+     * suelta o plata revisada que ya no se toca.
+     */
+    async listForFinance(
+      appointmentFinanceId: number,
+    ): Promise<Array<CommissionEntry & { run_status: CommissionRunStatus | null }>> {
+      return db
+        .selectFrom("commission_entry as ce")
+        .innerJoin(
+          "appointment_finance_item as afi",
+          "afi.id",
+          "ce.appointment_finance_item_id",
+        )
+        .leftJoin("commission_run as cr", "cr.id", "ce.commission_run_id")
+        .selectAll("ce")
+        .select("cr.status as run_status")
+        .where("afi.appointment_finance_id", "=", appointmentFinanceId)
+        .orderBy("ce.id")
+        .execute();
     },
 
     async listByRun(commissionRunId: number): Promise<CommissionEntry[]> {

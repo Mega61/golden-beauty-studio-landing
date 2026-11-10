@@ -57,6 +57,7 @@ function fakeRepos() {
       replaceForFinance: record("appointmentFinanceItems.replaceForFinance"),
     },
     auditLog: { append: record("auditLog.append") },
+    commissionEntries: { listForFinance: async () => [] },
   };
 }
 

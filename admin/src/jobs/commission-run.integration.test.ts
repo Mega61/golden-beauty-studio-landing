@@ -781,6 +781,56 @@ describe.skipIf(!canRunDbTests())(
       );
 
       it(
+        "corregir una cuenta con comisión en borrador: se suelta, se reescribe y Recalcular la repone",
+        async () => {
+          // Lo que hace `cerrarCuenta()` al guardar una cuenta ya liquidada en
+          // borrador. Contra MySQL real porque el bug era la llave: con
+          // `fk_ce_item` RESTRICT, reescribir los renglones sin soltar antes la
+          // comisión rebota, y la hoja lo mostraba como "sin conexión".
+          const repos = repositories(db);
+          const [cuenta] = await db
+            .selectFrom("appointment_finance as af")
+            .innerJoin("appointment_finance_item as afi", "afi.appointment_finance_id", "af.id")
+            .innerJoin("commission_entry as ce", "ce.appointment_finance_item_id", "afi.id")
+            .select("af.id")
+            .where("ce.ea_provider_id", "=", SARA)
+            .execute();
+          const financeId = Number(cuenta.id);
+
+          const antes = await repos.commissionEntries.listForFinance(financeId);
+          expect(antes.length).toBeGreaterThan(0);
+          expect(antes.every((entry) => entry.run_status === "borrador")).toBe(true);
+
+          const renglones = (await repos.appointmentFinanceItems.listByFinanceIds([financeId])).map(
+            (item) => ({
+              kind: item.kind,
+              ea_service_id: item.ea_service_id,
+              pricing_id: item.pricing_id,
+              qty: item.qty,
+              unit_price_snapshot: item.unit_price_snapshot,
+              line_total: item.line_total,
+              note: item.note,
+            }),
+          );
+          await expect(
+            repos.appointmentFinanceItems.replaceForFinance(financeId, renglones),
+          ).rejects.toMatchObject({ code: "ER_ROW_IS_REFERENCED_2" });
+
+          await repos.commissionEntries.deletePending(antes.map((entry) => entry.id));
+          await repos.appointmentFinanceItems.replaceForFinance(financeId, renglones);
+          expect(await repos.commissionEntries.listForFinance(financeId)).toEqual([]);
+
+          const result = await runFortnight(
+            { db },
+            { period: QUINCENA, actorUserId: OWNER_ID, now: DESPUES },
+          );
+          expect(result.runs.find((run) => run.eaProviderId === SARA)?.total).toBe(40_000);
+          expect(await repos.commissionEntries.listForFinance(financeId)).toHaveLength(antes.length);
+        },
+        TEST_TIMEOUT,
+      );
+
+      it(
         "borrar sin ids no borra nada, y soltar un borrador no borra sus entradas",
         async () => {
           const repos = repositories(db);

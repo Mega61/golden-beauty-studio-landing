@@ -89,8 +89,15 @@ export type SendOutcome =
    * técnica, con el borrador intacto para que pueda corregir.
    */
   | { status: "rechazado"; message: string }
-  /** No llegó, o el servidor falló feo. Se queda en la cola. */
-  | { status: "reintentar"; message: string };
+  /**
+   * No llegó, o el servidor falló feo. Se queda en la cola.
+   *
+   * `offline` distingue los dos: `true` es que el envío ni siquiera llegó (la
+   * Server Action lanzó). Sin él, el servidor sí contestó y `message` dice por
+   * qué no guardó — y decirle "sin conexión" a quien tiene wifi la deja
+   * reintentando a ciegas algo que no se va a arreglar solo.
+   */
+  | { status: "reintentar"; message: string; offline?: boolean };
 
 export type FlushReport = {
   sent: number[];

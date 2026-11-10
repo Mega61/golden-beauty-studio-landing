@@ -273,6 +273,7 @@ export function useTicketOutbox({
           return {
             status: "reintentar",
             message: error instanceof Error ? error.message : "No se pudo enviar",
+            offline: true,
           };
         }
       }
@@ -290,6 +291,7 @@ export function useTicketOutbox({
         outcome = {
           status: "reintentar",
           message: error instanceof Error ? error.message : "No se pudo enviar",
+          offline: true,
         };
       }
 
