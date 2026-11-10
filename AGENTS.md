@@ -107,6 +107,11 @@ El 40 % de lo cobrado, quincenal. El motor de reglas puro vive en
   en Reportes y rotulada "cortesía" en Comisiones. La ficha de la clienta trae
   "cortesía de la casa por defecto" (`customer_setting`), que solo pre-marca la
   casilla: se puede desmarcar en cada cuenta, porque a veces pagan.
+- **Corregir una cuenta con comisión en borrador la suelta.** `fk_ce_item` es
+  RESTRICT y guardar reescribe los renglones, así que `cerrarCuenta()` borra
+  antes las entradas `pending` de esa cuenta (y baja el total del borrador), en
+  la misma transacción; "Recalcular" en Comisiones las vuelve a crear. Con la
+  quincena revisada o pagada, la cuenta ya no se corrige desde Hoy.
 - **Las quincenas son 1–15 y 16–fin de mes**, en calendario de Bogotá.
 - **Los pesos sobrantes del redondeo** se reparten con `allocateByWeights`, el
   mismo repartidor que usa el resto del panel, para que la suma de los renglones

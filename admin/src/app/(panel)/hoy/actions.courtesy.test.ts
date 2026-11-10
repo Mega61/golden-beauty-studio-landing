@@ -26,6 +26,8 @@ const DISENO = 31;
 
 let session: { userId: string; role: UserRole; eaProviderId: number | null };
 let existing: Record<string, unknown>;
+/** Las comisiones ya calculadas sobre los renglones de la cuenta. */
+let commissions: { id: number; status: string; commission_run_id: number | null; run_status: string | null }[];
 
 /** Lo que la Action intentó escribir, en orden. */
 let writes: { what: string; args: unknown[] }[];
@@ -60,6 +62,13 @@ function fakeRepos() {
       replaceForFinance: record("appointmentFinanceItems.replaceForFinance"),
     },
     auditLog: { append: record("auditLog.append"), listForEntity: async () => [] },
+    commissionEntries: {
+      listForFinance: async () => commissions,
+      deletePending: record("commissionEntries.deletePending"),
+      // Lo que queda en la liquidación después de soltar las de esta cuenta.
+      listByRun: async () => [{ id: 900, amount: 50_000 }],
+    },
+    commissionRuns: { setDraftTotal: record("commissionRuns.setDraftTotal") },
   };
 }
 
@@ -158,6 +167,7 @@ function patchEscrito(): Record<string, unknown> {
 
 beforeEach(() => {
   writes = [];
+  commissions = [];
   existing = fila();
   session = DUENA;
 });
@@ -408,4 +418,52 @@ describe("cerrarCuenta — el método de pago es obligatorio para quien puede re
     expect(result).toMatchObject({ ok: true, amountCharged: 210_000 });
     expect(patchEscrito()).toMatchObject({ payment_method: null, paid_at: null });
   });
+});
+
+// ── La comisión ya calculada ────────────────────────────────────────────────
+
+describe("cerrarCuenta — una cuenta con comisión ya calculada", () => {
+  // `fk_ce_item` es RESTRICT: sin soltar la comisión, borrar los renglones
+  // rebotaba contra la llave y la hoja decía "sin conexión" para siempre. Así
+  // quedaron las dos cuentas del 2026-11-05 cuando la quincena ya tenía
+  // borrador.
+  const cerrada = () => fila({ closed_at: new Date(), amount_charged: 210_000 });
+  const conMetodo = () =>
+    entrada({ houseCourtesy: false, payments: [{ method: "efectivo", amount: 0 }] });
+
+  it("en borrador se suelta antes de reescribir los renglones, y el total del borrador baja", async () => {
+    existing = cerrada();
+    commissions = [
+      { id: 35, status: "pending", commission_run_id: 2, run_status: "borrador" },
+      { id: 36, status: "pending", commission_run_id: 2, run_status: "borrador" },
+    ];
+    expect(await cerrarCuenta(conMetodo())).toMatchObject({ ok: true });
+
+    const orden = writes.map((w) => w.what);
+    expect(orden.indexOf("commissionEntries.deletePending")).toBeLessThan(
+      orden.indexOf("appointmentFinanceItems.replaceForFinance"),
+    );
+    expect(writes.find((w) => w.what === "commissionEntries.deletePending")?.args[0]).toEqual([35, 36]);
+    expect(writes.find((w) => w.what === "commissionRuns.setDraftTotal")?.args).toEqual([2, 50_000]);
+  });
+
+  it("sin liquidación todavía se suelta igual, sin tocar ningún total", async () => {
+    existing = cerrada();
+    commissions = [{ id: 40, status: "pending", commission_run_id: null, run_status: null }];
+    expect(await cerrarCuenta(conMetodo())).toMatchObject({ ok: true });
+    expect(writes.map((w) => w.what)).toContain("commissionEntries.deletePending");
+    expect(writes.map((w) => w.what)).not.toContain("commissionRuns.setDraftTotal");
+  });
+
+  it.each(["revisada", "pagada"])(
+    "con la quincena %s se rechaza sin reintento y no se escribe nada",
+    async (runStatus) => {
+      existing = cerrada();
+      commissions = [{ id: 35, status: "pending", commission_run_id: 2, run_status: runStatus }];
+      const result = await cerrarCuenta(conMetodo());
+      expect(result).toMatchObject({ ok: false, retryable: false });
+      expect(result.ok ? "" : result.message).toMatch(/quincena revisada o pagada/);
+      expect(writes).toEqual([]);
+    },
+  );
 });

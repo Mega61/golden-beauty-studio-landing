@@ -19,6 +19,7 @@ import {
   validateHouseCourtesyClose,
   validateTicketClose,
 } from "@/lib/ticket";
+import { sumEntries } from "@/jobs/commission-run";
 import { recordEditAdjustment, refreshDayCloseTotals } from "@/jobs/day-close";
 import { upsertAppointmentFinance } from "@/jobs/snapshot";
 import {
@@ -472,9 +473,57 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     closed_at: now,
   } as const;
 
+  // --- La comisión que ya se calculó sobre estos renglones -------------------
+  //
+  // Guardar reescribe los renglones (borra e inserta), y `fk_ce_item` es
+  // RESTRICT: un renglón con comisión no se borra. Una quincena en borrador ya
+  // tiene comisión calculada sobre cuentas que nadie terminó de corregir —las
+  // dos del 2026-11-05 sin método de pago quedaron así, y cada guardada
+  // rebotaba contra la llave y se reintentaba para siempre como "sin conexión".
+  //
+  // En borrador esa comisión todavía no es plata: se suelta, y "Recalcular" en
+  // Comisiones la vuelve a calcular sobre los renglones nuevos (la cuenta sale
+  // como cerrada sin comisión hasta entonces). Revisada o pagada, el total que
+  // se revisó es el que se paga, y la cuenta ya no se corrige por acá.
+  let draftCommissions: { id: number; commission_run_id: number | null }[];
+  try {
+    const commissions = await repos.commissionEntries.listForFinance(financeId);
+    if (
+      commissions.some(
+        (entry) =>
+          entry.status === "paid" || (entry.run_status !== null && entry.run_status !== "borrador"),
+      )
+    ) {
+      return rechazo(
+        "La comisión de esta cuenta ya está en una quincena revisada o pagada, así que ya no se puede corregir.",
+      );
+    }
+    draftCommissions = commissions;
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("[hoy] no se pudo leer la comisión de la cuenta", error);
+    return masTarde("La base no respondió. Se reintenta solo.");
+  }
+
   try {
     await db.transaction().execute(async (trx) => {
       const tx = repositories(trx);
+      if (draftCommissions.length > 0) {
+        await tx.commissionEntries.deletePending(draftCommissions.map((entry) => entry.id));
+        // El total del borrador baja con lo que se soltó, para que Comisiones
+        // no muestre una cifra que ninguna entrada respalda.
+        const runIds = new Set(
+          draftCommissions.flatMap((entry) =>
+            entry.commission_run_id === null ? [] : [entry.commission_run_id],
+          ),
+        );
+        for (const runId of runIds) {
+          await tx.commissionRuns.setDraftTotal(
+            runId,
+            sumEntries(await tx.commissionEntries.listByRun(runId)),
+          );
+        }
+      }
       await tx.appointmentFinanceItems.replaceForFinance(financeId, rows);
       await tx.appointmentPayments.replaceForFinance(
         financeId,
@@ -504,6 +553,9 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
         after: {
           ...patch,
           clientRequestId: data.clientRequestId,
+          // Las comisiones en borrador que se soltaron al reescribir los
+          // renglones: "Recalcular" las vuelve a crear.
+          commissionsReleased: draftCommissions.map((entry) => entry.id),
           // Qué promo se aplicó y con qué datos, para que una cuenta con
           // descuento automático se pueda explicar sin recalcular nada.
           promo:
