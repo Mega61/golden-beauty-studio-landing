@@ -301,7 +301,7 @@ export type WinbackCardOutcome =
       card: { id: string; uniqueId: string; stamps: number; totalStamps: number; rewardName: string };
       /** `false` = ya tenía una tarjeta activa de esa campaña y se reusó. */
       created: boolean;
-      cardBaseUrl: string | null;
+      cardBaseUrl: string;
     }
   | { ok: false; message: string };
 
@@ -348,6 +348,16 @@ export async function issueWinbackCard(input: {
     return { ok: false, message: "Stampee no respondió. No se emitió nada; intenta en un momento." };
   }
   const cardBaseUrl = config.appUrl && slug ? `${config.appUrl}/${slug}` : null;
+  // Sin link no hay qué mandar: se corta ANTES de emitir, para no dejar una
+  // tarjeta de regalo que nadie le va a enviar.
+  if (cardBaseUrl === null) {
+    return {
+      ok: false,
+      message: config.appUrl
+        ? "Stampee no devolvió el enlace público del estudio (/profile). No se emitió nada."
+        : "Falta STAMPEE_APP_URL en el panel: no hay link de tarjeta para mandar. No se emitió nada.",
+    };
+  }
 
   const campaign = campaigns.find((c) => c.id === input.campaignId);
   if (!campaign) return { ok: false, message: "La campaña de \"Te extrañamos\" ya no está en Stampee." };

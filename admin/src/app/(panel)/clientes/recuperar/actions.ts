@@ -69,9 +69,6 @@ export async function enviarRegalo(phoneRaw: string): Promise<SendOutcome> {
       today,
     });
     if (!issued.ok) return { ok: false, message: issued.message };
-    if (issued.cardBaseUrl === null) {
-      return { ok: false, message: "Falta STAMPEE_APP_URL en el panel: no hay link de tarjeta para mandar." };
-    }
 
     const discountPercent = previous ? previous.discountPercent : settings.discountEnabled ? FIRST_VISIT_PERCENT : 0;
     const expiresOn = previous
