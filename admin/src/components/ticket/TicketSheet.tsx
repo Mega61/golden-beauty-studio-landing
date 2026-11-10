@@ -156,7 +156,12 @@ export function TicketSheet({
   // descubrirlo al tocar "Guardar" es tarde.
   const cortesiaAjena = cortesia && !canGiveCourtesy;
   const bloqueado = readOnly || saving || cortesiaAjena;
-  const puedeGuardar = !bloqueado && pricingResult.errors.length === 0;
+  // Quien puede registrar el método tiene que elegirlo antes de guardar: una
+  // cuenta cobrada sin método no viaja a Actual. El servidor dice lo mismo
+  // (`cerrarCuenta()`); acá se dice antes de que alguien toque "Guardar".
+  const faltaMetodo =
+    canCharge && !cortesia && (amountCharged ?? 0) > 0 && draft.payments.length === 0;
+  const puedeGuardar = !bloqueado && pricingResult.errors.length === 0 && !faltaMetodo;
 
   function patch(next: Partial<TicketDraft>): void {
     onDraftChange({ ...draft, ...next, updatedAt: Date.now() });
@@ -183,7 +188,9 @@ export function TicketSheet({
           >
             {cortesia
               ? "Guardar · cortesía"
-              : amountCharged === null
+              : faltaMetodo && !bloqueado
+                ? "Elige el método de pago"
+                : amountCharged === null
                 ? "Guardar"
                 : `Guardar · ${formatCOP(amountCharged)}`}
           </Button>
@@ -452,6 +459,7 @@ export function TicketSheet({
                 <MetodoPago
                   payments={draft.payments}
                   amountCharged={amountCharged ?? 0}
+                  required={faltaMetodo}
                   disabled={bloqueado}
                   onChange={(payments) => patch({ payments })}
                 />
@@ -1233,11 +1241,14 @@ function RenglonManual({
 function MetodoPago({
   payments,
   amountCharged,
+  required,
   disabled,
   onChange,
 }: {
   payments: readonly TicketPayment[];
   amountCharged: Cop;
+  /** Hay plata cobrada y todavía no se eligió método: sin esto no se guarda. */
+  required: boolean;
   disabled: boolean;
   onChange: (payments: TicketPayment[]) => void;
 }) {
@@ -1323,6 +1334,12 @@ function MetodoPago({
         ))}
       </div>
 
+      {required && (
+        <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-warn-ink)" }}>
+          Elige cómo pagó para poder guardar: sin método, la plata no llega a Actual.
+        </p>
+      )}
+
       {dividido && (
         <>
           {payments.map((payment) => (
@@ -1345,7 +1362,7 @@ function MetodoPago({
             style={{
               margin: 0,
               fontSize: "var(--text-2xs)",
-              color: falta === 0 ? "var(--color-ink-soft)" : "var(--color-alerta)",
+              color: falta === 0 ? "var(--color-ink-soft)" : "var(--color-warn-ink)",
             }}
           >
             {falta === 0

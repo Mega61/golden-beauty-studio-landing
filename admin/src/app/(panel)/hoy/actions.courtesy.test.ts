@@ -282,7 +282,9 @@ describe("cerrarCuenta — la cortesía de la dueña", () => {
 
   it("la dueña puede desmarcarla y cobrarla: a veces pagan", async () => {
     existing = fila({ is_house_courtesy: 1, closed_at: new Date(), amount_charged: 0, discount: 210_000 });
-    const result = await cerrarCuenta(entrada({ houseCourtesy: false }));
+    const result = await cerrarCuenta(
+      entrada({ houseCourtesy: false, payments: [{ method: "efectivo", amount: 0 }] }),
+    );
     expect(result).toMatchObject({ ok: true, amountCharged: 210_000 });
     expect(patchEscrito()).toMatchObject({
       is_house_courtesy: 0,
@@ -354,5 +356,56 @@ describe("cerrarCuenta — la cortesía de la dueña", () => {
         (w) => w.what === "auditLog.append" && (w.args[0] as { action: string }).action === "ticket.adjust",
       ),
     ).toBe(false);
+  });
+});
+
+// ── El método de pago ───────────────────────────────────────────────────────
+
+describe("cerrarCuenta — el método de pago es obligatorio para quien puede registrarlo", () => {
+  it("la dueña no guarda una cuenta cobrada sin método, y no se escribe nada", async () => {
+    const result = await cerrarCuenta(entrada({ houseCourtesy: false }));
+    expect(result).toEqual({
+      ok: false,
+      retryable: false,
+      message: "Elige cómo pagó la clienta: efectivo, transferencia u otro.",
+    });
+    expect(writes).toEqual([]);
+  });
+
+  it("recepción tampoco", async () => {
+    session = RECEPCION;
+    expect(await cerrarCuenta(entrada({ houseCourtesy: false }))).toMatchObject({ ok: false });
+    expect(writes).toEqual([]);
+  });
+
+  it("con el método elegido se guarda con todo lo cobrado y su fecha de pago", async () => {
+    const result = await cerrarCuenta(
+      entrada({ houseCourtesy: false, payments: [{ method: "transferencia", amount: 0 }] }),
+    );
+    expect(result).toMatchObject({ ok: true, amountCharged: 210_000 });
+    expect(patchEscrito()).toMatchObject({ payment_method: "transferencia" });
+    expect(patchEscrito().paid_at).not.toBeNull();
+  });
+
+  it("completar el método de una cuenta que se guardó sin él", async () => {
+    // Las dos cuentas del 2026-11-05: cerradas, sin método, sin enviar.
+    existing = fila({ closed_at: new Date(), amount_charged: 210_000 });
+    expect(await cerrarCuenta(entrada({ houseCourtesy: false }))).toMatchObject({ ok: false });
+    const result = await cerrarCuenta(
+      entrada({ houseCourtesy: false, payments: [{ method: "efectivo", amount: 0 }] }),
+    );
+    expect(result).toMatchObject({ ok: true });
+    expect(patchEscrito()).toMatchObject({ payment_method: "efectivo" });
+  });
+
+  it("la cortesía no lleva método", async () => {
+    expect(await cerrarCuenta(entrada())).toMatchObject({ ok: true, amountCharged: 0 });
+  });
+
+  it("la técnica sin permiso de cobrar guarda sin método: lo completa recepción", async () => {
+    session = TECNICA;
+    const result = await cerrarCuenta(entrada({ houseCourtesy: false }));
+    expect(result).toMatchObject({ ok: true, amountCharged: 210_000 });
+    expect(patchEscrito()).toMatchObject({ payment_method: null, paid_at: null });
   });
 });

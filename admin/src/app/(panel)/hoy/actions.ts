@@ -198,7 +198,8 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // El método de pago es una capacidad aparte (`TICKET_STAFF_COBRA`). Se
   // **rechaza** en vez de descartarlo en silencio: guardar la cuenta sin el
   // método que la técnica sí registró la dejaría creyendo que quedó cobrada.
-  if (data.payments.length > 0 && !can(session.role, "cuenta:cobrar", { staffCobra: staffCobra() })) {
+  const puedeCobrar = can(session.role, "cuenta:cobrar", { staffCobra: staffCobra() });
+  if (data.payments.length > 0 && !puedeCobrar) {
     return rechazo("En este estudio el método de pago lo registra recepción.");
   }
 
@@ -387,6 +388,15 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // calcular esta función. Con dos, los montos vienen escritos y solo se
   // verifican.
   const payments = houseCourtesy ? [] : draftToPayments(draft, totals.amountCharged);
+
+  // Quien puede registrar el método **tiene** que registrarlo: una cuenta
+  // cobrada sin método no puede viajar a Actual y se queda en Caja como
+  // pendiente hasta que alguien se acuerde (dos cuentas del 2026-11-05 así).
+  // Quien no puede —la técnica sin `TICKET_STAFF_COBRA`— guarda igual y el
+  // método lo completa recepción, que sí cae acá.
+  if (puedeCobrar && !houseCourtesy && totals.amountCharged > 0 && payments.length === 0) {
+    return rechazo("Elige cómo pagó la clienta: efectivo, transferencia u otro.");
+  }
 
   try {
     assertPaymentsCoverCharge(payments, totals.amountCharged);
