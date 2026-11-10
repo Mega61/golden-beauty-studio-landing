@@ -207,11 +207,13 @@ export type CloseTicketAction = (input: CloseTicketInput) => Promise<CloseTicket
 /**
  * Lo que dijo el historial sobre si es su primera visita (`hoy/first-visit.ts`).
  * `desconocido` = no se pudo leer todo, y se trata como **no**: el 10 % no se
- * pone solo sobre una duda.
+ * pone solo sobre una duda. `recuperacion` = ya vino, pero se le mandó el
+ * regalo de "Te extrañamos" y esta es su primera visita desde entonces: le
+ * toca el mismo 10 % que a una nueva (`lib/winback.ts`).
  *
  * Es lo único del historial que llega a la cuenta: un sí/no, nunca un monto.
  */
-export type FirstVisitStatus = "primera" | "recurrente" | "desconocido";
+export type FirstVisitStatus = "primera" | "recurrente" | "recuperacion" | "desconocido";
 
 /** La firma de la pregunta. La real es la Server Action `revisarPrimeraVisita`. */
 export type FirstVisitCheck = (eaAppointmentId: number) => Promise<FirstVisitStatus>;

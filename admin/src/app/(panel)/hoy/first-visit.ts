@@ -6,6 +6,7 @@ import type { EaClient } from "@/lib/ea/client";
 import { loadHistoryByPhone } from "../clientes/data";
 import { hasVisitedBefore } from "../clientes/history";
 import { normalizePhoneE164 } from "../clientes/identity";
+import { hasWinbackDiscount } from "../clientes/winback-discount";
 
 /**
  * **¿Es su primera visita?** — la pregunta del 10 %, contestada desde el
@@ -22,6 +23,12 @@ import { normalizePhoneE164 } from "../clientes/identity";
  * **un sí/no**. Ningún monto, ninguna fila, ningún precio del historial.
  *
  * ## Tres respuestas, no dos
+ *
+ * ## "Te extrañamos"
+ *
+ * Una clienta que ya vino pero recibió el regalo de recuperación sale
+ * `recuperacion`: la hoja la trata como primera visita (mismo 10 %, mismas
+ * reglas) y el motivo lo dice.
  *
  * `desconocido` es cuando no se pudo leer todo (EA o la base no respondieron,
  * o la cita no tiene una clienta con teléfono). Se trata como **no**: el 10 %
@@ -44,7 +51,9 @@ export async function detectFirstVisit(
     const { history, partial } = await loadHistoryByPhone(phone, ea);
     // Una visita encontrada vale aunque falte la otra mitad: ya vino. Que no
     // se encuentre ninguna solo vale si se leyó todo.
-    if (hasVisitedBefore(history.entries, appointment.start)) return "recurrente";
+    if (hasVisitedBefore(history.entries, appointment.start)) {
+      return (await hasWinbackDiscount(phone, history.entries, appointment.start)) ? "recuperacion" : "recurrente";
+    }
     return partial ? "desconocido" : "primera";
   } catch (error) {
     console.error("[hoy] no se pudo revisar si es primera visita", error);

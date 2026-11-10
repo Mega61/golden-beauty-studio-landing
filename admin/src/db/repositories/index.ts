@@ -31,6 +31,7 @@ import { staffTotpRepository } from "./staff-totp";
 import { stationRepository } from "./station";
 import { waMessageRepository } from "./wa-message";
 import { webhookEventRepository } from "./webhook-event";
+import { winbackRepository } from "./winback";
 import type { Db } from "./shared";
 
 export function repositories(db: Db) {
@@ -59,6 +60,7 @@ export function repositories(db: Db) {
     stations: stationRepository(db),
     waMessages: waMessageRepository(db),
     webhookEvents: webhookEventRepository(db),
+    winback: winbackRepository(db),
   };
 }
 
@@ -106,5 +108,7 @@ export { stationRepository } from "./station";
 export { waMessageRepository } from "./wa-message";
 export type { ManualSendInput, PendingInput, WaMessageWithSender } from "./wa-message";
 export { webhookEventRepository } from "./webhook-event";
+export { winbackRepository } from "./winback";
+export type { WinbackConfigRow, WinbackOfferRow } from "./winback";
 export type { RecordedEvent } from "./webhook-event";
 export type { Db } from "./shared";

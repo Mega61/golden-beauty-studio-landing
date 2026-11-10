@@ -621,6 +621,7 @@ function promoReasonText(slug: string, firstVisitCheck: FirstVisitStatus | null)
   if (slug !== FIRST_VISIT_SLUG || firstVisitCheck === null || firstVisitCheck === "primera") {
     return slug;
   }
+  if (firstVisitCheck === "recuperacion") return `${slug} · te extrañamos`;
   return firstVisitCheck === "recurrente"
     ? `${slug} · marcada a mano: el historial dice que ya vino`
     : `${slug} · sin confirmar en el historial`;

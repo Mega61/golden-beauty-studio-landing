@@ -287,6 +287,12 @@ export function isAllowedIdentity(
  *   ya se aplicó. Es trabajo de mostrador, como en el kiosko de Stampee: la
  *   dueña y recepción. La técnica no, porque el premio es un descuento sobre
  *   su propio servicio.
+ * - `recuperar:enviar` — "Te extrañamos": mandarle a una clienta que dejó de
+ *   venir la tarjeta de sellos de regalo y el 10 % por WhatsApp. Emite una
+ *   tarjeta en Stampee y promete un descuento, así que es de quien atiende el
+ *   WhatsApp del estudio: la dueña y recepción.
+ * - `recuperar:configurar` — elegir la campaña, el texto del mensaje y las
+ *   condiciones del regalo. Es decidir qué se regala: de la dueña sola.
  */
 export type Capability =
   | "cuenta:cerrar-propia"
@@ -314,7 +320,9 @@ export type Capability =
   | "clientes:exportar"
   | "cortesia:otorgar"
   | "fidelidad:ver"
-  | "fidelidad:canjear";
+  | "fidelidad:canjear"
+  | "recuperar:enviar"
+  | "recuperar:configurar";
 
 /**
  * Contexto que hace variar una fila de la matriz.
@@ -366,6 +374,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "cortesia:otorgar",
     "fidelidad:ver",
     "fidelidad:canjear",
+    "recuperar:enviar",
+    "recuperar:configurar",
   ]),
 
   // Recepción. Opera el día completo y cierra la caja, pero no corrige después
@@ -392,6 +402,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     // Las tarjetas de sellos y el canje del premio: mostrador, como Stampee.
     "fidelidad:ver",
     "fidelidad:canjear",
+    // "Te extrañamos" sale por el WhatsApp del estudio, que atiende recepción.
+    "recuperar:enviar",
   ]),
 
   // La técnica. Su alcance es su propio día, sus propias cuentas y su propia

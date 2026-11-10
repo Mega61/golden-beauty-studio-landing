@@ -2,8 +2,10 @@ import "server-only";
 
 import {
   buildSnapshot,
+  phoneKey,
   type LoyaltySnapshot,
   type StampeeCampaignRaw,
+  type StampeeCardRaw,
   type StampeeCustomerRaw,
 } from "./model";
 
@@ -11,9 +13,11 @@ import {
  * El **único** lugar del panel que le habla a Stampee.
  *
  * Lee clientas, tarjetas y campañas con la API key del estudio
- * (`docs/PRODUCTION_API.md` del repo de Stampee) y escribe una sola cosa:
+ * (`docs/PRODUCTION_API.md` del repo de Stampee) y escribe dos cosas:
  * **aplicar el premio** de una tarjeta llena, igual que lo hace el kiosko de
- * Stampee. Los sellos no los toca nunca: los pone el CRM cada noche desde las
+ * Stampee, y **emitir la tarjeta de regalo** de "Te extrañamos"
+ * ({@link issueWinbackCard}), que nace con los sellos que pone la campaña.
+ * Sellos sueltos no los escribe nunca: los pone el CRM cada noche desde las
  * visitas del panel, y dos productores de sellos sobre la misma tarjeta es
  * cómo una clienta termina con un sello de más.
  *
@@ -286,4 +290,125 @@ export async function redeemCard(
   }
 
   return { ok: true, customerName: owner.name, rewardName: card.rewardName, historyRecorded };
+}
+
+// ── Escritura: la tarjeta de regalo de "Te extrañamos" ──────────────────────
+
+export type WinbackCardOutcome =
+  | {
+      ok: true;
+      customerId: string;
+      card: { id: string; uniqueId: string; stamps: number; totalStamps: number; rewardName: string };
+      /** `false` = ya tenía una tarjeta activa de esa campaña y se reusó. */
+      created: boolean;
+      cardBaseUrl: string | null;
+    }
+  | { ok: false; message: string };
+
+/**
+ * Le emite a una clienta una tarjeta **nueva** de la campaña de "Te
+ * extrañamos", que nace con los sellos de regalo de la campaña
+ * (`bonusStamps`): Stampee los pone al emitirla, el panel no escribe sellos.
+ * Es la única otra escritura del panel en Stampee, además del canje.
+ *
+ * - Lee fresco (decide una escritura) y busca a la clienta por los últimos 10
+ *   dígitos del celular. Si no existe en Stampee —vino antes de que hubiera
+ *   tarjetas— se crea. **Nunca crea una segunda ficha** para un número que ya
+ *   está: el CRM cruza por teléfono y dos fichas con el mismo número le
+ *   esconderían una.
+ * - Si ya tiene una tarjeta activa de esa campaña, la devuelve: tocar el botón
+ *   dos veces no regala dos tarjetas.
+ * - Anota el renglón `issued` con los sellos regalados, para que Stampee, el
+ *   panel y el CRM los cuenten como regalo y no como visitas aunque después se
+ *   cambie la campaña.
+ */
+export async function issueWinbackCard(input: {
+  phone: string;
+  name: string;
+  campaignId: string;
+  actorName: string;
+  today: string;
+}): Promise<WinbackCardOutcome> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return { ok: false, message: "Stampee no está configurado en el panel." };
+
+  let customers: StampeeCustomerRaw[];
+  let campaigns: StampeeCampaignRaw[];
+  let slug: string | null | undefined;
+  try {
+    [customers, campaigns, slug] = await Promise.all([
+      call<StampeeCustomerRaw[]>(config, "/customers?include=cards"),
+      call<StampeeCampaignRaw[]>(config, "/campaigns"),
+      call<{ slug?: string | null }>(config, "/profile")
+        .then((p) => p?.slug)
+        .catch(() => null),
+    ]);
+  } catch (error) {
+    console.error("[stampee] no se pudo leer antes de emitir la tarjeta de regalo", error);
+    return { ok: false, message: "Stampee no respondió. No se emitió nada; intenta en un momento." };
+  }
+  const cardBaseUrl = config.appUrl && slug ? `${config.appUrl}/${slug}` : null;
+
+  const campaign = campaigns.find((c) => c.id === input.campaignId);
+  if (!campaign) return { ok: false, message: "La campaña de \"Te extrañamos\" ya no está en Stampee." };
+  if (!campaign.isEnabled) {
+    return { ok: false, message: `La campaña "${campaign.name}" está apagada en Stampee. Actívala para emitir tarjetas.` };
+  }
+  const summary = (raw: { id: string; uniqueId: string; stamps: number }) => ({
+    id: raw.id,
+    uniqueId: raw.uniqueId,
+    stamps: raw.stamps,
+    totalStamps: campaign.totalStamps,
+    rewardName: campaign.rewardName ?? "",
+  });
+
+  const key = phoneKey(input.phone);
+  const matches = key === null ? [] : customers.filter((c) => phoneKey(c.mobile) === key);
+  for (const customer of matches) {
+    const existing = (customer.cards ?? []).find(
+      (card) => card.campaignId === campaign.id && card.status !== "Redeemed",
+    );
+    if (existing) return { ok: true, customerId: customer.id, card: summary(existing), created: false, cardBaseUrl };
+  }
+
+  try {
+    // La ficha con tarjetas primero: es la que el CRM y el kiosko ya conocen.
+    let customerId = [...matches].sort((a, b) => (b.cards?.length ?? 0) - (a.cards?.length ?? 0))[0]?.id;
+    if (customerId === undefined) {
+      const created = await call<{ id: string }>(config, "/customers", {
+        method: "POST",
+        body: JSON.stringify({ name: input.name.slice(0, 120) || input.phone, mobile: input.phone, status: "Active" }),
+      });
+      customerId = created.id;
+    }
+    const card = await call<StampeeCardRaw>(config, "/cards", {
+      method: "POST",
+      body: JSON.stringify({ customerId, campaignId: campaign.id }),
+    });
+
+    try {
+      await call(config, `/cards/${encodeURIComponent(card.id)}/transactions`, {
+        method: "POST",
+        body: JSON.stringify({
+          type: "issued",
+          amount: card.stamps,
+          date: input.today,
+          timestamp: Date.now(),
+          title: "Card Issued",
+          remarks: `Te extrañamos · desde el panel por ${input.actorName}`.slice(0, 500),
+        }),
+      });
+    } catch (error) {
+      // Sin el renglón, Stampee y el CRM toman los sellos de regalo de la
+      // campaña, que hoy dice lo mismo: se sigue.
+      console.error("[stampee] la tarjeta de regalo quedó sin renglón de emisión", error);
+    }
+
+    return { ok: true, customerId, card: summary(card), created: true, cardBaseUrl };
+  } catch (error) {
+    console.error("[stampee] no se pudo emitir la tarjeta de regalo", error);
+    return { ok: false, message: "Stampee no aceptó la tarjeta nueva. Intenta de nuevo." };
+  } finally {
+    invalidateLoyalty();
+  }
 }

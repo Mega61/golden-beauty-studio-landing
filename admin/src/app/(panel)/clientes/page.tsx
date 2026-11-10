@@ -46,14 +46,15 @@ export default async function ClientesPage({
   const rawPage = Number(typeof params.pagina === "string" ? params.pagina : 1);
   const page = Number.isInteger(rawPage) && rawPage > 0 && rawPage < 1000 ? rawPage : 1;
 
-  const [result, canExport] = await Promise.all([
+  const [result, canExport, canRecover] = await Promise.all([
     searchClients(query, page),
     sessionCan("clientes:exportar"),
+    sessionCan("recuperar:enviar"),
   ]);
 
   return (
     <AppShell role={navRole(session.role)} title="Clientes">
-      <ClientesLista canExport={canExport} result={result} />
+      <ClientesLista canExport={canExport} canRecover={canRecover} result={result} />
     </AppShell>
   );
 }

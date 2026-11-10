@@ -105,6 +105,11 @@ export type AudiencePerson = {
   lastAttended: EaLocalDateTime | null;
   /** ¿Tiene una cita futura que no esté cancelada? */
   hasUpcoming: boolean;
+  /**
+   * Cuántas visitas atendidas tiene, EA + Agenda Pro. Aproximado: una cita
+   * recreada en EA puede contar en los dos. Sirve para ordenar, no para plata.
+   */
+  visits: number;
 };
 
 export type AudienceSources = {
@@ -170,10 +175,12 @@ export function buildAudience(sources: AudienceSources): Audience {
       city,
       lastAttended: null,
       hasUpcoming: false,
+      visits: 0,
     });
   }
 
   const attended = (person: AudiencePerson, at: EaLocalDateTime) => {
+    person.visits += 1;
     if (person.lastAttended === null || at > person.lastAttended) person.lastAttended = at;
   };
 
@@ -211,6 +218,7 @@ export function buildAudience(sources: AudienceSources): Audience {
         city: null,
         lastAttended: null,
         hasUpcoming: false,
+        visits: 0,
       };
       byPhone.set(phone, person);
     } else if (person.firstName === "" && person.lastName === "" && row.name) {
