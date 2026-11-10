@@ -39,6 +39,9 @@
 #                              obligatoria con INGEST_URL. Ver lib/ingest-client.ts)
 #   VAPID_PUBLIC_KEY          VAPID_PRIVATE_KEY      VAPID_SUBJECT   (opcionales: avisos push)
 #   STAMPEE_API_URL           STAMPEE_API_KEY        STAMPEE_APP_URL (opcionales: Fidelidad)
+#   TICKET_STAFF_COBRA        "true" si la técnica registra el método de pago (sin
+#                             recepción de planta, tiene que serlo: si no, la cuenta
+#                             se guarda sin método y no viaja a Actual)
 #   WHATSAPP_TOKEN            WHATSAPP_PHONE_NUMBER_ID                (opcionales: WhatsApp automático)
 #   WHATSAPP_APP_SECRET       WHATSAPP_VERIFY_TOKEN                   (webhook de estado de Meta)
 #   WHATSAPP_GRAPH_VERSION    WHATSAPP_TEMPLATE_LANG                  (opcionales, con valor por defecto)
@@ -162,6 +165,10 @@ services:
       STAMPEE_APP_URL: ${STAMPEE_APP_URL:-}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET}
       INGEST_SINCE: ${INGEST_SINCE:-}
+
+      # La técnica registra el método de pago (`cuenta:cobrar` para `staff`).
+      # Sin pasarla acá, el valor del stack nunca llega al contenedor.
+      TICKET_STAFF_COBRA: ${TICKET_STAFF_COBRA:-}
 
       # Avisos push de reservas web. Opcionales: vacías, la función no aparece
       # (ver `admin/src/lib/push/config.ts`). El `:-` evita el aviso de Compose
