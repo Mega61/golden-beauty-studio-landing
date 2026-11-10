@@ -30,10 +30,13 @@ import type { ResolvedClient } from "./identity";
 export function ClientesLista({
   result,
   canExport = false,
+  canRecover = false,
 }: {
   result: ClientListResult;
   /** `clientes:exportar`: el enlace a la lista para Meta. Solo la dueña. */
   canExport?: boolean;
+  /** `recuperar:enviar`: el enlace a "Te extrañamos". Dueña y recepción. */
+  canRecover?: boolean;
 }) {
   const columns = clientColumns();
 
@@ -80,6 +83,11 @@ export function ClientesLista({
       */}
       <div className={styles.actions}>
         <NuevaClienta />
+        {canRecover ? (
+          <Link className="ui-btn ui-btn--secondary ui-btn--sm" href="/clientes/recuperar">
+            Recuperar clientas
+          </Link>
+        ) : null}
         {canExport ? (
           <Link className="ui-btn ui-btn--secondary ui-btn--sm" href="/clientes/exportar-meta">
             Exportar para Meta

@@ -829,6 +829,39 @@ export interface BookingAttributionTable {
   created_at: Generated<Date>;
 }
 
+/**
+ * La configuración de "Te extrañamos" (migración `032`): una sola fila, `id = 1`.
+ * `stampee_campaign_id` `null` = todavía no se eligió campaña y no se puede mandar.
+ */
+export interface WinbackConfigTable {
+  id: number;
+  stampee_campaign_id: string | null;
+  message_template: string | null;
+  discount_enabled: Generated<number>;
+  valid_days: number | null;
+  lapsed_days: Generated<number>;
+  updated_by_user_id: AuthId | null;
+  updated_at: Date;
+}
+
+/**
+ * A quién ya se le mandó el regalo de "Te extrañamos" (migración `032`). Una
+ * fila por teléfono. `discount_percent` es lo prometido al mandarlo.
+ */
+export interface WinbackOfferTable {
+  phone_e164: string;
+  client_name: string | null;
+  stampee_customer_id: string | null;
+  stampee_card_id: string | null;
+  stampee_card_unique_id: string | null;
+  gifted_stamps: Generated<number>;
+  discount_percent: Generated<number>;
+  expires_on: SqlDate | null;
+  sent_by_user_id: AuthId | null;
+  sent_at: Date;
+  last_sent_at: Date;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -862,6 +895,8 @@ export interface Database {
   appointment_planned_service: AppointmentPlannedServiceTable;
   stampee_card_share: StampeeCardShareTable;
   booking_attribution: BookingAttributionTable;
+  winback_config: WinbackConfigTable;
+  winback_offer: WinbackOfferTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;

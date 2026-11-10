@@ -40,7 +40,9 @@
  * que la cuenta aplica sola al cerrarse) y `029` (`stampee_card_share`, a quién
  * ya se le mandó el link de su tarjeta de sellos) y `030` (`day_close.closed_by`
  * acepta `NULL`: el cierre lo arma la sincronización nocturna) y `031`
- * (`booking_attribution`, de dónde llegó cada reserva hecha desde la página).
+ * (`booking_attribution`, de dónde llegó cada reserva hecha desde la página) y `032`
+ * (`winback_config` + `winback_offer`, el regalo "Te extrañamos" para las
+ * clientas que no vuelven).
  * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
  * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
  * detecta que alguien editó una migración ya aplicada.
@@ -79,6 +81,7 @@ import { migration as m028 } from "./028-appointment-planned-service";
 import { migration as m029 } from "./029-stampee-card-share";
 import { migration as m030 } from "./030-day-close-system";
 import { migration as m031 } from "./031-booking-attribution";
+import { migration as m032 } from "./032-winback";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -112,6 +115,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m029,
   m030,
   m031,
+  m032,
 ];
 
 /**
@@ -150,6 +154,8 @@ export const EXPECTED_TABLES: readonly string[] = [
   "appointment_planned_service",
   "stampee_card_share",
   "booking_attribution",
+  "winback_config",
+  "winback_offer",
   // Infraestructura
   "schema_migration",
 ];

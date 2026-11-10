@@ -3,10 +3,11 @@ import "server-only";
 import { loadHistoryByPhone } from "@/app/(panel)/clientes/data";
 import { hasVisitedBefore } from "@/app/(panel)/clientes/history";
 import { normalizePhoneE164 } from "@/app/(panel)/clientes/identity";
+import { hasWinbackDiscount } from "@/app/(panel)/clientes/winback-discount";
 import { getDb } from "@/db/client";
 import { serviceMapRepository } from "@/db/repositories";
 import { createCachedEaClient, type EaClient } from "@/lib/ea/client";
-import { instantToEaLocal, type EaLocalDate } from "@/lib/ea/datetime";
+import { instantToEaLocal, type EaLocalDate, type EaLocalDateTime } from "@/lib/ea/datetime";
 import { buildQuoteLines, createLookupGate, quoteVisit, type LookupGate, type Quote } from "./quote";
 
 /**
@@ -58,7 +59,7 @@ export async function loadQuote(input: QuoteInput): Promise<QuoteResult> {
   const lines = buildQuoteLines(input, services, slugOf);
   if (lines === null) return { status: "unknown-service" };
 
-  const firstVisit = await resolveFirstVisit(input.phone, client);
+  const firstVisit = await resolveFirstVisit(input.phone, input.date, client);
   return { status: "ok", quote: quoteVisit(lines, input.date, firstVisit) };
 }
 
@@ -66,8 +67,14 @@ export async function loadQuote(input: QuoteInput): Promise<QuoteResult> {
  * ¿Es su primera visita? `null` cuando no se puede afirmar ni negar: sin
  * número válido, sin cupo para preguntarle a EA, o con el historial a medias.
  * Prometer un 10% que el estudio después no reconoce es peor que no mostrarlo.
+ * `true` también para quien ya vino pero tiene el regalo de "Te extrañamos"
+ * sin usar (`clientes/winback-discount.ts`).
  */
-async function resolveFirstVisit(raw: string | null, client: EaClient): Promise<boolean | null> {
+async function resolveFirstVisit(
+  raw: string | null,
+  date: EaLocalDate,
+  client: EaClient,
+): Promise<boolean | null> {
   const phone = raw === null ? null : normalizePhoneE164(raw);
   if (phone === null) return null;
 
@@ -80,7 +87,13 @@ async function resolveFirstVisit(raw: string | null, client: EaClient): Promise<
     if (partial) return null;
     // Lo que ya pasó hasta ahora. Una cita futura que todavía no se atendió no
     // la vuelve conocida: quien reservó y no ha venido sigue siendo nueva.
-    const firstVisit = !hasVisitedBefore(history.entries, instantToEaLocal(new Date()));
+    const now = instantToEaLocal(new Date());
+    // Ya vino pero recibió "Te extrañamos": la cita que está reservando tiene
+    // el mismo 10 %, si cae antes de que venza.
+    const dayStart = `${date} 00:00:00` as EaLocalDateTime;
+    const firstVisit =
+      !hasVisitedBefore(history.entries, now) ||
+      (await hasWinbackDiscount(phone, history.entries, dayStart > now ? dayStart : now));
     gate().remember(phone, firstVisit);
     return firstVisit;
   } catch (error) {

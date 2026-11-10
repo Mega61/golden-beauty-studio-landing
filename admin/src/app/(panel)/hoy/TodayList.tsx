@@ -174,7 +174,7 @@ export function TodayList({
           .catch((): FirstVisitStatus => "desconocido")
           .then((status) => {
             setFirstVisit((cur) => (cur?.id === id ? { id, status } : cur));
-            if (status !== "primera" || local !== null) return;
+            if ((status !== "primera" && status !== "recuperacion") || local !== null) return;
             setDraft((d) =>
               d !== null && d.eaAppointmentId === id && !d.firstVisit ? { ...d, firstVisit: true } : d,
             );

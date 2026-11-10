@@ -52,6 +52,8 @@ const TODAS: Capability[] = [
   "cortesia:otorgar",
   "fidelidad:ver",
   "fidelidad:canjear",
+  "recuperar:enviar",
+  "recuperar:configurar",
 ];
 
 /**
@@ -103,6 +105,8 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // Las tarjetas de sellos y el canje del premio son de mostrador.
     "fidelidad:ver": true,
     "fidelidad:canjear": true,
+    "recuperar:enviar": true,
+    "recuperar:configurar": false,
   },
   staff: {
     "cuenta:cerrar-propia": true,
@@ -140,6 +144,8 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     // El premio es un descuento sobre su propio servicio; lo aplica el mostrador.
     "fidelidad:ver": false,
     "fidelidad:canjear": false,
+    "recuperar:enviar": false,
+    "recuperar:configurar": false,
   },
 };
 

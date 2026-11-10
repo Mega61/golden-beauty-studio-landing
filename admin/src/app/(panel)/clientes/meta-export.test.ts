@@ -189,6 +189,7 @@ describe("selectSegment", () => {
     city: null,
     lastAttended: lastAttended === null ? null : at(lastAttended),
     hasUpcoming,
+    visits: 1,
   });
 
   const PEOPLE = [
@@ -233,6 +234,7 @@ describe("buildMetaCsv", () => {
     city: null,
     lastAttended: null,
     hasUpcoming: false,
+    visits: 1,
   };
 
   it("columnas de Meta, todo cifrado con los vectores de node:crypto", () => {

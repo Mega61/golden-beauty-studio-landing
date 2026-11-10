@@ -115,6 +115,8 @@ export type CampaignStats = {
   enabled: boolean;
   rewardName: string;
   totalStamps: number;
+  /** Con cuántos sellos de regalo nace una tarjeta de esta campaña. */
+  bonusStamps: number;
   active: number;
   lista: number;
   cerca: number;
@@ -252,6 +254,7 @@ export function buildSnapshot(
       enabled: campaign.isEnabled,
       rewardName: campaign.rewardName ?? "",
       totalStamps: campaign.totalStamps,
+      bonusStamps: Math.min(campaign.bonusStamps ?? 0, Math.max(campaign.totalStamps - 1, 0)),
       active: 0,
       lista: 0,
       cerca: 0,
