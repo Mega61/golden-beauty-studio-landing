@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type Ref,
   useId,
   type InputHTMLAttributes,
   type ReactNode,
@@ -112,6 +113,8 @@ export function TextArea({
   invalid,
   ...rest
 }: Wired &
+  // React 19: `ref` es un prop más y viaja con `rest` (insertar en el cursor).
+  { ref?: Ref<HTMLTextAreaElement> } &
   Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id" | "className">) {
   return (
     <textarea
