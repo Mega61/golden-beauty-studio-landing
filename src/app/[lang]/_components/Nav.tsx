@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Logo from "./Logo";
 import MobileMenu from "./MobileMenu";
+import NavOrnament from "./season/NavOrnament";
 import { PrimaryCTA } from "./atoms";
 import type { Locale } from "../dictionaries";
 import { bookingHref, siteConfig, type SectionKey } from "@/config/site";
@@ -41,6 +42,7 @@ export default function Nav({
   onLanding = true,
   switchPath = "",
   showCta = true,
+  ornament = false,
 }: {
   lang: Locale;
   dict: NavDict;
@@ -63,6 +65,8 @@ export default function Nav({
    * also gives `/en/trabaja-con-nosotros` its only internal inbound link.
    */
   switchPath?: string;
+  /** Temporada de Navidad: una bola cuelga bajo el header. Solo en la landing. */
+  ornament?: boolean;
 }) {
   const otherLang: Locale = lang === "es" ? "en" : "es";
   const switchHref = `/${otherLang}${switchPath}`;
@@ -91,7 +95,8 @@ export default function Nav({
       className="sticky top-0 z-50 border-b border-hair backdrop-blur-2xl"
       style={{ background: "rgba(248, 244, 238, 0.86)" }}
     >
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 pb-3.5 pt-3.5 md:px-14 md:py-5">
+      <div className="relative mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 pb-3.5 pt-3.5 md:px-14 md:py-5">
+        {ornament && <NavOrnament />}
         <Link href={`/${lang}`} aria-label="Golden Beauty Studio">
           <Logo variant="text" size={12} />
         </Link>

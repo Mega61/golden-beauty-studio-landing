@@ -773,6 +773,19 @@
     "termsClose": "Close",
     "termsCloseAria": "Close terms"
   },
+  "navidad": {
+    "heroEyebrow": "Season of shine",
+    "ornament": "A little sparkle",
+    "adviento": {
+      "eyebrow": "Advent calendar",
+      "title": "Your Golden card hides",
+      "title_em": "twelve surprises.",
+      "body": "From December 2 to 24, a new door opens every other day at 7 a.m. on the back of your stamp card. Open it and see what you got.",
+      "note": "No card yet? We'll set one up at your next appointment.",
+      "cta": "Open my card",
+      "ctaBooking": "Book now"
+    }
+  },
   "footer": {
     "tagline": "Specialist nail studio.\nSabaneta · Medellín · Antioquia.",
     "visit": {

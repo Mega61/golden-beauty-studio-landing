@@ -4,6 +4,7 @@ import { BioLink, BioView } from "./BioLink";
 import BioPromoBanner from "./BioPromoBanner";
 import SocialIcon from "./SocialIcon";
 import TrabajaBio from "./TrabajaBio";
+import Garland from "./season/Garland";
 import type { TrabajaDict } from "./PostulacionForm";
 import type { BioData, BioHiring, BioPromo } from "@/data/bio.types";
 import type { JobRole } from "@/data/careers.types";
@@ -23,6 +24,8 @@ type Props = {
    * studio stops advertising that it's hiring.
    */
   hiring: BioHiring | null;
+  /** Temporada de Navidad: guirnalda sobre el logo. Nada más — el bio es un atajo, no una vitrina. */
+  garland?: boolean;
 };
 
 /**
@@ -43,6 +46,7 @@ export default function Bio({
   trabaja,
   roles,
   hiring,
+  garland = false,
 }: Props) {
   const primary = bio.links.find((l) => l.primary) ?? null;
   const rows = bio.links.filter((l) => !l.primary);
@@ -88,6 +92,12 @@ export default function Bio({
         }}
       >
         <h1 className="sr-only">Golden Beauty Studio — {bio.handle}</h1>
+
+        {garland && (
+          <div className="-mt-4 mb-2 w-full">
+            <Garland />
+          </div>
+        )}
 
         {/* Brand lockup — leads the page now that the avatar is gone */}
         <Logo variant="text" size={18} />

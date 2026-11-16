@@ -45,6 +45,12 @@ const whatsappUrl = wppNumber
   ? `https://wa.me/${wppNumber}?text=${encodeURIComponent(wppGreeting)}`
   : null;
 
+// La tarjeta de fidelidad (Stampee). La banda del calendario de adviento lleva
+// aquí: las puertas viven en el reverso de la tarjeta de cada clienta.
+const DEFAULT_LOYALTY_URL = "https://loyalty.goldenbeautystudio.com.co";
+const loyaltyUrl =
+  process.env.NEXT_PUBLIC_LOYALTY_URL?.trim() || DEFAULT_LOYALTY_URL;
+
 const instagramUrl = process.env.NEXT_PUBLIC_INSTAGRAM_URL?.trim() || null;
 const tiktokUrl = process.env.NEXT_PUBLIC_TIKTOK_URL?.trim() || null;
 
@@ -103,6 +109,7 @@ export const siteConfig = {
   siteUrl,
   bookingUrl,
   whatsappUrl,
+  loyaltyUrl,
   instagramUrl,
   tiktokUrl,
   gaId,
