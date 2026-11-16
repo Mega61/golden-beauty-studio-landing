@@ -20,7 +20,8 @@ import { createGiftCard } from "@/lib/stampee/client";
  * - **El celular se normaliza acá** (`+57…`): la landing lo manda tal como se
  *   escribió, y Stampee cruza la compradora por los últimos diez dígitos.
  * - `ref === "adviento"` le pone a la tarjeta `buyerStampOnPaid`: quien compra
- *   desde el calendario de adviento recibe un sello al confirmarse el pago.
+ *   desde el calendario de adviento recibe `ADVENT_BUYER_STAMPS` sellos al
+ *   confirmarse el pago (Stampee nunca completa la tarjeta con un regalo).
  *
  * Respuestas: `201 { ok, data: { code, amountCop, tierName, publicUrl } }`;
  * `400 { field }` con un campo malo; `422 { field: "tierId" }` solo cuando
@@ -28,6 +29,9 @@ import { createGiftCard } from "@/lib/stampee/client";
  * rechazo de Stampee; `503` si no responde.
  */
 export const dynamic = "force-dynamic";
+
+/** Sellos de regalo para quien compra desde la puerta 20 del adviento (decisión de Juan, 2026-11-16). */
+const ADVENT_BUYER_STAMPS = 2;
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
@@ -49,7 +53,7 @@ export async function POST(req: NextRequest) {
     recipientName: order.recipientName,
     message: order.message,
     source: "sale",
-    rules: order.ref === "adviento" ? { buyerStampOnPaid: true, ref: "adviento" } : order.ref ? { ref: order.ref } : undefined,
+    rules: order.ref === "adviento" ? { buyerStampOnPaid: true, buyerStamps: ADVENT_BUYER_STAMPS, ref: "adviento" } : order.ref ? { ref: order.ref } : undefined,
     ref: order.ref,
   });
 

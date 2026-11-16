@@ -333,7 +333,7 @@ export type GiftCardDto = {
   validTo: string | null;
   minTicketCop: number | null;
   transferable: boolean;
-  rules: { recipient?: "any" | "new_or_dormant"; giverStampOnRedeem?: boolean; buyerStampOnPaid?: boolean; ref?: string } | null;
+  rules: { recipient?: "any" | "new_or_dormant"; giverStampOnRedeem?: boolean; buyerStampOnPaid?: boolean; buyerStamps?: number; ref?: string } | null;
   paidAt: string | null;
   paidMethod: string | null;
   paidAmountCop: number | null;
