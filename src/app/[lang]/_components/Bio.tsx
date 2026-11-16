@@ -229,7 +229,7 @@ export default function Bio({
               linkKey="adviento"
               label={season.advent.label}
               kind="row"
-              external
+              external={/^https?:\/\//i.test(season.advent.href)}
               className="relative flex w-full items-center overflow-hidden no-underline"
               style={{
                 minHeight: 72,

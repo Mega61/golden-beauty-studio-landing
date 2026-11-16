@@ -64,7 +64,7 @@ export type BioCopy = {
   location: string;
   promoCta: string; // banner CTA label — "Ver la promoción"
   links: Record<
-    "agendar" | "whatsapp" | "servicios" | "instagram" | "maps",
+    "agendar" | "whatsapp" | "servicios" | "tarjeta" | "instagram" | "maps",
     { label: string; sub: string }
   >;
   socials: Record<"ig" | "wa" | "tt", string>;

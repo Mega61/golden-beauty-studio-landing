@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale } from "./dictionaries";
-import { bookingHref, siteConfig } from "@/config/site";
+import { bookingHref, siteConfig, whatsappMessageUrl } from "@/config/site";
 import { currentAdvent, currentSeason } from "@/config/season";
 import { getActiveScenarios } from "@/data/promos";
 import { getReviews } from "@/data/reviews";
@@ -18,6 +18,7 @@ import Tecnicas from "./_components/Tecnicas";
 import Estudio from "./_components/Estudio";
 import Reviews from "./_components/Reviews";
 import Contacto from "./_components/Contacto";
+import MiTarjeta from "./_components/MiTarjeta";
 import Footer from "./_components/Footer";
 import FloatingActions from "./_components/FloatingActions";
 import BrandDivider from "./_components/BrandDivider";
@@ -96,6 +97,13 @@ export default async function Page({
       {sections.tecnicas && sections.estudio && <BrandDivider garland={navidad} />}
       {sections.estudio && <Estudio dict={dict.estudio} />}
       {sections.reviews && <Reviews dict={dict.reviews} data={reviews} />}
+      {sections.tarjeta && (
+        <MiTarjeta
+          dict={dict.miTarjeta}
+          whatsappUrl={whatsappMessageUrl(dict.miTarjeta.whatsappText)}
+          season={navidad}
+        />
+      )}
       {sections.contacto && <Contacto dict={dict.contacto} lang={lang} />}
       <Footer
         dict={dict.footer}

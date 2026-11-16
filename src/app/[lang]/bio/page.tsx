@@ -73,7 +73,10 @@ export default async function BioPage({
           eyebrow: dict.navidad.bio.eyebrow,
           snowman: dict.navidad.snowman,
           advent: currentAdvent()
-            ? { ...dict.navidad.bio.advent, href: siteConfig.loyaltyUrl }
+            ? {
+                ...dict.navidad.bio.advent,
+                href: siteConfig.sections.tarjeta ? `/${typedLang}#mi-tarjeta` : siteConfig.loyaltyUrl,
+              }
             : null,
         }
       : null;
