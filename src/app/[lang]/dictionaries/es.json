@@ -743,6 +743,42 @@
     "cta": "Ver todas en Google",
     "ctaWrite": "Déjanos tu reseña"
   },
+  "miTarjeta": {
+    "eyebrow": "Tarjeta Golden",
+    "title1": "Encuentra tu",
+    "title2_em": "tarjeta de sellos.",
+    "body": "Cada visita suma un sello y, al llenarla, tienes tu premio. Escribe el celular con el que te atendemos y tu primer nombre, y te damos el link de tu tarjeta: es el mismo siempre, guárdalo.",
+    "phone": "Celular",
+    "phonePlaceholder": "300 123 4567",
+    "name": "Primer nombre",
+    "namePlaceholder": "Como te registraste",
+    "submit": "Buscar mi tarjeta",
+    "searching": "Buscando…",
+    "foundTitle": "¡Aquí está tu tarjeta!",
+    "stamps": "{stamps} de {total} sellos",
+    "reward": "Al llenarla: {reward}",
+    "ready": "¡Tu tarjeta está llena! Reclama tu premio en tu próxima cita.",
+    "open": "Abrir mi tarjeta",
+    "copy": "Copiar link",
+    "copied": "¡Copiado!",
+    "save": "Guárdala en favoritos o en la pantalla de inicio de tu celular.",
+    "notFound": "No encontramos una tarjeta con ese celular y ese nombre. Revisa el número y escribe tu primer nombre como te registraste, o pídela por WhatsApp.",
+    "askWhatsapp": "Pedirla por WhatsApp",
+    "whatsappText": "Hola Golden, quiero el link de mi tarjeta de sellos",
+    "invalidPhone": "Escribe tu celular de 10 dígitos.",
+    "invalidName": "Escribe tu primer nombre.",
+    "rateLimited": "Hiciste muchas búsquedas seguidas. Prueba de nuevo en unos minutos.",
+    "unavailable": "No pudimos buscar en este momento. Prueba en un rato o pídela por WhatsApp.",
+    "noCard": "¿Aún no tienes tarjeta? Te la creamos en tu próxima cita.",
+    "seasonNote": "En diciembre tu tarjeta trae calendario de adviento: una puerta nueva cada 2 días.",
+    "privacy": "Solo tú deberías tener este link: no lo compartas.",
+    "again": "Buscar otra tarjeta",
+    "newTitle": "Aún no tienes tarjeta Golden",
+    "newBody": "No encontramos ese número entre nuestras clientas. Agenda tu primera cita: ese día te creamos la tarjeta y empiezas a sumar sellos. Si es tu primera visita, el 10% de bienvenida se aplica solo al reservar.",
+    "newCta": "Agendar mi primera cita",
+    "newRedirect": "Te llevamos a agendar en {s} s…",
+    "newStay": "Me equivoqué de número"
+  },
   "contacto": {
     "eyebrow": "07 · Visítanos",
     "title1": "Nos encuentras en",
@@ -917,6 +953,29 @@
     "termsEyebrow": "Términos y condiciones",
     "termsClose": "Cerrar",
     "termsCloseAria": "Cerrar términos"
+  },
+  "navidad": {
+    "heroEyebrow": "Temporada de brillo",
+    "snowman": {
+      "label": "Muñeco de nieve dorado: tócalo y suelta confeti",
+      "hint": "¡Tócame!"
+    },
+    "adviento": {
+      "eyebrow": "Calendario de adviento",
+      "title": "Tu tarjeta Golden trae",
+      "title_em": "doce sorpresas.",
+      "body": "Del 2 al 24 de diciembre se abre una puerta nueva cada dos días, a las 7 a.m., en el reverso de tu tarjeta de sellos. Ábrela y descubre qué te tocó.",
+      "note": "¿Aún no tienes tarjeta? Te la creamos en tu próxima cita.",
+      "cta": "Abrir mi tarjeta",
+      "ctaBooking": "Agendar cita"
+    },
+    "bio": {
+      "eyebrow": "Navidad Golden",
+      "advent": {
+        "label": "Calendario de adviento",
+        "sub": "Una puerta nueva cada 2 días · 2–24 dic"
+      }
+    }
   },
   "footer": {
     "tagline": "Estudio especializado en uñas.\nSabaneta · Medellín · Antioquia.",

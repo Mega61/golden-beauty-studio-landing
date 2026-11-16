@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale, type Locale } from "../dictionaries";
 import { siteConfig } from "@/config/site";
+import { currentAdvent, currentSeason } from "@/config/season";
 import { getActiveScenarios } from "@/data/promos";
 import { getJobRoles } from "@/data/careers";
 import { getBio, scenariosToBioPromos } from "@/data/bio";
-import Bio from "../_components/Bio";
+import Bio, { type BioSeason } from "../_components/Bio";
+
+// La temporada (escena de Navidad, fila de adviento) se decide por fecha al renderizar (ver page.tsx).
+export const revalidate = 3600;
 
 export async function generateMetadata({
   params,
@@ -63,6 +67,20 @@ export default async function BioPage({
       }
     : null;
 
+  const season: BioSeason | null =
+    currentSeason() === "navidad"
+      ? {
+          eyebrow: dict.navidad.bio.eyebrow,
+          snowman: dict.navidad.snowman,
+          advent: currentAdvent()
+            ? {
+                ...dict.navidad.bio.advent,
+                href: siteConfig.sections.tarjeta ? `/${typedLang}#mi-tarjeta` : siteConfig.loyaltyUrl,
+              }
+            : null,
+        }
+      : null;
+
   return (
     <Bio
       bio={bio}
@@ -71,6 +89,7 @@ export default async function BioPage({
       trabaja={careersOn ? dict.trabaja : null}
       roles={roles}
       hiring={hiring}
+      season={season}
     />
   );
 }

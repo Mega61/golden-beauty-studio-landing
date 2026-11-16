@@ -1,3 +1,5 @@
+import Garland from "./season/Garland";
+
 type Tone = "light" | "dark";
 
 /**
@@ -14,11 +16,16 @@ type Tone = "light" | "dark";
  * vertical whitespace, so we crop tightly via `overflow: hidden` + scaled img.
  * Empirical content extents (matches the constants in `Logo.tsx`):
  *   content height ratio = 0.043 of canvas, top margin = 0.479.
+ *
+ * `garland` (temporada de Navidad) cuelga una guirnalda dorada encima del
+ * texto; el separador pasa a columna para que la guirnalda quede arriba.
  */
 export default function BrandDivider({
   tone = "light",
+  garland = false,
 }: {
   tone?: Tone;
+  garland?: boolean;
 }) {
   const contentH = 14;
   // SubText fills only 4.3% of its 1500² canvas — render the img ~23× the
@@ -35,7 +42,7 @@ export default function BrandDivider({
 
   return (
     <div
-      className="brand-divider relative flex items-center justify-center"
+      className={`brand-divider relative flex items-center justify-center ${garland ? "flex-col gap-1" : ""}`}
       role="separator"
       aria-hidden
       style={{
@@ -43,6 +50,7 @@ export default function BrandDivider({
         padding: "32px 16px",
       }}
     >
+      {garland && <Garland tone={tone} />}
       <span
         style={{
           display: "inline-block",
