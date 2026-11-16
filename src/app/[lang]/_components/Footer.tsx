@@ -3,7 +3,7 @@ import { bookingHref, siteConfig } from "@/config/site";
 import Logo from "./Logo";
 import TrackedBookingLink from "./TrackedBookingLink";
 import TrackedWhatsappLink from "./TrackedWhatsappLink";
-import ConfettiOrnament from "./season/ConfettiOrnament";
+import SnowmanConfetti from "./season/SnowmanConfetti";
 
 type FooterDict = {
   tagline: string;
@@ -44,12 +44,12 @@ function resolveFindLink(
 export default function Footer({
   dict,
   lang,
-  ornamentLabel,
+  snowman,
 }: {
   dict: FooterDict;
   lang: string;
-  /** Temporada de Navidad: la bola del confeti junto al logo. Sin label, no hay bola. */
-  ornamentLabel?: string;
+  /** Temporada: el muñeco dorado del confeti junto al logo. */
+  snowman?: { label: string; hint: string };
 }) {
   const { instagramUrl, whatsappUrl, mapsPlaceId } = siteConfig;
   const bookingUrl = bookingHref(lang);
@@ -76,7 +76,11 @@ export default function Footer({
           <div>
             <div className="flex items-start gap-4">
               <Logo variant="text" size={14} />
-              {ornamentLabel && <ConfettiOrnament label={ornamentLabel} />}
+              {snowman && (
+                <span className="-mt-6 ml-auto md:ml-2">
+                  <SnowmanConfetti label={snowman.label} hint={snowman.hint} size={104} hintSide="left" />
+                </span>
+              )}
             </div>
             <p className="m-0 mt-6 max-w-[380px] whitespace-pre-line font-display text-[16px] italic leading-[1.5] text-ink-soft md:text-[19px]">
               {dict.tagline}

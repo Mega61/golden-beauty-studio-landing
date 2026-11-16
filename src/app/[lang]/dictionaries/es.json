@@ -920,7 +920,10 @@
   },
   "navidad": {
     "heroEyebrow": "Temporada de brillo",
-    "ornament": "Un poco de brillo",
+    "snowman": {
+      "label": "Muñeco de nieve dorado: tócalo y suelta confeti",
+      "hint": "¡Tócame!"
+    },
     "adviento": {
       "eyebrow": "Calendario de adviento",
       "title": "Tu tarjeta Golden trae",
@@ -929,6 +932,13 @@
       "note": "¿Aún no tienes tarjeta? Te la creamos en tu próxima cita.",
       "cta": "Abrir mi tarjeta",
       "ctaBooking": "Agendar cita"
+    },
+    "bio": {
+      "eyebrow": "Navidad Golden",
+      "advent": {
+        "label": "Calendario de adviento",
+        "sub": "Una puerta nueva cada 2 días · 2–24 dic"
+      }
     }
   },
   "footer": {

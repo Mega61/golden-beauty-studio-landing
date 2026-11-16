@@ -70,7 +70,11 @@ function makeFlake(w: number, h: number, anywhere: boolean): Flake {
   };
 }
 
-export default function GoldLeaf() {
+/**
+ * `fixed`: el canvas cubre la ventana en vez de su contenedor (el `/bio`, que
+ * es largo: así cae sobre lo que se ve y no sobre una tela de 2.500 px).
+ */
+export default function GoldLeaf({ fixed = false }: { fixed?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -196,7 +200,7 @@ export default function GoldLeaf() {
     <canvas
       ref={ref}
       aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full"
+      className={`pointer-events-none ${fixed ? "fixed" : "absolute"} inset-0 h-full w-full`}
       style={{ opacity: 0, transition: "opacity 1600ms ease" }}
     />
   );

@@ -1,21 +1,15 @@
-"use client";
-
-import { useRef } from "react";
-import Bauble from "./Bauble";
-
 /**
- * El huevo de pascua del footer: una bola que, al tocarla, suelta una lluvia
- * corta de confeti dorado desde donde está.
+ * Lluvia corta de confeti dorado desde un punto de la pantalla.
  *
- * El canvas se crea al tocar y se borra solo al terminar (~2 s): mientras nadie
- * la toque no hay nada corriendo. Con `prefers-reduced-motion` la bola solo se
- * mece y no hay lluvia.
+ * El canvas se crea al llamarla y se borra solo al terminar (~2 s): mientras
+ * nadie toque nada no hay nada corriendo. Quien la llama decide qué hacer con
+ * `prefers-reduced-motion` (ver `SnowmanConfetti`).
  */
 
 const PALETTE = ["#ac8231", "#e7aa51", "#ffd49f", "#fff1d6", "#8b6a1f"];
 const DURATION_MS = 2200;
 
-function burst(originX: number, originY: number) {
+export function goldBurst(originX: number, originY: number) {
   const canvas = document.createElement("canvas");
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = window.innerWidth;
@@ -91,37 +85,4 @@ function burst(originX: number, originY: number) {
     else canvas.remove();
   };
   requestAnimationFrame(frame);
-}
-
-export default function ConfettiOrnament({ label }: { label: string }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const busy = useRef(false);
-
-  const onClick = () => {
-    const el = ref.current;
-    if (!el) return;
-    el.classList.remove("is-rung");
-    // Reinicia la animación del vaivén aunque la toquen dos veces seguidas.
-    void el.offsetWidth;
-    el.classList.add("is-rung");
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (busy.current) return;
-    busy.current = true;
-    window.setTimeout(() => (busy.current = false), 600);
-    const r = el.getBoundingClientRect();
-    burst(r.left + r.width / 2, r.top + r.height * 0.75);
-  };
-
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="gbs-confetti-ornament relative inline-flex h-12 w-10 cursor-pointer items-start justify-center border-0 bg-transparent p-0"
-    >
-      <Bauble size={16} thread={20} className="gbs-swing-hover" />
-    </button>
-  );
 }

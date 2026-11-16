@@ -920,7 +920,10 @@
   },
   "navidad": {
     "heroEyebrow": "Season of shine",
-    "ornament": "A little sparkle",
+    "snowman": {
+      "label": "Golden snowman: tap it for confetti",
+      "hint": "Tap me!"
+    },
     "adviento": {
       "eyebrow": "Advent calendar",
       "title": "Your Golden card hides",
@@ -929,6 +932,13 @@
       "note": "No card yet? We'll set one up at your next appointment.",
       "cta": "Open my card",
       "ctaBooking": "Book now"
+    },
+    "bio": {
+      "eyebrow": "Golden Christmas",
+      "advent": {
+        "label": "Advent calendar",
+        "sub": "A new door every 2 days · Dec 2–24"
+      }
     }
   },
   "footer": {
