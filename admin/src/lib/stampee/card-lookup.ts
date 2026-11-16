@@ -15,14 +15,25 @@ import { leadingCard, phoneKey, type LoyaltyClient, type LoyaltySnapshot } from 
  * decidió el 2026-11-16 sabiendo eso: celular **y** primer nombre, nada más.
  * Lo que este módulo pone encima:
  *
- * - **No revela quién es clienta.** Celular desconocido y nombre que no
- *   coincide responden exactamente lo mismo.
+ * - **Celular que no es de nadie → a agendar.** Juan lo pidió (2026-11-16):
+ *   quien no tiene tarjeta va directo a reservar su primera cita. Eso dice si
+ *   un número es clienta, el mismo riesgo que la dueña ya aceptó en la
+ *   cotización de `/reservar` (primera visita). Lo que **no** se distingue es
+ *   el nombre: celular de clienta con nombre errado responde igual que un
+ *   celular bloqueado.
  * - **No deja adivinar el nombre.** Cinco nombres errados para un mismo celular
  *   en una hora lo bloquean por esa hora ({@link createAttemptGate}); bloqueado,
  *   también responde "no encontrada", aunque el nombre sea el correcto.
  * - **No devuelve datos de la clienta**: ni nombre, ni correo, ni regalos. Solo
  *   el link y cuántos sellos lleva.
  */
+
+export type CardLookup =
+  | ({ kind: "found" } & CardMatch)
+  /** Ninguna ficha de Stampee con ese celular: aún no es clienta (o no tiene tarjeta). */
+  | { kind: "unknown-phone" }
+  /** El celular es de alguien, pero el nombre no coincide. */
+  | { kind: "no-match" };
 
 export type CardMatch = {
   url: string;
@@ -59,7 +70,7 @@ function bestClient(clients: readonly LoyaltyClient[]): LoyaltyClient | null {
 }
 
 /**
- * La tarjeta de quien escribió ese celular y ese nombre, o `null`.
+ * La tarjeta de quien escribió ese celular y ese nombre.
  *
  * `cardBaseUrl` es `https://…/<slug>` (de `loadLoyalty`). El link es el
  * permanente de la clienta (`publicId`, Stampee #10) cuando la lectura lo trae;
@@ -71,22 +82,24 @@ export function findCard(
   cardBaseUrl: string,
   phone: string,
   name: string,
-): CardMatch | null {
+): CardLookup {
   const key = phoneKey(phone);
   const first = firstNameKey(name);
-  if (key === null || key.length < 10 || first === null) return null;
+  if (key === null || key.length < 10 || first === null) return { kind: "no-match" };
 
-  const matches = snapshot.clients.filter(
-    (c) => c.phoneKey === key && firstNameKey(c.name) === first,
-  );
-  const client = bestClient(matches);
-  if (client === null) return null;
+  // Una ficha sin tarjetas cuenta como "sin tarjeta": no hay link que darle.
+  const byPhone = snapshot.clients.filter((c) => c.phoneKey === key && c.cards.length > 0);
+  if (byPhone.length === 0) return { kind: "unknown-phone" };
+
+  const client = bestClient(byPhone.filter((c) => firstNameKey(c.name) === first));
+  if (client === null) return { kind: "no-match" };
 
   const card = leadingCard(client.cards) ?? client.cards[0];
   // `publicId` llega con el calendario de adviento; leído así para no depender
   // de que el tipo ya lo tenga en esta rama.
   const publicId = (client as { publicId?: string | null }).publicId;
   return {
+    kind: "found",
     url: `${cardBaseUrl.replace(/\/+$/, "")}/${publicId || card.uniqueId}`,
     stamps: card.stamps,
     totalStamps: card.totalStamps,

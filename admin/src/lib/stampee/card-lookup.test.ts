@@ -38,8 +38,8 @@ describe("firstNameKey", () => {
 describe("findCard", () => {
   it("encuentra con celular en cualquier formato y solo el primer nombre", () => {
     const hit = findCard(snapshot, BASE, "300-123-4567", "maria");
-    expect(hit).toEqual({ url: `${BASE}/u-1`, stamps: 3, totalStamps: 8, rewardName: "15% off" });
-    expect(findCard(snapshot, BASE, "573001234567", "María José")?.url).toBe(`${BASE}/u-1`);
+    expect(hit).toEqual({ kind: "found", url: `${BASE}/u-1`, stamps: 3, totalStamps: 8, rewardName: "15% off" });
+    expect(findCard(snapshot, BASE, "573001234567", "María José")).toMatchObject({ url: `${BASE}/u-1` });
   });
 
   it("usa el link permanente de la clienta cuando existe", () => {
@@ -47,21 +47,25 @@ describe("findCard", () => {
       ...snapshot,
       clients: snapshot.clients.map((c) => (c.id === "a" ? { ...c, publicId: "p-maria" } : c)),
     };
-    expect(findCard(withPublic, BASE, "3001234567", "maria")?.url).toBe(`${BASE}/p-maria`);
+    expect(findCard(withPublic, BASE, "3001234567", "maria")).toMatchObject({ url: `${BASE}/p-maria` });
   });
 
-  it("con el nombre equivocado no encuentra nada", () => {
-    expect(findCard(snapshot, BASE, "3001234567", "Mariana")).toBeNull();
-    expect(findCard(snapshot, BASE, "3001234567", "Pérez")).toBeNull();
+  it("con el nombre equivocado no encuentra nada (sin decir de quién es)", () => {
+    expect(findCard(snapshot, BASE, "3001234567", "Mariana")).toEqual({ kind: "no-match" });
+    expect(findCard(snapshot, BASE, "3001234567", "Pérez")).toEqual({ kind: "no-match" });
+  });
+
+  it("un celular que no es de nadie es una clienta nueva", () => {
+    expect(findCard(snapshot, BASE, "3157778888", "Ana")).toEqual({ kind: "unknown-phone" });
   });
 
   it("prefiere la tarjeta activa sobre la canjeada", () => {
-    expect(findCard(snapshot, BASE, "3109998888", "laura")?.url).toBe(`${BASE}/u-3`);
+    expect(findCard(snapshot, BASE, "3109998888", "laura")).toMatchObject({ url: `${BASE}/u-3` });
   });
 
-  it("sin tarjeta, o con celular incompleto, no hay nada", () => {
-    expect(findCard(snapshot, BASE, "3205554444", "sin")).toBeNull();
-    expect(findCard(snapshot, BASE, "1234567", "maria")).toBeNull();
+  it("una ficha sin tarjetas cuenta como sin tarjeta; un celular incompleto no se busca", () => {
+    expect(findCard(snapshot, BASE, "3205554444", "sin")).toEqual({ kind: "unknown-phone" });
+    expect(findCard(snapshot, BASE, "1234567", "maria")).toEqual({ kind: "no-match" });
   });
 });
 

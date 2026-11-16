@@ -772,7 +772,12 @@
     "noCard": "No card yet? We'll create one at your next appointment.",
     "seasonNote": "In December your card has an advent calendar: a new door every 2 days.",
     "privacy": "Only you should have this link: don't share it.",
-    "again": "Search again"
+    "again": "Search again",
+    "newTitle": "You don't have a Golden card yet",
+    "newBody": "We couldn't find that number among our clients. Book your first appointment: we'll create your card that day and you'll start collecting stamps. If it's your first visit, the 10% welcome discount is applied automatically when you book.",
+    "newCta": "Book my first appointment",
+    "newRedirect": "Taking you to booking in {s} s…",
+    "newStay": "I typed the wrong number"
   },
   "contacto": {
     "eyebrow": "07 · Visit us",

@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
             totalStamps: data.totalStamps,
             rewardName: data.rewardName,
           }
-        : { found: false };
+        : data.newClient === true
+          ? { found: false, newClient: true }
+          : { found: false };
     return NextResponse.json(out, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[tarjeta/buscar] el panel no respondió", error);
