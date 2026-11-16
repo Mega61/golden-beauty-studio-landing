@@ -54,6 +54,7 @@ const TODAS: Capability[] = [
   "fidelidad:canjear",
   "recuperar:enviar",
   "recuperar:configurar",
+  "regalos:vender",
 ];
 
 /**
@@ -107,6 +108,8 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "fidelidad:canjear": true,
     "recuperar:enviar": true,
     "recuperar:configurar": false,
+    // Confirmar el pago de una tarjeta regalo es registrar plata: mostrador.
+    "regalos:vender": true,
   },
   staff: {
     "cuenta:cerrar-propia": true,
@@ -146,11 +149,12 @@ const DEL_PLAN: Record<UserRole, Record<Capability, boolean | "segun-cobra">> = 
     "fidelidad:canjear": false,
     "recuperar:enviar": false,
     "recuperar:configurar": false,
+    "regalos:vender": false,
   },
 };
 
 describe("AUDIT · la matriz completa, celda por celda, contra el plan", () => {
-  it("75 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
+  it("87 celdas × las tres posiciones de TICKET_STAFF_COBRA", () => {
     for (const role of ["owner", "admin", "staff"] as UserRole[]) {
       for (const capability of TODAS) {
         const esperado = DEL_PLAN[role][capability];

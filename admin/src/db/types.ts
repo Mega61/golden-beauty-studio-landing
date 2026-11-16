@@ -70,6 +70,15 @@ export type UserRole = "owner" | "admin" | "staff";
 export type PaymentMethod = "efectivo" | "transferencia" | "otro";
 
 /**
+ * Con qué se pagó **una cuenta** (`appointment_payment.method`, migración
+ * `033`): los tres de Strapi más `bono`, la tarjeta regalo pagada. `bono` no
+ * es un método de Strapi y **nunca viaja**: esa plata ya entró a Actual el día
+ * en que se vendió la tarjeta (`gift_card_sale`). `lib/ingest-payload.ts` lo
+ * saca del lote.
+ */
+export type AccountPaymentMethod = PaymentMethod | "bono";
+
+/**
  * De dónde salió el snapshot de precio.
  *
  * `fallback` **es** la marca de "esta cita se valoró al precio de lista de hoy
@@ -262,6 +271,19 @@ export interface AppointmentFinanceTable {
   day_close_id: number | null;
   pushed_to_ingest_at: SqlDateTime | null;
 
+  /**
+   * Migración `033`. La tarjeta regalo redimida en esta cuenta (`TR-XXXX-XXXX`),
+   * pagada o promocional. Es lo que deja deshacer la redención en Stampee si
+   * alguien corrige la cuenta y la quita. `null` = ninguna.
+   */
+  gift_card_code: Generated<string | null>;
+  /**
+   * Migración `033`. El método de la propina **solo** cuando una tarjeta
+   * regalo pagó toda la cuenta y no hay otro pago donde llevarla. `null` en
+   * cualquier otro caso: la propina viaja en el primer pago.
+   */
+  tip_method: Generated<PaymentMethod | null>;
+
   created_at: CreatedAt;
   updated_at: UpdatedAt;
 }
@@ -310,9 +332,12 @@ export interface AppointmentFinanceItemTable {
 export interface AppointmentPaymentTable {
   id: Generated<number>;
   appointment_finance_id: number;
-  method: PaymentMethod;
+  /** `bono` = tarjeta regalo pagada (migración `033`). No viaja a Strapi. */
+  method: AccountPaymentMethod;
   /** Siempre > 0. Una devolución sería un ajuste con id propio, no un negativo. */
   amount: Cop;
+  /** El código de la tarjeta cuando `method = 'bono'`. */
+  gift_card_code: Generated<string | null>;
   created_at: CreatedAt;
 }
 
@@ -862,6 +887,33 @@ export interface WinbackOfferTable {
   last_sent_at: Date;
 }
 
+/**
+ * Una tarjeta regalo vendida (migración `033`). Es **ingreso del día del
+ * pago**, y viaja al CRM como `bono:<código>` en la sincronización nocturna.
+ */
+export interface GiftCardSaleTable {
+  id: Generated<number>;
+  stampee_gift_card_id: string;
+  code: string;
+  tier_name: string | null;
+  amount: Cop;
+  method: PaymentMethod;
+  /** Instante del pago; el día de caja es su fecha en Bogotá. */
+  paid_at: Date;
+  paid_ref: string | null;
+  buyer_name: string | null;
+  buyer_phone: string | null;
+  created_by: AuthId | null;
+  created_at: CreatedAt;
+  voided_at: Date | null;
+  voided_by: AuthId | null;
+  void_reason: string | null;
+  /** `null` = todavía no viajó al CRM. */
+  pushed_to_ingest_at: Date | null;
+  /** El ajuste negativo de una anulación posterior al envío (`:adj1`). */
+  void_pushed_at: Date | null;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -897,6 +949,7 @@ export interface Database {
   booking_attribution: BookingAttributionTable;
   winback_config: WinbackConfigTable;
   winback_offer: WinbackOfferTable;
+  gift_card_sale: GiftCardSaleTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -919,6 +972,8 @@ export type AppointmentFinanceItem = Selectable<AppointmentFinanceItemTable>;
 export type NewAppointmentFinanceItem = Insertable<AppointmentFinanceItemTable>;
 
 export type AppointmentPayment = Selectable<AppointmentPaymentTable>;
+export type GiftCardSale = Selectable<GiftCardSaleTable>;
+export type NewGiftCardSale = Insertable<GiftCardSaleTable>;
 export type NewAppointmentPayment = Insertable<AppointmentPaymentTable>;
 
 export type WaMessage = Selectable<WaMessageTable>;

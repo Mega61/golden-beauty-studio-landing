@@ -28,6 +28,7 @@
       "estudio": "Estudio",
       "reviews": "Reseñas",
       "contacto": "Contacto",
+      "regalar": "Regalar",
       "trabaja": "Postúlate"
     },
     "cta": "Agendar cita",
@@ -412,6 +413,150 @@
       "address": "Calle 69 Sur #43a - 41, primer piso · Sabaneta",
       "directions": "Cómo llegar",
       "photoAlt": "El estudio: pared de mármol dorado con el logo de Golden iluminado"
+    }
+  },
+  "regalar": {
+    "meta": {
+      "title": "Tarjetas regalo — Golden Beauty Studio",
+      "description": "Regala uñas en Golden Beauty Studio, Sabaneta. Elige la tarjeta, paga por transferencia y te enviamos el link para regalarla por WhatsApp. Vale 12 meses.",
+      "back": "Volver al inicio"
+    },
+    "hero": {
+      "eyebrow": "Tarjeta regalo",
+      "title1": "Regala un rato",
+      "title2_em": "solo para ella.",
+      "body": "Una tarjeta digital de Golden Beauty Studio para que alguien que quieres elija su diseño, su técnica y su día. Tú pones el detalle; ella, todo lo demás.",
+      "cta": "Elegir tarjeta",
+      "facts": [
+        "Digital, llega por WhatsApp",
+        "Vale 12 meses",
+        "Pago por transferencia"
+      ]
+    },
+    "card": {
+      "label": "Tarjeta regalo",
+      "to": "Para",
+      "from": "De",
+      "someone": "alguien especial",
+      "you": "ti"
+    },
+    "steps": {
+      "eyebrow": "Cómo funciona",
+      "items": [
+        {
+          "title": "Eliges y pagas",
+          "body": "Escoge la tarjeta y paga por transferencia. Sin pasarelas ni tarjeta de crédito."
+        },
+        {
+          "title": "Te enviamos el link",
+          "body": "Cuando confirmamos el pago, te llega por WhatsApp el link de la tarjeta para que la regales."
+        },
+        {
+          "title": "Ella reserva",
+          "body": "Quien la recibe escribe su nombre en la tarjeta y agenda su cita cuando quiera."
+        }
+      ]
+    },
+    "tiers": {
+      "eyebrow": "Elige tu tarjeta",
+      "title1": "Tres formas",
+      "title2_em": "de consentir.",
+      "body": "Cada tarjeta es un monto para cualquier servicio del estudio. Esto es lo que suele alcanzar.",
+      "choose": "Regalar esta",
+      "chosen": "Elegida",
+      "validity": "Vale {months} meses",
+      "covers": {
+        "detalle": "Un semipermanente en manos, con su color y su brillo.",
+        "consentida": "Semipermanente en manos y pies, o un set de press-on.",
+        "golden": "Un montaje esculpido con diseño y sus extras."
+      }
+    },
+    "form": {
+      "eyebrow": "Tu pedido",
+      "title": "Los datos de la tarjeta",
+      "tier": "Tu tarjeta",
+      "change": "Cambiar",
+      "pickTier": "Elige una tarjeta arriba para continuar.",
+      "buyerName": "Tu nombre",
+      "buyerPhone": "Tu WhatsApp",
+      "phoneHint": "Por aquí te enviamos el link de la tarjeta.",
+      "phoneInvalid": "Revisa el número: debe ser un celular de 10 dígitos.",
+      "recipient": "Para",
+      "optional": "opcional",
+      "recipientPlaceholder": "Su nombre",
+      "recipientHint": "Si prefieres, quien la reciba lo escribe en la tarjeta.",
+      "message": "Mensaje en la tarjeta",
+      "messagePlaceholder": "Feliz Navidad, te lo mereces todo",
+      "submit": "Pedir tarjeta",
+      "sending": "Creando tu tarjeta…",
+      "payNote": "Aquí no pagas nada: al terminar te mostramos cómo pagar por transferencia.",
+      "fallbackNote": "En este momento no podemos crear la tarjeta en línea. Pídela por WhatsApp y te la preparamos.",
+      "fallbackCta": "Pedir por WhatsApp",
+      "fallbackText": "Hola Golden ✨ Quiero regalar una tarjeta {tier}"
+    },
+    "errors": {
+      "validation": "Revisa los datos marcados.",
+      "phone": "Revisa tu WhatsApp: debe ser un celular de 10 dígitos.",
+      "rate_limited": "Hiciste varios pedidos seguidos. Espera unos minutos y vuelve a intentarlo.",
+      "captcha": "No pudimos verificar que eres una persona. Vuelve a intentarlo.",
+      "spam": "Algo salió mal al enviar. Recarga la página y vuelve a intentarlo.",
+      "taken": "Esa tarjeta ya no está disponible. Elige otra.",
+      "unavailable": "No pudimos crear tu tarjeta en este momento. Vuelve a intentarlo o escríbenos por WhatsApp."
+    },
+    "success": {
+      "eyebrow": "Pedido recibido",
+      "title": "¡Ya casi es suya!",
+      "body": "Tu tarjeta {tier} quedó apartada. En cuanto confirmemos el pago se activa y te enviamos el link por WhatsApp.",
+      "code": "Código",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "payTitle": "Cómo pagar",
+      "amount": "Valor",
+      "payFallback": "Te enviamos los datos para la transferencia por WhatsApp.",
+      "payThen": "Después de transferir, envíanos el comprobante con tu código.",
+      "whatsappCta": "Enviar comprobante por WhatsApp",
+      "whatsappText": "Hola Golden ✨ Quiero pagar mi tarjeta regalo {code}",
+      "cardLink": "Ver la tarjeta",
+      "cardHint": "Queda en espera hasta que confirmemos el pago.",
+      "again": "Regalar otra tarjeta"
+    },
+    "terms": {
+      "eyebrow": "Condiciones",
+      "title": "Lo que debes saber",
+      "items": [
+        "Se usa completa en una sola visita.",
+        "Vale 12 meses desde que confirmamos el pago.",
+        "No se cambia por dinero y no se devuelve lo que sobre.",
+        "Si el servicio cuesta más, la diferencia se paga en el estudio.",
+        "Quien la recibe escribe su nombre en la tarjeta una sola vez."
+      ]
+    },
+    "faq": {
+      "eyebrow": "Preguntas frecuentes",
+      "title1": "Sobre las tarjetas",
+      "title2_em": "regalo.",
+      "items": [
+        {
+          "q": "¿Cómo se paga una tarjeta regalo de Golden Beauty Studio?",
+          "a": "Por transferencia, o en efectivo en el estudio. Al pedirla en línea ves los datos para transferir; envías el comprobante por WhatsApp con el código de la tarjeta y, cuando confirmamos el pago, la tarjeta queda activa y te llega el link para regalarla."
+        },
+        {
+          "q": "¿Cuándo llega el link de la tarjeta regalo?",
+          "a": "El link llega por WhatsApp apenas confirmamos el pago, en horario del estudio: lunes a sábado, de 1 a 7 p. m. Puedes pedir la tarjeta con días de anticipación y entregarla cuando quieras, porque vale 12 meses desde el pago."
+        },
+        {
+          "q": "¿Qué servicios se pueden pagar con la tarjeta regalo?",
+          "a": "Cualquier servicio del estudio: semipermanente, press-on, montajes, retoques, forrados y adicionales. El valor de la tarjeta se descuenta de la cuenta de la visita; si el servicio cuesta más, la diferencia se paga en el estudio con cualquier medio."
+        },
+        {
+          "q": "¿La tarjeta regalo se puede usar en varias citas?",
+          "a": "No. La tarjeta regalo se usa completa en una sola visita. Si el servicio cuesta menos que la tarjeta, la diferencia no se devuelve en dinero, así que conviene elegir el monto pensando en el servicio que le gustaría hacerse."
+        },
+        {
+          "q": "¿Cómo usa la tarjeta regalo quien la recibe?",
+          "a": "Abre el link, escribe su nombre en la tarjeta y agenda su cita en línea o por WhatsApp. Al llegar al estudio dice el código de la tarjeta y el valor se descuenta al pagar la visita."
+        }
+      ]
     }
   },
   "faq": {
@@ -800,6 +945,7 @@
         "Instagram @goldenbeauty",
         "WhatsApp Business",
         "Reserva en línea",
+        "Tarjetas regalo",
         "Google Maps"
       ]
     },

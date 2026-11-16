@@ -2,6 +2,7 @@ import "server-only";
 
 import { safeBody, type EaLocalDate } from "@/lib/ea";
 
+import { giftSaleKeyOfTx } from "./ingest-id";
 import type { IngestPayment } from "./ingest-payload";
 
 /**
@@ -34,8 +35,9 @@ import type { IngestPayment } from "./ingest-payload";
  * - ✅ **La ruta JSON existe desde el corte de Agenda Pro (2026-10-24):**
  *   `POST /api/ingest/payments` con `{ payments: [...] }`, validación
  *   todo-o-nada (un renglón malo = 400 para el lote entero) y solo acepta
- *   `tx_id` que empiecen por `ea-appt:`. Hace upsert por `tx_id` con el mismo
- *   `upsertPayment()` del scraper, así que `actual-sync` no cambió.
+ *   `tx_id` que empiecen por `ea-appt:` — y, desde las tarjetas regalo, por
+ *   `bono:` (la venta de una tarjeta; CRM `validatePanelPayments`). Hace
+ *   upsert por `tx_id` con el mismo `upsertPayment()` del scraper.
  * - ✅ Acepta además `client_name` y `service_name` opcionales: son las notas
  *   del movimiento en Actual ("Ana Ruiz · Forrado polygel · efectivo"). Antes
  *   las ponía el reporte de ventas de Agenda Pro. Los arma quien llama
@@ -110,9 +112,11 @@ export type PaymentLabel = { clientName?: string | null; serviceName?: string | 
 
 /**
  * Las etiquetas, por `tx_id`. Se indexan por el id de la cita que va adentro de
- * la llave, así un pago partido y sus ajustes llevan las mismas.
+ * la llave, así un pago partido y sus ajustes llevan las mismas. Una tarjeta
+ * regalo vendida no tiene cita: se indexa por su llave base `bono:<código>`,
+ * que comparte con su ajuste de anulación.
  */
-export type PaymentLabels = ReadonlyMap<number, PaymentLabel>;
+export type PaymentLabels = ReadonlyMap<number | string, PaymentLabel>;
 
 const TX_APPOINTMENT_RE = /^ea-appt:(\d+)(?::|$)/;
 
@@ -153,7 +157,7 @@ function envelope(payments: readonly IngestPayment[], labels?: PaymentLabels): u
   return {
     [INGEST_WRAPPER_KEY]: payments.map((payment) => {
       const body = toStrapiPayment(payment);
-      const id = appointmentIdOfTx(body.tx_id);
+      const id = appointmentIdOfTx(body.tx_id) ?? giftSaleKeyOfTx(body.tx_id);
       const label = id === null ? undefined : labels?.get(id);
       if (label?.clientName) body.client_name = label.clientName;
       if (label?.serviceName) body.service_name = label.serviceName;

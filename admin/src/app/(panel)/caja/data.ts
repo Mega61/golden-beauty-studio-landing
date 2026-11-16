@@ -17,7 +17,9 @@ import {
   type PaymentLabels,
 } from "@/lib/ingest-client";
 import type { DayRangeSource } from "@/jobs/pending-charges";
+import { saleRowOf, type GiftSaleRow } from "./regalos/data";
 import {
+  dayBounds,
   loadReview,
   type DayAccount,
   type DayAppointment,
@@ -202,6 +204,12 @@ export type CajaView = {
   pushEnabled: boolean;
   /** `INGEST_SINCE`: los días anteriores no se envían nunca. */
   cutover?: string | null;
+  /**
+   * Las tarjetas regalo vendidas ese día (`gift_card_sale`): plata que entró
+   * al cajón o al banco y que no es de ninguna cita. Van aparte para que el
+   * cuadre cierre. Ausente = no se pudo leer.
+   */
+  giftSales?: GiftSaleRow[];
 };
 
 /**
@@ -226,10 +234,15 @@ export async function loadCajaView(
   const config = ingestConfigFromEnv();
   const pushEnabled = config !== null;
 
-  const [review, dayClose, pendingPush] = await Promise.all([
+  const [from, to] = dayBounds(date);
+  const [review, dayClose, pendingPush, giftSales] = await Promise.all([
     loadReview({ db, loadAppointments: loadDayAppointments() }, date, now),
     repos.dayCloses.findByDate(date),
     repos.dayCloses.listPendingPush(config?.since),
+    repos.giftCardSales.listPaidBetween(from, to).catch((error: unknown) => {
+      console.error("[caja] no se pudieron leer las tarjetas regalo del día", error);
+      return null;
+    }),
   ]);
 
   return {
@@ -241,6 +254,7 @@ export async function loadCajaView(
     pendingPush: pendingPush.filter((row) => row.close_date !== date && row.close_date < today),
     pushEnabled,
     cutover: config?.since ?? null,
+    giftSales: giftSales === null ? undefined : giftSales.map(saleRowOf),
   };
 }
 

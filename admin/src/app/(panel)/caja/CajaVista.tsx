@@ -16,9 +16,11 @@ import {
 } from "@/components/ui";
 import { mapEaStatus } from "@/components/calendar/status-map";
 import type { DayAccount, DayIssue, DayTotals } from "@/jobs/day-close";
+import { GIFT_PAYMENT_LABEL, summarizeGiftSales } from "@/lib/gift-cards";
 
 import { SincronizarAhora } from "./CajaAcciones";
 import type { CajaView } from "./data";
+import type { GiftSaleRow } from "./regalos/data";
 
 /**
  * **Caja** — el día completo: lo que quedó sin cobrar, el cuadre del cajón y
@@ -79,6 +81,10 @@ export function CajaVista({ view }: { view: CajaView }) {
       <Totales totals={review.totals} />
 
       <Cerradas accounts={review.closed} nombres={nombres} />
+
+      {view.giftSales === undefined || view.giftSales.length === 0 ? null : (
+        <TarjetasVendidas sales={view.giftSales} />
+      )}
 
       <Sincronizacion view={view} />
 
@@ -335,6 +341,11 @@ function Totales({ totals }: { totals: DayTotals }) {
           {totals.cortesias === 0 ? null : (
             <Tile label="Cortesías (fuera de caja)" value={String(totals.cortesias)} />
           )}
+          {/* Lo que pagaron tarjetas regalo: esa plata entró el día de la
+              venta y está en esa caja, no en esta. */}
+          {totals.bono === 0 ? null : (
+            <Tile label="Con tarjeta regalo (fuera de caja)" value={formatCOP(totals.bono)} />
+          )}
         </div>
       </div>
     </Card>
@@ -368,6 +379,7 @@ const METHOD_LABEL: Record<string, string> = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
   otro: "Otro",
+  bono: "Tarjeta regalo",
 };
 
 /**
@@ -496,6 +508,51 @@ function Cerradas({
   );
 }
 
+// ── Tarjetas regalo vendidas ────────────────────────────────────────────────
+
+/**
+ * Las tarjetas regalo vendidas ese día: plata que entró al cajón o al banco
+ * sin ninguna cita detrás. Van en su propio renglón para que el cuadre cierre
+ * (efectivo de cuentas + efectivo de tarjetas = lo que hay en el cajón), y
+ * viajan a Actual cada una con su llave `bono:<código>`.
+ */
+function TarjetasVendidas({ sales }: { sales: readonly GiftSaleRow[] }) {
+  const totals = summarizeGiftSales(
+    sales.map((sale) => ({ method: sale.method, amount: sale.amount, voided: sale.voided })),
+  );
+  return (
+    <Card padded={false}>
+      <CardHead title="Tarjetas regalo vendidas" actions={<Link href="/caja/regalos">Ver todas</Link>} />
+      <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.75rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gap: "0.75rem",
+            gridTemplateColumns: "repeat(auto-fit, minmax(6.25rem, 1fr))",
+          }}
+        >
+          <Tile label="Total vendido" value={formatCOP(totals.total)} />
+          <Tile label="Efectivo" value={formatCOP(totals.efectivo)} />
+          <Tile label="Transferencia" value={formatCOP(totals.transferencia)} />
+          {totals.otro === 0 ? null : <Tile label="Otro" value={formatCOP(totals.otro)} />}
+        </div>
+        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
+          Suman aparte del ingreso de las cuentas: para cuadrar el cajón, súmalas al efectivo de arriba.
+        </p>
+        <ul style={{ margin: 0, paddingLeft: "1.125rem", fontSize: "var(--text-sm)", display: "grid", gap: "0.25rem" }}>
+          {sales.map((sale) => (
+            <li key={sale.id} style={sale.voided ? { textDecoration: "line-through", color: "var(--color-ink-soft)" } : undefined}>
+              <span className="ui-num">{sale.code}</span> · {sale.buyerName ?? "—"} · {GIFT_PAYMENT_LABEL[sale.method]}{" "}
+              <span className="ui-num">{formatPesos(sale.amount)}</span>
+              {sale.voided ? " · anulada" : sale.pushed ? " · en Actual" : " · esta noche"}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Card>
+  );
+}
+
 // ── Sincronización ──────────────────────────────────────────────────────────
 
 /**
@@ -511,7 +568,10 @@ function Sincronizacion({ view }: { view: CajaView }) {
   const enviadas = review.closed.filter(
     (account) => account.houseCourtesy !== true && account.pushedToIngestAt !== null,
   ).length;
-  const listas = unsynced.filter((account) => account.payments.length > 0).length;
+  const cuentasListas = unsynced.filter((account) => account.payments.length > 0).length;
+  // Una venta de tarjeta regalo sin viajar también sale con el botón.
+  const tarjetasListas = (view.giftSales ?? []).filter((sale) => !sale.pushed && !sale.voided).length;
+  const listas = cuentasListas + tarjetasListas;
 
   return (
     <Card padded={false}>
@@ -520,15 +580,15 @@ function Sincronizacion({ view }: { view: CajaView }) {
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-carbon)" }}>
           {antesDelCorte
             ? "Este día es anterior al corte de Agenda Pro: esa plata entró a Actual por allá y no se manda."
-            : review.closed.length === 0
+            : review.closed.length === 0 && tarjetasListas === 0
               ? "Todavía no hay nada cobrado en este día."
               : listas === 0
                 ? enviadas === 0
                   ? "No hay cuentas que enviar."
                   : "Todo lo cobrado de este día ya está en Actual."
                 : `${enviadas === 0 ? "" : `${enviadas} ${enviadas === 1 ? "cuenta ya está" : "cuentas ya están"} en Actual. `}${
-                    listas === 1 ? "1 cuenta sale" : `${listas} cuentas salen`
-                  } solas esta noche.`}
+                    listas === 1 ? "1 movimiento sale" : `${listas} movimientos salen`
+                  } solos esta noche${tarjetasListas === 0 ? "" : ` (${tarjetasListas === 1 ? "1 tarjeta regalo" : `${tarjetasListas} tarjetas regalo`})`}.`}
         </p>
         <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
           No hay que cerrar el día. Si corriges una cuenta que ya está en Actual, la diferencia viaja

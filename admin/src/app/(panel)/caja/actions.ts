@@ -6,7 +6,8 @@ import { z } from "zod";
 
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { isEaLocalDate, type EaLocalDate } from "@/lib/ea";
-import { syncDay, type PushOutcome, type SyncDayResult } from "@/jobs/day-close";
+import { dayBounds, syncDay, type PushOutcome, type SyncDayResult } from "@/jobs/day-close";
+import { summarizeGiftSaleSync, syncGiftCardSales } from "@/jobs/gift-card-sales";
 
 import { dayCloseDeps } from "./data";
 
@@ -84,10 +85,23 @@ export async function sincronizarAhora(fecha: string): Promise<SyncResult> {
   }
 
   try {
-    const result = await syncDay(dayCloseDeps(), { date: parsed.data as EaLocalDate });
+    const deps = dayCloseDeps();
+    const result = await syncDay(deps, { date: parsed.data as EaLocalDate });
+    // Las tarjetas regalo vendidas ese día salen con el mismo botón. Un fallo
+    // acá no tapa lo de las cuentas: se dice al lado.
+    const [from, to] = dayBounds(parsed.data as EaLocalDate);
+    const gifts = await syncGiftCardSales(deps, { from, to }).catch((error: unknown) => {
+      console.error("[caja] no se pudieron sincronizar las tarjetas regalo", error);
+      return { state: "fallo", message: "no se pudieron enviar", retryable: true } as const;
+    });
     revalidatePath("/caja");
     revalidatePath("/hoy");
-    return syncMessage(result);
+    revalidatePath("/caja/regalos");
+    const base = syncMessage(result);
+    const giftLine = summarizeGiftSaleSync(gifts);
+    return giftLine === null
+      ? base
+      : { ok: base.ok && gifts.state !== "fallo", message: `${base.message} ${giftLine[0].toUpperCase()}${giftLine.slice(1)}.` };
   } catch (error) {
     unstable_rethrow(error);
     console.error("[caja] no se pudo sincronizar", error);

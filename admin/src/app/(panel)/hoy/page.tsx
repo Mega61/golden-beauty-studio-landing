@@ -20,7 +20,7 @@ import { relativeDayLabel } from "@/lib/push/payload";
 import { describePending, groupPendingByDay, type PendingCharge } from "@/lib/pending-charges";
 import { loadRangeAppointments } from "../caja/data";
 import { activeRows, clientsForPhone, leadingCard } from "@/lib/stampee/model";
-import { cerrarCuenta, revisarPrimeraVisita } from "./actions";
+import { cerrarCuenta, consultarTarjetaRegalo, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
 import { loadConfirmations, pendingConfirmations } from "../recordatorios/confirmations-data";
 import { loadReminders } from "../recordatorios/data";
@@ -339,6 +339,7 @@ export default async function HoyPage({
             action={cerrarCuenta}
             combos={comboSource.combos}
             checkFirstVisit={revisarPrimeraVisita}
+            giftCardLookup={consultarTarjetaRegalo}
             isToday={isToday}
           />
         </DaySwipe>

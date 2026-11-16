@@ -215,6 +215,54 @@ export function buildPaymentAdjustmentSourceTxId(
   return `${EA_PAYMENT_PREFIX}${eaAppointmentId}${ADJUSTMENT_SEPARATOR}${sequence}`;
 }
 
+// ── Tarjetas regalo ─────────────────────────────────────────────────────────
+
+/**
+ * Prefijo de la fila `Payment` de **una tarjeta regalo vendida**.
+ *
+ * Es plata que entra el día de la venta y no tiene cita detrás, así que no
+ * puede llevar `ea-appt:`. En Actual queda `agendapro-tx:bono:TR-…` — el mismo
+ * prefijo congelado envolviendo nuestra llave, como las citas — y no choca con
+ * ninguna: los códigos `TR-XXXX-XXXX` son únicos por estudio, y ni los ids de
+ * Agenda Pro ni `ea-appt:` empiezan por `bono:`.
+ *
+ * El **pago** de una cuenta con una tarjeta (método `bono`) no usa esta llave
+ * ni ninguna otra: no viaja, porque esa plata ya es este movimiento.
+ */
+export const GIFT_SALE_PREFIX = "bono:";
+
+const GIFT_CODE_IN_KEY = /^TR-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
+
+function assertGiftCode(code: string): void {
+  if (!GIFT_CODE_IN_KEY.test(code)) {
+    // El código viaja dentro de una llave única e inmutable: `tr-…` o con
+    // espacios serían dos llaves para la misma venta.
+    throw new IngestIdError(`El código de la tarjeta regalo no es canónico: ${JSON.stringify(code)}`);
+  }
+}
+
+/** La llave de la venta de una tarjeta regalo: `bono:TR-XXXX-XXXX`. */
+export function buildGiftSaleSourceTxId(code: string): string {
+  assertGiftCode(code);
+  return `${GIFT_SALE_PREFIX}${code}`;
+}
+
+/**
+ * La llave del ajuste `n` de una venta: hoy solo la anulación posterior al
+ * envío (`bono:TR-…:adj1`, en negativo). Mismo separador que las citas.
+ */
+export function buildGiftSaleAdjustmentSourceTxId(code: string, sequence: number): string {
+  assertGiftCode(code);
+  assertEaId(sequence, "El número de ajuste");
+  return `${GIFT_SALE_PREFIX}${code}${ADJUSTMENT_SEPARATOR}${sequence}`;
+}
+
+/** La llave base de la venta dentro de un `tx_id` (`bono:TR-…[:adjN]` → `bono:TR-…`), o `null`. */
+export function giftSaleKeyOfTx(txId: string): string | null {
+  const match = /^bono:(TR-[0-9A-Z]{4}-[0-9A-Z]{4})(?::adj\d+)?$/.exec(txId);
+  return match === null ? null : `${GIFT_SALE_PREFIX}${match[1]}`;
+}
+
 /** Lo que un `imported_id` significa, una vez leído de vuelta. */
 export type ParsedImportedId =
   | { source: "agendapro"; txId: string }

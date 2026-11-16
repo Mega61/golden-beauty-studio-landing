@@ -45,6 +45,7 @@ import {
   type TicketDraft,
 } from "./draft";
 import type { PaymentMethod, VarianceReasonCode } from "@/db/types";
+import { normalizeGiftCode } from "@/lib/gift-cards";
 
 /**
  * Lo mínimo de `Storage` que hace falta.
@@ -311,6 +312,9 @@ export function parseDraft(raw: unknown): TicketDraft | null {
     // cuenta que la técnica ya cobró sin ellas.
     applyPromo: raw.applyPromo === true,
     firstVisit: raw.firstVisit === true,
+    // Un código que no es canónico no se adivina: se descarta, y la hoja lo
+    // pide de nuevo. Ausente = sin tarjeta.
+    giftCardCode: typeof raw.giftCardCode === "string" ? normalizeGiftCode(raw.giftCardCode) : null,
     updatedAt,
   };
 }

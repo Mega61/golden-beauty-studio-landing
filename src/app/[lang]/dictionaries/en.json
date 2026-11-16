@@ -28,6 +28,7 @@
       "estudio": "Studio",
       "reviews": "Reviews",
       "contacto": "Contact",
+      "regalar": "Gift cards",
       "trabaja": "Careers"
     },
     "cta": "Book a visit",
@@ -412,6 +413,150 @@
       "address": "Calle 69 Sur #43a - 41, first floor · Sabaneta",
       "directions": "Directions",
       "photoAlt": "The studio: gold marble wall with the Golden logo lit up"
+    }
+  },
+  "regalar": {
+    "meta": {
+      "title": "Gift cards — Golden Beauty Studio",
+      "description": "Give nails at Golden Beauty Studio, Sabaneta. Pick a card, pay by bank transfer and we send you the link to gift it on WhatsApp. Valid for 12 months.",
+      "back": "Back to home"
+    },
+    "hero": {
+      "eyebrow": "Gift card",
+      "title1": "Give her time",
+      "title2_em": "just for herself.",
+      "body": "A Golden Beauty Studio digital gift card, so someone you love chooses her design, her technique and her day. You bring the gesture; she picks the rest.",
+      "cta": "Choose a card",
+      "facts": [
+        "Digital, sent on WhatsApp",
+        "Valid for 12 months",
+        "Paid by bank transfer"
+      ]
+    },
+    "card": {
+      "label": "Gift card",
+      "to": "To",
+      "from": "From",
+      "someone": "someone special",
+      "you": "you"
+    },
+    "steps": {
+      "eyebrow": "How it works",
+      "items": [
+        {
+          "title": "Choose and pay",
+          "body": "Pick the card and pay by bank transfer. No payment gateway, no credit card."
+        },
+        {
+          "title": "We send you the link",
+          "body": "Once the payment is confirmed, you get the card's link on WhatsApp, ready to gift."
+        },
+        {
+          "title": "She books",
+          "body": "Whoever receives it writes her name on the card and books whenever she likes."
+        }
+      ]
+    },
+    "tiers": {
+      "eyebrow": "Choose your card",
+      "title1": "Three ways",
+      "title2_em": "to spoil her.",
+      "body": "Each card is an amount for any service at the studio. Here's what it usually covers.",
+      "choose": "Gift this one",
+      "chosen": "Selected",
+      "validity": "Valid {months} months",
+      "covers": {
+        "detalle": "A gel polish manicure, colour and shine included.",
+        "consentida": "Gel polish on hands and feet, or a press-on set.",
+        "golden": "A sculpted full set with nail art and extras."
+      }
+    },
+    "form": {
+      "eyebrow": "Your order",
+      "title": "Card details",
+      "tier": "Your card",
+      "change": "Change",
+      "pickTier": "Choose a card above to continue.",
+      "buyerName": "Your name",
+      "buyerPhone": "Your WhatsApp",
+      "phoneHint": "We send the card's link here.",
+      "phoneInvalid": "Check the number: a Colombian mobile has 10 digits. Abroad? Start with +.",
+      "recipient": "To",
+      "optional": "optional",
+      "recipientPlaceholder": "Her name",
+      "recipientHint": "Or leave it blank and she writes it on the card.",
+      "message": "Message on the card",
+      "messagePlaceholder": "Merry Christmas, you deserve it all",
+      "submit": "Order card",
+      "sending": "Creating your card…",
+      "payNote": "You don't pay anything here: next we show you how to pay by transfer.",
+      "fallbackNote": "We can't create the card online right now. Order it on WhatsApp and we'll get it ready.",
+      "fallbackCta": "Order on WhatsApp",
+      "fallbackText": "Hi Golden ✨ I'd like to gift a {tier} card"
+    },
+    "errors": {
+      "validation": "Please check the highlighted fields.",
+      "phone": "Check your WhatsApp number: a Colombian mobile has 10 digits.",
+      "rate_limited": "You placed several orders in a row. Wait a few minutes and try again.",
+      "captcha": "We couldn't verify you're a person. Please try again.",
+      "spam": "Something went wrong sending it. Reload the page and try again.",
+      "taken": "That card is no longer available. Please choose another.",
+      "unavailable": "We couldn't create your card right now. Try again or message us on WhatsApp."
+    },
+    "success": {
+      "eyebrow": "Order received",
+      "title": "Almost hers!",
+      "body": "Your {tier} card is set aside. As soon as we confirm the payment it's activated and we send you the link on WhatsApp.",
+      "code": "Code",
+      "copy": "Copy",
+      "copied": "Copied",
+      "payTitle": "How to pay",
+      "amount": "Amount",
+      "payFallback": "We'll send you the transfer details on WhatsApp.",
+      "payThen": "After the transfer, send us the receipt with your code.",
+      "whatsappCta": "Send receipt on WhatsApp",
+      "whatsappText": "Hi Golden ✨ I'd like to pay for my gift card {code}",
+      "cardLink": "View the card",
+      "cardHint": "It stays on hold until we confirm the payment.",
+      "again": "Gift another card"
+    },
+    "terms": {
+      "eyebrow": "Terms",
+      "title": "Good to know",
+      "items": [
+        "Used in full in a single visit.",
+        "Valid for 12 months from the day we confirm the payment.",
+        "Can't be exchanged for cash, and any unused balance isn't refunded.",
+        "If the service costs more, the difference is paid at the studio.",
+        "The recipient writes her name on the card only once."
+      ]
+    },
+    "faq": {
+      "eyebrow": "FAQ",
+      "title1": "About gift",
+      "title2_em": "cards.",
+      "items": [
+        {
+          "q": "How do I pay for a Golden Beauty Studio gift card?",
+          "a": "By bank transfer, or in cash at the studio. When you order online you see the transfer details; send the receipt on WhatsApp with the card's code and, once the payment is confirmed, the card is activated and you get the link to gift it."
+        },
+        {
+          "q": "When does the gift card link arrive?",
+          "a": "The link arrives on WhatsApp as soon as the payment is confirmed, during studio hours: Monday to Saturday, 1 to 7 p.m. You can order the card days ahead and give it whenever you like, since it is valid for 12 months from payment."
+        },
+        {
+          "q": "Which services can the gift card pay for?",
+          "a": "Any service at the studio: gel polish, press-on, full sets, refills, overlays and extras. The card's value comes off the bill for that visit; if the service costs more, the difference is paid at the studio with any method."
+        },
+        {
+          "q": "Can the gift card be used across several visits?",
+          "a": "No. The gift card is used in full in a single visit. If the service costs less than the card, the difference is not refunded in cash, so it's worth choosing the amount with the service she'd like in mind."
+        },
+        {
+          "q": "How does the recipient use the gift card?",
+          "a": "She opens the link, writes her name on the card and books online or on WhatsApp. At the studio she gives the card's code and its value comes off when she pays for the visit."
+        }
+      ]
     }
   },
   "faq": {
@@ -800,6 +945,7 @@
         "Instagram @goldenbeauty",
         "WhatsApp Business",
         "Book online",
+        "Gift cards",
         "Google Maps"
       ]
     },

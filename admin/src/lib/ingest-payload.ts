@@ -30,6 +30,11 @@
  * - **Fecha en base caja**, `YYYY-MM-DD`. Se cobra siempre el mismo día, así
  *   que base caja = base servicio y no hay cuentas por cobrar que conciliar.
  * - Los identificadores salen de `lib/ingest-id.ts` y de ningún otro lado.
+ * - **Un pago con tarjeta regalo (`bono`) no produce ningún movimiento.** Esa
+ *   plata entró a Actual el día en que se vendió la tarjeta, como
+ *   `bono:<código>` ({@link buildGiftSalePayment}); mandarla otra vez al
+ *   redimirla la contaría dos veces. Del lote sale solo lo que la clienta pagó
+ *   aparte, con las mismas reglas de llave de siempre.
  * - **Una cortesía de la casa no produce ningún movimiento.** No entró plata,
  *   así que no hay fila `Payment` ni transacción en Actual: ni de `$0` —que
  *   sería ruido en la conciliación— ni con un método inventado. Su llave
@@ -49,6 +54,8 @@
  */
 
 import {
+  buildGiftSaleAdjustmentSourceTxId,
+  buildGiftSaleSourceTxId,
   buildPaymentAdjustmentSourceTxId,
   buildPaymentSourceTxId,
   buildPaymentSplitSourceTxId,
@@ -108,6 +115,11 @@ export type FinanceForIngest = {
    * en vez de dejarla pasar.
    */
   houseCourtesy?: boolean;
+  /**
+   * El método de la propina cuando una tarjeta regalo pagó **toda** la cuenta
+   * (migración `033`). Sin otro pago, es el único que dice por dónde entró.
+   */
+  tipMethod?: PaymentMethod | null;
 };
 
 /**
@@ -228,12 +240,32 @@ function paymentsOf(finance: FinanceForIngest, amountCharged: Cop): readonly Tic
  * rareza, lo correcto es que la pantalla pregunte; queda dicho acá para que ese
  * cambio sea una decisión y no un descubrimiento.
  */
-function adjustmentMethodOf(payments: readonly TicketPayment[]): PaymentMethod {
+function adjustmentMethodOf(payments: readonly MoneyPayment[]): PaymentMethod {
   let best = payments[0];
   for (const payment of payments) {
     if (payment.amount > best.amount) best = payment;
   }
   return best.method;
+}
+
+/** Un pago que sí movió plata ese día: todo menos la tarjeta regalo. */
+type MoneyPayment = TicketPayment & { method: PaymentMethod };
+
+/** Los pagos que viajan: sin los de tarjeta regalo (`bono`). */
+export function moneyPaymentsOf(payments: readonly TicketPayment[]): MoneyPayment[] {
+  return payments.filter((payment): payment is MoneyPayment => payment.method !== "bono");
+}
+
+/**
+ * Lo cobrado de una cuenta que **sí** es plata del día: lo cobrado menos lo
+ * que cubrió una tarjeta regalo pagada. Es lo que viajó a Actual, y por eso es
+ * la base de un ajuste por corrección.
+ */
+export function pushableAmountOf(amountCharged: Cop | null, payments: readonly TicketPayment[]): Cop {
+  const bono = payments
+    .filter((payment) => payment.method === "bono")
+    .reduce((sum, payment) => sum + payment.amount, 0);
+  return (amountCharged ?? 0) - bono;
 }
 
 /**
@@ -278,7 +310,29 @@ export function buildIngestPayment(finance: FinanceForIngest): IngestPayment[] {
     );
   }
 
-  const payments = paymentsOf(finance, finance.amountCharged);
+  // La suma se verifica con **todos** los pagos —la tarjeta incluida—, y
+  // después la tarjeta sale del lote: ya viajó el día de la venta.
+  const payments = moneyPaymentsOf(paymentsOf(finance, finance.amountCharged));
+
+  if (payments.length === 0) {
+    // Todo lo pagó la tarjeta. La propina, si la hubo, sí es plata del día:
+    // viaja sola, monto 0 + propina, con la llave de la cuenta.
+    if (finance.tip === 0) return [];
+    if (finance.tipMethod == null) {
+      throw new IngestPayloadError(
+        `La cita ${finance.eaAppointmentId} se pagó con tarjeta regalo y dejó propina sin decir el método`,
+      );
+    }
+    return [
+      baseOf(
+        finance,
+        0,
+        buildPaymentSourceTxId(finance.eaAppointmentId),
+        finance.tipMethod,
+        finance.tip,
+      ),
+    ];
+  }
 
   if (payments.length === 1) {
     return [
@@ -335,9 +389,16 @@ export function buildIngestAdjustment(
     );
   }
 
-  if (finance.payments.length === 0) {
+  const money: MoneyPayment[] = moneyPaymentsOf(finance.payments);
+  // Pagada toda con tarjeta: el único método de plata conocido es el de la propina.
+  if (money.length === 0 && finance.tipMethod != null) {
+    money.push({ method: finance.tipMethod, amount: 0 });
+  }
+  if (money.length === 0) {
     throw new IngestPayloadError(
-      `La cita ${finance.eaAppointmentId} no tiene método de pago y no se puede empujar`,
+      finance.payments.length === 0
+        ? `La cita ${finance.eaAppointmentId} no tiene método de pago y no se puede empujar`
+        : `La cita ${finance.eaAppointmentId} se pagó solo con tarjeta regalo: el ajuste no tiene método con el que viajar`,
     );
   }
 
@@ -347,7 +408,7 @@ export function buildIngestAdjustment(
     // Llave propia, con la secuencia adentro: reusar la del pago le pisaría
     // el monto a la fila original en vez de agregar un movimiento.
     buildPaymentAdjustmentSourceTxId(finance.eaAppointmentId, sequence),
-    adjustmentMethodOf(finance.payments),
+    adjustmentMethodOf(money),
     // La propina no se re-empuja con el ajuste: si cambió, cambió como parte
     // del delta que el llamador calculó.
     0,
@@ -399,4 +460,54 @@ export function buildDayClosePayments(
   }
 
   return payments;
+}
+
+// ── Tarjetas regalo vendidas ────────────────────────────────────────────────
+
+/** Lo que hace falta de una fila `gift_card_sale` para mandarla. */
+export type GiftSaleForIngest = {
+  code: string;
+  amount: Cop;
+  method: PaymentMethod;
+  /** Fecha de caja `YYYY-MM-DD`: el día del pago, en Bogotá. */
+  paidOn: string;
+};
+
+function giftSaleBase(sale: GiftSaleForIngest, amount: Cop, txId: string): IngestPayment {
+  if (!isPaymentMethod(sale.method)) {
+    throw new IngestPayloadError(
+      `Método de pago desconocido en la tarjeta ${sale.code}: ${JSON.stringify(sale.method)}`,
+    );
+  }
+  if (!DATE_RE.test(sale.paidOn)) {
+    throw new IngestPayloadError(
+      `La tarjeta ${sale.code} no tiene fecha de caja válida: ${JSON.stringify(sale.paidOn)}`,
+    );
+  }
+  assertPesos(amount, `El monto de la tarjeta ${sale.code}`);
+  return { source_tx_id: txId, amount, tip: 0, method: sale.method, paid_on: sale.paidOn };
+}
+
+/**
+ * La venta de una tarjeta regalo, como movimiento: ingreso del día del pago,
+ * con llave `bono:<código>` y sin propina.
+ */
+export function buildGiftSalePayment(sale: GiftSaleForIngest): IngestPayment {
+  if (!(sale.amount > 0)) {
+    throw new IngestPayloadError(`La tarjeta ${sale.code} tiene un monto de ${sale.amount}`);
+  }
+  return giftSaleBase(sale, sale.amount, buildGiftSaleSourceTxId(sale.code));
+}
+
+/**
+ * La anulación de una venta que **ya viajó**: el mismo monto en negativo, con
+ * llave propia (`bono:<código>:adj1`), el mismo método y el mismo día de caja
+ * de la venta — Actual no cambia un movimiento ya importado, y la venta se
+ * deshace como la plata que se devuelve.
+ */
+export function buildGiftSaleVoidAdjustment(sale: GiftSaleForIngest): IngestPayment {
+  if (!(sale.amount > 0)) {
+    throw new IngestPayloadError(`La tarjeta ${sale.code} tiene un monto de ${sale.amount}`);
+  }
+  return giftSaleBase(sale, -sale.amount, buildGiftSaleAdjustmentSourceTxId(sale.code, 1));
 }

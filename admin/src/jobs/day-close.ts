@@ -6,7 +6,7 @@ import {
   repositories,
   type Db,
 } from "@/db";
-import type { AppointmentFinance, AuthId, Cop, DayClose, PaymentMethod } from "@/db/types";
+import type { AccountPaymentMethod, AppointmentFinance, AuthId, Cop, DayClose } from "@/db/types";
 import {
   EA_TIME_ZONE,
   eaLocalToInstant,
@@ -130,7 +130,7 @@ export type DayAppointment = {
  */
 export function toDayAccount(
   row: AppointmentFinance,
-  payments: readonly { method: PaymentMethod; amount: Cop }[] = [],
+  payments: readonly { method: AccountPaymentMethod; amount: Cop }[] = [],
 ): DayAccount {
   return {
     financeId: row.id,
@@ -147,6 +147,7 @@ export function toDayAccount(
     eaProviderId: row.ea_provider_id,
     performedServiceId: row.performed_service_id,
     houseCourtesy: row.is_house_courtesy === 1,
+    tipMethod: row.tip_method ?? null,
     closedAt: row.closed_at,
     dayCloseId: row.day_close_id,
     pushedToIngestAt: row.pushed_to_ingest_at,
@@ -168,11 +169,20 @@ export type DayTotals = {
    * recepción la reclame — y mientras sea distinta de cero, el día no cierra.
    */
   sinMetodo: Cop;
+  /**
+   * Lo que cubrieron **tarjetas regalo pagadas** (método `bono`). No entra al
+   * ingreso del día ni a ninguna columna del cajón: esa plata entró el día en
+   * que se vendió la tarjeta, y ese día es donde se cuenta.
+   */
+  bono: Cop;
   /** Aparte, siempre. Nunca entra al ingreso ni a la base de comisión. */
   tips: Cop;
   /** Cuentas cerradas contadas. **Sin las cortesías de la casa.** */
   count: number;
-  /** Ingreso del estudio: los tres métodos más lo que falta asignar. */
+  /**
+   * Ingreso del estudio: los tres métodos más lo que falta asignar. Sin lo
+   * pagado con tarjeta regalo (`bono`), que fue ingreso el día de la venta.
+   */
   ingreso: Cop;
   /**
    * Cortesías de la casa cerradas en el día. Van aparte y no suman a nada: no
@@ -191,6 +201,7 @@ const CERO: DayTotals = {
   transferencia: 0,
   otro: 0,
   sinMetodo: 0,
+  bono: 0,
   tips: 0,
   count: 0,
   ingreso: 0,
@@ -225,9 +236,9 @@ export function summarizeDayTotals(accounts: readonly DayAccount[]): DayTotals {
     const amount = account.amountCharged ?? 0;
     totals.count += 1;
     totals.tips += account.tip;
-    totals.ingreso += amount;
 
     if (account.payments.length === 0) {
+      totals.ingreso += amount;
       totals.sinMetodo += amount;
       continue;
     }
@@ -245,10 +256,15 @@ export function summarizeDayTotals(accounts: readonly DayAccount[]): DayTotals {
         case "transferencia":
           totals.transferencia += payment.amount;
           break;
+        case "bono":
+          // Ni cajón ni banco: la tarjeta se pagó el día de su venta.
+          totals.bono += payment.amount;
+          continue;
         default:
           totals.otro += payment.amount;
           break;
       }
+      totals.ingreso += payment.amount;
     }
   }
 
@@ -262,6 +278,7 @@ export function totalsOf(row: DayClose): DayTotals {
     transferencia: row.total_transferencia,
     otro: row.total_otro,
     sinMetodo: 0,
+    bono: 0,
     tips: row.total_tips,
     count: row.appointment_count,
     ingreso: row.total_efectivo + row.total_transferencia + row.total_otro,
@@ -475,6 +492,13 @@ function missingOf(account: DayAccount): string | null {
   }
   if (account.payments.length === 0) {
     return "Falta el método de pago";
+  }
+  if (
+    account.tip > 0 &&
+    account.tipMethod == null &&
+    account.payments.every((payment) => payment.method === "bono")
+  ) {
+    return "Falta el método de la propina";
   }
   if (account.paidOn === null) {
     return "Falta la fecha de caja";
@@ -850,7 +874,7 @@ async function withPayments(
     rows.map((row) => row.id),
   );
 
-  const byFinance = new Map<number, { method: PaymentMethod; amount: Cop }[]>();
+  const byFinance = new Map<number, { method: AccountPaymentMethod; amount: Cop }[]>();
   for (const payment of payments) {
     const list = byFinance.get(payment.appointment_finance_id) ?? [];
     list.push({ method: payment.method, amount: payment.amount });

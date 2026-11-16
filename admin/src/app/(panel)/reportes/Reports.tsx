@@ -515,6 +515,9 @@ function LegacyPaymentsFrame({ data }: { data: Data }) {
 export function DailyReports({ data }: { data: Data }) {
   const close = dailyClose(data.finance, data.appointments, data.providers);
   const previous = dailyClose(data.previousFinance, [], data.providers);
+  // La tarjeta regalo solo se dibuja el día que hubo alguna: un tramo vacío en
+  // la leyenda haría pensar que falta un dato.
+  const methods = close.byMethod.filter((row) => row.method !== "bono" || row.count > 0);
 
   return (
     <>
@@ -525,7 +528,7 @@ export function DailyReports({ data }: { data: Data }) {
         data,
         "esa caja se cerró en Agenda Pro y su plata ya está en Actual Budget. Sus ventas están en «Ventas y citas del periodo».",
       )}
-      legend={close.byMethod.map((row, index) => ({
+      legend={methods.map((row, index) => ({
         label: row.label,
         color: SERIES[index] ?? SERIES[0],
       }))}
@@ -579,7 +582,7 @@ export function DailyReports({ data }: { data: Data }) {
       </TileRow>
 
       <StackBar
-        data={close.byMethod.map((row) => ({
+        data={methods.map((row) => ({
           id: row.method,
           label: PAYMENT_LABEL[row.method],
           value: row.amount,

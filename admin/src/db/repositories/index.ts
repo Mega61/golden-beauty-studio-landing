@@ -21,6 +21,7 @@ import { bookingAttributionRepository } from "./booking-attribution";
 import { commissionRunRepository } from "./commission-run";
 import { customerSettingRepository } from "./customer-setting";
 import { dayCloseRepository } from "./day-close";
+import { giftCardSaleRepository } from "./gift-card-sale";
 import { jobRunRepository } from "./job-run";
 import { legacyAppointmentRepository } from "./legacy-appointment";
 import { legacyPaymentRepository } from "./legacy-payment";
@@ -50,6 +51,7 @@ export function repositories(db: Db) {
     commissionRuns: commissionRunRepository(db),
     customerSettings: customerSettingRepository(db),
     dayCloses: dayCloseRepository(db),
+    giftCardSales: giftCardSaleRepository(db),
     jobRuns: jobRunRepository(db),
     legacyAppointments: legacyAppointmentRepository(db),
     legacyPayments: legacyPaymentRepository(db),
@@ -75,6 +77,7 @@ export type { EnsureResult } from "./appointment-finance";
 export { appointmentFinanceItemRepository } from "./appointment-finance-item";
 export { appointmentPaymentRepository } from "./appointment-payment";
 export { auditLogRepository } from "./audit-log";
+export { giftCardSaleRepository } from "./gift-card-sale";
 export type { AuditEntry } from "./audit-log";
 export { comboRepository } from "./combo";
 export { commissionEntryRepository } from "./commission-entry";

@@ -65,6 +65,7 @@ describe("bottomBarFor", () => {
     ]);
     expect(overflowFor("reception").map((d) => d.id)).toEqual([
       "fidelidad",
+      "regalos",
       "recordatorios",
       "comisiones",
       "servicios",
@@ -158,11 +159,17 @@ describe("catálogo", () => {
     // El bug que este test habría atrapado: «Avanzado (EA)» apuntaba a
     // `/avanzado`, un directorio que nunca se creó. Compilaba, pasaba el lint y
     // abría una pestaña nueva en un 404.
+    // Una ruta anidada (`/caja/regalos`) cuenta igual: lo que importa es que
+    // haya un `page.tsx` donde apunta el enlace.
     const pantallas = readdirSync(new URL("../../app/(panel)", import.meta.url), {
       withFileTypes: true,
+      recursive: true,
     })
-      .filter((e) => e.isDirectory())
-      .map((e) => `/${e.name}`);
+      .filter((e) => e.isFile() && e.name === "page.tsx")
+      .map((e) => {
+        const dir = e.parentPath.replace(/\\/g, "/");
+        return dir.slice(dir.indexOf("(panel)") + "(panel)".length) || "/";
+      });
 
     for (const d of DESTINATIONS) {
       if (d.external) continue;

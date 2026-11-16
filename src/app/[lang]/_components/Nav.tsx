@@ -13,6 +13,7 @@ type NavItemKey =
   | "estudio"
   | "reviews"
   | "contacto"
+  | "regalar"
   | "trabaja";
 
 type NavDict = {
@@ -29,11 +30,14 @@ const NAV_SECTION_MAP: Record<NavItemKey, SectionKey> = {
   estudio: "estudio",
   reviews: "reviews",
   contacto: "contacto",
+  regalar: "regalar",
   trabaja: "trabaja",
 };
 
 /** Careers lives on its own route, not a section of the landing. */
 const CAREERS_PATH = "trabaja-con-nosotros";
+/** So do gift cards. */
+const GIFT_PATH = "regalar";
 
 export default function Nav({
   lang,
@@ -71,13 +75,17 @@ export default function Nav({
   const otherLang: Locale = lang === "es" ? "en" : "es";
   const switchHref = `/${otherLang}${switchPath}`;
   // `route: true` items navigate to another page; the rest are in-page anchors.
-  const allAnchors: Array<{ key: NavItemKey; hash: string; route?: boolean }> = [
+  // `wideOnly` items join the desktop bar only from 1536 px: at 1280 an eighth
+  // link pushed the CTA off-screen in Spanish. They stay in the mobile menu
+  // (used below 1280) and the footer, so 1280–1535 still reaches them there.
+  const allAnchors: Array<{ key: NavItemKey; hash: string; route?: boolean; wideOnly?: boolean }> = [
     { key: "trabajo", hash: "#trabajo" },
     { key: "servicios", hash: "#servicios" },
     { key: "tecnicas", hash: "#tecnicas" },
     { key: "estudio", hash: "#estudio" },
     { key: "reviews", hash: "#reviews" },
     { key: "contacto", hash: "#contacto" },
+    { key: "regalar", hash: `/${lang}/${GIFT_PATH}`, route: true, wideOnly: true },
     { key: "trabaja", hash: `/${lang}/${CAREERS_PATH}`, route: true },
   ];
   const anchors = allAnchors
@@ -108,8 +116,9 @@ export default function Nav({
             what fits. */}
         <nav className="hidden gap-7 xl:flex 2xl:gap-9">
           {anchors.map((a) => {
-            const className =
-              "font-sans text-[11px] font-medium uppercase tracking-[0.28em] text-ink no-underline hover:text-gold";
+            const className = `font-sans text-[11px] font-medium uppercase tracking-[0.28em] text-ink no-underline hover:text-gold${
+              a.wideOnly ? " hidden 2xl:inline" : ""
+            }`;
             // Routes use <Link> for client-side navigation; hash anchors stay
             // plain <a> because next/link short-circuits repeat same-hash clicks.
             return a.route ? (

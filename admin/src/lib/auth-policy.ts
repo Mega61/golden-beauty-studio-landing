@@ -293,6 +293,12 @@ export function isAllowedIdentity(
  *   WhatsApp del estudio: la dueña y recepción.
  * - `recuperar:configurar` — elegir la campaña, el texto del mensaje y las
  *   condiciones del regalo. Es decidir qué se regala: de la dueña sola.
+ * - `regalos:vender` — Caja → Tarjetas regalo: ver los pedidos de la página,
+ *   **confirmar su pago** (es registrar plata que entró, como cobrar una
+ *   cuenta), vender una en el estudio y mandársela a la compradora por
+ *   WhatsApp. Es mostrador: la dueña y recepción. Anular una venta que ya
+ *   llegó a Actual pide además `cuenta:corregir-tras-cierre` (la dueña).
+ *   Redimir una tarjeta no es esto: es cobrar la cuenta (`cuenta:cobrar`).
  */
 export type Capability =
   | "cuenta:cerrar-propia"
@@ -322,7 +328,8 @@ export type Capability =
   | "fidelidad:ver"
   | "fidelidad:canjear"
   | "recuperar:enviar"
-  | "recuperar:configurar";
+  | "recuperar:configurar"
+  | "regalos:vender";
 
 /**
  * Contexto que hace variar una fila de la matriz.
@@ -376,6 +383,7 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "fidelidad:canjear",
     "recuperar:enviar",
     "recuperar:configurar",
+    "regalos:vender",
   ]),
 
   // Recepción. Opera el día completo y cierra la caja, pero no corrige después
@@ -404,6 +412,8 @@ const MATRIX: Record<UserRole, ReadonlySet<Capability>> = {
     "fidelidad:canjear",
     // "Te extrañamos" sale por el WhatsApp del estudio, que atiende recepción.
     "recuperar:enviar",
+    // Confirmar el pago de una tarjeta regalo es registrar plata, como cobrar.
+    "regalos:vender",
   ]),
 
   // La técnica. Su alcance es su propio día, sus propias cuentas y su propia
