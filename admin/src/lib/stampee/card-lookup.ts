@@ -61,9 +61,10 @@ function bestClient(clients: readonly LoyaltyClient[]): LoyaltyClient | null {
 /**
  * La tarjeta de quien escribió ese celular y ese nombre, o `null`.
  *
- * `cardBaseUrl` es `https://…/<slug>` (de `loadLoyalty`). El link va a la
- * tarjeta por su `uniqueId`: Stampee lo resuelve a la página permanente de la
- * clienta (la del calendario de adviento) y reescribe la URL.
+ * `cardBaseUrl` es `https://…/<slug>` (de `loadLoyalty`). El link es el
+ * permanente de la clienta (`publicId`, Stampee #10) cuando la lectura lo trae;
+ * si no, el de su tarjeta (`uniqueId`), que Stampee resuelve a esa misma página
+ * permanente y reescribe la URL.
  */
 export function findCard(
   snapshot: LoyaltySnapshot,
@@ -82,8 +83,11 @@ export function findCard(
   if (client === null) return null;
 
   const card = leadingCard(client.cards) ?? client.cards[0];
+  // `publicId` llega con el calendario de adviento; leído así para no depender
+  // de que el tipo ya lo tenga en esta rama.
+  const publicId = (client as { publicId?: string | null }).publicId;
   return {
-    url: `${cardBaseUrl.replace(/\/+$/, "")}/${card.uniqueId}`,
+    url: `${cardBaseUrl.replace(/\/+$/, "")}/${publicId || card.uniqueId}`,
     stamps: card.stamps,
     totalStamps: card.totalStamps,
     rewardName: card.rewardName,
