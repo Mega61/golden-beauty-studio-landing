@@ -132,6 +132,7 @@ describe("buildSnapshot", () => {
         id: "c-1",
         name: "Laura",
         mobile: "300 123 4567",
+        publicId: "p-laura",
         cards: [
           card({ id: "a", stamps: 10 }),
           card({ id: "b", status: "Redeemed", stamps: 10 }),
@@ -165,6 +166,11 @@ describe("buildSnapshot", () => {
   it("cruza por teléfono en cualquier formato", () => {
     expect(clientsForPhone(snapshot, "573001234567").map((c) => c.id)).toEqual(["c-1"]);
     expect(clientsForPhone(snapshot, null)).toEqual([]);
+  });
+
+  it("lee el link permanente de la clienta cuando Stampee lo manda, y si no queda en null", () => {
+    expect(snapshot.clients.find((c) => c.id === "c-1")?.publicId).toBe("p-laura");
+    expect(snapshot.clients.find((c) => c.id === "c-2")?.publicId).toBeNull();
   });
 
   it("la tarjeta que manda es la activa más cerca del premio", () => {

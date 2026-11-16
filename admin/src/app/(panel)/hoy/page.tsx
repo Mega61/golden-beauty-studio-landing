@@ -13,12 +13,14 @@ import { requireSession, sessionCan } from "@/lib/dal";
 import type { UserRole } from "@/db/types";
 import { loadComboCompositions } from "@/lib/combo-source";
 import { hoyCardShare, pendingShares } from "@/lib/stampee/card-share";
-import { loadLoyaltyWithin } from "@/lib/stampee/client";
+import { availableCouponCount } from "@/lib/stampee/advent";
+import { loadAvailableAdventWithin, loadLoyaltyWithin } from "@/lib/stampee/client";
 import { loadRecentPendingCharges } from "@/jobs/pending-charges";
 import { createCachedEaClient } from "@/lib/ea/client";
 import { relativeDayLabel } from "@/lib/push/payload";
 import { describePending, groupPendingByDay, type PendingCharge } from "@/lib/pending-charges";
 import { loadRangeAppointments } from "../caja/data";
+import { normalizePhoneE164 } from "../clientes/identity";
 import { activeRows, clientsForPhone, leadingCard } from "@/lib/stampee/model";
 import { cerrarCuenta, consultarTarjetaRegalo, revisarPrimeraVisita } from "./actions";
 import { loadToday } from "./data";
@@ -130,7 +132,14 @@ export default async function HoyPage({
   // que recepción abre primero: un "3 pendientes" a la vista es lo que hace
   // que la pasada diaria no dependa de acordarse. Si la carga falla, el acceso
   // sale sin número —nunca tumba Hoy por un dato accesorio.
-  const [{ date, appointments: citas, catalog, problems }, pendingReminders, comboSource, loyalty, pendingCharges] = await Promise.all([
+  const [
+    { date, appointments: citas, catalog, problems },
+    pendingReminders,
+    comboSource,
+    loyalty,
+    pendingCharges,
+    adventRewards,
+  ] = await Promise.all([
     loadToday(session, { verTodas, date: fecha }),
     // Recordatorios **y** reservas nuevas por confirmar: los dos son mensajes
     // que salen del mismo botón de la misma pantalla.
@@ -154,6 +163,9 @@ export default async function HoyPage({
     loadLoyaltyWithin(1_500),
     // Solo para dueña y recepción: a la técnica no le toca.
     canCloseDay ? pendingChargesSafe() : Promise.resolve([]),
+    // "N regalos de Adviento" en la cita: mismo tope que los sellos, y con
+    // caché de 60 s. Sin calendario o con Stampee lento, Hoy sale sin el aviso.
+    loadAvailableAdventWithin(1_500),
   ]);
 
   // La tarjeta de sellos por mandar: el CRM la crea en silencio y Stampee no
@@ -168,7 +180,11 @@ export default async function HoyPage({
 
   const appointments = citas.map((appointment) => {
     if (!loyalty?.ok) return appointment;
-    const cards = clientsForPhone(loyalty.data, appointment.customerPhone).flatMap((client) => client.cards);
+    const clients = clientsForPhone(loyalty.data, appointment.customerPhone);
+    const cards = clients.flatMap((client) => client.cards);
+    const adventCount =
+      adventRewards === null ? 0 : availableCouponCount(adventRewards, clients.map((c) => c.id));
+    const e164 = normalizePhoneE164(appointment.customerPhone);
     const card = leadingCard(cards);
     const share =
       sentCardIds === null
@@ -181,11 +197,15 @@ export default async function HoyPage({
             phone: appointment.customerPhone,
             customerName: appointment.customerName,
             cardBaseUrl: loyalty.data.cardBaseUrl,
+            publicId: clients.find((c) => card !== null && c.cards.includes(card))?.publicId ?? null,
           });
     return {
       ...appointment,
       ...(card && (card.stage === "lista" || card.stage === "cerca")
         ? { loyalty: { stage: card.stage, remaining: card.remaining, rewardName: card.rewardName } }
+        : {}),
+      ...(adventCount > 0
+        ? { advent: { count: adventCount, href: verTodas && e164 ? `/clientes/${e164.slice(1)}` : null } }
         : {}),
       ...(share === null
         ? {}

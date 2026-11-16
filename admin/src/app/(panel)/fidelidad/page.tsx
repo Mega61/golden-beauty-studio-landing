@@ -2,16 +2,20 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/components/shell";
 import type { Role } from "@/components/shell/nav";
-import { EmptyState, Icon } from "@/components/ui";
+import { Card, CardHead, EmptyState, Icon } from "@/components/ui";
 import { getDb } from "@/db/client";
 import { stampeeCardShareRepository } from "@/db/repositories";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
-import { cardShareLink, pendingShares } from "@/lib/stampee/card-share";
-import { loadLoyalty } from "@/lib/stampee/client";
+import { instantToEaDate } from "@/lib/ea";
+import { adventFrontDesk, ADVENT_RECENT_HOURS } from "@/lib/stampee/advent";
+import { cardShareLink, cardUrl, pendingShares, wasSent } from "@/lib/stampee/card-share";
+import { listAdventRewards, loadLoyalty } from "@/lib/stampee/client";
 import { activeRows } from "@/lib/stampee/model";
 
 import { normalizePhoneE164 } from "../clientes/identity";
+import { AdventGiftList } from "./AdventGiftList";
+import styles from "./fidelidad.module.css";
 import { FidelidadVista, type FidelidadRow } from "./FidelidadVista";
 
 /**
@@ -36,7 +40,7 @@ function navRole(role: UserRole): Role {
 
 export default async function FidelidadPage() {
   const session = await requireCapability("fidelidad:ver");
-  const [result, canRedeem, sentIds] = await Promise.all([
+  const [result, canRedeem, sentIds, advent] = await Promise.all([
     loadLoyalty(),
     sessionCan("fidelidad:canjear"),
     // A quién ya se le mandó la tarjeta. Si la base no responde, los botones
@@ -48,6 +52,9 @@ export default async function FidelidadPage() {
         console.error("[fidelidad] no se pudo leer a quién ya se le mandó la tarjeta", error);
         return null;
       }),
+    // Los regalos del calendario de Adviento. Sin calendario (o con un Stampee
+    // que todavía no lo tiene) la sección no sale.
+    listAdventRewards({ status: "all" }),
   ]);
 
   if (!result.ok) {
@@ -75,16 +82,32 @@ export default async function FidelidadPage() {
       clientName: client.name,
       mobile: client.mobile,
       fichaHref: e164 ? `/clientes/${e164.slice(1)}` : null,
-      cardUrl: data.cardBaseUrl ? `${data.cardBaseUrl}/${card.uniqueId}` : null,
+      cardUrl: cardUrl(data.cardBaseUrl, card, client.publicId),
       share:
-        cardShareLink({ phone: client.mobile, customerName: client.name, card, cardBaseUrl: data.cardBaseUrl }) ===
-        null
+        cardShareLink({
+          phone: client.mobile,
+          customerName: client.name,
+          card,
+          cardBaseUrl: data.cardBaseUrl,
+          publicId: client.publicId,
+        }) === null
           ? null
-          : { sent: sent.has(card.id), pending: pending.has(card.id) },
+          : { sent: wasSent(client, card, sent), pending: pending.has(card.id) },
       card,
     };
   });
   const redeemed = data.campaigns.reduce((sum, c) => sum + c.canjeadas, 0);
+
+  const today = instantToEaDate(new Date());
+  const desk = advent.ok ? adventFrontDesk(advent.rewards, new Date()) : null;
+  const fichaHrefs = new Map(
+    data.clients.map((client) => {
+      const e164 = normalizePhoneE164(client.mobile);
+      return [client.id, e164 ? `/clientes/${e164.slice(1)}` : null] as const;
+    }),
+  );
+  const showAdvent =
+    (advent.ok && advent.rewards.length > 0) || (!advent.ok && advent.status !== 404 && advent.status !== null);
 
   return (
     <AppShell role={navRole(session.role)} title="Fidelidad">
@@ -102,6 +125,45 @@ export default async function FidelidadPage() {
               .
             </span>
           </div>
+        ) : null}
+        {showAdvent ? (
+          <Card padded={false}>
+            <CardHead title="Regalos de Adviento por usar" />
+            {!advent.ok ? (
+              <p className={styles.empty}>{advent.message}</p>
+            ) : desk && desk.available.length === 0 && desk.recentlyUsed.length === 0 ? (
+              <p className={styles.empty}>
+                Nadie tiene un cupón de Adviento por usar. Cuando una clienta abra una puerta con
+                cupón, aparece acá y en su ficha.
+              </p>
+            ) : desk ? (
+              <>
+                <p className={styles.lead}>
+                  Cupones que las clientas abrieron en su calendario. Al cobrarlo: “Marcar usado”, y el
+                  descuento va en la cuenta con motivo promo y la nota “Adviento día N”.
+                </p>
+                {desk.available.length > 0 ? (
+                  <AdventGiftList
+                    rewards={desk.available}
+                    today={today}
+                    canRedeem={canRedeem}
+                    fichaHrefs={fichaHrefs}
+                  />
+                ) : null}
+                {desk.recentlyUsed.length > 0 ? (
+                  <>
+                    <p className={styles.sub}>Usados en las últimas {ADVENT_RECENT_HOURS} horas</p>
+                    <AdventGiftList
+                      rewards={desk.recentlyUsed}
+                      today={today}
+                      canRedeem={canRedeem}
+                      fichaHrefs={fichaHrefs}
+                    />
+                  </>
+                ) : null}
+              </>
+            ) : null}
+          </Card>
         ) : null}
         <FidelidadVista
           rows={rows}

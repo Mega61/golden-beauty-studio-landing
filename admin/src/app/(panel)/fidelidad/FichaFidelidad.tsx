@@ -2,7 +2,7 @@ import { StagePill, StampDots, stageLabel } from "@/components/loyalty/StampDots
 import { Card, CardHead, Icon } from "@/components/ui";
 import { getDb } from "@/db/client";
 import { stampeeCardShareRepository } from "@/db/repositories";
-import { cardShareLink } from "@/lib/stampee/card-share";
+import { cardShareLink, cardUrl, wasSent } from "@/lib/stampee/card-share";
 import { loadLoyalty } from "@/lib/stampee/client";
 import { clientsForPhone } from "@/lib/stampee/model";
 
@@ -61,7 +61,14 @@ export async function FichaFidelidad({
             const gifted = card.gifted.welcome + card.gifted.winBack;
             const canShare =
               card.stage !== "canjeada" &&
-              cardShareLink({ phone: client.mobile, customerName: client.name, card, cardBaseUrl }) !== null;
+              cardShareLink({
+                phone: client.mobile,
+                customerName: client.name,
+                card,
+                cardBaseUrl,
+                publicId: client.publicId,
+              }) !== null;
+            const href = cardUrl(cardBaseUrl, card, client.publicId);
             return (
               <li key={card.id} className={styles.row}>
                 <div className={styles.rowMain}>
@@ -91,11 +98,11 @@ export async function FichaFidelidad({
                   {canRedeem && card.stage === "lista" ? (
                     <RedeemButton cardId={card.id} customerName={client.name} rewardName={card.rewardName} />
                   ) : null}
-                  {canShare ? <ShareCardButton cardId={card.id} sent={sentIds.has(card.id)} /> : null}
-                  {cardBaseUrl ? (
+                  {canShare ? <ShareCardButton cardId={card.id} sent={wasSent(client, card, sentIds)} /> : null}
+                  {href ? (
                     <a
                       className="ui-btn ui-btn--ghost ui-btn--sm"
-                      href={`${cardBaseUrl}/${card.uniqueId}`}
+                      href={href}
                       target="_blank"
                       rel="noreferrer"
                       title="Abrir la tarjeta en Stampee"
