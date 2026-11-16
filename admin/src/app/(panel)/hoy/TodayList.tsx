@@ -25,6 +25,7 @@ import {
   useTicketOutbox,
   type CloseTicketAction,
   type FirstVisitCheck,
+  type GiftCardLookup,
   type FirstVisitStatus,
   type PendingTicket,
   type TicketCatalog,
@@ -72,6 +73,7 @@ export function TodayList({
   action,
   combos = [],
   checkFirstVisit,
+  giftCardLookup,
   isToday = true,
 }: {
   appointments: readonly TodayAppointment[];
@@ -90,6 +92,8 @@ export function TodayList({
   combos?: readonly ComboComposition[];
   /** La pregunta "¿es su primera visita?" (Server Action). Sin ella, no se pregunta. */
   checkFirstVisit?: FirstVisitCheck;
+  /** Revisar una tarjeta regalo (`consultarTarjetaRegalo`). Sin esto, la hoja no la ofrece. */
+  giftCardLookup?: GiftCardLookup;
   /** `false` cuando se está mirando un día anterior: cambia el texto del vacío. */
   isToday?: boolean;
 }) {
@@ -296,6 +300,7 @@ export function TodayList({
           }}
           combos={combos}
           firstVisitStatus={firstVisit?.id === current.eaAppointmentId ? firstVisit.status : null}
+          giftCardLookup={giftCardLookup}
           canCharge={canCharge}
           canGiveCourtesy={canGiveCourtesy}
           courtesyFromDefault={current.houseCourtesyDefault && current.finance.closedAt === null}

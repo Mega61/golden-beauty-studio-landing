@@ -13,11 +13,13 @@ import { expect, test } from "./fixtures";
  * abre una página.
  */
 
-/** Las nueve pantallas del panel, con algo que solo aparece si montó bien. */
+/** Las pantallas del panel, con algo que solo aparece si montó bien. */
 const PANTALLAS = [
   { ruta: "/admin/hoy", titulo: "Hoy" },
   { ruta: "/admin/agenda", titulo: "Agenda" },
   { ruta: "/admin/caja", titulo: "Caja" },
+  // Sin Stampee en CI: la pantalla tiene que montar igual y decirlo.
+  { ruta: "/admin/caja/regalos", titulo: "Tarjetas regalo" },
   { ruta: "/admin/clientes", titulo: "Clientes" },
   { ruta: "/admin/comisiones", titulo: "Comisiones" },
   { ruta: "/admin/servicios", titulo: "Servicios" },

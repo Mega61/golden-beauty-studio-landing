@@ -84,6 +84,16 @@ export const DESTINATIONS: readonly Destination[] = [
     roles: NO_STAFF,
   },
   {
+    id: "regalos",
+    label: "Tarjetas regalo",
+    // Vive bajo Caja porque es plata: confirmar el pago de una tarjeta es
+    // registrar un ingreso. El prefijo más largo gana, así que esta ruta
+    // ilumina este destino y no "Caja".
+    href: "/caja/regalos",
+    icon: "regalo",
+    roles: NO_STAFF,
+  },
+  {
     id: "recordatorios",
     label: "Recordatorios",
     href: "/recordatorios",

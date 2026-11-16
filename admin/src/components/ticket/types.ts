@@ -22,6 +22,7 @@ import type {
   SnapshotSource,
   VarianceReasonCode,
 } from "@/db/types";
+import type { GiftCardQuote } from "@/lib/gift-cards";
 import type { TicketPayment } from "@/lib/ticket";
 
 /**
@@ -59,6 +60,10 @@ export type TicketFinanceView = {
    * cobró, y la profesional cobra su comisión sobre el precio de lista.
    */
   houseCourtesy: boolean;
+  /** La tarjeta regalo redimida en la cuenta (migración `033`). `null` = ninguna. */
+  giftCardCode?: string | null;
+  /** El método de la propina cuando la tarjeta pagó todo (migración `033`). */
+  tipMethod?: "efectivo" | "transferencia" | "otro" | null;
   /** Hora de pared del cierre de la cuenta. `null` = sigue abierta. */
   closedAt: string | null;
   /**
@@ -172,6 +177,12 @@ export type CloseTicketInput = {
    * —eso cambiaría un cobro que ya se hizo—; la usa, y anota si coincidía.
    */
   firstVisit?: boolean;
+  /**
+   * La tarjeta regalo que trajo la clienta (`TR-XXXX-XXXX`). **Solo el
+   * código**: el servidor la lee de Stampee, la valida y decide si es pago o
+   * descuento. Ausente o `null` = ninguna (y si la cuenta tenía una, se libera).
+   */
+  giftCardCode?: string | null;
   /** Rastro del intento, para la bitácora. Ver `draft-store.ts`. */
   clientRequestId: string;
 };
@@ -217,3 +228,13 @@ export type FirstVisitStatus = "primera" | "recurrente" | "recuperacion" | "desc
 
 /** La firma de la pregunta. La real es la Server Action `revisarPrimeraVisita`. */
 export type FirstVisitCheck = (eaAppointmentId: number) => Promise<FirstVisitStatus>;
+
+/**
+ * Lo que contesta "Revisar" sobre una tarjeta regalo: la tarjeta lista para
+ * aplicarse, o por qué no. La real es la Server Action `consultarTarjetaRegalo`.
+ */
+export type GiftCardLookupResult =
+  | { ok: true; quote: GiftCardQuote }
+  | { ok: false; message: string };
+
+export type GiftCardLookup = (eaAppointmentId: number, code: string) => Promise<GiftCardLookupResult>;

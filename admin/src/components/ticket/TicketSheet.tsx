@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
 import {
   Button,
@@ -11,6 +11,7 @@ import {
   MoneyInput,
   Panel,
   TextArea,
+  TextInput,
   formatCOP,
   formatPesos,
   formatTimeRange,
@@ -18,6 +19,7 @@ import {
 import type { Cop, PaymentMethod } from "@/db/types";
 import { composeFrom, findCombo, pairedServiceId, partnersFor, roleOf, type ComboComposition } from "@/lib/combos";
 import type { PromoQuote } from "@/lib/promos";
+import { giftCardPayment, normalizeGiftCode, type GiftCardQuote } from "@/lib/gift-cards";
 import type { TicketPayment } from "@/lib/ticket";
 import { ExtrasChips } from "./ExtrasChips";
 import { CambioTag, ServicePicker } from "./ServicePicker";
@@ -28,16 +30,23 @@ import {
   PAYMENT_METHODS,
   VARIANCE_REASONS,
   addService,
+  amountAfterGiftCard,
   appendNoteChip,
   bumpExtra,
   mergeIntoCombo,
   priceDraft,
   removeService,
+  type AppliedGiftCard,
   type TicketDraft,
   type TicketPricing,
 } from "./draft";
 import type { PendingTicket } from "./draft-store";
-import type { FirstVisitStatus, TodayAppointment } from "./types";
+import type {
+  FirstVisitStatus,
+  GiftCardLookup,
+  GiftCardLookupResult,
+  TodayAppointment,
+} from "./types";
 
 /**
  * **Cerrar servicio** — la pantalla diseñada para un celular en una mano, entre
@@ -96,6 +105,7 @@ export function TicketSheet({
   storageBlocked = false,
   combos = [],
   firstVisitStatus = null,
+  giftCardLookup,
   onDraftChange,
   onClose,
   onSave,
@@ -128,6 +138,11 @@ export function TicketSheet({
    * se pregunta; `null` cuando no se preguntó (una cuenta ya guardada).
    */
   firstVisitStatus?: FirstVisitStatus | "pendiente" | null;
+  /**
+   * Revisar una tarjeta regalo en Stampee (`consultarTarjetaRegalo`). Sin
+   * esto, la hoja no ofrece tarjeta regalo.
+   */
+  giftCardLookup?: GiftCardLookup;
   onDraftChange: (next: TicketDraft) => void;
   onClose: () => void;
   onSave: () => void;
@@ -136,9 +151,37 @@ export function TicketSheet({
   const [showTotalEditor, setShowTotalEditor] = useState(false);
   const [showManual, setShowManual] = useState(draft.manual !== null);
 
+  // La tarjeta regalo del borrador, leída de Stampee. Se guarda con su código:
+  // una respuesta de otro código (la escribieron de nuevo) no cuenta.
+  const [gift, setGift] = useState<{ code: string; result: GiftCardLookupResult } | null>(null);
+  const giftCode = draft.giftCardCode ?? null;
+  const giftResult = gift !== null && gift.code === giftCode ? gift.result : null;
+  const giftQuote: GiftCardQuote | null = giftResult?.ok === true ? giftResult.quote : null;
+  const giftPendiente = giftCode !== null && giftResult === null;
+
+  // Una cuenta reabierta trae su código: se vuelve a leer al abrir la hoja.
+  const giftLeido = gift !== null && gift.code === giftCode;
+  useEffect(() => {
+    if (giftCode === null || giftCardLookup === undefined || giftLeido) return;
+    let vigente = true;
+    giftCardLookup(appointment.eaAppointmentId, giftCode)
+      .catch((): GiftCardLookupResult => ({ ok: false, message: "No se pudo revisar la tarjeta. Intenta de nuevo." }))
+      .then((result) => {
+        if (vigente) setGift({ code: giftCode, result });
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [giftCode, giftLeido, giftCardLookup, appointment.eaAppointmentId]);
+
+  const pricingConTarjeta = useMemo(
+    () => ({ ...pricing, giftCard: giftQuote }),
+    [pricing, giftQuote],
+  );
+
   const pricingResult = useMemo(
-    () => priceDraft(draft, catalog, pricing),
-    [draft, catalog, pricing],
+    () => priceDraft(draft, catalog, pricingConTarjeta),
+    [draft, catalog, pricingConTarjeta],
   );
 
   const editandoTotal = showTotalEditor || draft.totalOverride !== null;
@@ -159,9 +202,20 @@ export function TicketSheet({
   // Quien puede registrar el método tiene que elegirlo antes de guardar: una
   // cuenta cobrada sin método no viaja a Actual. El servidor dice lo mismo
   // (`cerrarCuenta()`); acá se dice antes de que alguien toque "Guardar".
+  // Lo que cubre una tarjeta regalo **pagada**; los métodos de la hoja pagan
+  // el resto. Una promocional ya está en el descuento.
+  const bono = giftCardPayment(cortesia ? null : giftQuote, amountCharged ?? 0);
+  const resto = amountAfterGiftCard(draft, amountCharged ?? 0, cortesia ? null : giftQuote);
+  // La tarjeta pagó todo y hay propina: la propina sí es plata del día y
+  // necesita su método, aunque la cuenta no lo pida.
+  const soloPropina = bono > 0 && resto <= 0 && draft.tip > 0;
   const faltaMetodo =
-    canCharge && !cortesia && (amountCharged ?? 0) > 0 && draft.payments.length === 0;
-  const puedeGuardar = !bloqueado && pricingResult.errors.length === 0 && !faltaMetodo;
+    canCharge && !cortesia && (resto > 0 || soloPropina) && draft.payments.length === 0;
+  // Un código sin revisar, o que Stampee rechazó, no se guarda: el servidor lo
+  // rechazaría igual, y es mejor decirlo antes.
+  const tarjetaPendiente = giftCode !== null && !cortesia && (giftPendiente || giftResult?.ok === false);
+  const puedeGuardar =
+    !bloqueado && pricingResult.errors.length === 0 && !faltaMetodo && !tarjetaPendiente;
 
   function patch(next: Partial<TicketDraft>): void {
     onDraftChange({ ...draft, ...next, updatedAt: Date.now() });
@@ -188,8 +242,14 @@ export function TicketSheet({
           >
             {cortesia
               ? "Guardar · cortesía"
+              : tarjetaPendiente && !bloqueado
+                ? giftPendiente
+                  ? "Revisando la tarjeta…"
+                  : "Revisa la tarjeta regalo"
               : faltaMetodo && !bloqueado
-                ? "Elige el método de pago"
+                ? soloPropina
+                  ? "Elige el método de la propina"
+                  : "Elige el método de pago"
                 : amountCharged === null
                 ? "Guardar"
                 : `Guardar · ${formatCOP(amountCharged)}`}
@@ -354,6 +414,24 @@ export function TicketSheet({
                 onFirstVisit={(firstVisit) => patch({ firstVisit })}
               />
 
+              {giftCardLookup !== undefined ? (
+                <TarjetaRegaloBlock
+                  code={giftCode}
+                  pendiente={giftPendiente}
+                  result={giftResult}
+                  applied={pricingResult.giftCard}
+                  note={pricingResult.giftCardNote}
+                  bono={bono}
+                  disabled={bloqueado}
+                  onApply={(code, result) => {
+                    setGift({ code, result });
+                    patch({ giftCardCode: code });
+                  }}
+                  onLookup={(code) => giftCardLookup(appointment.eaAppointmentId, code)}
+                  onRemove={() => patch({ giftCardCode: null })}
+                />
+              ) : null}
+
               <TotalBlock
                 subtotal={subtotal}
                 amountCharged={amountCharged}
@@ -455,10 +533,23 @@ export function TicketSheet({
             </p>
           ) : (
             <>
-              {canCharge ? (
+              {bono > 0 && giftQuote !== null ? (
+                <BonoResumen quote={giftQuote} bono={bono} resto={resto} />
+              ) : null}
+
+              {canCharge && bono > 0 && resto <= 0 ? (
+                soloPropina ? (
+                  <MetodoPropina
+                    value={draft.payments[0]?.method ?? null}
+                    required={faltaMetodo}
+                    disabled={bloqueado}
+                    onChange={(method) => patch({ payments: method === null ? [] : [{ method, amount: 0 }] })}
+                  />
+                ) : null
+              ) : canCharge ? (
                 <MetodoPago
                   payments={draft.payments}
-                  amountCharged={amountCharged ?? 0}
+                  amountCharged={resto}
                   required={faltaMetodo}
                   disabled={bloqueado}
                   onChange={(payments) => patch({ payments })}
@@ -1240,6 +1331,265 @@ function RenglonManual({
   );
 }
 
+/**
+ * **Tarjeta regalo**: el código que trajo la clienta.
+ *
+ * Se escribe, se revisa en Stampee y queda como su propio renglón, igual que
+ * la promo. Una **promocional** es un descuento y compite con la promo (gana
+ * la mayor); una **pagada** es un pago, y se ve en el paso de Cobro. La hoja
+ * no redime nada: eso pasa al guardar.
+ */
+function TarjetaRegaloBlock({
+  code,
+  pendiente,
+  result,
+  applied,
+  note,
+  bono,
+  disabled,
+  onApply,
+  onLookup,
+  onRemove,
+}: {
+  code: string | null;
+  pendiente: boolean;
+  result: GiftCardLookupResult | null;
+  applied: AppliedGiftCard | null;
+  note: string | null;
+  bono: Cop;
+  disabled: boolean;
+  onApply: (code: string, result: GiftCardLookupResult) => void;
+  onLookup: (code: string) => Promise<GiftCardLookupResult>;
+  onRemove: () => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function revisar(): Promise<void> {
+    const normalized = normalizeGiftCode(texto);
+    if (normalized === null) {
+      setError("Ese código no es de una tarjeta regalo. Es TR- y ocho letras o números.");
+      return;
+    }
+    setBuscando(true);
+    setError(null);
+    const found = await onLookup(normalized).catch(
+      (): GiftCardLookupResult => ({ ok: false, message: "No se pudo revisar la tarjeta. Intenta de nuevo." }),
+    );
+    setBuscando(false);
+    if (!found.ok) {
+      setError(found.message);
+      return;
+    }
+    setAbierto(false);
+    setTexto("");
+    onApply(normalized, found);
+  }
+
+  if (code !== null) {
+    const quote = result?.ok === true ? result.quote : null;
+    const detalle = quote === null ? null : [quote.tierName, quote.recipientName ? `para ${quote.recipientName}` : null]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <div style={{ display: "grid", gap: "0.375rem" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            padding: "0.5rem 0.75rem",
+            borderRadius: "var(--radius-md)",
+            border: `1px solid ${result?.ok === false ? "var(--color-warn-line)" : "var(--color-gold-dark)"}`,
+            background: result?.ok === false ? "var(--color-warn-tint)" : "var(--color-gold-pale)",
+          }}
+        >
+          <Icon name="regalo" size={18} style={{ flex: "none" }} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontWeight: 600 }}>Tarjeta regalo · {code}</span>
+            {detalle ? (
+              <span style={{ display: "block", fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+                {detalle}
+              </span>
+            ) : null}
+          </span>
+          {applied !== null ? (
+            <span className="ui-num" style={{ fontWeight: 600 }}>
+              −{formatCOP(applied.discount)}
+            </span>
+          ) : bono > 0 ? (
+            <span className="ui-num" style={{ fontWeight: 600 }}>
+              Paga {formatCOP(bono)}
+            </span>
+          ) : null}
+          <button type="button" className="ui-btn ui-btn--ghost" disabled={disabled} onClick={onRemove}>
+            Quitar
+          </button>
+        </div>
+        {pendiente ? (
+          <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+            Revisando la tarjeta en Stampee…
+          </p>
+        ) : result?.ok === false ? (
+          <p role="alert" style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-warn-ink)" }}>
+            {result.message}
+          </p>
+        ) : note !== null ? (
+          <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>{note}</p>
+        ) : quote?.funded ? (
+          <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+            Ya está pagada: cubre la cuenta en el paso de Cobro. Se usa entera en esta visita.
+          </p>
+        ) : (
+          <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+            Es un regalo del estudio: va como descuento y no se suma a la promo (queda la mayor).
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        className="ui-btn ui-btn--ghost"
+        disabled={disabled}
+        onClick={() => setAbierto(true)}
+        style={{ justifySelf: "start" }}
+      >
+        <Icon name="regalo" size={16} /> Tarjeta regalo
+      </button>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: "0.5rem",
+        padding: "0.75rem",
+        borderRadius: "var(--radius-md)",
+        border: "1px dashed var(--hair-strong)",
+        background: "var(--color-paper)",
+      }}
+    >
+      <Field label="Código de la tarjeta" hint="Está en la tarjeta que le llegó por WhatsApp: TR-XXXX-XXXX." error={error ?? undefined}>
+        {({ id, describedBy, invalid }) => (
+          <TextInput
+            id={id}
+            describedBy={describedBy}
+            invalid={invalid}
+            value={texto}
+            disabled={disabled || buscando}
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="TR-XXXX-XXXX"
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void revisar();
+              }
+            }}
+          />
+        )}
+      </Field>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <Button variant="secondary" loading={buscando} loadingLabel="Revisando" disabled={disabled || texto.trim() === ""} onClick={() => void revisar()}>
+          Aplicar tarjeta
+        </Button>
+        <button
+          type="button"
+          className="ui-btn ui-btn--ghost"
+          disabled={buscando}
+          onClick={() => {
+            setAbierto(false);
+            setTexto("");
+            setError(null);
+          }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Con qué dejó la propina, cuando la tarjeta regalo pagó toda la cuenta. Un
+ * solo método: la propina no se parte.
+ */
+function MetodoPropina({
+  value,
+  required,
+  disabled,
+  onChange,
+}: {
+  value: TicketPayment["method"] | null;
+  required: boolean;
+  disabled: boolean;
+  onChange: (method: PaymentMethod | null) => void;
+}) {
+  return (
+    <fieldset style={{ margin: 0, padding: 0, border: 0, display: "grid", gap: "0.375rem" }}>
+      <legend
+        style={{
+          padding: 0,
+          fontSize: "var(--text-2xs)",
+          fontWeight: 600,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: "var(--color-ink-soft)",
+        }}
+      >
+        Cómo dejó la propina
+      </legend>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+        {PAYMENT_METHODS.map((m) => (
+          <button
+            key={m.method}
+            type="button"
+            className={`ui-btn ${value === m.method ? "ui-btn--primary" : "ui-btn--secondary"}`}
+            aria-pressed={value === m.method}
+            disabled={disabled}
+            onClick={() => onChange(value === m.method ? null : m.method)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {required ? (
+        <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-warn-ink)" }}>
+          La tarjeta pagó la cuenta, pero la propina es plata que entró: elige por dónde.
+        </p>
+      ) : null}
+    </fieldset>
+  );
+}
+
+/** Lo que cubre la tarjeta regalo pagada, y lo que queda por pagar. */
+function BonoResumen({ quote, bono, resto }: { quote: GiftCardQuote; bono: Cop; resto: Cop }) {
+  return (
+    <div style={{ display: "grid", gap: "0.25rem" }}>
+      <p style={{ margin: 0, display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
+        <span>Tarjeta regalo {quote.code}</span>
+        <span className="ui-num" style={{ fontWeight: 600 }}>{formatCOP(bono)}</span>
+      </p>
+      <p style={{ margin: 0, fontSize: "var(--text-2xs)", color: "var(--color-ink-soft)" }}>
+        {resto > 0
+          ? `Queda ${formatCOP(resto)} por pagar con otro método.`
+          : quote.amountCop > bono
+            ? `La tarjeta es de ${formatCOP(quote.amountCop)} y cubre toda la cuenta. Se usa entera: no hay vueltas.`
+            : "La tarjeta cubre toda la cuenta."}
+      </p>
+    </div>
+  );
+}
+
 function MetodoPago({
   payments,
   amountCharged,
@@ -1298,7 +1648,7 @@ function MetodoPago({
     ]);
   }
 
-  function setAmount(method: PaymentMethod, amount: Cop): void {
+  function setAmount(method: TicketPayment["method"], amount: Cop): void {
     onChange(
       payments.map((payment) => (payment.method === method ? { ...payment, amount } : payment)),
     );

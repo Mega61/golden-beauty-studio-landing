@@ -354,6 +354,7 @@ describe("la caja del día no ve las cortesías", () => {
       transferencia: 0,
       otro: 0,
       sinMetodo: 0,
+      bono: 0,
       tips: 10_000,
       count: 1,
       ingreso: 180_000,

@@ -38,6 +38,13 @@ import {
 import type { Cop, PaymentMethod, VarianceReasonCode } from "@/db/types";
 import { isEaLocalDate, type EaLocalDate } from "@/lib/ea/datetime";
 import { bestPromo, type PromoQuote } from "@/lib/promos";
+import {
+  giftCardDiscount,
+  giftCardPayment,
+  giftCardReasonText,
+  giftCodeFromReason,
+  type GiftCardQuote,
+} from "@/lib/gift-cards";
 import { findService, type TicketCatalog } from "./catalog";
 
 /** Sube cuando la forma guardada deja de ser legible por el código nuevo. */
@@ -122,6 +129,13 @@ export type TicketDraft = {
    * con el historial (ver `hoy/actions.ts`).
    */
   firstVisit: boolean;
+  /**
+   * El código de la **tarjeta regalo** que la clienta trajo (`TR-XXXX-XXXX`).
+   * Como la promo, es una elección y no un monto: cuánto cubre —y si es pago o
+   * descuento— lo dice la tarjeta leída de Stampee (`TicketPricing.giftCard`),
+   * y el servidor la vuelve a leer al guardar. Ausente o `null` = ninguna.
+   */
+  giftCardCode?: string | null;
   /** Epoch ms de la última tecla. Sirve para ordenar y para depurar. */
   updatedAt: number;
 };
@@ -145,7 +159,21 @@ export type TicketPricing = {
    * día que no se sabe.
    */
   promoDate?: EaLocalDate | null;
+  /**
+   * La tarjeta regalo del borrador, ya leída y validada (`lib/gift-cards.ts`).
+   * Solo cuenta si su código es el de `draft.giftCardCode`: una lectura vieja
+   * de otro código no se aplica.
+   */
+  giftCard?: GiftCardQuote | null;
 };
+
+/** La tarjeta del borrador, si la lectura que hay es la de su código. */
+export function giftCardOf(draft: TicketDraft, pricing: TicketPricing): GiftCardQuote | null {
+  const code = draft.giftCardCode ?? null;
+  if (code === null || draft.houseCourtesy) return null;
+  const card = pricing.giftCard ?? null;
+  return card !== null && card.code === code ? card : null;
+}
 
 /** El día de una hora de pared de EA (`"2026-10-14 10:00:00"` → `"2026-10-14"`). */
 export function promoDateOf(start: string | null | undefined): EaLocalDate | null {
@@ -186,6 +214,7 @@ export function emptyDraft(
     houseCourtesy,
     applyPromo: promo.applyPromo ?? true,
     firstVisit: promo.firstVisit ?? false,
+    giftCardCode: null,
     updatedAt: now,
   };
 }
@@ -216,6 +245,10 @@ export function draftFromFinance(
     varianceReason: string;
     /** Ausente = no es cortesía. */
     houseCourtesy?: boolean;
+    /** La tarjeta regalo redimida en la cuenta (migración `033`). */
+    giftCardCode?: string | null;
+    /** El método de la propina cuando la tarjeta pagó todo (migración `033`). */
+    tipMethod?: PaymentMethod | null;
     items: readonly {
       kind: "servicio" | "adicional" | "manual";
       eaServiceId: number | null;
@@ -263,6 +296,13 @@ export function draftFromFinance(
   // reabre sin ella aunque hoy le tocara: prenderla sola cambiaría el cobro de
   // una cuenta que ya se cerró.
   const promo = !cortesia && finance.varianceReasonCode === "promo";
+  // La tarjeta regalo: la columna de la cuenta, o —si la cuenta es de antes de
+  // guardarla ahí— el motivo de una promocional. Su pago (`bono`) no es un
+  // método que la hoja elija: lo vuelve a poner `draftToPayments()`.
+  const giftCardCode = cortesia
+    ? null
+    : (finance.giftCardCode ?? (promo ? giftCodeFromReason(finance.varianceReason) : null));
+  const fromGiftCard = giftCardCode !== null && giftCodeFromReason(finance.varianceReason) !== null;
 
   return {
     version: DRAFT_VERSION,
@@ -275,13 +315,28 @@ export function draftFromFinance(
     varianceReasonCode: cortesia || promo ? null : finance.varianceReasonCode,
     varianceReason: cortesia || promo ? "" : finance.varianceReason,
     notes: finance.serviceNotes,
-    payments: finance.payments,
+    payments: reopenPayments(finance.payments, finance.tipMethod ?? null),
     tip: finance.tip,
     houseCourtesy: cortesia,
     applyPromo: promo,
-    firstVisit: promo && finance.varianceReason.startsWith(FIRST_VISIT_SLUG),
+    firstVisit: promo && !fromGiftCard && finance.varianceReason.startsWith(FIRST_VISIT_SLUG),
+    giftCardCode,
     updatedAt: now,
   };
+}
+
+/**
+ * Los pagos de una cuenta guardada, como los edita la hoja: sin el `bono` (lo
+ * vuelve a poner `draftToPayments()` con la tarjeta) y, si la tarjeta pagó
+ * todo, con el método de la propina como el elegido.
+ */
+function reopenPayments(
+  payments: readonly TicketPayment[],
+  tipMethod: PaymentMethod | null,
+): TicketPayment[] {
+  const money = payments.filter((payment) => payment.method !== "bono");
+  if (money.length === 0 && tipMethod !== null) return [{ method: tipMethod, amount: 0 }];
+  return money;
 }
 
 /**
@@ -299,14 +354,66 @@ export function draftFromFinance(
 export function draftToPayments(
   draft: TicketDraft,
   amountCharged: Cop,
+  /**
+   * La tarjeta regalo leída (`TicketPricing.giftCard`). Una **pagada** cubre
+   * primero todo lo que alcance, como pago `bono`; los métodos del borrador
+   * pagan el resto. Si no queda resto, no hay más pagos: un pago de cero no
+   * existe. Una promocional no paga nada: ya es el descuento.
+   */
+  giftCard: GiftCardQuote | null = null,
 ): TicketPayment[] {
-  if (draft.payments.length === 0) return [];
+  const card =
+    giftCard !== null && giftCard.code === (draft.giftCardCode ?? null) && !draft.houseCourtesy
+      ? giftCard
+      : null;
+  const bono = giftCardPayment(card, amountCharged);
+  const rest = amountCharged - bono;
+  const bonoPayment: TicketPayment[] = bono > 0 ? [{ method: "bono", amount: bono }] : [];
+
+  if (draft.payments.length === 0 || (bono > 0 && rest <= 0)) return bonoPayment;
 
   if (draft.payments.length === 1) {
-    return [{ method: draft.payments[0].method, amount: amountCharged }];
+    return [...bonoPayment, { method: draft.payments[0].method, amount: rest }];
   }
 
-  return draft.payments.map((payment) => ({ ...payment }));
+  return [...bonoPayment, ...draft.payments.map((payment) => ({ ...payment }))];
+}
+
+/**
+ * El método de la **propina** cuando la tarjeta regalo pagó toda la cuenta:
+ * no queda ningún pago donde llevarla, así que se toma el método que eligió
+ * la hoja. `null` si no hace falta (sin propina, o hay otro pago que la lleva)
+ * o si no se eligió ninguno — que quien cobra tiene que resolver.
+ */
+export function tipMethodFor(
+  draft: TicketDraft,
+  payments: readonly TicketPayment[],
+): PaymentMethod | null {
+  if (draft.tip <= 0 || draft.houseCourtesy) return null;
+  if (payments.some((payment) => payment.method !== "bono")) return null;
+  const chosen = draft.payments.find((payment) => payment.method !== "bono");
+  return chosen === undefined ? null : (chosen.method as PaymentMethod);
+}
+
+/** ¿La tarjeta pagó todo y quedó una propina sin método? Bloquea el guardado. */
+export function tipNeedsMethod(draft: TicketDraft, payments: readonly TicketPayment[]): boolean {
+  return (
+    draft.tip > 0 &&
+    !draft.houseCourtesy &&
+    payments.length > 0 &&
+    payments.every((payment) => payment.method === "bono") &&
+    tipMethodFor(draft, payments) === null
+  );
+}
+
+/** Lo que falta pagar con los métodos de la hoja, después de la tarjeta regalo pagada. */
+export function amountAfterGiftCard(
+  draft: TicketDraft,
+  amountCharged: Cop,
+  giftCard: GiftCardQuote | null,
+): Cop {
+  const card = giftCard !== null && giftCard.code === (draft.giftCardCode ?? null) ? giftCard : null;
+  return amountCharged - giftCardPayment(draft.houseCourtesy ? null : card, amountCharged);
 }
 
 /** ¿Hay algo escrito que se pueda perder? Decide si el panel se cierra al tocar afuera. */
@@ -324,7 +431,8 @@ export function isDirty(draft: TicketDraft, baseline: TicketDraft): boolean {
     draft.tip !== baseline.tip ||
     draft.houseCourtesy !== baseline.houseCourtesy ||
     draft.applyPromo !== baseline.applyPromo ||
-    draft.firstVisit !== baseline.firstVisit
+    draft.firstVisit !== baseline.firstVisit ||
+    (draft.giftCardCode ?? null) !== (baseline.giftCardCode ?? null)
   );
 }
 
@@ -383,7 +491,14 @@ export type DraftPricing = {
   promo: PromoQuote | null;
   /** El motivo que se va a guardar: `promo` si la variación es la promo. */
   varianceReasonCode: VarianceReasonCode | null;
+  /** La tarjeta regalo promocional aplicada como descuento. `null` = ninguna. */
+  giftCard: AppliedGiftCard | null;
+  /** Por qué la tarjeta del borrador **no** se aplicó, si no se aplicó. */
+  giftCardNote: string | null;
 };
+
+/** Una tarjeta regalo promocional que quedó como el descuento de la cuenta. */
+export type AppliedGiftCard = { code: string; discount: Cop };
 
 // ---------------------------------------------------------------------------
 // Promos
@@ -435,6 +550,10 @@ export type ResolvedDiscount = {
   discount: Cop;
   availablePromo: PromoQuote | null;
   promo: PromoQuote | null;
+  /** La tarjeta regalo promocional, cuando es ella el descuento. */
+  giftCard: AppliedGiftCard | null;
+  /** Por qué la tarjeta del borrador no quedó aplicada (promo mayor, mínimo…). */
+  giftCardNote: string | null;
   varianceReasonCode: VarianceReasonCode | null;
   varianceReason: string;
 };
@@ -473,14 +592,51 @@ export function resolveDiscount(
     : promoForItems(items, pricing, draft.firstVisit);
   const wanted = draft.applyPromo ? availablePromo : null;
 
-  const discount =
-    draft.totalOverride === null ? (wanted?.discount ?? 0) : subtotal - draft.totalOverride;
+  // La tarjeta regalo **promocional** es un descuento más y compite con la
+  // promo: gana el mayor, nunca se suman. En un empate gana la promo y la
+  // tarjeta queda para otra visita — es lo mejor para la clienta.
+  const card = giftCardOf(draft, pricing);
+  const cardDiscount = card === null ? null : giftCardDiscount(card, subtotal);
+  const useCard = cardDiscount !== null && (wanted === null || cardDiscount > wanted.discount);
+  let giftCardNote: string | null = null;
+  if (card !== null && !card.funded && !useCard) {
+    giftCardNote =
+      cardDiscount === null
+        ? card.minTicketCop !== null && subtotal < card.minTicketCop
+          ? `La tarjeta ${card.code} pide una cuenta de al menos $${card.minTicketCop.toLocaleString("es-CO")}.`
+          : `La tarjeta ${card.code} no tiene nada que descontar.`
+        : `${wanted?.label ?? "La promo"} descuenta más: la tarjeta ${card.code} no se usa y queda para otra visita.`;
+  }
 
-  if (wanted !== null && discount === wanted.discount) {
+  const automatic = useCard ? cardDiscount : (wanted?.discount ?? null);
+  const discount =
+    draft.totalOverride === null ? (automatic ?? 0) : subtotal - draft.totalOverride;
+
+  if (useCard && cardDiscount !== null && discount === cardDiscount) {
+    return {
+      discount,
+      availablePromo,
+      promo: null,
+      giftCard: { code: card!.code, discount: cardDiscount },
+      giftCardNote: null,
+      varianceReasonCode: "promo",
+      varianceReason: giftCardReasonText(card!.code),
+    };
+  }
+
+  if (useCard) {
+    // Un total escrito a mano manda, igual que con la promo: la tarjeta no se
+    // suma por debajo de una cifra que alguien escribió.
+    giftCardNote = `La tarjeta ${card!.code} no se suma a un total escrito a mano. Vuelve al calculado para usarla.`;
+  }
+
+  if (!useCard && wanted !== null && discount === wanted.discount) {
     return {
       discount,
       availablePromo,
       promo: wanted,
+      giftCard: null,
+      giftCardNote,
       varianceReasonCode: "promo",
       varianceReason: wanted.slug,
     };
@@ -492,6 +648,8 @@ export function resolveDiscount(
     discount,
     availablePromo,
     promo: null,
+    giftCard: null,
+    giftCardNote,
     varianceReasonCode: ownCode,
     varianceReason: ownCode === null ? "" : draft.varianceReason,
   };
@@ -680,6 +838,8 @@ export function priceDraft(
       availablePromo: null,
       promo: null,
       varianceReasonCode: "cortesia",
+      giftCard: null,
+      giftCardNote: null,
     };
   }
 
@@ -697,6 +857,8 @@ export function priceDraft(
       availablePromo: null,
       promo: null,
       varianceReasonCode: null,
+      giftCard: null,
+      giftCardNote: null,
     };
   }
 
@@ -747,6 +909,8 @@ export function priceDraft(
     availablePromo: resolved.availablePromo,
     promo: resolved.promo,
     varianceReasonCode: resolved.varianceReasonCode,
+    giftCard: resolved.giftCard,
+    giftCardNote: resolved.giftCardNote,
   };
 }
 

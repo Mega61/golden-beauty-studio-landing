@@ -31,7 +31,7 @@
 
 import { allocateByWeights } from "./combo-allocation";
 
-import type { Cop, FinanceItemKind, PaymentMethod, VarianceReasonCode } from "@/db/types";
+import type { AccountPaymentMethod, Cop, FinanceItemKind, VarianceReasonCode } from "@/db/types";
 
 /** Una cuenta mal armada. Es data inválida, no un error de red ni de base. */
 export class TicketError extends Error {
@@ -363,7 +363,8 @@ export function ticketFromEnteredTotal(
  * resto, que es un caso real del estudio.
  */
 export type TicketPayment = {
-  method: PaymentMethod;
+  /** `bono` = tarjeta regalo pagada: plata que ya entró el día de la venta. */
+  method: AccountPaymentMethod;
   /** Entero de pesos, siempre > 0. */
   amount: Cop;
 };
@@ -394,7 +395,7 @@ export function assertPaymentsCoverCharge(
 ): void {
   if (payments.length === 0) return;
 
-  const seen = new Set<PaymentMethod>();
+  const seen = new Set<AccountPaymentMethod>();
 
   for (const payment of payments) {
     assertPesos(payment.amount, `El monto de un pago (${payment.method})`);

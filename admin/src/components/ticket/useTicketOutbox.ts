@@ -170,6 +170,7 @@ export function useTicketOutbox({
       additionalServiceIds: p.draft.additionalServices,
       applyPromo: p.draft.applyPromo,
       firstVisit: p.draft.firstVisit,
+      giftCardCode: p.draft.giftCardCode ?? null,
       clientRequestId: p.clientRequestId,
     });
     if (result.ok) savedRef.current?.(result);

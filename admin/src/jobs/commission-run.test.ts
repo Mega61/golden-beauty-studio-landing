@@ -258,6 +258,8 @@ describe("toCommissionAccount", () => {
     closed_at: new Date("2026-09-08T20:00:00Z"),
     day_close_id: null,
     pushed_to_ingest_at: null,
+    gift_card_code: null,
+    tip_method: null,
     created_at: new Date("2026-09-08T10:00:00Z"),
     updated_at: new Date("2026-09-08T20:00:00Z"),
   };

@@ -13,7 +13,9 @@ import {
  * El **único** lugar del panel que le habla a Stampee.
  *
  * Lee clientas, tarjetas y campañas con la API key del estudio
- * (`docs/PRODUCTION_API.md` del repo de Stampee) y escribe dos cosas:
+ * (`docs/PRODUCTION_API.md` del repo de Stampee). Las **tarjetas regalo**
+ * (`/gift-cards`) tienen su propio bloque, delimitado. Fuera de ellas escribe
+ * dos cosas:
  * **aplicar el premio** de una tarjeta llena, igual que lo hace el kiosko de
  * Stampee, y **emitir la tarjeta de regalo** de "Te extrañamos"
  * ({@link issueWinbackCard}), que nace con los sellos que pone la campaña.
@@ -56,6 +58,8 @@ export class StampeeError extends Error {
   constructor(
     message: string,
     readonly status: number | null,
+    /** El `error.code` del sobre de Stampee (`ALREADY_REDEEMED`…), si vino. */
+    readonly code: string | null = null,
   ) {
     super(message);
     this.name = "StampeeError";
@@ -91,7 +95,11 @@ async function call<T>(config: StampeeConfig, path: string, init: RequestInit = 
   }
   if (!response.ok || json?.ok !== true) {
     const detail = json?.error?.message ?? json?.error?.code ?? `HTTP ${response.status}`;
-    throw new StampeeError(`Stampee ${init.method ?? "GET"} ${path.split("?")[0]}: ${detail}`, response.status);
+    throw new StampeeError(
+      `Stampee ${init.method ?? "GET"} ${path.split("?")[0]}: ${detail}`,
+      response.status,
+      json?.error?.code ?? null,
+    );
   }
   return json.data as T;
 }
@@ -291,6 +299,285 @@ export async function redeemCard(
 
   return { ok: true, customerName: owner.name, rewardName: card.rewardName, historyRecorded };
 }
+
+// ═══ Tarjetas regalo (inicio del bloque) ════════════════════════════════════
+//
+// La API de tarjetas regalo de Stampee (`/gift-cards`, `/gift-card-tiers`),
+// contrato en el SPEC de tarjetas regalo. Las reglas —qué se puede redimir,
+// cuánto descuenta, qué viaja al CRM— no viven acá: son puras, en
+// `lib/gift-cards.ts`. Acá solo se habla con Stampee, **siempre fresco**: cada
+// llamada decide una escritura o un cobro, y no pasan por la caché de sellos.
+
+export type GiftCardDto = {
+  id: string;
+  uniqueId: string;
+  code: string;
+  amountCop: number;
+  status: "pending_payment" | "active" | "redeemed" | "void";
+  effectiveStatus: "pending_payment" | "active" | "redeemed" | "void" | "expired";
+  funded: boolean;
+  source: "sale" | "advent" | "manual";
+  tierId: string | null;
+  tierName: string | null;
+  buyerCustomerId: string | null;
+  buyerName: string | null;
+  buyerPhone: string | null;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  recipientCustomerId: string | null;
+  message: string;
+  validFrom: string | null;
+  validTo: string | null;
+  minTicketCop: number | null;
+  transferable: boolean;
+  rules: { recipient?: "any" | "new_or_dormant"; giverStampOnRedeem?: boolean; buyerStampOnPaid?: boolean; ref?: string } | null;
+  paidAt: string | null;
+  paidMethod: string | null;
+  paidAmountCop: number | null;
+  paidRef: string | null;
+  redeemedAt: string | null;
+  redeemedRef: string | null;
+  redeemedAmountCop: number | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  externalRef: string | null;
+  publicUrl: string | null;
+  createdAt: string;
+  /** Solo en `GET /gift-cards/:id`: la bitácora de la tarjeta, la más vieja primero. */
+  events?: { id: number; type: string; data: unknown; actorName: string | null; createdAt: string }[];
+};
+
+export type GiftCardTierDto = {
+  id: string;
+  name: string;
+  amountCop: number;
+  description: string;
+  validityDays: number;
+  isEnabled: boolean;
+  sort: number;
+  design: unknown;
+  createdAt: string;
+};
+
+/**
+ * Un fallo de Stampee, con el código HTTP y el `error.code` del sobre para que
+ * quien llama decida (`TIER_UNAVAILABLE`, `ALREADY_REDEEMED`, `REF_MISMATCH`…).
+ */
+export type GiftCardFailure = { ok: false; status: number | null; code: string | null; message: string };
+
+function giftFailure(error: unknown, fallback: string): GiftCardFailure {
+  if (error instanceof StampeeError) {
+    return {
+      ok: false,
+      status: error.status,
+      code: error.code,
+      message: error.isConfiguration
+        ? "Stampee rechazó la llave del panel (STAMPEE_API_KEY)."
+        : error.status === null
+          ? "Stampee no respondió. Intenta en un momento."
+          : `${fallback} (${error.message})`,
+    };
+  }
+  return { ok: false, status: null, code: null, message: fallback };
+}
+
+const NOT_CONFIGURED: GiftCardFailure = {
+  ok: false,
+  status: null,
+  code: null,
+  message: "Stampee no está configurado en el panel.",
+};
+
+/** La tarjeta de un código, o `null` si no existe. Lanza `StampeeError` si Stampee falla. */
+export async function getGiftCardByCode(code: string): Promise<GiftCardDto | null> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) throw new StampeeError("Stampee no está configurado en el panel.", null);
+  try {
+    return await call<GiftCardDto>(config, `/gift-cards/by-code/${encodeURIComponent(code)}`);
+  } catch (error) {
+    if (error instanceof StampeeError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function getGiftCard(id: string): Promise<{ ok: true; card: GiftCardDto } | GiftCardFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return NOT_CONFIGURED;
+  try {
+    return { ok: true, card: await call<GiftCardDto>(config, `/gift-cards/${encodeURIComponent(id)}`) };
+  } catch (error) {
+    return giftFailure(error, "No se pudo leer la tarjeta");
+  }
+}
+
+/**
+ * `GET /gift-cards`: `data` es un arreglo plano (el más nuevo primero); el
+ * total va en el header `X-Total-Count`, que el panel no necesita. `status`
+ * es el efectivo: `active` excluye las vencidas.
+ */
+export async function listGiftCards(query: {
+  status?: GiftCardDto["effectiveStatus"];
+  q?: string;
+  limit?: number;
+}): Promise<{ ok: true; cards: GiftCardDto[] } | GiftCardFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return NOT_CONFIGURED;
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.q) params.set("q", query.q);
+  params.set("limit", String(query.limit ?? 50));
+  try {
+    return { ok: true, cards: await call<GiftCardDto[]>(config, `/gift-cards?${params.toString()}`) };
+  } catch (error) {
+    return giftFailure(error, "No se pudieron leer las tarjetas regalo");
+  }
+}
+
+export async function listGiftCardTiers(
+  opts: { enabledOnly?: boolean } = {},
+): Promise<{ ok: true; tiers: GiftCardTierDto[] } | GiftCardFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return NOT_CONFIGURED;
+  try {
+    const tiers = await call<GiftCardTierDto[]>(
+      config,
+      `/gift-card-tiers${opts.enabledOnly ? "?enabled=1" : ""}`,
+    );
+    return { ok: true, tiers };
+  } catch (error) {
+    return giftFailure(error, "No se pudieron leer los montos de las tarjetas");
+  }
+}
+
+/** Un pedido nuevo: queda `pending_payment` hasta que alguien confirme el pago. */
+export async function createGiftCard(input: {
+  tierId: string;
+  buyer: { name: string; phone: string };
+  recipientName?: string | null;
+  message?: string | null;
+  source: "sale" | "manual";
+  rules?: GiftCardDto["rules"];
+  ref?: string | null;
+}): Promise<{ ok: true; card: GiftCardDto } | GiftCardFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return NOT_CONFIGURED;
+  try {
+    const card = await call<GiftCardDto>(config, "/gift-cards", {
+      method: "POST",
+      body: JSON.stringify({
+        tierId: input.tierId,
+        buyer: input.buyer,
+        ...(input.recipientName ? { recipientName: input.recipientName } : {}),
+        ...(input.message ? { message: input.message } : {}),
+        source: input.source,
+        funded: true,
+        ...(input.rules ? { rules: input.rules } : {}),
+        ...(input.ref ? { ref: input.ref } : {}),
+      }),
+    });
+    return { ok: true, card };
+  } catch (error) {
+    return giftFailure(error, "Stampee no aceptó el pedido");
+  }
+}
+
+/**
+ * `pending_payment → active`. Idempotente en Stampee si ya está activa con el
+ * mismo `paidRef`, así que reintentar una confirmación a medias es seguro.
+ */
+export async function activateGiftCard(
+  id: string,
+  input: { paidAt: string; method: "efectivo" | "transferencia" | "otro"; paidAmountCop: number; paidRef: string },
+): Promise<{ ok: true; card: GiftCardDto } | GiftCardFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return NOT_CONFIGURED;
+  try {
+    const card = await call<GiftCardDto>(config, `/gift-cards/${encodeURIComponent(id)}/activate`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return { ok: true, card };
+  } catch (error) {
+    return giftFailure(error, "Stampee no activó la tarjeta");
+  }
+}
+
+export async function voidGiftCard(
+  id: string,
+  reason: string,
+): Promise<{ ok: true; card: GiftCardDto } | GiftCardFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return NOT_CONFIGURED;
+  try {
+    const card = await call<GiftCardDto>(config, `/gift-cards/${encodeURIComponent(id)}/void`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason.trim().slice(0, 200) }),
+    });
+    return { ok: true, card };
+  } catch (error) {
+    return giftFailure(error, "Stampee no anuló la tarjeta");
+  }
+}
+
+/**
+ * Redime la tarjeta en una cuenta. `externalRef` es la cuenta
+ * (`ea-appt:<id>`): Stampee contesta OK si ya estaba redimida con esa misma
+ * llave, y 409 si la usó otra (`conflict`).
+ */
+export async function redeemGiftCard(
+  code: string,
+  input: {
+    externalRef: string;
+    amountUsedCop: number;
+    customer?: { name: string; phone: string } | null;
+    date: string;
+  },
+): Promise<
+  | { ok: true; card: GiftCardDto; alreadyRedeemed: boolean }
+  | (GiftCardFailure & { conflict: boolean })
+> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return { ...NOT_CONFIGURED, conflict: false };
+  try {
+    const card = await call<GiftCardDto & { alreadyRedeemed?: boolean }>(config, `/gift-cards/by-code/${encodeURIComponent(code)}/redeem`, {
+      method: "POST",
+      body: JSON.stringify({
+        externalRef: input.externalRef,
+        amountUsedCop: input.amountUsedCop,
+        ...(input.customer ? { customer: input.customer } : {}),
+        date: input.date,
+      }),
+    });
+    return { ok: true, card, alreadyRedeemed: card.alreadyRedeemed === true };
+  } catch (error) {
+    const failure = giftFailure(error, "Stampee no aceptó la tarjeta");
+    return { ...failure, conflict: failure.code === "ALREADY_REDEEMED" };
+  }
+}
+
+/**
+ * Deshace la redención de esa cuenta. OK también si la tarjeta ya estaba
+ * activa (reintentar una compensación es seguro); 409 `REF_MISMATCH` si la
+ * redimió otra cuenta.
+ */
+export async function unredeemGiftCard(
+  code: string,
+  input: { externalRef: string },
+): Promise<{ ok: true } | GiftCardFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return NOT_CONFIGURED;
+  try {
+    await call(config, `/gift-cards/by-code/${encodeURIComponent(code)}/unredeem`, {
+      method: "POST",
+      body: JSON.stringify({ externalRef: input.externalRef }),
+    });
+    return { ok: true };
+  } catch (error) {
+    return giftFailure(error, "Stampee no liberó la tarjeta");
+  }
+}
+
+// ═══ Tarjetas regalo (fin del bloque) ═══════════════════════════════════════
 
 // ── Escritura: la tarjeta de regalo de "Te extrañamos" ──────────────────────
 
