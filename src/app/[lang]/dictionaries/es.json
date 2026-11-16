@@ -627,7 +627,12 @@
     "noCard": "¿Aún no tienes tarjeta? Te la creamos en tu próxima cita.",
     "seasonNote": "En diciembre tu tarjeta trae calendario de adviento: una puerta nueva cada 2 días.",
     "privacy": "Solo tú deberías tener este link: no lo compartas.",
-    "again": "Buscar otra tarjeta"
+    "again": "Buscar otra tarjeta",
+    "newTitle": "Aún no tienes tarjeta Golden",
+    "newBody": "No encontramos ese número entre nuestras clientas. Agenda tu primera cita: ese día te creamos la tarjeta y empiezas a sumar sellos. Si es tu primera visita, el 10% de bienvenida se aplica solo al reservar.",
+    "newCta": "Agendar mi primera cita",
+    "newRedirect": "Te llevamos a agendar en {s} s…",
+    "newStay": "Me equivoqué de número"
   },
   "contacto": {
     "eyebrow": "07 · Visítanos",

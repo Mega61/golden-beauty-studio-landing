@@ -101,6 +101,7 @@ export default async function Page({
         <MiTarjeta
           dict={dict.miTarjeta}
           whatsappUrl={whatsappMessageUrl(dict.miTarjeta.whatsappText)}
+          bookingHref={bookingHref(lang)}
           season={navidad}
         />
       )}

@@ -11,8 +11,12 @@ import { phoneKey } from "@/lib/stampee/model";
  *
  * Las reglas (y el riesgo que se aceptó) están en `lib/stampee/card-lookup.ts`.
  * Acá solo: valida, lee la caché de Stampee del panel (la misma de Fidelidad,
- * un minuto) y responde. **Celular desconocido, nombre errado y celular
- * bloqueado dan la misma respuesta**: `{ found: false }`.
+ * un minuto) y responde:
+ *
+ * - `{ found: true, url, … }` — la tarjeta.
+ * - `{ found: false, newClient: true }` — ningún celular así en Stampee: la
+ *   landing la manda a reservar su primera cita.
+ * - `{ found: false }` — nombre errado o celular bloqueado, sin distinguir.
  *
  * Detrás del límite por IP de la landing (`/api/tarjeta/buscar`); el bloqueo
  * por celular de acá cubre también a quien entre por el rewrite de `/admin`.
@@ -47,12 +51,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unavailable" }, { status: 503, headers: NO_STORE });
   }
 
-  const match = findCard(loyalty.data, loyalty.data.cardBaseUrl, phone, name);
-  if (match === null) {
-    gate.fail(key);
-    return NextResponse.json({ found: false }, { headers: NO_STORE });
+  const result = findCard(loyalty.data, loyalty.data.cardBaseUrl, phone, name);
+  if (result.kind === "found") {
+    const { url, stamps, totalStamps, rewardName } = result;
+    return NextResponse.json({ found: true, url, stamps, totalStamps, rewardName }, { headers: NO_STORE });
   }
-  return NextResponse.json({ found: true, ...match }, { headers: NO_STORE });
+  // Los dos fallos suman al bloqueo: un barrido de números también se frena.
+  gate.fail(key);
+  return NextResponse.json(
+    result.kind === "unknown-phone" ? { found: false, newClient: true } : { found: false },
+    { headers: NO_STORE },
+  );
 }
 
 function bad(field: string) {

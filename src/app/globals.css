@@ -267,7 +267,15 @@ a:hover .logo-full-mark {
   70% { transform: scale(1.12); opacity: 1; }
   100% { transform: scale(1); }
 }
+@keyframes gbs-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
 @layer components {
+  .gbs-countdown {
+    transform-origin: 0 50%;
+    animation: gbs-countdown linear forwards;
+  }
   .gbs-stamp {
     border: 1px solid rgba(172, 130, 49, 0.45);
     background: transparent;

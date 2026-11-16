@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { EyebrowLabel } from "./atoms";
 
 /**
@@ -8,8 +8,14 @@ import { EyebrowLabel } from "./atoms";
  * link permanente de su tarjeta de sellos en Stampee.
  *
  * Todo lo sensible pasa en el panel (`/api/tarjeta/buscar` → panel): aquí no
- * hay datos de nadie. "No encontrada" no distingue entre número desconocido y
- * nombre errado a propósito, y siempre ofrece pedirla por WhatsApp.
+ * hay datos de nadie.
+ *
+ * - **Número que no es de ninguna clienta** → a reservar su primera cita (lo
+ *   pidió Juan): una cuenta regresiva visible y cancelable, porque un dígito
+ *   mal puesto también cae aquí y no queremos sacar de la página a quien sí es
+ *   clienta.
+ * - **Nombre que no coincide** → "no encontrada" genérico, con WhatsApp: el
+ *   nombre no se puede adivinar por descarte.
  *
  * En temporada (`season`) la acompaña el muñeco dorado y una línea del
  * calendario de adviento: es a donde lleva el botón de la banda de adviento.
@@ -45,13 +51,22 @@ export type MiTarjetaDict = {
   seasonNote: string;
   privacy: string;
   again: string;
+  newTitle: string;
+  newBody: string;
+  newCta: string;
+  newRedirect: string;
+  newStay: string;
 };
+
+/** Segundos antes de llevar a una clienta nueva a reservar. */
+const REDIRECT_SECONDS = 5;
 
 type Found = { url: string; stamps: number; totalStamps: number; rewardName: string };
 type State =
   | { kind: "idle" }
   | { kind: "searching" }
   | { kind: "found"; card: Found }
+  | { kind: "new"; seconds: number | null }
   | { kind: "error"; message: string; offerWhatsapp: boolean };
 
 const fill = (template: string, values: Record<string, string | number>) =>
@@ -60,9 +75,12 @@ const fill = (template: string, values: Record<string, string | number>) =>
 export default function MiTarjeta({
   dict,
   whatsappUrl,
+  bookingHref,
   season = false,
 }: {
   dict: MiTarjetaDict;
+  /** A dónde va una clienta nueva; sin reserva configurada no hay redirección. */
+  bookingHref: string | null;
   /** Chat con el estudio y el mensaje ya escrito, o null sin número configurado. */
   whatsappUrl: string | null;
   season?: boolean;
@@ -72,6 +90,18 @@ export default function MiTarjeta({
   const [state, setState] = useState<State>({ kind: "idle" });
   const [copied, setCopied] = useState(false);
   const phoneId = useId();
+
+  // Cuenta regresiva hacia la reserva; `seconds: null` = la canceló.
+  const countdown = state.kind === "new" ? state.seconds : null;
+  useEffect(() => {
+    if (countdown === null || !bookingHref) return;
+    if (countdown <= 0) {
+      window.location.assign(bookingHref);
+      return;
+    }
+    const t = window.setTimeout(() => setState({ kind: "new", seconds: countdown - 1 }), 1000);
+    return () => window.clearTimeout(t);
+  }, [countdown, bookingHref]);
   const nameId = useId();
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -91,7 +121,7 @@ export default function MiTarjeta({
       if (res.status === 429) return setState({ kind: "error", message: dict.rateLimited, offerWhatsapp: true });
       if (res.status === 400) return setState({ kind: "error", message: dict.invalidPhone, offerWhatsapp: false });
       if (!res.ok) return setState({ kind: "error", message: dict.unavailable, offerWhatsapp: true });
-      const data = (await res.json()) as { found: boolean } & Partial<Found>;
+      const data = (await res.json()) as { found: boolean; newClient?: boolean } & Partial<Found>;
       if (data.found && typeof data.url === "string") {
         setState({
           kind: "found",
@@ -102,6 +132,10 @@ export default function MiTarjeta({
             rewardName: data.rewardName ?? "",
           },
         });
+      } else if (data.newClient && bookingHref) {
+        // Con reduced-motion no hay cuenta regresiva: queda el botón.
+        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        setState({ kind: "new", seconds: still ? null : REDIRECT_SECONDS });
       } else {
         setState({ kind: "error", message: dict.notFound, offerWhatsapp: true });
       }
@@ -161,6 +195,13 @@ export default function MiTarjeta({
           <div className="relative border bg-paper p-6 md:p-9" style={{ borderColor: "var(--hair)", boxShadow: "0 24px 60px -36px rgba(40,30,20,0.35)" }}>
             {state.kind === "found" ? (
               <FoundCard card={state.card} dict={dict} copied={copied} onCopy={onCopy} onBack={() => setState({ kind: "idle" })} />
+            ) : state.kind === "new" && bookingHref ? (
+              <NewClient
+                dict={dict}
+                bookingHref={bookingHref}
+                seconds={state.seconds}
+                onStay={() => setState({ kind: "idle" })}
+              />
             ) : (
               <form onSubmit={onSubmit} noValidate>
                 <label htmlFor={phoneId} className="block font-sans text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-soft">
@@ -285,6 +326,53 @@ function FoundCard({
         className="mt-5 cursor-pointer border-0 bg-transparent p-0 font-sans text-[11px] uppercase tracking-[0.2em] text-ink-mute underline underline-offset-4"
       >
         ← {dict.again}
+      </button>
+    </div>
+  );
+}
+
+function NewClient({
+  dict,
+  bookingHref,
+  seconds,
+  onStay,
+}: {
+  dict: MiTarjetaDict;
+  bookingHref: string;
+  seconds: number | null;
+  onStay: () => void;
+}) {
+  return (
+    <div aria-live="polite">
+      <p className="m-0 font-display text-[28px] leading-[1.1] text-ink md:text-[34px]">{dict.newTitle}</p>
+      <p className="m-0 mt-4 font-sans text-[14px] leading-[1.6] text-ink-soft">{dict.newBody}</p>
+      <a
+        href={bookingHref}
+        className="bg-gold-grad mt-7 flex w-full items-center justify-between px-6 py-4 font-sans text-[12px] font-semibold uppercase tracking-[0.24em] text-white no-underline"
+      >
+        {dict.newCta}
+        <span aria-hidden className="font-display text-[22px] italic leading-none">→</span>
+      </a>
+      {seconds !== null && (
+        <div className="mt-4">
+          {/* La barra se vacía en los segundos de la cuenta regresiva. */}
+          <span aria-hidden className="block h-px w-full overflow-hidden bg-[var(--hair)]">
+            <span
+              className="gbs-countdown block h-full bg-gold"
+              style={{ animationDuration: `${REDIRECT_SECONDS}s` }}
+            />
+          </span>
+          <p className="m-0 mt-2 font-sans text-[12px] text-ink-mute">
+            {dict.newRedirect.replace("{s}", String(seconds))}
+          </p>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onStay}
+        className="mt-5 cursor-pointer border-0 bg-transparent p-0 font-sans text-[11px] uppercase tracking-[0.2em] text-ink-mute underline underline-offset-4"
+      >
+        ← {dict.newStay}
       </button>
     </div>
   );
