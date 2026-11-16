@@ -5,14 +5,19 @@ import { adventFor, parseSeasonOverride, seasonFor } from "./season";
 const bogota = (iso: string) => new Date(`${iso}-05:00`);
 
 describe("seasonFor — ventana por fecha", () => {
-  it("está apagada en noviembre", () => {
-    expect(seasonFor(bogota("2026-11-30T23:59:59"))).toBeNull();
+  it("está apagada antes del 16 de noviembre", () => {
+    expect(seasonFor(bogota("2026-11-15T23:59:59"))).toBeNull();
   });
 
-  it("se prende a la medianoche del 1 de diciembre en Bogotá, no en UTC", () => {
-    // 2026-12-01T03:00Z todavía es 30 de noviembre en Bogotá.
-    expect(seasonFor(new Date("2026-12-01T03:00:00Z"))).toBeNull();
-    expect(seasonFor(bogota("2026-12-01T00:00:00"))).toBe("navidad");
+  it("se prende a la medianoche del 16 de noviembre en Bogotá, no en UTC", () => {
+    expect(seasonFor(new Date("2026-11-16T03:00:00Z"))).toBeNull();
+    expect(seasonFor(bogota("2026-11-16T00:00:00"))).toBe("navidad");
+    expect(seasonFor(bogota("2026-11-30T23:59:59"))).toBe("navidad");
+  });
+
+  it("la banda del adviento no sale en noviembre aunque ya haya adornos", () => {
+    expect(seasonFor(bogota("2026-11-20T12:00:00"))).toBe("navidad");
+    expect(adventFor(bogota("2026-11-20T12:00:00"))).toBe(false);
   });
 
   it("sigue el 31 de diciembre y en Reyes", () => {

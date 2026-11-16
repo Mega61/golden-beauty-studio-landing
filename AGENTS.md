@@ -39,7 +39,7 @@ Las promos viven en `src/data/promos.{es,en}.ts` (mismas keys de escenario en am
 
 Adornos de "Navidad de pan de oro" en la landing: pan de oro cayendo en el hero (`season/GoldLeaf`), guirnalda con bolas sobre los `BrandDivider`, una bola colgando del header (`season/NavOrnament`), la bola del confeti junto al logo del footer (`season/ConfettiOrnament`), el eyebrow del hero (`navidad.heroEyebrow`) y la banda del calendario de adviento dentro de `#promos` (`season/AdventBand`). El `/bio` solo lleva la guirnalda. `/reservar` no se toca.
 
-- **Se prende sola por fecha**, hora de Bogotá: del 1 de diciembre al 6 de enero (`seasonFor` en `src/config/season.ts`). La banda de adviento vive solo del 1 al 24 de diciembre (`adventFor`), porque después "una puerta nueva cada dos días" ya no es verdad.
+- **Se prende sola por fecha**, hora de Bogotá: del 16 de noviembre al 6 de enero (`seasonFor` en `src/config/season.ts`, `SEASON_START_NOV_DAY`). La banda de adviento vive solo del 1 al 24 de diciembre (`adventFor`), porque después "una puerta nueva cada dos días" ya no es verdad.
 - **El cambio de fecha no necesita deploy:** `/[lang]` y `/[lang]/bio` tienen `revalidate = 3600` (y las fetch de Strapi lo bajan a 60 s), así que el primer render después de la medianoche del 1 ya sale decorado.
 - **Forzarla:** `NEXT_PUBLIC_SEASON=navidad` (para revisar en un preview fuera de fecha) u `off` (apagarla en plena temporada). Es `NEXT_PUBLIC_`, así que se hornea en el build: cambiarla en Vercel pide redeploy.
 - **El CTA de la banda** va a la tarjeta de fidelidad, `NEXT_PUBLIC_LOYALTY_URL` (por defecto `https://loyalty.goldenbeautystudio.com.co`).
