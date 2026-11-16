@@ -2,14 +2,16 @@
  * Temporada decorativa del sitio (por ahora solo Navidad).
  *
  * Se prende y se apaga sola por fecha, en hora de Bogotá, para que nadie tenga
- * que acordarse de quitar los adornos el 7 de enero. `NEXT_PUBLIC_SEASON` la
+ * que acordarse de quitar los adornos el 7 de enero. Arranca el 16 de noviembre:
+ * en Colombia la temporada ya se siente en noviembre (decisión de 2026-11-16).
+ * La banda del adviento sigue atada al 1–24 de diciembre (`adventFor`). `NEXT_PUBLIC_SEASON` la
  * fuerza: `navidad` la prende fuera de fecha (para revisar en un preview) y
  * `off` la apaga aunque sea diciembre. Cualquier otro valor — o la variable
  * vacía — deja mandar al calendario.
  *
  * Las páginas que la usan son ISR (`revalidate` en el segmento), así que el
  * cambio de fecha se ve sin redeploy: el primer render después de la
- * medianoche del 1 de diciembre ya sale decorado.
+ * medianoche del 16 de noviembre ya sale decorado.
  */
 export type Season = "navidad";
 
@@ -31,13 +33,16 @@ export function parseSeasonOverride(raw: string | undefined): Override {
   return null;
 }
 
-/** Navidad: del 1 de diciembre al 6 de enero inclusive (Reyes). */
+/** Primer día de la temporada en noviembre (Bogotá). */
+export const SEASON_START_NOV_DAY = 16;
+
+/** Navidad: del 16 de noviembre al 6 de enero inclusive (Reyes). */
 export function seasonFor(now: Date, override?: string): Season | null {
   const forced = parseSeasonOverride(override);
   if (forced === "off") return null;
   if (forced) return forced;
   const { month, day } = bogotaDate(now);
-  if (month === 12 || (month === 1 && day < 7)) return "navidad";
+  if ((month === 11 && day >= SEASON_START_NOV_DAY) || month === 12 || (month === 1 && day < 7)) return "navidad";
   return null;
 }
 
