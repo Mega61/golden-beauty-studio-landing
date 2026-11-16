@@ -1,5 +1,6 @@
 import "server-only";
 
+import { adventErrorMessage, type AdventReward, type StudioAdventReward } from "./advent";
 import {
   buildSnapshot,
   phoneKey,
@@ -19,6 +20,8 @@ import {
  * **aplicar el premio** de una tarjeta llena, igual que lo hace el kiosko de
  * Stampee, y **emitir la tarjeta de regalo** de "Te extrañamos"
  * ({@link issueWinbackCard}), que nace con los sellos que pone la campaña.
+ * El **calendario de Adviento** (`/advent/rewards`) va en su bloque, al final:
+ * leer los regalos y marcarlos usados (o deshacerlo).
  * Sellos sueltos no los escribe nunca: los pone el CRM cada noche desde las
  * visitas del panel, y dos productores de sellos sobre la misma tarjeta es
  * cómo una clienta termina con un sello de más.
@@ -727,5 +730,163 @@ export async function issueWinbackCard(input: {
     return { ok: false, message: "Stampee no aceptó la tarjeta nueva. Intenta de nuevo." };
   } finally {
     invalidateLoyalty();
+  }
+}
+
+// ═══ Calendario de Adviento ═════════════════════════════════════════════════
+//
+// `GET /advent/rewards`, `POST /advent/rewards/:code/redeem|unredeem`
+// (contrato en `docs/ADVENT_CONTRACT.md` del repo de Stampee). Las reglas —qué
+// se puede marcar, cómo se muestra— son puras, en `lib/stampee/advent.ts`.
+// Marcar y deshacer van **siempre frescos**; la lista de todas para Hoy tiene
+// su propia caché corta, que esas dos escrituras invalidan.
+
+/** Un fallo de Stampee con el mensaje ya en castellano para la recepción. */
+export type AdventFailure = { ok: false; status: number | null; code: string | null; message: string };
+
+function adventFailure(error: unknown, fallback: string): AdventFailure {
+  if (error instanceof StampeeError) {
+    return {
+      ok: false,
+      status: error.status,
+      code: error.code,
+      message: adventErrorMessage(error.code, error.status, fallback),
+    };
+  }
+  return { ok: false, status: null, code: null, message: fallback };
+}
+
+const ADVENT_NOT_CONFIGURED: AdventFailure = {
+  ok: false,
+  status: null,
+  code: null,
+  message: "Stampee no está configurado en el panel.",
+};
+
+/**
+ * Los regalos de Adviento. Sin `customerId`, los de todas las clientas (las
+ * listas de Fidelidad y Hoy). `available` trae solo los que siguen por usar,
+ * de cualquier tipo; `all` también los usados, vencidos y regalados.
+ */
+export async function listAdventRewards(query: {
+  customerId?: string;
+  status: "available" | "all";
+}): Promise<{ ok: true; rewards: StudioAdventReward[] } | AdventFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return ADVENT_NOT_CONFIGURED;
+  const params = new URLSearchParams();
+  if (query.customerId) params.set("customerId", query.customerId);
+  params.set("status", query.status);
+  try {
+    const data = await call<{ rewards: StudioAdventReward[] }>(config, `/advent/rewards?${params.toString()}`);
+    return { ok: true, rewards: data.rewards ?? [] };
+  } catch (error) {
+    return adventFailure(error, "No se pudieron leer los regalos de Adviento");
+  }
+}
+
+/**
+ * Marca un cupón de Adviento como usado. Un segundo toque no falla: Stampee
+ * contesta 200 con `alreadyRedeemed: true` (misma convención que las tarjetas
+ * regalo). 409 `EXPIRED` / `NOT_YET_VALID` / `NOT_REDEEMABLE` vuelven con su
+ * frase en `message`.
+ */
+export async function redeemAdventReward(
+  code: string,
+  input: { actorName: string; ticketRef?: string },
+): Promise<
+  | { ok: true; reward: AdventReward & { customerId: string; customerName: string }; alreadyRedeemed: boolean }
+  | AdventFailure
+> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return ADVENT_NOT_CONFIGURED;
+  try {
+    const data = await call<{
+      reward: AdventReward & { customerId: string; customerName: string };
+      alreadyRedeemed?: boolean;
+    }>(config, `/advent/rewards/${encodeURIComponent(code)}/redeem`, {
+      method: "POST",
+      body: JSON.stringify({
+        actorName: input.actorName.slice(0, 120),
+        ...(input.ticketRef ? { ticketRef: input.ticketRef } : {}),
+      }),
+    });
+    return { ok: true, reward: data.reward, alreadyRedeemed: data.alreadyRedeemed === true };
+  } catch (error) {
+    return adventFailure(error, "Stampee no aceptó el regalo. No se marcó nada; intenta de nuevo.");
+  } finally {
+    invalidateAdventRewards();
+  }
+}
+
+/** Deshace un "Marcar usado" equivocado. OK también si ya estaba disponible. */
+export async function unredeemAdventReward(
+  code: string,
+  input: { actorName: string },
+): Promise<{ ok: true } | AdventFailure> {
+  const config = stampeeConfigFromEnv();
+  if (config === null) return ADVENT_NOT_CONFIGURED;
+  try {
+    await call(config, `/advent/rewards/${encodeURIComponent(code)}/unredeem`, {
+      method: "POST",
+      body: JSON.stringify({ actorName: input.actorName.slice(0, 120) }),
+    });
+    return { ok: true };
+  } catch (error) {
+    return adventFailure(error, "Stampee no deshizo el uso del regalo. Intenta de nuevo.");
+  } finally {
+    invalidateAdventRewards();
+  }
+}
+
+const ADVENT_TTL_MS = 60_000;
+
+type AdventSlot = { value: StudioAdventReward[] | null; at: number; inflight: Promise<StudioAdventReward[]> | null };
+const adventGlobal = globalThis as unknown as { __gbsStampeeAdvent?: AdventSlot };
+function adventSlot(): AdventSlot {
+  adventGlobal.__gbsStampeeAdvent ??= { value: null, at: 0, inflight: null };
+  return adventGlobal.__gbsStampeeAdvent;
+}
+
+export function invalidateAdventRewards(): void {
+  const s = adventSlot();
+  s.value = null;
+  s.at = 0;
+  s.inflight = null;
+}
+
+/**
+ * Los regalos por usar de todas, para el aviso de Hoy: caché de 60 s y tope de
+ * espera, como los sellos. `null` = Stampee no contestó a tiempo, no hay
+ * calendario, o falló; Hoy sale sin el aviso. Nunca lanza.
+ */
+export async function loadAvailableAdventWithin(ms: number): Promise<StudioAdventReward[] | null> {
+  const s = adventSlot();
+  if (s.value && Date.now() - s.at < ADVENT_TTL_MS) return s.value;
+  if (s.inflight === null) {
+    const flight: Promise<StudioAdventReward[]> = listAdventRewards({ status: "available" })
+      .then((result) => {
+        if (!result.ok) throw new StampeeError(result.message, result.status, result.code);
+        if (s.inflight === flight) {
+          s.value = result.rewards;
+          s.at = Date.now();
+        }
+        return result.rewards;
+      })
+      .finally(() => {
+        if (s.inflight === flight) s.inflight = null;
+      });
+    s.inflight = flight;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  try {
+    return await Promise.race([s.inflight, timeout]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
