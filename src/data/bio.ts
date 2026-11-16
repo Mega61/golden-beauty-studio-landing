@@ -59,6 +59,13 @@ export async function getBio(lang: Locale): Promise<BioData> {
       image: "/lookbook-wm/polygel/golden.jpg",
     },
     {
+      // Encuentra tu tarjeta de sellos (sección `#mi-tarjeta` de la landing).
+      key: "tarjeta",
+      ...copy.links.tarjeta,
+      href: siteConfig.sections.tarjeta ? `/${lang}#mi-tarjeta` : "",
+      image: "/lookbook-wm/semipermanente/blanco-oro.jpg",
+    },
+    {
       key: "instagram",
       ...copy.links.instagram,
       href: instagramUrl ?? "",

@@ -2,6 +2,7 @@ import { bookingHref, siteConfig } from "@/config/site";
 import Logo from "./Logo";
 import TrackedBookingLink from "./TrackedBookingLink";
 import TrackedWhatsappLink from "./TrackedWhatsappLink";
+import SnowmanConfetti from "./season/SnowmanConfetti";
 
 type FooterDict = {
   tagline: string;
@@ -35,7 +36,16 @@ function resolveFindLink(
   return null;
 }
 
-export default function Footer({ dict, lang }: { dict: FooterDict; lang: string }) {
+export default function Footer({
+  dict,
+  lang,
+  snowman,
+}: {
+  dict: FooterDict;
+  lang: string;
+  /** Temporada: el muñeco dorado del confeti junto al logo. */
+  snowman?: { label: string; hint: string };
+}) {
   const { instagramUrl, whatsappUrl, mapsPlaceId } = siteConfig;
   const bookingUrl = bookingHref(lang);
   const addressQuery = encodeURIComponent(
@@ -58,7 +68,14 @@ export default function Footer({ dict, lang }: { dict: FooterDict; lang: string 
       <div className="mx-auto max-w-[1240px]">
         <div className="mb-9 grid grid-cols-1 gap-8 md:mb-14 md:grid-cols-[1.4fr_1fr_1fr] md:gap-14">
           <div>
-            <Logo variant="text" size={14} />
+            <div className="flex items-start gap-4">
+              <Logo variant="text" size={14} />
+              {snowman && (
+                <span className="-mt-6 ml-auto md:ml-2">
+                  <SnowmanConfetti label={snowman.label} hint={snowman.hint} size={104} hintSide="left" />
+                </span>
+              )}
+            </div>
             <p className="m-0 mt-6 max-w-[380px] whitespace-pre-line font-display text-[16px] italic leading-[1.5] text-ink-soft md:text-[19px]">
               {dict.tagline}
             </p>

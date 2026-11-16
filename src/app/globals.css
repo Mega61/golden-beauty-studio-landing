@@ -259,3 +259,278 @@ a:hover .logo-full-mark {
     scroll-behavior: auto;
   }
 }
+
+/* Sellos de "Encuentra tu tarjeta" (MiTarjeta.tsx): hilo de oro vacío, oro
+   lleno; los puestos aparecen uno tras otro al encontrarla. */
+@keyframes gbs-stamp-in {
+  0% { transform: scale(0.3); opacity: 0; }
+  70% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes gbs-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@layer components {
+  .gbs-countdown {
+    transform-origin: 0 50%;
+    animation: gbs-countdown linear forwards;
+  }
+  .gbs-stamp {
+    border: 1px solid rgba(172, 130, 49, 0.45);
+    background: transparent;
+  }
+  .gbs-stamp.is-on {
+    border-color: transparent;
+    background:
+      radial-gradient(circle at 34% 30%, var(--color-gold-pale) 0%, rgba(255, 241, 214, 0) 36%),
+      radial-gradient(circle at 50% 55%, var(--color-gold-bright) 0%, var(--color-gold) 55%, var(--color-gold-deep) 100%);
+    box-shadow: 0 2px 6px rgba(91, 43, 8, 0.25);
+    animation: gbs-stamp-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gbs-stamp.is-on { animation: none; }
+  }
+}
+
+/* ── Temporada: Navidad de pan de oro ─────────────────────────────────────
+   Bolas de árbol en oro (`season/Bauble.tsx`) y su vaivén. Todo es transform
+   sobre elementos pequeños — corre en el compositor, sin repintar la página.
+   En @layer components para que utilidades como `absolute` les ganen (una
+   regla sin capa le gana a Tailwind, ver el comentario de @layer base).
+   Con reduced-motion las bolas quedan quietas y la guirnalda sigue ahí. */
+@keyframes gbs-swing {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+@keyframes gbs-rock {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50% { transform: rotate(2.5deg); }
+}
+@keyframes gbs-hop {
+  0% { transform: translateY(0) scale(1, 1); }
+  18% { transform: translateY(2px) scale(1.06, 0.92); }
+  45% { transform: translateY(-18px) scale(0.96, 1.05); }
+  70% { transform: translateY(0) scale(1.04, 0.95); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes gbs-tree-lift {
+  0%, 100% { transform: translateY(-4px) rotate(-3deg); }
+  50% { transform: translateY(-7px) rotate(3deg); }
+}
+@keyframes gbs-twinkle {
+  0%, 100% { opacity: 0.75; rotate: 0deg; }
+  50% { opacity: 1; rotate: 45deg; }
+}
+@keyframes gbs-glow {
+  0%, 100% { scale: 0.85; }
+  50% { scale: 1.15; }
+}
+@keyframes gbs-hint {
+  0%, 100% { opacity: 0.55; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+@keyframes gbs-ring {
+  0% { transform: rotate(0); }
+  20% { transform: rotate(16deg); }
+  45% { transform: rotate(-11deg); }
+  70% { transform: rotate(6deg); }
+  100% { transform: rotate(0); }
+}
+
+@layer components {
+  .gbs-bauble {
+    --bauble-size: 12px;
+    --bauble-thread: 16px;
+    display: block;
+    position: relative;
+    width: var(--bauble-size);
+    height: calc(var(--bauble-thread) + var(--bauble-size) + 3px);
+    transform-origin: 50% 0;
+    pointer-events: auto;
+  }
+  .gbs-bauble-thread {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: var(--bauble-thread);
+    background: linear-gradient(180deg, rgba(172, 130, 49, 0.35), var(--color-gold));
+    transform: translateX(-50%);
+  }
+  .gbs-bauble-cap {
+    position: absolute;
+    left: 50%;
+    top: calc(var(--bauble-thread) - 1px);
+    width: calc(var(--bauble-size) * 0.34);
+    height: 4px;
+    background: linear-gradient(90deg, var(--color-gold-dark), var(--color-gold-soft), var(--color-gold-dark));
+    transform: translateX(-50%);
+  }
+  .gbs-bauble-ball {
+    position: absolute;
+    left: 0;
+    top: calc(var(--bauble-thread) + 2px);
+    width: var(--bauble-size);
+    height: var(--bauble-size);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 30%, var(--color-gold-pale) 0%, rgba(255, 241, 214, 0) 34%),
+      radial-gradient(circle at 50% 55%, var(--color-gold-bright) 0%, var(--color-gold) 52%, var(--color-gold-deep) 100%);
+    box-shadow: 0 2px 6px rgba(91, 43, 8, 0.25);
+  }
+
+
+  /* Guirnalda: se mece solo mientras está en pantalla (`.is-live`). */
+  .gbs-garland.is-live .gbs-swing {
+    animation: gbs-swing 4.6s ease-in-out infinite;
+  }
+  /* Bola del nav: se mece al pasar el mouse. */
+  .gbs-swing-hover:hover {
+    animation: gbs-ring 1.1s ease-out;
+  }
+
+  /* Muñeco de nieve (botón del confeti): se mece en reposo, brinca al tocarlo. */
+  .gbs-snowman {
+    transform-origin: 50% 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .gbs-snowman-img {
+    transform-origin: 50% 100%;
+    animation: gbs-rock 3.4s ease-in-out infinite;
+    filter: drop-shadow(0 6px 8px rgba(91, 43, 8, 0.22));
+  }
+  .gbs-snowman:hover .gbs-snowman-img {
+    animation-duration: 1.2s;
+  }
+  .gbs-snowman.is-hop {
+    animation: gbs-hop 0.6s cubic-bezier(0.3, 0.7, 0.4, 1);
+  }
+  .gbs-snowman:focus-visible {
+    outline: 1px solid var(--color-gold);
+    outline-offset: 4px;
+  }
+  .gbs-snowman-hint {
+    animation: gbs-hint 1.8s ease-in-out infinite;
+  }
+  .gbs-snowman-hint::before {
+    content: "✦ ";
+    color: var(--color-gold-bright);
+  }
+  /* "Volver arriba" de temporada: el árbol dorado (`season/TreeToTop.tsx`). */
+  .gbs-tree-top {
+    --p: 0;
+    width: 46px;
+    height: 84px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(26px) scale(0.55);
+    transform-origin: 50% 100%;
+    transition:
+      opacity 220ms ease,
+      transform 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .gbs-tree-top.is-in {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+  }
+  .gbs-tree-top.is-launching {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-46vh) scale(0.7) rotate(-6deg);
+    transition:
+      opacity 700ms ease 260ms,
+      transform 900ms cubic-bezier(0.55, 0, 0.75, 0.2);
+  }
+  .gbs-tree-top-body {
+    transform-origin: 50% 100%;
+    filter: drop-shadow(0 6px 7px rgba(91, 43, 8, 0.28));
+    transition: transform 260ms ease;
+  }
+  .gbs-tree-top.is-in .gbs-tree-top-body {
+    animation: gbs-rock 3.8s ease-in-out infinite;
+  }
+  .gbs-tree-top.is-in:hover .gbs-tree-top-body,
+  .gbs-tree-top.is-in:focus-visible .gbs-tree-top-body {
+    animation: gbs-tree-lift 1.1s ease-in-out infinite;
+  }
+  /* Estrella: un destello de cuatro puntas que titila; crece con el scroll. */
+  .gbs-tree-top-star {
+    position: absolute;
+    left: 50%;
+    top: 3px;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    background: radial-gradient(circle, #fff7e6 0 18%, rgba(255, 212, 159, 0) 19%),
+      conic-gradient(from 45deg, transparent 0 20%, var(--color-gold-soft) 22% 28%, transparent 30% 45%, var(--color-gold-soft) 47% 53%, transparent 55% 70%, var(--color-gold-soft) 72% 78%, transparent 80% 95%, var(--color-gold-soft) 97% 100%);
+    clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+    transform: scale(calc(0.7 + var(--p) * 0.6));
+    animation: gbs-twinkle 2.2s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .gbs-tree-top-glow {
+    position: absolute;
+    left: 50%;
+    top: -6px;
+    width: 34px;
+    height: 34px;
+    margin-left: -17px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 212, 159, 0.9) 0%, rgba(231, 170, 81, 0.35) 40%, rgba(231, 170, 81, 0) 70%);
+    opacity: calc(0.25 + var(--p) * 0.75);
+    animation: gbs-glow 2.2s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .gbs-tree-top-arrow {
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    transform: translate(-50%, 6px);
+    font: 600 11px/1 var(--font-sans);
+    color: var(--color-ivory);
+    opacity: 0;
+    transition: opacity 200ms ease, transform 300ms ease;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(91, 43, 8, 0.6);
+  }
+  .gbs-tree-top.is-in:hover .gbs-tree-top-arrow,
+  .gbs-tree-top.is-in:focus-visible .gbs-tree-top-arrow {
+    opacity: 1;
+    transform: translate(-50%, -2px);
+  }
+  .gbs-tree-top:focus-visible {
+    outline: 1px solid var(--color-gold);
+    outline-offset: 4px;
+  }
+
+  /* Árbol del bio: un vaivén mínimo, desfasado del muñeco. */
+  .gbs-scene-sway {
+    transform-origin: 50% 100%;
+    animation: gbs-rock 5.2s ease-in-out -1.3s infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gbs-garland.is-live .gbs-swing,
+    .gbs-swing-hover:hover,
+    .gbs-snowman-img,
+    .gbs-snowman.is-hop,
+    .gbs-snowman-hint,
+    .gbs-scene-sway,
+    .gbs-tree-top.is-in .gbs-tree-top-body,
+    .gbs-tree-top.is-in:hover .gbs-tree-top-body,
+    .gbs-tree-top-star,
+    .gbs-tree-top-glow {
+      animation: none;
+    }
+    .gbs-tree-top {
+      transition: opacity 200ms ease;
+      transform: none;
+    }
+  }
+}

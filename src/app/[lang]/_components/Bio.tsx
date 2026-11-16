@@ -4,6 +4,10 @@ import { BioLink, BioView } from "./BioLink";
 import BioPromoBanner from "./BioPromoBanner";
 import SocialIcon from "./SocialIcon";
 import TrabajaBio from "./TrabajaBio";
+import Garland from "./season/Garland";
+import GoldLeaf from "./season/GoldLeaf";
+import SideDecor from "./season/SideDecor";
+import WinterScene from "./season/WinterScene";
 import type { TrabajaDict } from "./PostulacionForm";
 import type { BioData, BioHiring, BioPromo } from "@/data/bio.types";
 import type { JobRole } from "@/data/careers.types";
@@ -23,6 +27,19 @@ type Props = {
    * studio stops advertising that it's hiring.
    */
   hiring: BioHiring | null;
+  /**
+   * Temporada de Navidad, o null fuera de ella. El bio es de lo más visitado
+   * del sitio (llega todo el tráfico de Instagram), así que aquí va la escena
+   * completa: guirnalda, pan de oro de fondo, el muñeco del confeti y la fila
+   * del calendario de adviento (esa solo del 1 al 24).
+   */
+  season?: BioSeason | null;
+};
+
+export type BioSeason = {
+  eyebrow: string;
+  snowman: { label: string; hint: string };
+  advent: { label: string; sub: string; href: string } | null;
 };
 
 /**
@@ -43,6 +60,7 @@ export default function Bio({
   trabaja,
   roles,
   hiring,
+  season = null,
 }: Props) {
   const primary = bio.links.find((l) => l.primary) ?? null;
   const rows = bio.links.filter((l) => !l.primary);
@@ -78,6 +96,12 @@ export default function Bio({
             "linear-gradient(180deg, rgba(248,244,238,0.55) 0%, rgba(248,244,238,0.78) 100%)",
         }}
       />
+      {season && (
+        <>
+          <GoldLeaf fixed />
+          <SideDecor />
+        </>
+      )}
       <div
         className="relative mx-auto flex w-full max-w-[400px] flex-col items-center"
         style={{
@@ -88,6 +112,12 @@ export default function Bio({
         }}
       >
         <h1 className="sr-only">Golden Beauty Studio — {bio.handle}</h1>
+
+        {season && (
+          <div className="-mt-4 mb-2 w-full">
+            <Garland />
+          </div>
+        )}
 
         {/* Brand lockup — leads the page now that the avatar is gone */}
         <Logo variant="text" size={18} />
@@ -129,6 +159,14 @@ export default function Bio({
         >
           {bio.tagline}
         </p>
+
+        {season && (
+          <WinterScene
+            eyebrow={season.eyebrow}
+            snowmanLabel={season.snowman.label}
+            snowmanHint={season.snowman.hint}
+          />
+        )}
 
         {/* Pinned promo band — a photographic hero (omitted when no scenario is
             active). With 2+ slides it becomes a swipeable rotating carousel,
@@ -185,6 +223,40 @@ export default function Bio({
           className="flex w-full flex-col"
           style={{ marginTop: rowsMt, gap: 12 }}
         >
+          {season?.advent && (
+            <BioLink
+              href={season.advent.href}
+              linkKey="adviento"
+              label={season.advent.label}
+              kind="row"
+              external={/^https?:\/\//i.test(season.advent.href)}
+              className="relative flex w-full items-center overflow-hidden no-underline"
+              style={{
+                minHeight: 72,
+                background: "var(--color-carbon)",
+                border: "1px solid rgba(231, 170, 81, 0.35)",
+                gap: 14,
+                padding: "10px 18px 10px 12px",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- render 3D de 17 KB */}
+              <img src="/navidad/presents.webp" alt="" width={62} height={54} className="block shrink-0" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="block font-display" style={{ fontSize: 19, lineHeight: 1.12, color: "var(--color-gold-soft)" }}>
+                  {season.advent.label}
+                </span>
+                <span
+                  className="block font-sans uppercase"
+                  style={{ marginTop: 6, fontSize: 10, letterSpacing: "0.18em", color: "rgba(255, 212, 159, 0.7)" }}
+                >
+                  {season.advent.sub}
+                </span>
+              </span>
+              <span aria-hidden className="shrink-0 font-display italic leading-none" style={{ fontSize: 22, color: "var(--color-gold-bright)" }}>
+                →
+              </span>
+            </BioLink>
+          )}
           {rows.map((link) => (
             <BioLink
               key={link.key}

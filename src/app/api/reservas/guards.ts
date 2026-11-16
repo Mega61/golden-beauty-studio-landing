@@ -53,7 +53,7 @@ const hits = new Map<string, number[]>();
  * "Confirmar", and her booking came back 429. The bucket is what keeps reads
  * from spending the write's allowance.
  */
-export type RateBucket = "catalogo" | "disponibilidad" | "reservar" | "cotizar";
+export type RateBucket = "catalogo" | "disponibilidad" | "reservar" | "cotizar" | "tarjeta";
 
 export function rateLimited(ip: string, max: number, bucket: RateBucket): boolean {
   const now = Date.now();

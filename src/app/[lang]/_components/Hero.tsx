@@ -2,6 +2,8 @@ import Image from "next/image";
 import { EyebrowLabel, PrimaryCTA, SecondaryCTA } from "./atoms";
 import { bookingHref } from "@/config/site";
 import { getHeroImage } from "@/data/hero";
+import type { Season } from "@/config/season";
+import GoldLeaf from "./season/GoldLeaf";
 
 type HeroDict = {
   eyebrow: string;
@@ -15,8 +17,20 @@ type HeroDict = {
   metaStatus: string;
 };
 
-export default async function Hero({ dict, lang }: { dict: HeroDict; lang: string }) {
+export default async function Hero({
+  dict,
+  lang,
+  season = null,
+  seasonEyebrow,
+}: {
+  dict: HeroDict;
+  lang: string;
+  /** Temporada activa (ver `src/config/season.ts`); null = el hero de siempre. */
+  season?: Season | null;
+  seasonEyebrow?: string;
+}) {
   const heroSrc = await getHeroImage();
+  const navidad = season === "navidad";
   return (
     <section className="relative bg-carbon">
       <div className="relative h-[620px] overflow-hidden md:h-[760px]">
@@ -62,10 +76,15 @@ export default async function Hero({ dict, lang }: { dict: HeroDict; lang: strin
           }}
         />
 
+        {/* Pan de oro cayendo — encima de la foto y los velos, debajo del texto. */}
+        {navidad && <GoldLeaf />}
+
         <div className="absolute inset-0 mx-auto flex max-w-[1440px] flex-col justify-end px-6 pb-14 text-ivory md:px-20 md:pb-20">
           <div className="mb-4 flex items-center gap-3.5 md:mb-6">
             <span className="block h-px w-9 bg-gold-bright" aria-hidden />
-            <EyebrowLabel className="text-gold-soft">{dict.eyebrow}</EyebrowLabel>
+            <EyebrowLabel className="text-gold-soft">
+              {navidad && seasonEyebrow ? seasonEyebrow : dict.eyebrow}
+            </EyebrowLabel>
           </div>
           <h1
             className="m-0 max-w-[900px] font-display text-[44px] font-normal leading-[0.98] md:text-[96px]"

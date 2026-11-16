@@ -45,6 +45,23 @@ const whatsappUrl = wppNumber
   ? `https://wa.me/${wppNumber}?text=${encodeURIComponent(wppGreeting)}`
   : null;
 
+/**
+ * Un chat de WhatsApp con el estudio y un mensaje ya escrito. Con
+ * `api.whatsapp.com/send` y no `wa.me`: `wa.me` rompe los emojis del texto.
+ * `null` sin número configurado.
+ */
+export function whatsappMessageUrl(text: string): string | null {
+  return wppNumber
+    ? `https://api.whatsapp.com/send?phone=${wppNumber}&text=${encodeURIComponent(text)}`
+    : null;
+}
+
+// La tarjeta de fidelidad (Stampee). La banda del calendario de adviento lleva
+// aquí: las puertas viven en el reverso de la tarjeta de cada clienta.
+const DEFAULT_LOYALTY_URL = "https://loyalty.goldenbeautystudio.com.co";
+const loyaltyUrl =
+  process.env.NEXT_PUBLIC_LOYALTY_URL?.trim() || DEFAULT_LOYALTY_URL;
+
 const instagramUrl = process.env.NEXT_PUBLIC_INSTAGRAM_URL?.trim() || null;
 const tiktokUrl = process.env.NEXT_PUBLIC_TIKTOK_URL?.trim() || null;
 
@@ -103,6 +120,7 @@ export const siteConfig = {
   siteUrl,
   bookingUrl,
   whatsappUrl,
+  loyaltyUrl,
   instagramUrl,
   tiktokUrl,
   gaId,
@@ -121,6 +139,8 @@ export const siteConfig = {
     estudio: bool(process.env.NEXT_PUBLIC_SECTION_ESTUDIO, true),
     reviews: bool(process.env.NEXT_PUBLIC_SECTION_REVIEWS, true),
     contacto: bool(process.env.NEXT_PUBLIC_SECTION_CONTACTO, true),
+    // "Encuentra tu tarjeta Golden" (`#mi-tarjeta`) y su fila del /bio.
+    tarjeta: bool(process.env.NEXT_PUBLIC_SECTION_TARJETA, true),
     trabaja: sectionTrabaja,
   },
 } as const;
