@@ -99,7 +99,7 @@ export default async function Page({
       <Footer
         dict={dict.footer}
         lang={lang}
-        ornamentLabel={navidad ? dict.navidad.ornament : undefined}
+        snowman={navidad ? dict.navidad.snowman : undefined}
       />
       <FloatingActions dict={dict.floating} bookingHref={bookingHref(lang)} />
       <BackToTop label={dict.floating.backToTop} />
