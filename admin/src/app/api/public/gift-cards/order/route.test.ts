@@ -43,7 +43,7 @@ describe("pedido de tarjeta regalo", () => {
       tierId: "t-1",
       buyer: { name: "Ana Ruiz", phone: "+573001234567" },
       source: "sale",
-      rules: { buyerStampOnPaid: true, ref: "adviento" },
+      rules: { buyerStampOnPaid: true, buyerStamps: 2, ref: "adviento" },
     });
   });
 
