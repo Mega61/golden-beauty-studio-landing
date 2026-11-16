@@ -77,6 +77,7 @@ export default function MiTarjeta({
   whatsappUrl,
   bookingHref,
   season = false,
+  adventNote = false,
 }: {
   dict: MiTarjetaDict;
   /** A dónde va una clienta nueva; sin reserva configurada no hay redirección. */
@@ -84,6 +85,8 @@ export default function MiTarjeta({
   /** Chat con el estudio y el mensaje ya escrito, o null sin número configurado. */
   whatsappUrl: string | null;
   season?: boolean;
+  /** La línea del calendario de adviento: desde el inicio de la temporada hasta el 24 de diciembre. */
+  adventNote?: boolean;
 }) {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -171,7 +174,7 @@ export default function MiTarjeta({
             <em className="text-gold-grad italic">{dict.title2_em}</em>
           </h2>
           <p className="m-0 mt-6 max-w-[460px] font-sans text-[15px] leading-[1.65] text-ink-soft">{dict.body}</p>
-          {season && (
+          {adventNote && (
             <p className="m-0 mt-5 max-w-[460px] font-display text-[18px] italic leading-[1.45] text-gold-dark">
               ✦ {dict.seasonNote}
             </p>

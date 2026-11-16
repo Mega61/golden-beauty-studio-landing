@@ -62,3 +62,23 @@ export function currentSeason(now: Date = new Date()): Season | null {
 export function currentAdvent(now: Date = new Date()): boolean {
   return adventFor(now, process.env.NEXT_PUBLIC_SEASON);
 }
+
+/**
+ * ¿Todavía se puede anunciar el calendario de adviento? Desde que arranca la
+ * temporada (en noviembre se anuncia lo que viene) hasta el 24 de diciembre.
+ * Del 25 en adelante la temporada sigue (adornos hasta Reyes), pero decir "tu
+ * tarjeta trae calendario de adviento" ya sería mentira. Lo usa la nota de
+ * `#mi-tarjeta`; la banda y la fila del /bio usan {@link adventFor} (1–24 dic).
+ */
+export function adventNoteFor(now: Date, override?: string): boolean {
+  const forced = parseSeasonOverride(override);
+  if (forced === "off") return false;
+  if (forced === "navidad") return true;
+  if (seasonFor(now) === null) return false;
+  const { month, day } = bogotaDate(now);
+  return month === 11 || (month === 12 && day <= 24);
+}
+
+export function currentAdventNote(now: Date = new Date()): boolean {
+  return adventNoteFor(now, process.env.NEXT_PUBLIC_SEASON);
+}

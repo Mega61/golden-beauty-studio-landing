@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale } from "./dictionaries";
 import { bookingHref, siteConfig, whatsappMessageUrl } from "@/config/site";
-import { currentAdvent, currentSeason } from "@/config/season";
+import { currentAdvent, currentAdventNote, currentSeason } from "@/config/season";
 import { getActiveScenarios } from "@/data/promos";
 import { getReviews } from "@/data/reviews";
 import { getJobRoles } from "@/data/careers";
@@ -103,6 +103,7 @@ export default async function Page({
           whatsappUrl={whatsappMessageUrl(dict.miTarjeta.whatsappText)}
           bookingHref={bookingHref(lang)}
           season={navidad}
+          adventNote={currentAdventNote()}
         />
       )}
       {sections.contacto && <Contacto dict={dict.contacto} lang={lang} />}
