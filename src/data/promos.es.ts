@@ -140,9 +140,9 @@ export const PROMOS_DATA: PromosBySlug = {
         eyebrow: "Regalo",
         title: "Tarjeta regalo digital",
         body:
-          "Envía un bono por WhatsApp en menos de 5 minutos. La beneficiada elige fecha, técnica y largo.",
+          "Elige la tarjeta, paga por transferencia y te enviamos el link para regalarla por WhatsApp. Quien la recibe elige fecha, técnica y diseño.",
         cta_label: "Comprar tarjeta",
-        cta_href: "#contacto",
+        cta_href: "/es/regalar",
         accent: "mocha",
         featured: false,
       },

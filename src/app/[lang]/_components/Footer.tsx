@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { bookingHref, siteConfig } from "@/config/site";
 import Logo from "./Logo";
 import TrackedBookingLink from "./TrackedBookingLink";
@@ -26,9 +27,13 @@ function resolveFindLink(
     whatsapp: string | null;
     booking: string | null;
     maps: string;
+    gift: string | null;
   }
 ): string | null {
   const l = label.toLowerCase();
+  // Before "reserva"/"book": none of the gift labels contain those, but a
+  // future "Book a gift" would otherwise land on the booking flow.
+  if (l.includes("regal") || l.includes("gift")) return urls.gift;
   if (l.includes("instagram")) return urls.instagram;
   if (l.includes("whatsapp")) return urls.whatsapp;
   if (l.includes("reserva") || l.includes("book")) return urls.booking;
@@ -59,6 +64,7 @@ export default function Footer({
     whatsapp: whatsappUrl,
     booking: bookingUrl,
     maps: mapsHref,
+    gift: siteConfig.sections.regalar ? `/${lang}/regalar` : null,
   };
   return (
     <footer
@@ -102,12 +108,17 @@ export default function Footer({
                 if (!href) return null;
                 const isBooking = href === findUrls.booking;
                 const isWhatsapp = href === findUrls.whatsapp;
+                const isGift = href === findUrls.gift;
                 const className =
                   "pb-0.5 font-sans text-[14px] text-ink no-underline";
                 const style = { borderBottom: "1px solid var(--hair)" };
                 return (
                   <li key={l}>
-                    {isBooking ? (
+                    {isGift ? (
+                      <Link href={href} className={className} style={style}>
+                        {l} →
+                      </Link>
+                    ) : isBooking ? (
                       <TrackedBookingLink
                         href={href}
                         location="footer"

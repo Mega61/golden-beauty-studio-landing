@@ -212,6 +212,16 @@ El plan completo vive en **`docs/ADMIN-PANEL.md`** — topología, modelo de dat
 - **El 10 % se gasta solo:** vale para la primera visita atendida después de mandarlo y antes de `expires_on`. La cuenta lo ve como `FirstVisitStatus = "recuperacion"` (`hoy/first-visit.ts` → `clientes/winback-discount.ts`), marca la casilla de primera visita y el motivo queda `primera-visita · te extrañamos`; `/reservar` lo cotiza igual. Mismas reglas que la primera visita: solo servicios, no se suma, gana la mayor.
 - **Lee el historial de Agenda Pro a propósito** (vía `loadMetaAudience()`): casi todas las que se fueron vinieron antes del corte. Solo para saber a quién y cuándo vino; nada de plata, y a la cuenta solo cruza el sí/no, como la primera visita. Sí filtra `wa_optout`.
 
+## Tarjetas regalo (`bono:`)
+
+Montos fijos (niveles en Stampee), uso único, link público `/:slug/regalo/:uniqueId` en Stampee. La compra arranca en `/[lang]/regalar` (sin pasarela: pedido → pago por transferencia/efectivo → confirmación en el panel).
+
+- **Pedido:** `/api/regalos` (mismas guardas que `/api/reservas`) → `/admin/api/public/gift-cards/order` → Stampee `POST /gift-cards` en `pending_payment`. El monto sale siempre del nivel, nunca del cliente. `?ref=adviento` → `rules.buyerStampOnPaid`.
+- **Venta:** `/admin/caja/regalos` (`regalos:vender`) confirma el pago: fila en `gift_card_sale` (migración `033`) y después `activate` en Stampee; si Stampee falla, se borra la fila. El job nocturno (`jobs/gift-card-sales.ts`) la manda al CRM como `bono:<código>`; anular después de sincronizar manda `bono:<código>:adj1` negativo. Contabilidad en caja: el dinero entra al vender.
+- **Canje al cerrar la cuenta:** tarjeta pagada (`funded`) = pago con método `bono`, que **nunca** se manda al CRM (ya entró al venderla); comisión igual que siempre. Tarjeta promocional (`funded:false`, p. ej. adviento) = candidata de descuento en `resolveDiscount` (gana la mayor, no se acumula). Redeem en Stampee con `ea-appt:<id>` **antes** de escribir; si falla la escritura, `unredeem`. Quitar la tarjeta al editar la libera.
+- **Propina con cuenta 100 % en tarjeta:** va en `appointment_finance.tip_method` y viaja como fila `amount 0 + tip`.
+- Toda la lógica pura está en `lib/gift-cards.ts`; el cliente HTTP en el bloque de tarjetas regalo de `lib/stampee/client.ts`.
+
 ## Encuentra tu tarjeta Golden (`#mi-tarjeta`)
 
 Sección de la landing (todo el año, antes de Contacto) donde la clienta escribe su celular y su primer nombre y recibe el link de su tarjeta de sellos de Stampee. La fila "Mi tarjeta Golden" del `/bio`, la fila de adviento del `/bio` y el botón de la banda de adviento llevan aquí. Se apaga con `NEXT_PUBLIC_SECTION_TARJETA=false` (y entonces la banda de adviento vuelve a `NEXT_PUBLIC_LOYALTY_URL`).

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
 import type { NewAppointmentFinanceItem } from "@/db/types";
-import { instantToEaLocal } from "@/lib/ea";
+import { instantToEaLocal, type EaLocalDateTime } from "@/lib/ea";
 import { createCachedEaClient, createEaClient } from "@/lib/ea/client";
 import { ForbiddenError, requireCapability, requireOwnProvider } from "@/lib/dal";
 import { can } from "@/lib/auth-policy";
@@ -30,13 +30,36 @@ import {
   draftToPayments,
   promoDateOf,
   resolveDiscount,
+  tipMethodFor,
+  tipNeedsMethod,
   type ResolvedDiscount,
   type TicketDraft,
   type TicketPricing,
 } from "@/components/ticket/draft";
-import type { CloseTicketInput, CloseTicketResult } from "@/components/ticket/types";
-import type { PaymentMethod } from "@/db/types";
+import type {
+  CloseTicketInput,
+  CloseTicketResult,
+  GiftCardLookupResult,
+} from "@/components/ticket/types";
+import type { AccountPaymentMethod } from "@/db/types";
 import { canOpenAccount } from "@/lib/attendance";
+import { formatCOP } from "@/components/ui/format";
+import {
+  checkGiftCard,
+  giftCardRedeemRef,
+  normalizeGiftCode,
+  redeemErrorMessage,
+  releaseSettled,
+  type GiftCardCheck,
+  type GiftCardQuote,
+} from "@/lib/gift-cards";
+import { moneyPaymentsOf, pushableAmountOf } from "@/lib/ingest-payload";
+import {
+  getGiftCardByCode,
+  redeemGiftCard,
+  unredeemGiftCard,
+  type GiftCardDto,
+} from "@/lib/stampee/client";
 import { marcarCompletadaAlCerrar } from "./attendance";
 import { loadCatalogForClose } from "./catalog-server";
 import { detectFirstVisit, type FirstVisitStatus } from "./first-visit";
@@ -124,6 +147,26 @@ import { detectFirstVisit, type FirstVisitStatus } from "./first-visit";
  * ya se hizo. Se revisa el historial igual y se anota si coincidía, para que
  * un 10 % marcado a mano se vea como tal en la bitácora y en el reporte de
  * variación.
+ *
+ * ## Tarjeta regalo
+ *
+ * La hoja manda **solo el código** (`giftCardCode`). Acá se lee la tarjeta
+ * fresca de Stampee y se valida (`checkGiftCard()`): activa, vigente el día de
+ * la cita, y —si es promocional y solo para clientas nuevas— con el historial
+ * de acuerdo. Después:
+ *
+ * - **Pagada** (`funded`): es un pago `bono` por lo que cubra
+ *   (`draftToPayments()`); el resto va con los métodos de la hoja. Es plata que
+ *   entró el día de la venta, así que no viaja otra vez a Actual. Registrarla
+ *   es cobrar: pide `cuenta:cobrar`.
+ * - **Promocional**: es un descuento que compite con la promo
+ *   (`resolveDiscount()`), con motivo `promo` y `bono TR-…` en el texto.
+ *
+ * La redención se hace en Stampee **antes** de escribir la cuenta, con la
+ * cuenta como llave (`ea-appt:<id>`, idempotente). Si la escritura falla, se
+ * deshace. Si la cuenta tenía otra tarjeta —o se le quitó—, la anterior se
+ * libera (`unredeem`) también antes, y vuelve a redimirse si la escritura
+ * falla. La cuenta guarda el código en `gift_card_code` para poder hacerlo.
  */
 
 const REASONS = ["cambio_servicio", "adicionales", "cortesia", "correccion", "otro"] as const;
@@ -161,6 +204,8 @@ const InputSchema = z.object({
     .optional(),
   applyPromo: z.boolean().optional(),
   firstVisit: z.boolean().optional(),
+  // Solo el código. Ausente o `null` = sin tarjeta (y la que tuviera, se libera).
+  giftCardCode: z.string().max(40).nullable().optional(),
   clientRequestId: z.string().max(64),
 });
 
@@ -185,6 +230,15 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
 
   const data = parsed.data;
   const houseCourtesy = data.houseCourtesy === true;
+
+  const rawGiftCode = (data.giftCardCode ?? "").trim();
+  const giftCode = rawGiftCode === "" ? null : normalizeGiftCode(rawGiftCode);
+  if (rawGiftCode !== "" && giftCode === null) {
+    return rechazo("El código de la tarjeta regalo no es válido. Es TR- y ocho letras o números.");
+  }
+  if (houseCourtesy && giftCode !== null) {
+    return rechazo("Una cortesía de la casa no usa tarjeta regalo: quita una de las dos.");
+  }
 
   let session;
   try {
@@ -251,7 +305,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // Los pagos que la cuenta ya tenía, para la bitácora: el "antes" de una
   // corrección tiene que decir con qué se había cobrado, y eso ya no vive en la
   // fila del encabezado.
-  let existingPayments: { method: PaymentMethod; amount: number }[] = [];
+  let existingPayments: { method: AccountPaymentMethod; amount: number }[] = [];
   try {
     const outcome = await upsertAppointmentFinance({ db, ea }, appointment, "reconcile");
     financeId = outcome.financeId;
@@ -323,8 +377,24 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     houseCourtesy,
     applyPromo: data.applyPromo === true,
     firstVisit: data.firstVisit === true,
+    giftCardCode: giftCode,
     updatedAt: Date.now(),
   };
+
+  // --- La tarjeta regalo, fresca de Stampee -------------------------------
+  const redeemRef = giftCardRedeemRef(data.eaAppointmentId);
+  let giftCard: GiftCardDto | null = null;
+  let giftQuote: GiftCardQuote | null = null;
+  if (giftCode !== null) {
+    const lookup = await loadGiftCardFor(ea, appointment, giftCode, redeemRef);
+    if (lookup.kind === "later") return masTarde(lookup.message);
+    if (!lookup.check.ok) return rechazo(lookup.check.message);
+    if (lookup.check.quote.funded && !puedeCobrar) {
+      return rechazo("Esta tarjeta regalo es un pago: la registra recepción al cobrar.");
+    }
+    giftCard = lookup.card;
+    giftQuote = lookup.check.quote;
+  }
 
   const pricing: TicketPricing = {
     bookedServiceId: existing.booked_service_id,
@@ -332,6 +402,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     // El día de la cita según EA, no el de hoy ni el que diga el navegador: la
     // promo del miércoles es de la cita del miércoles.
     promoDate: promoDateOf(appointment.start),
+    giftCard: giftQuote,
   };
 
   const { items } = draftToItems(draft, catalog, pricing);
@@ -388,7 +459,40 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // método el monto es **todo lo cobrado**, y el total definitivo lo acaba de
   // calcular esta función. Con dos, los montos vienen escritos y solo se
   // verifican.
-  const payments = houseCourtesy ? [] : draftToPayments(draft, totals.amountCharged);
+  const payments = houseCourtesy ? [] : draftToPayments(draft, totals.amountCharged, giftQuote);
+
+  // La tarjeta que de verdad se usa: una pagada, si cubrió algo; una
+  // promocional, si su descuento fue el que ganó. Una que no se usa (la promo
+  // descontaba más, un total escrito a mano) no se redime: queda para otra visita.
+  const bonoPaid = payments.find((payment) => payment.method === "bono")?.amount ?? 0;
+  const usedGift =
+    giftQuote === null
+      ? null
+      : giftQuote.funded
+        ? bonoPaid > 0
+          ? { code: giftQuote.code, funded: true, amountUsed: bonoPaid }
+          : null
+        : resolved?.giftCard
+          ? { code: giftQuote.code, funded: false, amountUsed: resolved.giftCard.discount }
+          : null;
+
+  // La tarjeta pagó todo y la clienta dejó propina: esa propina es plata que
+  // entró al cajón o al banco, y viaja a Actual con su método.
+  const tipMethod = houseCourtesy ? null : tipMethodFor(draft, payments);
+  if (tipNeedsMethod(draft, payments)) {
+    return rechazo(
+      puedeCobrar
+        ? "La tarjeta regalo cubre toda la cuenta. Elige cómo dejó la propina: efectivo, transferencia u otro."
+        : "La propina con tarjeta regalo la registra recepción, con su método.",
+    );
+  }
+
+  if (bonoPaid > 0 && bonoPaid < totals.amountCharged && payments.length === 1) {
+    return rechazo(
+      `La tarjeta regalo cubre ${formatCOP(bonoPaid)}. Elige cómo pagó la clienta el resto ` +
+        `(${formatCOP(totals.amountCharged - bonoPaid)}).`,
+    );
+  }
 
   // Quien puede registrar el método **tiene** que registrarlo: una cuenta
   // cobrada sin método no puede viajar a Actual y se queda en Caja como
@@ -407,7 +511,12 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     throw error;
   }
 
-  if (synced && (existing.amount_charged ?? 0) !== totals.amountCharged) {
+  // Lo que viajó a Actual es lo cobrado **menos** lo que pagó una tarjeta
+  // regalo: esa plata viajó el día de la venta. Un ajuste se mide sobre eso.
+  const pushedBefore = pushableAmountOf(existing.amount_charged, existingPayments);
+  const pushedAfter = pushableAmountOf(totals.amountCharged, payments);
+
+  if (synced && pushedBefore !== pushedAfter) {
     // Un ajuste sale con el método de la cuenta y nunca de una cortesía
     // (`buildIngestAdjustment()`): sin esto quedaría registrado un ajuste que
     // no puede viajar, y Actual se quedaría con la cifra vieja sin que nadie lo
@@ -418,7 +527,7 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
           "Corrige el total y escribe el motivo.",
       );
     }
-    if (payments.length === 0) {
+    if (moneyPaymentsOf(payments).length === 0) {
       return rechazo("Esta cuenta ya llegó a Actual: para corregir el total elige el método de pago.");
     }
   }
@@ -446,7 +555,9 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     ? ""
     : resolved?.promo
       ? promoReasonText(resolved.promo.slug, firstVisitCheck)
-      : data.varianceReason;
+      : resolved?.giftCard
+        ? resolved.varianceReason
+        : data.varianceReason;
 
   const patch = {
     performed_service_id: data.performedServiceId,
@@ -458,7 +569,10 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     // Con un solo método se escribe ése, y con dos queda en `null` — el código
     // de la imagen anterior lo muestra como "sin método", que es visible y
     // reclamable, en vez de afirmar un método que no fue.
-    payment_method: payments.length === 1 ? payments[0].method : null,
+    // `bono` no existe en la columna vieja: una cuenta pagada con tarjeta
+    // queda como "sin método" para la imagen anterior, que es lo honesto.
+    payment_method:
+      payments.length === 1 && payments[0].method !== "bono" ? payments[0].method : null,
     paid_at: paidAt,
     service_notes: data.notes.trim() === "" ? null : data.notes,
     variance_reason_code: varianceReasonCode,
@@ -471,6 +585,8 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
         : varianceText,
     closed_by: session.userId,
     closed_at: now,
+    gift_card_code: usedGift?.code ?? null,
+    tip_method: tipMethod,
   } as const;
 
   // --- La comisión que ya se calculó sobre estos renglones -------------------
@@ -505,6 +621,62 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     return masTarde("La base no respondió. Se reintenta solo.");
   }
 
+  // --- La tarjeta regalo, en Stampee, antes de escribir -------------------
+  const previousCode = existing.gift_card_code ?? null;
+  const previousAmount =
+    existingPayments.find((payment) => payment.method === "bono")?.amount ?? existing.discount;
+  let redeemedNow = false;
+  let releasedPrevious = false;
+
+  if (usedGift !== null) {
+    const already = giftCard?.status === "redeemed" && giftCard.redeemedRef === redeemRef;
+    if (!already) {
+      const customer = await customerOf(ea, appointment.customerId);
+      const redeemed = await redeemGiftCard(usedGift.code, {
+        externalRef: redeemRef,
+        amountUsedCop: usedGift.amountUsed,
+        customer,
+        date: pricing.promoDate ?? instantToEaLocal(now).slice(0, 10),
+      });
+      if (!redeemed.ok) {
+        console.error("[hoy] Stampee no redimió la tarjeta", usedGift.code, redeemed.code, redeemed.message);
+        // Un 4xx es definitivo (tarjeta usada, vencida, anulada…), con su texto;
+        // sin respuesta, 5xx o la llave rechazada, se reintenta.
+        const definitivo =
+          redeemed.status !== null &&
+          redeemed.status < 500 &&
+          redeemed.status !== 401 &&
+          redeemed.status !== 403 &&
+          redeemed.status !== 429;
+        return definitivo
+          ? rechazo(redeemErrorMessage(redeemed.code, redeemed.status, usedGift.code))
+          : masTarde("Stampee no respondió para la tarjeta regalo. Se reintenta solo.");
+      }
+      redeemedNow = true;
+    }
+  }
+
+  if (previousCode !== null && previousCode !== (usedGift?.code ?? null)) {
+    const released = await unredeemGiftCard(previousCode, { externalRef: redeemRef });
+    // Solo el OK (o "ya estaba activa") y `REF_MISMATCH` (la tiene otra
+    // cuenta) dejan esta cuenta libre de la tarjeta. Cualquier otra respuesta
+    // no se adivina: se registra, se deshace lo de arriba y se reintenta.
+    if (!releaseSettled(released)) {
+      console.error(
+        "[hoy] Stampee no liberó la tarjeta anterior",
+        previousCode,
+        released.ok ? null : released.code,
+        released.ok ? null : released.message,
+      );
+      if (redeemedNow && usedGift !== null) await compensateRedeem(usedGift.code, redeemRef);
+      return masTarde("Stampee no liberó la tarjeta regalo anterior. Se reintenta solo.");
+    }
+    if (!released.ok) {
+      console.warn("[hoy] la tarjeta anterior ya la tenía otra cuenta; no se toca", previousCode);
+    }
+    releasedPrevious = released.ok;
+  }
+
   try {
     await db.transaction().execute(async (trx) => {
       const tx = repositories(trx);
@@ -527,7 +699,11 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
       await tx.appointmentFinanceItems.replaceForFinance(financeId, rows);
       await tx.appointmentPayments.replaceForFinance(
         financeId,
-        payments.map((payment) => ({ method: payment.method, amount: payment.amount })),
+        payments.map((payment) =>
+          payment.method === "bono"
+            ? { method: payment.method, amount: payment.amount, gift_card_code: usedGift?.code ?? null }
+            : { method: payment.method, amount: payment.amount },
+        ),
       );
       await tx.appointmentFinance.update(financeId, patch);
       // La cuenta se puede corregir; lo que no se puede es corregirla sin dejar
@@ -549,9 +725,11 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
             amount: payment.amount,
           })),
           closed_at: existing.closed_at,
+          gift_card_code: previousCode,
         },
         after: {
           ...patch,
+          giftCard: usedGift,
           clientRequestId: data.clientRequestId,
           // Las comisiones en borrador que se soltaron al reescribir los
           // renglones: "Recalcular" las vuelve a crear.
@@ -576,10 +754,12 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
       // ajuste en la misma transacción: la corrección y su ajuste son una sola
       // cosa, o ninguna.
       if (synced) {
+        // Sobre lo que viaja, no sobre lo cobrado: lo pagado con tarjeta
+        // regalo nunca viajó desde esta cuenta.
         await recordEditAdjustment(trx, {
           financeId,
-          before: existing.amount_charged ?? 0,
-          after: totals.amountCharged,
+          before: pushedBefore,
+          after: pushedAfter,
           actorUserId: session.userId,
           now,
         });
@@ -588,6 +768,21 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   } catch (error) {
     unstable_rethrow(error);
     console.error("[hoy] no se pudo guardar la cuenta", error);
+    // La cuenta no quedó: la tarjeta tampoco. Se deshace lo que se hizo en
+    // Stampee, en el orden inverso. Mejor esfuerzo: el reintento de la cola
+    // vuelve a pasar por acá con la misma llave, que es idempotente.
+    if (redeemedNow && usedGift !== null) await compensateRedeem(usedGift.code, redeemRef);
+    if (releasedPrevious && previousCode !== null) {
+      const again = await redeemGiftCard(previousCode, {
+        externalRef: redeemRef,
+        amountUsedCop: previousAmount,
+        customer: null,
+        date: pricing.promoDate ?? instantToEaLocal(now).slice(0, 10),
+      });
+      if (!again.ok) {
+        console.error("[hoy] la tarjeta anterior quedó liberada sin la cuenta", previousCode, again.message);
+      }
+    }
     return masTarde("No se pudo guardar. Queda pendiente y se reintenta solo.");
   }
 
@@ -651,6 +846,113 @@ export async function revisarPrimeraVisita(eaAppointmentId: number): Promise<Fir
   } catch (error) {
     unstable_rethrow(error);
     return "desconocido";
+  }
+}
+
+// ── Tarjeta regalo ──────────────────────────────────────────────────────────
+
+type GiftLookup =
+  | { kind: "later"; message: string }
+  | { kind: "checked"; card: GiftCardDto | null; check: GiftCardCheck };
+
+/**
+ * Lee la tarjeta de Stampee y la valida contra esta cita. Si es promocional y
+ * solo para clientas nuevas, pregunta al historial (la misma pregunta del 10 %).
+ */
+async function loadGiftCardFor(
+  ea: ReturnType<typeof createEaClient>,
+  appointment: { customerId: number | null; start: EaLocalDateTime },
+  code: string,
+  redeemRef: string,
+): Promise<GiftLookup> {
+  let card: GiftCardDto | null;
+  try {
+    card = await getGiftCardByCode(code);
+  } catch (error) {
+    console.error("[hoy] no se pudo leer la tarjeta regalo", code, error);
+    return { kind: "later", message: "Stampee no respondió para revisar la tarjeta regalo. Se reintenta solo." };
+  }
+  if (card === null) {
+    return {
+      kind: "checked",
+      card: null,
+      check: { ok: false, message: `No hay ninguna tarjeta regalo con el código ${code}.` },
+    };
+  }
+
+  let newOrDormant: boolean | null = null;
+  if (!card.funded && card.rules?.recipient === "new_or_dormant") {
+    const status = await detectFirstVisit(ea, appointment);
+    newOrDormant =
+      status === "primera" || status === "recuperacion" ? true : status === "desconocido" ? null : false;
+  }
+
+  const date = promoDateOf(appointment.start) ?? instantToEaLocal(new Date()).slice(0, 10);
+  return { kind: "checked", card, check: checkGiftCard(card, { date, redeemRef, newOrDormant }) };
+}
+
+/** El nombre y el celular de la clienta, para que Stampee enlace la tarjeta. Mejor esfuerzo. */
+async function customerOf(
+  ea: ReturnType<typeof createEaClient>,
+  customerId: number | null,
+): Promise<{ name: string; phone: string } | null> {
+  if (customerId === null) return null;
+  try {
+    const customer = await ea.customers.get(customerId);
+    const name = [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim();
+    return customer.phone ? { name: name || customer.phone, phone: customer.phone } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Deshace una redención hecha en esta misma llamada. Mejor esfuerzo, con log. */
+async function compensateRedeem(code: string, redeemRef: string): Promise<void> {
+  const undone = await unredeemGiftCard(code, { externalRef: redeemRef });
+  if (!undone.ok) {
+    console.error("[hoy] la tarjeta quedó redimida sin la cuenta", code, undone.message);
+  }
+}
+
+/**
+ * **"Revisar" la tarjeta regalo** desde la hoja: la tarjeta lista para
+ * aplicarse, o por qué no. Solo lectura: no redime nada (eso pasa al guardar).
+ *
+ * Nunca lanza.
+ */
+export async function consultarTarjetaRegalo(
+  eaAppointmentId: number,
+  rawCode: string,
+): Promise<GiftCardLookupResult> {
+  if (!Number.isSafeInteger(eaAppointmentId) || eaAppointmentId <= 0) {
+    return { ok: false, message: "La cita no es válida." };
+  }
+  const code = normalizeGiftCode(rawCode);
+  if (code === null) {
+    return { ok: false, message: "Ese código no es de una tarjeta regalo. Es TR- y ocho letras o números." };
+  }
+
+  try {
+    const session = await requireCapability("cuenta:cerrar-propia");
+    const ea = createEaClient();
+    const appointment = await ea.appointments.get(eaAppointmentId);
+    await requireOwnProvider(appointment.providerId);
+
+    const lookup = await loadGiftCardFor(ea, appointment, code, giftCardRedeemRef(eaAppointmentId));
+    if (lookup.kind === "later") return { ok: false, message: lookup.message };
+    if (!lookup.check.ok) return lookup.check;
+    if (lookup.check.quote.funded && !can(session.role, "cuenta:cobrar", { staffCobra: staffCobra() })) {
+      return {
+        ok: false,
+        message: "Esta tarjeta regalo es un pago: la registra recepción al cobrar. Guarda la cuenta sin ella.",
+      };
+    }
+    return lookup.check;
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ForbiddenError) return { ok: false, message: "Esta cita no es tuya." };
+    console.error("[hoy] no se pudo revisar la tarjeta regalo", error);
+    return { ok: false, message: "No se pudo revisar la tarjeta. Intenta de nuevo en un momento." };
   }
 }
 

@@ -61,6 +61,7 @@ import { attendanceOutcome, noShowRate, type AttendanceOutcome } from "@/lib/att
 import { priceVariance, type TicketItemInput } from "@/lib/ticket";
 import type {
   Cop,
+  AccountPaymentMethod,
   PaymentMethod,
   SnapshotSource,
   VarianceReasonCode,
@@ -130,7 +131,7 @@ export type FinanceRow = {
    * transferencia. El total por método suma **pago por pago**, no la cuenta
    * entera al método "principal": no existe tal cosa.
    */
-  payments: readonly { method: PaymentMethod; amount: Cop }[];
+  payments: readonly { method: AccountPaymentMethod; amount: Cop }[];
   varianceReasonCode: VarianceReasonCode | null;
   closed: boolean;
   /** Cortesía de la casa: cerrada, sin cobro, y fuera de todo reporte de ventas. */
@@ -205,10 +206,21 @@ export const PAYMENT_METHODS: readonly PaymentMethod[] = [
   "otro",
 ];
 
-export const PAYMENT_LABEL: Record<PaymentMethod, string> = {
+/**
+ * Los métodos de **una cuenta** del panel: los tres de Strapi más la tarjeta
+ * regalo pagada (`bono`, migración `033`), que se ve como su propio renglón.
+ * El historial de Agenda Pro sigue con {@link PAYMENT_METHODS}: ahí no existía.
+ */
+export const ACCOUNT_PAYMENT_METHODS: readonly AccountPaymentMethod[] = [
+  ...PAYMENT_METHODS,
+  "bono",
+];
+
+export const PAYMENT_LABEL: Record<AccountPaymentMethod, string> = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
   otro: "Otro",
+  bono: "Tarjeta regalo",
 };
 
 export type DailyClose = {
@@ -222,7 +234,7 @@ export type DailyClose = {
    * dato que falta, y sumarlo a "otro" lo escondería.
    */
   withoutMethod: number;
-  byMethod: { method: PaymentMethod; label: string; amount: Cop; count: number }[];
+  byMethod: { method: AccountPaymentMethod; label: string; amount: Cop; count: number }[];
   byProvider: { eaProviderId: number | null; name: string; revenue: Cop; tips: Cop; count: number }[];
   /**
    * Si el día ya está cerrado, cuándo y por quién queda del lado de Caja: acá
@@ -257,7 +269,7 @@ export function dailyClose(
   const revenue = closed.reduce((total, row) => total + (chargedOf(row) ?? 0), 0);
   const tips = closed.reduce((total, row) => total + row.tip, 0);
 
-  const byMethod = PAYMENT_METHODS.map((method) => {
+  const byMethod = ACCOUNT_PAYMENT_METHODS.map((method) => {
     // Se suma pago por pago y se cuentan **cuentas**, no pagos: "3 cuentas en
     // efectivo" es lo que alguien compara contra el cajón. Una cuenta partida
     // aporta su parte a cada método y cuenta una vez en cada uno — que es lo

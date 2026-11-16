@@ -236,6 +236,13 @@ describe("can — recepción y dueña", () => {
     expect(can("staff", "cortesia:otorgar", { staffCobra: true })).toBe(false);
   });
 
+  it("dueña y recepción venden tarjetas regalo; la técnica no", () => {
+    expect(can("owner", "regalos:vender")).toBe(true);
+    expect(can("admin", "regalos:vender")).toBe(true);
+    expect(can("staff", "regalos:vender")).toBe(false);
+    expect(can("staff", "regalos:vender", { staffCobra: true })).toBe(false);
+  });
+
   it("recepción ve las tarjetas de sellos y aplica el premio", () => {
     expect(can("admin", "fidelidad:ver")).toBe(true);
     expect(can("admin", "fidelidad:canjear")).toBe(true);

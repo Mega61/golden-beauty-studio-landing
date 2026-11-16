@@ -3,7 +3,7 @@ import { siteConfig } from "@/config/site";
 import { locales } from "./[lang]/dictionaries";
 
 /**
- * Landing + careers page, one entry per locale with hreflang alternates. `/bio`
+ * Landing + careers + gift cards, one entry per locale with hreflang alternates. `/bio`
  * is deliberately absent: it's a link tree for Instagram traffic, not a page
  * worth ranking.
  */
@@ -40,5 +40,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...(siteConfig.sections.trabaja
       ? entry("/trabaja-con-nosotros", "monthly", 0.6)
       : []),
+    // Tarjetas regalo: same rule, listed only while the page is on.
+    ...(siteConfig.sections.regalar ? entry("/regalar", "monthly", 0.7) : []),
   ];
 }

@@ -142,6 +142,10 @@ export const siteConfig = {
     // "Encuentra tu tarjeta Golden" (`#mi-tarjeta`) y su fila del /bio.
     tarjeta: bool(process.env.NEXT_PUBLIC_SECTION_TARJETA, true),
     trabaja: sectionTrabaja,
+    // Tarjetas regalo (`/regalar`): the page, its nav/footer links and its
+    // sitemap entry. Off = 404, so a season that ended doesn't leave a live
+    // order form behind.
+    regalar: bool(process.env.NEXT_PUBLIC_SECTION_REGALAR, true),
   },
 } as const;
 

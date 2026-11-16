@@ -13,6 +13,7 @@ import {
   type SkippedAccount,
   type SyncDayResult,
 } from "./day-close";
+import { summarizeGiftSaleSync, syncGiftCardSales, type GiftSaleSyncOutcome } from "./gift-card-sales";
 
 /**
  * **La sincronización nocturna de la caja.** Lo que antes dependía de que
@@ -31,6 +32,8 @@ import {
  * 3. **Cada ajuste sin mandar**: las cuentas que se corrigieron desde Hoy
  *    después de haber llegado a Actual (`recordEditAdjustment()`), y los
  *    ajustes cuyo push falló.
+ * 4. **Las tarjetas regalo vendidas** que no viajaron, y las anulaciones de
+ *    las que ya viajaron (`jobs/gift-card-sales.ts`).
  *
  * Hoy no se toca: el día no terminó, y hasta que la noche llegue una cuenta se
  * corrige sin que nada haya salido todavía.
@@ -43,6 +46,8 @@ export type NightlySyncReport = {
   adjustments: { eaAppointmentId: number; outcome: PushOutcome | { state: "sin-cuenta" } }[];
   /** Cuentas cobradas que no pudieron viajar, con el día y el motivo. */
   skipped: (SkippedAccount & { date: EaLocalDate })[];
+  /** Las tarjetas regalo vendidas. `null` = no se corrió (nada que hacer). */
+  giftSales?: GiftSaleSyncOutcome | null;
 };
 
 const startOf = (date: EaLocalDate): Date =>
@@ -95,6 +100,18 @@ export async function runNightlySync(
     report.adjustments.push({ eaAppointmentId: row.ea_appointment_id, outcome });
   }
 
+  // Las ventas de tarjetas regalo: independientes de los días de citas. Un
+  // fallo acá no tumba lo demás de la noche.
+  try {
+    report.giftSales = await syncGiftCardSales(deps, { from: startOf(from), to: startOf(today), now });
+  } catch (error) {
+    report.giftSales = {
+      state: "fallo",
+      message: error instanceof Error ? error.message : String(error),
+      retryable: true,
+    };
+  }
+
   return report;
 }
 
@@ -128,6 +145,8 @@ export function summarizeNightlySync(report: NightlySyncReport): string {
     const ok = report.adjustments.filter((a) => a.outcome.state === "hecho").length;
     parts.push(`ajustes: ${ok}/${report.adjustments.length} enviados`);
   }
+  const gift = report.giftSales ? summarizeGiftSaleSync(report.giftSales) : null;
+  if (gift !== null) parts.push(gift);
   if (report.skipped.length > 0) {
     parts.push(`sin poder viajar: ${report.skipped.map((s) => `#${s.eaAppointmentId} (${s.message})`).join(", ")}`);
   }
@@ -138,7 +157,8 @@ export function summarizeNightlySync(report: NightlySyncReport): string {
 export function nightlySyncFailed(report: NightlySyncReport): boolean {
   return (
     report.days.some((day) => day.result.state === "sincronizado" && day.result.push.state === "fallo") ||
-    report.adjustments.some((a) => a.outcome.state === "fallo")
+    report.adjustments.some((a) => a.outcome.state === "fallo") ||
+    report.giftSales?.state === "fallo"
   );
 }
 
