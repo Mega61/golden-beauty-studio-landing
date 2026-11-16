@@ -7,7 +7,7 @@ import { getDb } from "@/db/client";
 import { stampeeCardShareRepository } from "@/db/repositories";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
-import { cardShareLink, pendingShares } from "@/lib/stampee/card-share";
+import { cardShareLink, cardUrl, pendingShares, wasSent } from "@/lib/stampee/card-share";
 import { loadLoyalty } from "@/lib/stampee/client";
 import { activeRows } from "@/lib/stampee/model";
 
@@ -75,12 +75,17 @@ export default async function FidelidadPage() {
       clientName: client.name,
       mobile: client.mobile,
       fichaHref: e164 ? `/clientes/${e164.slice(1)}` : null,
-      cardUrl: data.cardBaseUrl ? `${data.cardBaseUrl}/${card.uniqueId}` : null,
+      cardUrl: cardUrl(data.cardBaseUrl, card, client.publicId),
       share:
-        cardShareLink({ phone: client.mobile, customerName: client.name, card, cardBaseUrl: data.cardBaseUrl }) ===
-        null
+        cardShareLink({
+          phone: client.mobile,
+          customerName: client.name,
+          card,
+          cardBaseUrl: data.cardBaseUrl,
+          publicId: client.publicId,
+        }) === null
           ? null
-          : { sent: sent.has(card.id), pending: pending.has(card.id) },
+          : { sent: wasSent(client, card, sent), pending: pending.has(card.id) },
       card,
     };
   });

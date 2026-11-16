@@ -589,6 +589,8 @@ export type WinbackCardOutcome =
       /** `false` = ya tenía una tarjeta activa de esa campaña y se reusó. */
       created: boolean;
       cardBaseUrl: string;
+      /** El link permanente de la clienta, si Stampee ya lo manda; si no, el link es el de la tarjeta. */
+      publicId: string | null;
     }
   | { ok: false; message: string };
 
@@ -665,12 +667,22 @@ export async function issueWinbackCard(input: {
     const existing = (customer.cards ?? []).find(
       (card) => card.campaignId === campaign.id && card.status !== "Redeemed",
     );
-    if (existing) return { ok: true, customerId: customer.id, card: summary(existing), created: false, cardBaseUrl };
+    if (existing) {
+      return {
+        ok: true,
+        customerId: customer.id,
+        card: summary(existing),
+        created: false,
+        cardBaseUrl,
+        publicId: customer.publicId ?? null,
+      };
+    }
   }
 
   try {
     // La ficha con tarjetas primero: es la que el CRM y el kiosko ya conocen.
-    let customerId = [...matches].sort((a, b) => (b.cards?.length ?? 0) - (a.cards?.length ?? 0))[0]?.id;
+    const known = [...matches].sort((a, b) => (b.cards?.length ?? 0) - (a.cards?.length ?? 0))[0];
+    let customerId = known?.id;
     if (customerId === undefined) {
       const created = await call<{ id: string }>(config, "/customers", {
         method: "POST",
@@ -678,7 +690,7 @@ export async function issueWinbackCard(input: {
       });
       customerId = created.id;
     }
-    const card = await call<StampeeCardRaw>(config, "/cards", {
+    const card = await call<StampeeCardRaw & { customerPublicId?: string | null }>(config, "/cards", {
       method: "POST",
       body: JSON.stringify({ customerId, campaignId: campaign.id }),
     });
@@ -701,7 +713,15 @@ export async function issueWinbackCard(input: {
       console.error("[stampee] la tarjeta de regalo quedó sin renglón de emisión", error);
     }
 
-    return { ok: true, customerId, card: summary(card), created: true, cardBaseUrl };
+    return {
+      ok: true,
+      customerId,
+      card: summary(card),
+      created: true,
+      cardBaseUrl,
+      // `POST /cards` trae el link permanente de la clienta (`customerPublicId`).
+      publicId: card.customerPublicId ?? known?.publicId ?? null,
+    };
   } catch (error) {
     console.error("[stampee] no se pudo emitir la tarjeta de regalo", error);
     return { ok: false, message: "Stampee no aceptó la tarjeta nueva. Intenta de nuevo." };

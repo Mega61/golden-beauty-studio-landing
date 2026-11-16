@@ -168,7 +168,8 @@ export default async function HoyPage({
 
   const appointments = citas.map((appointment) => {
     if (!loyalty?.ok) return appointment;
-    const cards = clientsForPhone(loyalty.data, appointment.customerPhone).flatMap((client) => client.cards);
+    const clients = clientsForPhone(loyalty.data, appointment.customerPhone);
+    const cards = clients.flatMap((client) => client.cards);
     const card = leadingCard(cards);
     const share =
       sentCardIds === null
@@ -181,6 +182,7 @@ export default async function HoyPage({
             phone: appointment.customerPhone,
             customerName: appointment.customerName,
             cardBaseUrl: loyalty.data.cardBaseUrl,
+            publicId: clients.find((c) => card !== null && c.cards.includes(card))?.publicId ?? null,
           });
     return {
       ...appointment,

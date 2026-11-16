@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildCardShareText,
   cardShareLink,
+  cardUrl,
   hoyCardShare,
   pendingShares,
   SHARE_PENDING_DAYS,
+  wasSent,
 } from "./card-share";
 import type { LoyaltyCard, LoyaltyClient } from "./model";
 
@@ -33,8 +35,50 @@ function card(over: Partial<LoyaltyCard> = {}): LoyaltyCard {
 }
 
 function client(over: Partial<LoyaltyClient> = {}): LoyaltyClient {
-  return { id: "c-1", name: "GERALDINE ORTIZ", mobile: "310 362 7503", phoneKey: "3103627503", cards: [], ...over };
+  return {
+    id: "c-1",
+    name: "GERALDINE ORTIZ",
+    mobile: "310 362 7503",
+    phoneKey: "3103627503",
+    publicId: null,
+    cards: [],
+    ...over,
+  };
 }
+
+const PUBLIC_ID = "p-geraldine";
+
+describe("cardUrl", () => {
+  it("con link permanente usa el de la clienta, no el de la tarjeta", () => {
+    expect(cardUrl(BASE, card(), PUBLIC_ID)).toBe(`${BASE}/${PUBLIC_ID}`);
+  });
+
+  it("sin link permanente (Stampee viejo) sigue con el de la tarjeta", () => {
+    expect(cardUrl(BASE, card())).toBe(`${BASE}/u-1`);
+    expect(cardUrl(BASE, card(), null)).toBe(`${BASE}/u-1`);
+  });
+
+  it("sin STAMPEE_APP_URL / slug no hay link", () => {
+    expect(cardUrl(null, card(), PUBLIC_ID)).toBeNull();
+  });
+});
+
+describe("wasSent", () => {
+  const first = card({ id: "card-1" });
+  const second = card({ id: "card-2", uniqueId: "u-2" });
+
+  it("con link permanente, mandar cualquiera de sus tarjetas cuenta para todas", () => {
+    const c = client({ publicId: PUBLIC_ID, cards: [first, second] });
+    expect(wasSent(c, second, new Set(["card-1"]))).toBe(true);
+    expect(wasSent(c, second, new Set())).toBe(false);
+  });
+
+  it("sin link permanente es tarjeta por tarjeta: el link viejo abre la tarjeta vieja", () => {
+    const c = client({ cards: [first, second] });
+    expect(wasSent(c, second, new Set(["card-1"]))).toBe(false);
+    expect(wasSent(c, second, new Set(["card-2"]))).toBe(true);
+  });
+});
 
 describe("buildCardShareText", () => {
   it("saluda con el nombre presentable y lleva el link en su renglón", () => {
@@ -65,6 +109,19 @@ describe("cardShareLink", () => {
     expect(decodeURIComponent(link!.split("text=")[1])).toContain(`${BASE}/u-1`);
   });
 
+  it("con link permanente manda el de la clienta", () => {
+    const link = cardShareLink({
+      phone: "310 362 7503",
+      customerName: "Geraldine",
+      card: card(),
+      cardBaseUrl: BASE,
+      publicId: PUBLIC_ID,
+    });
+    const text = decodeURIComponent(link!.split("text=")[1]);
+    expect(text).toContain(`${BASE}/${PUBLIC_ID}`);
+    expect(text).not.toContain(`${BASE}/u-1`);
+  });
+
   it("sin el link público de Stampee o sin número no hay botón", () => {
     expect(cardShareLink({ phone: "3103627503", customerName: null, card: card(), cardBaseUrl: null })).toBeNull();
     expect(cardShareLink({ phone: "no tiene", customerName: null, card: card(), cardBaseUrl: BASE })).toBeNull();
@@ -88,6 +145,35 @@ describe("pendingShares", () => {
     expect(pendingShares(rows, new Set(), NOW)).toEqual([]);
   });
 
+  it("con link permanente, una tarjeta nueva de una clienta que ya recibió el link no se vuelve a pedir", () => {
+    const old = card({ id: "card-old", stage: "canjeada" });
+    const fresh = card({ id: "card-new", uniqueId: "u-new" });
+    const c = client({ publicId: PUBLIC_ID, cards: [fresh, old] });
+    expect(pendingShares([{ client: c, card: fresh }], new Set(["card-old"]), NOW)).toEqual([]);
+    // Sin link permanente, la tarjeta nueva sí se pide: su link es otro.
+    const legacy = client({ cards: [fresh, old] });
+    expect(pendingShares([{ client: legacy, card: fresh }], new Set(["card-old"]), NOW)).toHaveLength(1);
+  });
+
+  it("con link permanente sale una sola fila por clienta, aunque tenga dos tarjetas sin mandar", () => {
+    const a = card({ id: "a" });
+    const b = card({ id: "b", uniqueId: "u-b" });
+    const c = client({ publicId: PUBLIC_ID, cards: [a, b] });
+    const rows = [
+      { client: c, card: a },
+      { client: c, card: b },
+    ];
+    expect(pendingShares(rows, new Set(), NOW).map((r) => r.card.id)).toEqual(["a"]);
+    const legacy = client({ cards: [a, b] });
+    expect(
+      pendingShares(
+        rows.map((r) => ({ ...r, client: legacy })),
+        new Set(),
+        NOW,
+      ),
+    ).toHaveLength(2);
+  });
+
   it("no pide la de una clienta sin celular usable: no habría a dónde mandarla", () => {
     expect(pendingShares([{ client: client({ mobile: null }), card: card() }], new Set(), NOW)).toEqual([]);
   });
@@ -108,6 +194,21 @@ describe("hoyCardShare", () => {
     const share = hoyCardShare({ ...base, closed: true, cards: [card()], leading: card() });
     expect(share?.state).toBe("enviar");
     expect(share && share.state === "enviar" ? share.cardId : null).toBe("card-1");
+  });
+
+  it("con link permanente no insiste si ya se le mandó otra de sus tarjetas", () => {
+    const fresh = card({ id: "card-2", uniqueId: "u-2" });
+    const old = card({ id: "card-1", stage: "canjeada" });
+    const args = { ...base, closed: true, cards: [fresh, old], leading: fresh, sent: new Set(["card-1"]) };
+    expect(hoyCardShare({ ...args, publicId: PUBLIC_ID })).toBeNull();
+    expect(hoyCardShare({ ...args, publicId: null })?.state).toBe("enviar");
+  });
+
+  it("con link permanente el botón manda el link de la clienta", () => {
+    const share = hoyCardShare({ ...base, closed: true, cards: [card()], leading: card(), publicId: PUBLIC_ID });
+    expect(share?.state).toBe("enviar");
+    const whatsapp = share && share.state === "enviar" ? share.whatsapp : "";
+    expect(decodeURIComponent(whatsapp.split("text=")[1])).toContain(`${BASE}/${PUBLIC_ID}`);
   });
 
   it("ya mandada, o con todas canjeadas, no insiste", () => {

@@ -8,7 +8,7 @@ import { getDb } from "@/db/client";
 import { auditLogRepository, stampeeCardShareRepository } from "@/db/repositories";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { instantToEaDate } from "@/lib/ea";
-import { cardShareLink } from "@/lib/stampee/card-share";
+import { cardShareLink, wasSent } from "@/lib/stampee/card-share";
 import { loadLoyalty, redeemCard } from "@/lib/stampee/client";
 
 import type { SendOutcome } from "../recordatorios/open-whatsapp";
@@ -96,6 +96,7 @@ export async function enviarTarjeta(cardId: string): Promise<SendOutcome> {
       customerName: owner.name,
       card,
       cardBaseUrl: loyalty.data.cardBaseUrl,
+      publicId: owner.publicId,
     });
     if (url === null) {
       return {
@@ -107,7 +108,7 @@ export async function enviarTarjeta(cardId: string): Promise<SendOutcome> {
     }
 
     const shares = stampeeCardShareRepository(getDb());
-    const already = (await shares.listSentCardIds()).has(parsed.data);
+    const already = wasSent(owner, card, await shares.listSentCardIds());
     await shares.markSent(parsed.data, session.userId, new Date());
 
     revalidatePath("/fidelidad");

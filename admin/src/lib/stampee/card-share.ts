@@ -8,6 +8,14 @@
  * y decide a quién todavía no se le mandó; el panel guarda quién lo mandó
  * (`stampee_card_share`, migración `029`).
  *
+ * **Un link por clienta.** Stampee le da a cada clienta un link permanente
+ * (`publicId`) que siempre abre su tarjeta vigente, así que lo que se manda es
+ * la clienta, no la tarjeta: si a una ya se le mandó el link de cualquiera de
+ * sus tarjetas, una tarjeta nueva no se vuelve a pedir. Las filas siguen siendo
+ * por tarjeta (la que se mostró al mandar), sin migración. Con un Stampee que
+ * todavía no manda `publicId` el link es el de la tarjeta, y entonces sí se
+ * cuenta tarjeta por tarjeta: un link viejo abre la tarjeta vieja.
+ *
  * "Mandado" quiere decir que alguien tocó el botón, que abre el chat con el
  * texto ya escrito. Si después no le dio "enviar" en WhatsApp, el panel no se
  * entera — igual que con los recordatorios manuales.
@@ -16,7 +24,7 @@
 import { normalizePhoneE164 } from "@/app/(panel)/clientes/identity";
 import { presentableFirstName, waMeLink } from "@/lib/whatsapp/manual-reminder";
 
-import type { LoyaltyCard, LoyaltyRow } from "./model";
+import type { LoyaltyCard, LoyaltyClient, LoyaltyRow } from "./model";
 
 /**
  * Cuántos días hacia atrás una tarjeta sin mandar se sigue pidiendo.
@@ -27,9 +35,32 @@ import type { LoyaltyCard, LoyaltyRow } from "./model";
  */
 export const SHARE_PENDING_DAYS = 30;
 
-/** El link público de la tarjeta, como lo abre la clienta. */
-export function cardUrl(cardBaseUrl: string | null, card: Pick<LoyaltyCard, "uniqueId">): string | null {
-  return cardBaseUrl ? `${cardBaseUrl}/${card.uniqueId}` : null;
+/**
+ * El link público, como lo abre la clienta: el permanente de la clienta
+ * (`publicId`) si Stampee lo manda, si no el de la tarjeta.
+ */
+export function cardUrl(
+  cardBaseUrl: string | null,
+  card: Pick<LoyaltyCard, "uniqueId">,
+  publicId: string | null = null,
+): string | null {
+  return cardBaseUrl ? `${cardBaseUrl}/${publicId ?? card.uniqueId}` : null;
+}
+
+/**
+ * ¿Ya se le mandó el link a esta clienta, para esta tarjeta?
+ *
+ * Con link permanente basta con que se le haya mandado cualquiera de sus
+ * tarjetas: el link viejo de una tarjeta también lleva a su página. Sin él, es
+ * tarjeta por tarjeta.
+ */
+export function wasSent(
+  client: Pick<LoyaltyClient, "publicId"> & { cards: readonly Pick<LoyaltyCard, "id">[] },
+  card: Pick<LoyaltyCard, "id">,
+  sent: ReadonlySet<string>,
+): boolean {
+  if (sent.has(card.id)) return true;
+  return client.publicId !== null && client.cards.some((c) => sent.has(c.id));
 }
 
 /**
@@ -69,9 +100,11 @@ export function cardShareLink(input: {
   customerName: string | null;
   card: Pick<LoyaltyCard, "uniqueId" | "stamps" | "totalStamps" | "rewardName">;
   cardBaseUrl: string | null;
+  /** El link permanente de la clienta; sin él va el de la tarjeta. */
+  publicId?: string | null;
 }): string | null {
   const e164 = normalizePhoneE164(input.phone);
-  const url = cardUrl(input.cardBaseUrl, input.card);
+  const url = cardUrl(input.cardBaseUrl, input.card, input.publicId ?? null);
   if (e164 === null || url === null) return null;
   return waMeLink(
     e164,
@@ -87,8 +120,11 @@ export function cardShareLink(input: {
 
 /**
  * Las tarjetas activas, emitidas hace menos de {@link SHARE_PENDING_DAYS} días,
- * que nadie le ha mandado a su clienta. Una tarjeta sin fecha de emisión no
- * entra: no se puede saber si es de antes del panel.
+ * cuya clienta no ha recibido el link ({@link wasSent}). Una tarjeta sin fecha
+ * de emisión no entra: no se puede saber si es de antes del panel.
+ *
+ * Con link permanente sale **una fila por clienta** (la primera que llega,
+ * que en `activeRows()` es la más cerca del premio): es un solo mensaje.
  */
 export function pendingShares(
   rows: readonly LoyaltyRow[],
@@ -96,14 +132,20 @@ export function pendingShares(
   now: Date,
 ): LoyaltyRow[] {
   const since = now.getTime() - SHARE_PENDING_DAYS * 24 * 60 * 60 * 1000;
-  return rows.filter(
-    ({ client, card }) =>
+  const seen = new Set<string>();
+  return rows.filter(({ client, card }) => {
+    const pending =
       card.stage !== "canjeada" &&
-      !sent.has(card.id) &&
+      !wasSent(client, card, sent) &&
       card.issuedAt !== null &&
       Date.parse(card.issuedAt) >= since &&
-      normalizePhoneE164(client.mobile) !== null,
-  );
+      normalizePhoneE164(client.mobile) !== null;
+    if (!pending) return false;
+    if (client.publicId === null) return true;
+    if (seen.has(client.id)) return false;
+    seen.add(client.id);
+    return true;
+  });
 }
 
 /**
@@ -129,18 +171,22 @@ export function hoyCardShare(input: {
   phone: string | null | undefined;
   customerName: string | null;
   cardBaseUrl: string | null;
+  /** El link permanente de la clienta; con él, cualquier tarjeta mandada cuenta. */
+  publicId?: string | null;
 }): HoyCardShare {
   if (!input.closed) return null;
   if (input.cards.length === 0) return { state: "manana" };
   // Tuvo tarjetas y todas están canjeadas: el CRM solo le emite tarjeta a
   // quien no tiene ninguna, así que no se le promete una para mañana.
   const card = input.leading;
-  if (card === null || input.sent.has(card.id)) return null;
+  const publicId = input.publicId ?? null;
+  if (card === null || wasSent({ publicId, cards: input.cards }, card, input.sent)) return null;
   const whatsapp = cardShareLink({
     phone: input.phone,
     customerName: input.customerName,
     card,
     cardBaseUrl: input.cardBaseUrl,
+    publicId,
   });
   return whatsapp === null ? null : { state: "enviar", cardId: card.id, whatsapp };
 }

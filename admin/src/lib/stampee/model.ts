@@ -56,6 +56,11 @@ export type StampeeCustomerRaw = {
   email?: string | null;
   mobile?: string | null;
   status?: string;
+  /**
+   * El link permanente de la clienta (`/:slug/<publicId>`), que no cambia
+   * aunque le emitan tarjetas nuevas. Un Stampee anterior no lo manda.
+   */
+  publicId?: string | null;
   cards?: StampeeCardRaw[];
 };
 
@@ -105,6 +110,8 @@ export type LoyaltyClient = {
   mobile: string | null;
   /** Los últimos 10 dígitos del celular; la llave para cruzar con EA. */
   phoneKey: string | null;
+  /** Su link permanente en Stampee, o `null` si el Stampee no lo manda todavía. */
+  publicId: string | null;
   /** Activas primero, de la más cerca del premio a la más lejos; luego canjeadas. */
   cards: LoyaltyCard[];
 };
@@ -241,6 +248,7 @@ export function buildSnapshot(
     name: customer.name,
     mobile: customer.mobile ?? null,
     phoneKey: phoneKey(customer.mobile),
+    publicId: str(customer.publicId) ?? null,
     cards: (customer.cards ?? [])
       .map((card) => summarizeCard(card, card.campaignId ? campaignById.get(card.campaignId) : undefined))
       .sort(compareCards),
