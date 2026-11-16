@@ -137,9 +137,9 @@ export const PROMOS_DATA: PromosBySlug = {
         eyebrow: "Gift",
         title: "Digital gift card",
         body:
-          "Send a gift card on WhatsApp in under 5 minutes. The recipient chooses date, technique and length.",
+          "Pick the card, pay by bank transfer and we send you the link to gift it on WhatsApp. The recipient chooses date, technique and design.",
         cta_label: "Buy the gift card",
-        cta_href: "#contacto",
+        cta_href: "/en/regalar",
         accent: "mocha",
         featured: false,
       },

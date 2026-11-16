@@ -122,6 +122,10 @@ export const siteConfig = {
     reviews: bool(process.env.NEXT_PUBLIC_SECTION_REVIEWS, true),
     contacto: bool(process.env.NEXT_PUBLIC_SECTION_CONTACTO, true),
     trabaja: sectionTrabaja,
+    // Tarjetas regalo (`/regalar`): the page, its nav/footer links and its
+    // sitemap entry. Off = 404, so a season that ended doesn't leave a live
+    // order form behind.
+    regalar: bool(process.env.NEXT_PUBLIC_SECTION_REGALAR, true),
   },
 } as const;
 

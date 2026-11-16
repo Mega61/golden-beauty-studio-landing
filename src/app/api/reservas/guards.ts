@@ -53,7 +53,13 @@ const hits = new Map<string, number[]>();
  * "Confirmar", and her booking came back 429. The bucket is what keeps reads
  * from spending the write's allowance.
  */
-export type RateBucket = "catalogo" | "disponibilidad" | "reservar" | "cotizar";
+export type RateBucket =
+  | "catalogo"
+  | "disponibilidad"
+  | "reservar"
+  | "cotizar"
+  | "regalos-tiers"
+  | "regalos";
 
 export function rateLimited(ip: string, max: number, bucket: RateBucket): boolean {
   const now = Date.now();
@@ -118,4 +124,9 @@ export function adminOrigin(): string | null {
 /** The panel is served under `/admin`, so its public API sits below that. */
 export function bookingUrl(origin: string, path: string): string {
   return `${origin}/admin/api/public/booking/${path}`;
+}
+
+/** Gift cards (`/regalar`): same panel, same public prefix, its own folder. */
+export function giftCardsUrl(origin: string, path: "tiers" | "order"): string {
+  return `${origin}/admin/api/public/gift-cards/${path}`;
 }
