@@ -179,6 +179,12 @@ describe("la venta de una tarjeta", () => {
     expect(() => buildGiftSalePayment({ ...venta, amount: 0 })).toThrow(IngestPayloadError);
     expect(() => buildGiftSalePayment({ ...venta, paidOn: "1/12/2026" })).toThrow(IngestPayloadError);
     expect(() => buildGiftSalePayment({ ...venta, code: "tr-ab12-cd34" })).toThrow(IngestIdError);
+    // Un método que no es de plata nunca viaja (ni `bono`, ni basura).
+    expect(() => buildGiftSalePayment({ ...venta, method: "bono" as never })).toThrow(IngestPayloadError);
+  });
+
+  it("la anulación tampoco viaja sin monto", () => {
+    expect(() => buildGiftSaleVoidAdjustment({ ...venta, amount: 0 })).toThrow(IngestPayloadError);
   });
 });
 
