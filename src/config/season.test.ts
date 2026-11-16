@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adventFor, parseSeasonOverride, seasonFor } from "./season";
+import { adventFor, adventNoteFor, parseSeasonOverride, seasonFor } from "./season";
 
 /** Un instante a la hora de Bogotá (UTC−5) dada. */
 const bogota = (iso: string) => new Date(`${iso}-05:00`);
@@ -69,5 +69,20 @@ describe("adventFor", () => {
   it("obedece el override", () => {
     expect(adventFor(bogota("2026-07-15T12:00:00"), "navidad")).toBe(true);
     expect(adventFor(bogota("2026-12-10T12:00:00"), "off")).toBe(false);
+  });
+});
+
+describe("adventNoteFor", () => {
+  it("anuncia el calendario desde que hay temporada hasta el 24 de diciembre", () => {
+    expect(adventNoteFor(bogota("2026-12-01T12:00:00"))).toBe(true);
+    expect(adventNoteFor(bogota("2026-12-24T23:00:00"))).toBe(true);
+    expect(adventNoteFor(bogota("2026-12-25T00:30:00"))).toBe(false);
+    expect(adventNoteFor(bogota("2027-01-03T12:00:00"))).toBe(false);
+    expect(adventNoteFor(bogota("2026-10-30T12:00:00"))).toBe(false);
+  });
+
+  it("respeta el override", () => {
+    expect(adventNoteFor(bogota("2026-12-28T12:00:00"), "navidad")).toBe(true);
+    expect(adventNoteFor(bogota("2026-12-10T12:00:00"), "off")).toBe(false);
   });
 });
