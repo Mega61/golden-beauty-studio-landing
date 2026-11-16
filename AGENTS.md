@@ -223,3 +223,11 @@ Montos fijos (niveles en Stampee), uso único, link público `/:slug/regalo/:uni
 - **Canje al cerrar la cuenta:** tarjeta pagada (`funded`) = pago con método `bono`, que **nunca** se manda al CRM (ya entró al venderla); comisión igual que siempre. Tarjeta promocional (`funded:false`, p. ej. adviento) = candidata de descuento en `resolveDiscount` (gana la mayor, no se acumula). Redeem en Stampee con `ea-appt:<id>` **antes** de escribir; si falla la escritura, `unredeem`. Quitar la tarjeta al editar la libera.
 - **Propina con cuenta 100 % en tarjeta:** va en `appointment_finance.tip_method` y viaja como fila `amount 0 + tip`.
 - Toda la lógica pura está en `lib/gift-cards.ts`; el cliente HTTP en el bloque de tarjetas regalo de `lib/stampee/client.ts`.
+
+## Encuentra tu tarjeta Golden (`#mi-tarjeta`)
+
+Sección de la landing (todo el año, antes de Contacto) donde la clienta escribe su celular y su primer nombre y recibe el link de su tarjeta de sellos de Stampee. La fila "Mi tarjeta Golden" del `/bio`, la fila de adviento del `/bio` y el botón de la banda de adviento llevan aquí. Se apaga con `NEXT_PUBLIC_SECTION_TARJETA=false` (y entonces la banda de adviento vuelve a `NEXT_PUBLIC_LOYALTY_URL`).
+
+- **Camino:** `MiTarjeta.tsx` → `POST /api/tarjeta/buscar` (cupo `tarjeta`, 8 por IP cada 10 min) → panel `api/public/tarjeta/buscar` → `lib/stampee/card-lookup.ts` sobre la caché de Stampee del panel (la misma de Fidelidad). No usa `/customers/lookup` de Stampee.
+- **Riesgo aceptado (2026-11-16):** el link es una llave al portador (sellos y "Mis regalos", incluidos códigos de tarjetas regalo). WhatsApp automático no está prendido, así que se muestra en pantalla; se pide celular **y** primer nombre. Celular desconocido y nombre errado responden igual (`{ found: false }`), y 5 nombres errados bloquean ese celular por una hora. Cuando la Cloud API esté prendida, lo correcto es mandarlo por WhatsApp en vez de mostrarlo.
+- **No encontrada** siempre ofrece "Pedirla por WhatsApp" (`whatsappMessageUrl`, con `api.whatsapp.com/send`).

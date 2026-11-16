@@ -95,10 +95,12 @@ export default function AdventBand({
           {dict.body}
         </p>
         <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-4">
+          {/* A la sección "Encuentra tu tarjeta" de esta misma página: ahí sale su
+              link, y el calendario vive en el reverso de su tarjeta. Sin la
+              sección, a la raíz de Stampee. */}
           <a
-            href={siteConfig.loyaltyUrl}
-            target="_blank"
-            rel="noopener"
+            href={siteConfig.sections.tarjeta ? "#mi-tarjeta" : siteConfig.loyaltyUrl}
+            {...(siteConfig.sections.tarjeta ? {} : { target: "_blank", rel: "noopener" })}
             className="inline-flex items-center gap-2.5 px-6 py-3.5 font-sans text-[11px] font-semibold uppercase tracking-[0.24em] text-carbon no-underline"
             style={{
               background:

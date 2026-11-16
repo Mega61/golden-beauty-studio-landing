@@ -15,6 +15,7 @@ export const BIO_COPY: BioCopy = {
     whatsapp: { label: "Escríbenos por WhatsApp", sub: "Respuesta el mismo día" },
     servicios: { label: "Servicios y precios", sub: "Catálogo completo del estudio" },
     instagram: { label: "Síguenos en Instagram", sub: "El trabajo, en detalle" },
+    tarjeta: { label: "Mi tarjeta Golden", sub: "Tus sellos · búscala con tu celular" },
     maps: { label: "Cómo llegar", sub: "Sabaneta · Calle 69 Sur" },
   },
   socials: {

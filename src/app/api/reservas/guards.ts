@@ -59,7 +59,8 @@ export type RateBucket =
   | "reservar"
   | "cotizar"
   | "regalos-tiers"
-  | "regalos";
+  | "regalos"
+  | "tarjeta";
 
 export function rateLimited(ip: string, max: number, bucket: RateBucket): boolean {
   const now = Date.now();

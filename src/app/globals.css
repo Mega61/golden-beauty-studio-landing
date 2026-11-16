@@ -260,6 +260,31 @@ a:hover .logo-full-mark {
   }
 }
 
+/* Sellos de "Encuentra tu tarjeta" (MiTarjeta.tsx): hilo de oro vacío, oro
+   lleno; los puestos aparecen uno tras otro al encontrarla. */
+@keyframes gbs-stamp-in {
+  0% { transform: scale(0.3); opacity: 0; }
+  70% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@layer components {
+  .gbs-stamp {
+    border: 1px solid rgba(172, 130, 49, 0.45);
+    background: transparent;
+  }
+  .gbs-stamp.is-on {
+    border-color: transparent;
+    background:
+      radial-gradient(circle at 34% 30%, var(--color-gold-pale) 0%, rgba(255, 241, 214, 0) 36%),
+      radial-gradient(circle at 50% 55%, var(--color-gold-bright) 0%, var(--color-gold) 55%, var(--color-gold-deep) 100%);
+    box-shadow: 0 2px 6px rgba(91, 43, 8, 0.25);
+    animation: gbs-stamp-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gbs-stamp.is-on { animation: none; }
+  }
+}
+
 /* ── Temporada: Navidad de pan de oro ─────────────────────────────────────
    Bolas de árbol en oro (`season/Bauble.tsx`) y su vaivén. Todo es transform
    sobre elementos pequeños — corre en el compositor, sin repintar la página.
