@@ -42,6 +42,14 @@ describe("findCard", () => {
     expect(findCard(snapshot, BASE, "573001234567", "María José")?.url).toBe(`${BASE}/u-1`);
   });
 
+  it("usa el link permanente de la clienta cuando existe", () => {
+    const withPublic = {
+      ...snapshot,
+      clients: snapshot.clients.map((c) => (c.id === "a" ? { ...c, publicId: "p-maria" } : c)),
+    };
+    expect(findCard(withPublic, BASE, "3001234567", "maria")?.url).toBe(`${BASE}/p-maria`);
+  });
+
   it("con el nombre equivocado no encuentra nada", () => {
     expect(findCard(snapshot, BASE, "3001234567", "Mariana")).toBeNull();
     expect(findCard(snapshot, BASE, "3001234567", "Pérez")).toBeNull();
