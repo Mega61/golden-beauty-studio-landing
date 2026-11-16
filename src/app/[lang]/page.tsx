@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDictionary, hasLocale } from "./dictionaries";
 import { bookingHref, siteConfig } from "@/config/site";
+import { currentAdvent, currentSeason } from "@/config/season";
 import { getActiveScenarios } from "@/data/promos";
 import { getReviews } from "@/data/reviews";
 import { getJobRoles } from "@/data/careers";
@@ -22,6 +23,13 @@ import FloatingActions from "./_components/FloatingActions";
 import BrandDivider from "./_components/BrandDivider";
 import BackToTop from "./_components/BackToTop";
 import JsonLd from "./_components/JsonLd";
+import AdventBand from "./_components/season/AdventBand";
+
+// La temporada (adornos de Navidad, banda de adviento) se decide por fecha al
+// renderizar. Sin esto la página sería estática si Strapi no está configurado y
+// los adornos solo cambiarían con un deploy; con esto, a lo sumo una hora tarde.
+// Las fetch de Strapi siguen mandando con sus 60 s cuando son más cortas.
+export const revalidate = 3600;
 
 export default async function Page({
   params,
@@ -38,16 +46,29 @@ export default async function Page({
   // Open cargos only matter when we're actually announcing them — skip the CMS
   // round-trip entirely when the hiring band is switched off.
   const hiringRoles = siteConfig.hiringBanner ? await getJobRoles(typedLang) : [];
+  const season = currentSeason();
+  const navidad = season === "navidad";
+  const advent = currentAdvent();
 
   return (
     <>
       <JsonLd lang={typedLang} dict={dict} />
       <PromoStrip scenarios={scenarios} dict={dict.promos} />
-      <Nav lang={lang} dict={dict.nav} sections={sections} />
-      <Hero dict={dict.hero} lang={lang} />
+      <Nav lang={lang} dict={dict.nav} sections={sections} ornament={navidad} />
+      <Hero
+        dict={dict.hero}
+        lang={lang}
+        season={season}
+        seasonEyebrow={dict.navidad.heroEyebrow}
+      />
       <Highlights
         scenarios={scenarios}
         dict={dict.promos}
+        advent={
+          advent ? (
+            <AdventBand dict={dict.navidad.adviento} bookingHref={bookingHref(lang)} />
+          ) : null
+        }
         hiring={
           siteConfig.hiringBanner ? (
             <VacantesBand
@@ -67,15 +88,19 @@ export default async function Page({
           currencySuffix={dict.servicios.labels.currencySuffix ?? ""}
         />
       )}
-      {sections.servicios && sections.diccionario && <BrandDivider />}
+      {sections.servicios && sections.diccionario && <BrandDivider garland={navidad} />}
       {sections.diccionario && <Diccionario dict={dict.diccionario} />}
-      {sections.diccionario && sections.tecnicas && <BrandDivider tone="dark" />}
+      {sections.diccionario && sections.tecnicas && <BrandDivider tone="dark" garland={navidad} />}
       {sections.tecnicas && <Tecnicas dict={dict.tecnicas} lang={lang} />}
-      {sections.tecnicas && sections.estudio && <BrandDivider />}
+      {sections.tecnicas && sections.estudio && <BrandDivider garland={navidad} />}
       {sections.estudio && <Estudio dict={dict.estudio} />}
       {sections.reviews && <Reviews dict={dict.reviews} data={reviews} />}
       {sections.contacto && <Contacto dict={dict.contacto} lang={lang} />}
-      <Footer dict={dict.footer} lang={lang} />
+      <Footer
+        dict={dict.footer}
+        lang={lang}
+        ornamentLabel={navidad ? dict.navidad.ornament : undefined}
+      />
       <FloatingActions dict={dict.floating} bookingHref={bookingHref(lang)} />
       <BackToTop label={dict.floating.backToTop} />
     </>

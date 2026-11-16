@@ -34,6 +34,11 @@ type Props = {
    * client bundle for no reason.
    */
   hiring?: React.ReactNode;
+  /**
+   * La banda del calendario de adviento (`season/AdventBand`), o null fuera de
+   * fecha. Slot de server component, por la misma razón que `hiring`.
+   */
+  advent?: React.ReactNode;
 };
 
 // Accent → background + text + cta colour. Cards never use border-radius and
@@ -476,7 +481,7 @@ function ScenarioGrid({
   );
 }
 
-export default function Highlights({ scenarios, dict, hiring }: Props) {
+export default function Highlights({ scenarios, dict, hiring, advent }: Props) {
   // Only scenarios that actually have cards become slides.
   const slides = scenarios.filter((s) => s.items.length > 0);
   const count = slides.length;
@@ -523,7 +528,7 @@ export default function Highlights({ scenarios, dict, hiring }: Props) {
   // promo and must not disappear just because the seasonal offer ended. It only
   // collapses to nothing when there's neither a promo nor a vacancy to announce.
   const hasPromos = count > 0;
-  if (!hasPromos && !hiring) return null;
+  if (!hasPromos && !hiring && !advent) return null;
   const scenario = hasPromos ? slides[current] : null;
 
   return (
@@ -630,8 +635,14 @@ export default function Highlights({ scenarios, dict, hiring }: Props) {
         {/* Hiring announcement — outside the height-locked carousel wrapper on
             purpose: anything inside it feeds the ResizeObserver that drives the
             cross-fade height, and a fixed band would fight the measurement. */}
-        {hiring && (
+        {advent && (
           <div className={hasPromos ? "mt-12 md:mt-16" : undefined}>
+            {advent}
+          </div>
+        )}
+
+        {hiring && (
+          <div className={hasPromos || advent ? "mt-12 md:mt-16" : undefined}>
             {hiring}
           </div>
         )}

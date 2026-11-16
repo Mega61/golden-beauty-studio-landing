@@ -773,6 +773,19 @@
     "termsClose": "Cerrar",
     "termsCloseAria": "Cerrar términos"
   },
+  "navidad": {
+    "heroEyebrow": "Temporada de brillo",
+    "ornament": "Un poco de brillo",
+    "adviento": {
+      "eyebrow": "Calendario de adviento",
+      "title": "Tu tarjeta Golden trae",
+      "title_em": "doce sorpresas.",
+      "body": "Del 2 al 24 de diciembre se abre una puerta nueva cada dos días, a las 7 a.m., en el reverso de tu tarjeta de sellos. Ábrela y descubre qué te tocó.",
+      "note": "¿Aún no tienes tarjeta? Te la creamos en tu próxima cita.",
+      "cta": "Abrir mi tarjeta",
+      "ctaBooking": "Agendar cita"
+    }
+  },
   "footer": {
     "tagline": "Estudio especializado en uñas.\nSabaneta · Medellín · Antioquia.",
     "visit": {
