@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
@@ -376,6 +377,7 @@ function AppointmentCard({
           </p>
           <WaSentLabels labels={appointment.waSent} />
           {appointment.loyalty ? <LoyaltyChip loyalty={appointment.loyalty} /> : null}
+          {appointment.advent ? <AdventChip advent={appointment.advent} /> : null}
           {appointment.cardShare?.state === "manana" ? (
             <p className={styles.loyalty}>
               <span className={styles.loyaltyReward}>
@@ -459,6 +461,24 @@ function AppointmentCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+/**
+ * Cupones del calendario de Adviento por usar. Lleva a la ficha, donde se ven
+ * el código y las condiciones y se marcan usados al cobrar.
+ */
+function AdventChip({ advent }: { advent: NonNullable<TodayAppointment["advent"]> }) {
+  const label =
+    advent.count === 1 ? "1 regalo de Adviento" : `${advent.count} regalos de Adviento`;
+  return (
+    <p className={styles.loyalty}>
+      <span className={`${styles.chip} ${styles.chipInfo}`}>
+        <Icon name="regalo" size={14} />
+        {advent.href ? <Link href={advent.href}>{label}</Link> : label}
+      </span>
+      <span className={styles.loyaltyReward}>por usar</span>
+    </p>
   );
 }
 

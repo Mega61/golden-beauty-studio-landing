@@ -124,6 +124,12 @@ export type TodayAppointment = {
    * ya se la mandaron, la cuenta sigue abierta, o quien mira no manda tarjetas.
    */
   cardShare?: { state: "enviar"; cardId: string } | { state: "manana" };
+  /**
+   * Cupones del calendario de Adviento que tiene por usar (Stampee). `href` =
+   * su ficha, donde se marcan usados; `null` si quien mira no abre fichas.
+   * Ausente = ninguno, o Stampee no respondió a tiempo.
+   */
+  advent?: { count: number; href: string | null };
   finance: TicketFinanceView;
 };
 
