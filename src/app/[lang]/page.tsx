@@ -22,6 +22,7 @@ import Footer from "./_components/Footer";
 import FloatingActions from "./_components/FloatingActions";
 import BrandDivider from "./_components/BrandDivider";
 import BackToTop from "./_components/BackToTop";
+import TreeToTop from "./_components/season/TreeToTop";
 import JsonLd from "./_components/JsonLd";
 import AdventBand from "./_components/season/AdventBand";
 
@@ -102,7 +103,11 @@ export default async function Page({
         snowman={navidad ? dict.navidad.snowman : undefined}
       />
       <FloatingActions dict={dict.floating} bookingHref={bookingHref(lang)} />
-      <BackToTop label={dict.floating.backToTop} />
+      {navidad ? (
+        <TreeToTop label={dict.floating.backToTop} />
+      ) : (
+        <BackToTop label={dict.floating.backToTop} />
+      )}
     </>
   );
 }
