@@ -8,6 +8,7 @@ import type { Role } from "@/components/shell/nav";
 import type { UserRole } from "@/db/types";
 import { requireCapability, sessionCan } from "@/lib/dal";
 
+import { FichaAdviento } from "../../fidelidad/FichaAdviento";
 import { FichaFidelidad } from "../../fidelidad/FichaFidelidad";
 import { loadClientProfile } from "../data";
 import { FichaClienta } from "../FichaClienta";
@@ -84,9 +85,14 @@ export default async function ClientaPage({
           canSeeLoyalty ? (
             // Stampee es otro servicio: la ficha no lo espera. La tarjeta de
             // sellos llega cuando llega.
-            <Suspense fallback={null}>
-              <FichaFidelidad phone={result.profile.client.phone} canRedeem={canRedeem} />
-            </Suspense>
+            <>
+              <Suspense fallback={null}>
+                <FichaFidelidad phone={result.profile.client.phone} canRedeem={canRedeem} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <FichaAdviento phone={result.profile.client.phone} canRedeem={canRedeem} />
+              </Suspense>
+            </>
           ) : null
         }
       />

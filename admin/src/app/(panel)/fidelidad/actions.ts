@@ -8,8 +8,14 @@ import { getDb } from "@/db/client";
 import { auditLogRepository, stampeeCardShareRepository } from "@/db/repositories";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { instantToEaDate } from "@/lib/ea";
-import { cardShareLink } from "@/lib/stampee/card-share";
-import { loadLoyalty, redeemCard } from "@/lib/stampee/client";
+import { cardShareLink, wasSent } from "@/lib/stampee/card-share";
+import { adventTicketNote } from "@/lib/stampee/advent";
+import {
+  loadLoyalty,
+  redeemAdventReward,
+  redeemCard,
+  unredeemAdventReward,
+} from "@/lib/stampee/client";
 
 import type { SendOutcome } from "../recordatorios/open-whatsapp";
 
@@ -96,6 +102,7 @@ export async function enviarTarjeta(cardId: string): Promise<SendOutcome> {
       customerName: owner.name,
       card,
       cardBaseUrl: loyalty.data.cardBaseUrl,
+      publicId: owner.publicId,
     });
     if (url === null) {
       return {
@@ -107,7 +114,7 @@ export async function enviarTarjeta(cardId: string): Promise<SendOutcome> {
     }
 
     const shares = stampeeCardShareRepository(getDb());
-    const already = (await shares.listSentCardIds()).has(parsed.data);
+    const already = wasSent(owner, card, await shares.listSentCardIds());
     await shares.markSent(parsed.data, session.userId, new Date());
 
     revalidatePath("/fidelidad");
@@ -121,5 +128,98 @@ export async function enviarTarjeta(cardId: string): Promise<SendOutcome> {
     }
     console.error("[fidelidad] no se pudo anotar el envío de la tarjeta", error);
     return { ok: false, message: "No se pudo preparar el mensaje. Intenta de nuevo." };
+  }
+}
+
+const AdventCode = z.string().trim().min(1).max(40);
+
+/**
+ * "Marcar usado" de un regalo del calendario de Adviento: igual que "Aplicar
+ * premio", marca en Stampee que el cupón ya se usó para que no se use dos
+ * veces. No toca la cuenta: el descuento lo pone quien la cierra, con motivo
+ * `promo` y la nota "Adviento día N".
+ *
+ * Stampee decide si se puede (vigente, no vencido, es un cupón) y contesta un
+ * 409 con su código si no; un segundo toque vuelve OK con `alreadyRedeemed`.
+ */
+export async function marcarRegaloAdviento(code: string): Promise<RedeemActionResult> {
+  try {
+    const session = await requireCapability("fidelidad:canjear");
+    const parsed = AdventCode.safeParse(code);
+    if (!parsed.success) return { ok: false, message: "Ese código no se reconoce." };
+
+    const outcome = await redeemAdventReward(parsed.data, { actorName: session.name || session.email });
+    if (!outcome.ok) return { ok: false, message: outcome.message };
+    const { reward } = outcome;
+
+    if (!outcome.alreadyRedeemed) {
+      await auditLogRepository(getDb())
+        .append({
+          actorUserId: session.userId,
+          action: "adviento.canjear",
+          entity: "adviento_regalo",
+          entityId: parsed.data,
+          after: { customer: reward.customerName, door: reward.dayLabel, title: reward.title },
+          at: new Date(),
+        })
+        // El regalo ya quedó usado en Stampee; una bitácora caída no lo
+        // devuelve ni tiene por qué decirle a la recepción que falló.
+        .catch((error) => console.error("[adviento] no se pudo anotar el uso", error));
+    }
+
+    revalidatePath("/fidelidad");
+    revalidatePath("/hoy");
+    revalidatePath("/clientes", "layout");
+
+    if (outcome.alreadyRedeemed) {
+      return { ok: true, message: `Ese regalo de ${reward.customerName} ya estaba marcado como usado.` };
+    }
+    return {
+      ok: true,
+      message:
+        `Regalo de ${reward.customerName} (${reward.title}) marcado como usado. ` +
+        `Al cerrar la cuenta pon el descuento con motivo promo y la nota «${adventTicketNote(reward)}».`,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ForbiddenError) {
+      return { ok: false, message: "Marcar un regalo como usado es de la dueña o de recepción." };
+    }
+    console.error("[adviento] marcar usado falló", error);
+    return { ok: false, message: "No se pudo marcar el regalo. Intenta de nuevo." };
+  }
+}
+
+/** "Deshacer": el regalo vuelve a quedar por usar (un toque equivocado). */
+export async function deshacerRegaloAdviento(code: string): Promise<RedeemActionResult> {
+  try {
+    const session = await requireCapability("fidelidad:canjear");
+    const parsed = AdventCode.safeParse(code);
+    if (!parsed.success) return { ok: false, message: "Ese código no se reconoce." };
+
+    const outcome = await unredeemAdventReward(parsed.data, { actorName: session.name || session.email });
+    if (!outcome.ok) return { ok: false, message: outcome.message };
+
+    await auditLogRepository(getDb())
+      .append({
+        actorUserId: session.userId,
+        action: "adviento.descanjear",
+        entity: "adviento_regalo",
+        entityId: parsed.data,
+        at: new Date(),
+      })
+      .catch((error) => console.error("[adviento] no se pudo anotar el deshacer", error));
+
+    revalidatePath("/fidelidad");
+    revalidatePath("/hoy");
+    revalidatePath("/clientes", "layout");
+    return { ok: true, message: `Listo: el regalo ${parsed.data} volvió a quedar por usar.` };
+  } catch (error) {
+    unstable_rethrow(error);
+    if (error instanceof ForbiddenError) {
+      return { ok: false, message: "Deshacer el uso de un regalo es de la dueña o de recepción." };
+    }
+    console.error("[adviento] deshacer falló", error);
+    return { ok: false, message: "No se pudo deshacer. Intenta de nuevo." };
   }
 }

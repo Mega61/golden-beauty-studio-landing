@@ -149,3 +149,7 @@
   font-size: var(--text-2xs);
   color: var(--color-ink-soft);
 }
+
+.chip a {
+  color: inherit;
+}

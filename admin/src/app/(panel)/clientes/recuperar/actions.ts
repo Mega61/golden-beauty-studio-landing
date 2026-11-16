@@ -110,7 +110,9 @@ export async function enviarRegalo(phoneRaw: string): Promise<SendOutcome> {
       premio: issued.card.rewardName || null,
       descuento: discountPercent > 0 ? String(discountPercent) : null,
       vence: expiresOn ? formatDayMonth(expiresOn) : null,
-      link: `${issued.cardBaseUrl}/${issued.card.uniqueId}?src=whatsapp`,
+      // El link permanente de la clienta si Stampee lo manda: abre la tarjeta
+      // vigente, que es esta (la activa más nueva).
+      link: `${issued.cardBaseUrl}/${issued.publicId ?? issued.card.uniqueId}?src=whatsapp`,
       reservar: WINBACK_BOOKING_URL,
     });
     const url = waMeLink(phone, text);
