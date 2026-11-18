@@ -342,6 +342,7 @@
     "pickDate": "Elige un día",
     "promo": {
       "labels": {
+        "martes-montajes": "Martes de montajes",
         "sabado-press": "Sábado de Press",
         "miercoles-pies": "Miércoles de pies",
         "primera-visita": "{percent}% primera visita"

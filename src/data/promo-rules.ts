@@ -14,6 +14,20 @@
 // - Las promos **no se acumulan**: si aplican varias, gana el descuento mayor.
 
 export const PROMO_RULES = {
+  // 15% sobre los montajes, con el precio de promo redondeado hacia abajo a la
+  // centena para que nunca sea menos del 15% (97.750 → 97.700). Un test en
+  // `promos.test.ts` lo recalcula contra `pricing.ts`: si sube un precio de
+  // lista, falla hasta que se actualice acá.
+  "martes-montajes": {
+    weekday: 2,
+    items: [
+      { key: "polygel-sculpted", regularId: "polygel-sculpted", promoCOP: 102000 },
+      { key: "acrylic-sculpted", regularId: "acrylic-sculpted", promoCOP: 97700 },
+      { key: "polygel-dual", regularId: "polygel-dual", promoCOP: 93500 },
+      { key: "builder-gel-dual", regularId: "builder-gel-dual", promoCOP: 89200 },
+      { key: "press-on", regularId: "press-on", promoCOP: 85000 },
+    ],
+  },
   "sabado-press": {
     weekday: 6,
     items: [{ key: "press-on", regularId: "press-on", promoCOP: 80000 }],
@@ -26,6 +40,9 @@ export const PROMO_RULES = {
     ],
   },
 } as const;
+
+/** Martes de montajes: el porcentaje que anuncia el afiche. */
+export const MARTES_MONTAJES_PERCENT = 15;
 
 /** Primera visita: este porcentaje sobre los servicios (no sobre adicionales). */
 export const FIRST_VISIT_PERCENT = 10;

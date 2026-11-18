@@ -4,6 +4,7 @@ import { PROMOS_DATA as ES } from "./promos.es";
 import { PROMOS_DATA as EN } from "./promos.en";
 import { PROMO_PRICES, promoPriceRows } from "./promo-prices";
 import { getPriceCOP } from "./pricing";
+import { MARTES_MONTAJES_PERCENT } from "./promo-rules";
 
 const original = process.env.NEXT_PUBLIC_ACTIVE_PROMO;
 
@@ -103,9 +104,9 @@ describe("getActiveScenario", () => {
 });
 
 describe("the current lineup", () => {
-  const LINEUP = "sabado-press,miercoles-pies,primera-visita";
+  const LINEUP = "martes-montajes,sabado-press,miercoles-pies,primera-visita";
 
-  it("resolves all three, in env order, in both languages", async () => {
+  it("resolves all four, in env order, in both languages", async () => {
     setPromo(LINEUP);
     for (const lang of ["es", "en"] as const) {
       const result = await getActiveScenarios(lang);
@@ -147,6 +148,20 @@ describe("promo prices", () => {
         expect(regular, `${slug}/${row.key}: ${row.regularId} not in pricing.ts`).not.toBeNull();
         expect(row.promoCOP, `${slug}/${row.key}`).toBeLessThan(regular!);
       }
+    }
+  });
+
+  // The poster says "15%": every Tuesday price must be exactly that off the
+  // list price, rounded down to the hundred so it is never less than 15%.
+  it("Martes de montajes is the advertised percent off every montaje", () => {
+    const rows = PROMO_PRICES["martes-montajes"];
+    expect(rows.map((r) => r.regularId).sort()).toEqual(
+      ["acrylic-sculpted", "builder-gel-dual", "polygel-dual", "polygel-sculpted", "press-on"],
+    );
+    for (const row of rows) {
+      const regular = getPriceCOP(row.regularId)!;
+      const expected = Math.floor((regular * (100 - MARTES_MONTAJES_PERCENT)) / 100 / 100) * 100;
+      expect(row.promoCOP, row.key).toBe(expected);
     }
   });
 

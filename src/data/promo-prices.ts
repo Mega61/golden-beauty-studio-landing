@@ -13,6 +13,7 @@ import { PROMO_RULES } from "./promo-rules";
 // `promos.test.ts` fails if a promo price is not actually below the regular one
 // — a strikethrough that saves nothing is false advertising.
 export const PROMO_PRICES = {
+  "martes-montajes": PROMO_RULES["martes-montajes"].items,
   "sabado-press": PROMO_RULES["sabado-press"].items,
   "miercoles-pies": PROMO_RULES["miercoles-pies"].items,
 } as const;
