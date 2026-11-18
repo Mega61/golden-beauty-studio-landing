@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dayPromoOn, parseQuote, promoHints, visitPricing, type DayPromo } from "./booking-promo";
+import { dayPromoOn, parseQuote, promoHints, visitPricing, weeklyPromos, type DayPromo } from "./booking-promo";
 
 const WED = "2026-10-14";
 const SAT = "2026-10-17";
@@ -97,5 +97,33 @@ describe("visitPricing", () => {
         { subtotal: 95000, promo: { slug: "primera-visita", discount: 9500 }, total: 85500, firstVisit: true },
       ),
     ).toEqual({ promo: { slug: "primera-visita", discount: 9500 }, total: 85500, firstVisit: true });
+  });
+});
+
+describe("weeklyPromos", () => {
+  const tue = (promoCOP: number): DayPromo[] => [{ slug: "martes-montajes", label: "Martes de montajes", weekday: 2, promoCOP }];
+
+  it("una por promo, desde el precio más bajo, en orden de semana", () => {
+    const result = weeklyPromos([
+      ["Montajes", [{ priceCOP: 120000, dayPromos: tue(102000) }, { priceCOP: 105000, dayPromos: tue(90000) }, { priceCOP: 100000, dayPromos: press }]],
+      ["Sencillos", [{ priceCOP: 35000, dayPromos: feet }, { priceCOP: 30000 }]],
+    ]);
+    expect(result).toEqual([
+      { slug: "martes-montajes", weekday: 2, fromCOP: 90000, category: "Montajes" },
+      { slug: "miercoles-pies", weekday: 3, fromCOP: 25000, category: "Sencillos" },
+      { slug: "sabado-press", weekday: 6, fromCOP: 80000, category: "Montajes" },
+    ]);
+  });
+
+  it("lleva a la categoría con más servicios en la promo", () => {
+    const result = weeklyPromos([
+      ["Combos", [{ priceCOP: 150000, dayPromos: tue(145000) }]],
+      ["Montajes", [{ priceCOP: 120000, dayPromos: tue(102000) }, { priceCOP: 115000, dayPromos: tue(97000) }]],
+    ]);
+    expect(result[0].category).toBe("Montajes");
+  });
+
+  it("un precio de promo que no ahorra no la anuncia", () => {
+    expect(weeklyPromos([["Sencillos", [{ priceCOP: 20000, dayPromos: feet }]]])).toEqual([]);
   });
 });

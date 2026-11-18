@@ -119,3 +119,44 @@ export function visitPricing(
     firstVisit: null,
   };
 }
+
+/** Una promo de la semana para la banda del paso 1. */
+export type WeeklyPromo = {
+  slug: string;
+  weekday: number;
+  /** El precio de promo más bajo entre los servicios que toca ("desde $25.000"). */
+  fromCOP: number;
+  /** La categoría con más servicios en la promo: a donde lleva tocarla. */
+  category: string;
+};
+
+/**
+ * Las promos del día que existen en el catálogo, una por promo, en orden de
+ * semana empezando el lunes. Para que la clienta las vea antes de elegir nada,
+ * no solo cuando toca el servicio indicado. Solo cuentan los precios que de
+ * verdad bajan, igual que en `promoHints`.
+ */
+export function weeklyPromos(
+  groups: readonly (readonly [string, readonly PromoLine[]])[],
+): WeeklyPromo[] {
+  const bySlug = new Map<string, { weekday: number; fromCOP: number; perCategory: Map<string, number> }>();
+  for (const [category, lines] of groups) {
+    for (const line of lines) {
+      for (const p of line.dayPromos ?? []) {
+        if (p.promoCOP >= line.priceCOP) continue;
+        const seen = bySlug.get(p.slug) ?? { weekday: p.weekday, fromCOP: p.promoCOP, perCategory: new Map() };
+        seen.fromCOP = Math.min(seen.fromCOP, p.promoCOP);
+        seen.perCategory.set(category, (seen.perCategory.get(category) ?? 0) + 1);
+        bySlug.set(p.slug, seen);
+      }
+    }
+  }
+  return [...bySlug.entries()]
+    .map(([slug, s]) => ({
+      slug,
+      weekday: s.weekday,
+      fromCOP: s.fromCOP,
+      category: [...s.perCategory.entries()].sort((a, b) => b[1] - a[1])[0][0],
+    }))
+    .sort((a, b) => ((a.weekday + 6) % 7) - ((b.weekday + 6) % 7));
+}
