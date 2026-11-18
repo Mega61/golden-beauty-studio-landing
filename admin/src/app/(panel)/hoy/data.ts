@@ -23,6 +23,7 @@ import {
 import type { TicketCatalog } from "@/components/ticket/catalog";
 import type { TicketFinanceView, TodayAppointment } from "@/components/ticket/types";
 import { loadPlannedServices } from "@/lib/planned-services";
+import { snapshotForService } from "@/lib/price-snapshot";
 import type { PanelSession } from "@/lib/dal";
 import { waSentLabelsByAppointment, type WaSentLabel } from "@/lib/whatsapp/sent-labels";
 import { loadCatalogForClose } from "./catalog-server";
@@ -130,6 +131,26 @@ function financeViewOf(
     snapshot: row.service_price_snapshot,
     snapshotSource: row.snapshot_source,
   };
+}
+
+/**
+ * La vista de plata con el congelado recortado al servicio que EA tiene hoy.
+ *
+ * `bookedServiceId` de la tarjeta viene de EA en vivo, y la hoja usa el
+ * congelado cuando el servicio hecho es ése; sin este recorte, un cambio de
+ * servicio todavía no recongelado se valoraba con el precio del anterior.
+ */
+function withLiveSnapshot(
+  view: TicketFinanceView,
+  row: AppointmentFinance | undefined,
+  liveServiceId: number | null,
+): TicketFinanceView {
+  if (row === undefined) return view;
+  const snapshot = snapshotForService(
+    { serviceId: row.booked_service_id, price: row.service_price_snapshot },
+    liveServiceId,
+  );
+  return snapshot === view.snapshot ? view : { ...view, snapshot, snapshotSource: null };
 }
 
 /**
@@ -294,7 +315,7 @@ export async function loadToday(
           ].join(" + "),
           plannedServiceIds: planned.get(appointment.id) ?? [],
           waSent: waSent.get(appointment.id),
-          finance: viewFor(finance),
+          finance: withLiveSnapshot(viewFor(finance), finance, appointment.serviceId),
         };
       })
       .sort((a, b) => a.start.localeCompare(b.start) || a.eaAppointmentId - b.eaAppointmentId);

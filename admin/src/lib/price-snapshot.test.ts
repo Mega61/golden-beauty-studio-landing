@@ -4,6 +4,7 @@ import {
   PriceSnapshotError,
   resolveListPrice,
   resolvePriceSnapshot,
+  snapshotForService,
   type PriceSnapshotInput,
 } from "./price-snapshot";
 
@@ -169,5 +170,25 @@ describe("resolveListPrice — el precio de un adicional", () => {
 
   it("un catálogo con centavos revienta en vez de propagarlos", () => {
     expect(() => resolveListPrice("roto", new Map([["roto", 10.5]]))).toThrow(/precio de lista/);
+  });
+});
+
+describe("snapshotForService — el congelado es de un servicio, no de la cita", () => {
+  const TRADICIONAL = 40;
+  const SEMI = 25;
+
+  it("mismo servicio: vale el congelado", () => {
+    expect(snapshotForService({ serviceId: SEMI, price: 100_000 }, SEMI)).toBe(100_000);
+  });
+
+  it("le cambiaron el servicio en EA y la fila no se ha recongelado: no hay congelado", () => {
+    // El caso real: agendada en tradicional (65.000), llegó pidiendo semi. La
+    // hoja le ponía al semi los 65.000 del tradicional.
+    expect(snapshotForService({ serviceId: TRADICIONAL, price: 65_000 }, SEMI)).toBeNull();
+  });
+
+  it("sin precio o sin servicio en la fila: no hay congelado", () => {
+    expect(snapshotForService({ serviceId: SEMI, price: null }, SEMI)).toBeNull();
+    expect(snapshotForService({ serviceId: null, price: 65_000 }, null)).toBeNull();
   });
 });

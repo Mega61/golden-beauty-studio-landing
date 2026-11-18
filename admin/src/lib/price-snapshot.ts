@@ -168,3 +168,23 @@ export function resolveListPrice(
 
   return marked(price, null);
 }
+
+/**
+ * El congelado de la fila, **solo si es del servicio que la cita tiene hoy**.
+ *
+ * El congelado es el precio de `booked_service_id`, no de la cita: si la dueña
+ * le cambia el servicio en EA (llegó pidiendo semi y estaba agendada en
+ * tradicional), la fila sigue con el precio viejo hasta que el webhook o el
+ * reconcile de la noche la recongelan. Mientras tanto la hoja comparaba el
+ * congelado contra el servicio **de EA** y le ponía al semi el precio del
+ * tradicional. Sin congelado aplicable, la hoja cae al precio de lista de hoy,
+ * que es el mismo que el guardado va a congelar (`upsertAppointmentFinance()`
+ * recongela antes de valorar).
+ */
+export function snapshotForService(
+  stored: { serviceId: number | null; price: Cop | null },
+  currentServiceId: number | null,
+): Cop | null {
+  if (stored.price === null || stored.serviceId === null) return null;
+  return stored.serviceId === currentServiceId ? stored.price : null;
+}
