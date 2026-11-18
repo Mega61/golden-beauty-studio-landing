@@ -20,6 +20,7 @@ import {
   icsFile,
   isDayOpen,
   isPlausiblePhone,
+  weekdayOf,
   whatsappLink,
   type Schedule,
 } from "@/lib/booking";
@@ -27,6 +28,7 @@ import {
   dayPromoOn,
   parseQuote,
   promoHints,
+  weeklyPromos,
   visitPricing,
   type DayPromo,
   type ServerQuote,
@@ -144,6 +146,11 @@ type Dict = {
     chipLabel: string;
     dayHint: string;
     dayMark: string;
+    weekTitle: string;
+    from: string;
+    firstVisitSub: string;
+    nudge: string;
+    nudgeCta: string;
     firstVisit: string;
     firstVisitLoses: string;
     checking: string;
@@ -434,6 +441,8 @@ export default function ReservaFlow({
   }, [catalog, copy]);
 
   const activeCategory = category ?? grouped[0]?.[0] ?? null;
+  /** Las promos del día del catálogo, para anunciarlas antes de elegir servicio. */
+  const weekPromos = useMemo(() => weeklyPromos(grouped), [grouped]);
   const visible = grouped.find(([c]) => c === activeCategory)?.[1] ?? [];
 
   /* ── The combo, derived from the chosen service ──────────────────────── */
@@ -695,6 +704,9 @@ export default function ReservaFlow({
   );
   const nextOpenAfter = (iso: string | null) =>
     days.find((d) => (iso === null || d > iso) && openDays.has(d)) ?? null;
+  /** El próximo día abierto con promo para esta visita, para ofrecerlo en el paso 2. */
+  const nextPromoDay = days.find((d) => promoDays.has(d) && openDays.has(d)) ?? null;
+  const nextPromo = nextPromoDay ? dayPromoOn(visitLines, nextPromoDay) : null;
 
   // Entering step 2, or changing technician onto a closed day: land on the
   // first open day so there are times on screen without a tap.
@@ -1169,6 +1181,59 @@ export default function ReservaFlow({
                 <Skeleton />
               ) : (
                 <>
+                  {/* Las promos, antes de elegir: quien no llegó por un afiche
+                      se entera de que existen, y de qué día le conviene. */}
+                  {(weekPromos.length > 0 || catalog.firstVisitPercent) && (
+                    <div className="mb-5">
+                      <p className="mb-2 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-deep">
+                        <span aria-hidden>✦ </span>
+                        {dict.promo.weekTitle}
+                      </p>
+                      <ul className="-mx-5 flex snap-x gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0">
+                        {weekPromos.map((p) => {
+                          const todayWd = weekdayOf(today);
+                          const when =
+                            p.weekday === todayWd
+                              ? dict.day.today
+                              : p.weekday === (todayWd + 1) % 7
+                                ? dict.day.tomorrow
+                                : null;
+                          return (
+                            <li key={p.slug} className="shrink-0 snap-start">
+                              <button
+                                type="button"
+                                onClick={() => setCategory(p.category)}
+                                className="flex flex-col items-start rounded-2xl border border-gold/40 bg-gradient-to-br from-gold-pale/80 to-paper px-3.5 py-2.5 text-left transition-colors hover:border-gold"
+                              >
+                                <span className="flex items-center gap-1.5 font-display text-[16px] leading-tight text-ink">
+                                  {promoLabel(p.slug)}
+                                  {when && (
+                                    <span className="rounded-full bg-carbon px-1.5 py-px font-sans text-[9px] font-semibold uppercase tracking-wider text-gold-soft">
+                                      {when}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="mt-0.5 font-sans text-[11.5px] text-gold-deep">
+                                  {fill(dict.promo.from, { price: formatCOP(p.fromCOP, lang) })}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                        {catalog.firstVisitPercent ? (
+                          <li className="shrink-0 snap-start">
+                            <div className="flex flex-col items-start rounded-2xl border border-ink/10 bg-paper px-3.5 py-2.5">
+                              <span className="font-display text-[16px] leading-tight text-ink">
+                                {promoLabel("primera-visita")}
+                              </span>
+                              <span className="mt-0.5 font-sans text-[11.5px] text-ink-mute">{dict.promo.firstVisitSub}</span>
+                            </div>
+                          </li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  )}
+
                   {grouped.length > 1 && (
                     <div
                       role="tablist"
@@ -1430,7 +1495,9 @@ export default function ReservaFlow({
                         selected
                           ? "border-carbon bg-carbon text-cream shadow-[0_10px_24px_-12px_rgba(28,23,20,0.6)]"
                           : open
-                            ? "border-ink/10 bg-paper text-ink hover:border-gold/60"
+                            ? promoDay
+                              ? "border-gold/60 bg-gold-pale/70 text-ink hover:border-gold"
+                              : "border-ink/10 bg-paper text-ink hover:border-gold/60"
                             : "cursor-not-allowed border-transparent bg-transparent text-ink/25"
                       }`}
                     >
@@ -1439,7 +1506,7 @@ export default function ReservaFlow({
                       {promoDay && (
                         <span
                           aria-hidden
-                          className={`absolute right-1.5 top-1 text-[10px] leading-none ${selected ? "text-gold-soft" : "text-gold"}`}
+                          className={`absolute right-1.5 top-1 text-[12px] leading-none ${selected ? "text-gold-soft" : "text-gold-deep"}`}
                         >
                           ✦
                         </span>
@@ -1496,6 +1563,46 @@ export default function ReservaFlow({
                       </span>
                     </span>
                   </m.p>
+                )}
+              </AnimatePresence>
+
+              {/* Un día sin promo, habiendo una para esta visita: decírselo con
+                  números y dejarla saltar al próximo, en vez de un ✦ mudo. */}
+              <AnimatePresence initial={false}>
+                {!dayPromo && visit && nextPromoDay && nextPromo && (
+                  <m.div
+                    key={`nudge-${nextPromoDay}`}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-gold/35 bg-gradient-to-br from-gold-pale/80 to-paper px-4 py-3 font-sans text-[13px] text-gold-deep">
+                      <span className="flex min-w-0 flex-1 items-start gap-2">
+                        <span aria-hidden className="mt-px">✦</span>
+                        <span>
+                          {fill(dict.promo.nudge, {
+                            label: promoLabel(nextPromo.slug),
+                            day: longDate(nextPromoDay, lang).toLowerCase(),
+                            price: formatCOP(visit.priceCOP - nextPromo.discount, lang),
+                            was: formatCOP(visit.priceCOP, lang),
+                          })}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          autoHops.current = 0;
+                          setDate(nextPromoDay);
+                          resetSlot();
+                          setError(null);
+                        }}
+                        className="shrink-0 rounded-full bg-carbon px-4 py-1.5 font-sans text-[12px] font-semibold text-cream transition-colors hover:bg-ink"
+                      >
+                        {fill(dict.promo.nudgeCta, { day: weekdayShort(nextPromoDay, lang).toLowerCase() + " " + Number(nextPromoDay.slice(8, 10)) })}
+                      </button>
+                    </div>
+                  </m.div>
                 )}
               </AnimatePresence>
 
