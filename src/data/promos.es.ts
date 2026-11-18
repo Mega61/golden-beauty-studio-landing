@@ -1,5 +1,6 @@
 import type { PromosBySlug } from "./promos.types";
 import { promoPrice, promoPriceRows } from "./promo-prices";
+import { MARTES_MONTAJES_PERCENT } from "./promo-rules";
 import { bookingHref } from "@/config/site";
 
 // Reservation URL lives in NEXT_PUBLIC_BOOKING_URL, localised by bookingHref(). If
@@ -165,6 +166,47 @@ export const PROMOS_DATA: PromosBySlug = {
   // Promos de día de la semana. Recurrentes, sin starts_at/ends_at: corren
   // mientras estén en NEXT_PUBLIC_ACTIVE_PROMO. Los montos viven en
   // `promo-prices.ts`, compartidos con el inglés.
+  "martes-montajes": {
+    slug: "martes-montajes",
+    label: "Martes de montajes",
+    active: true,
+    strip: {
+      tag: "Martes de montajes",
+      message: `Martes: ${MARTES_MONTAJES_PERCENT}% en todos los montajes`,
+      cta: "Reservar",
+      href: BOOKING,
+      accent: "gold",
+    },
+    items: [
+      {
+        id: "martes-montajes",
+        eyebrow: "Todos los martes",
+        title: `Martes de montajes: ${MARTES_MONTAJES_PERCENT}% off`,
+        body:
+          `Esculpidas en polygel o acrílico y dual system, con ${MARTES_MONTAJES_PERCENT}% de descuento. Tu set nuevo arrancando la semana — solo los martes.`,
+        cta_label: "Reservar un martes",
+        cta_href: BOOKING,
+        ribbon: `${MARTES_MONTAJES_PERCENT}% · Todos los martes`,
+        price_rows: promoPriceRows("martes-montajes", "es", {
+          "polygel-sculpted": "Esculpidas en polygel",
+          "acrylic-sculpted": "Esculpidas en acrílico",
+          "polygel-dual": "Dual system polygel",
+          "builder-gel-dual": "Dual system builder gel",
+        }),
+        accent: "gold",
+        featured: true,
+        terms_label: "Condiciones",
+        terms: [
+          `El ${MARTES_MONTAJES_PERCENT}% aplica a montajes realizados un martes: esculpidas en polygel o acrílico y dual system en polygel o builder gel.`,
+          "No aplica a Press On (tiene su propia promo los sábados), retoques, forrados ni servicios sencillos.",
+          "No es acumulable con otras promociones, incluido el 10% de primera visita.",
+          "Al reservar en línea un martes ya ves el precio de promo; se paga en el estudio.",
+          "Retiro de sistema, uñas sueltas y diseños se cobran aparte, según la lista de precios.",
+        ],
+      },
+    ],
+  },
+
   "sabado-press": {
     slug: "sabado-press",
     label: "Sábado de Press",

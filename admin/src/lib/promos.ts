@@ -45,7 +45,7 @@ export type PromoKind = "dia" | "primera_visita";
 
 export type PromoQuote = {
   kind: PromoKind;
-  /** `sabado-press` | `miercoles-pies` | `primera-visita`. */
+  /** `martes-montajes` | `sabado-press` | `miercoles-pies` | `primera-visita`. */
   slug: string;
   /** Texto corto para mostrar: "Miércoles de pies", "10% primera visita". */
   label: string;
@@ -64,6 +64,7 @@ export type PromoInput = {
 };
 
 const LABELS: Record<string, string> = {
+  "martes-montajes": "Martes de montajes",
   "sabado-press": "Sábado de Press",
   "miercoles-pies": "Miércoles de pies",
   "primera-visita": `${FIRST_VISIT_PERCENT}% primera visita`,

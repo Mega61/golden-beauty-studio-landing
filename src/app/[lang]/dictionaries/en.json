@@ -342,6 +342,7 @@
     "pickDate": "Pick a day",
     "promo": {
       "labels": {
+        "martes-montajes": "Full Set Tuesday",
         "sabado-press": "Press On Saturday",
         "miercoles-pies": "Pedicure Wednesday",
         "primera-visita": "{percent}% off first visit"

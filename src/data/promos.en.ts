@@ -1,5 +1,6 @@
 import type { PromosBySlug } from "./promos.types";
 import { promoPrice, promoPriceRows } from "./promo-prices";
+import { MARTES_MONTAJES_PERCENT } from "./promo-rules";
 import { bookingHref } from "@/config/site";
 
 const BOOKING = bookingHref("en") ?? "#contacto";
@@ -163,6 +164,47 @@ export const PROMOS_DATA: PromosBySlug = {
   // NEXT_PUBLIC_ACTIVE_PROMO. Amounts live in `promo-prices.ts`, shared with
   // the Spanish file. The flyers are in Spanish; the card's copy carries the
   // English version of everything printed on them.
+  "martes-montajes": {
+    slug: "martes-montajes",
+    label: "Full Set Tuesday",
+    active: true,
+    strip: {
+      tag: "Full Set Tuesday",
+      message: `Tuesdays: ${MARTES_MONTAJES_PERCENT}% off every full set`,
+      cta: "Book now",
+      href: BOOKING,
+      accent: "gold",
+    },
+    items: [
+      {
+        id: "martes-montajes",
+        eyebrow: "Every Tuesday",
+        title: `Full Set Tuesday: ${MARTES_MONTAJES_PERCENT}% off`,
+        body:
+          `Sculpted polygel or acrylic and dual system, ${MARTES_MONTAJES_PERCENT}% off. A brand-new set to start the week — Tuesdays only.`,
+        cta_label: "Book a Tuesday",
+        cta_href: BOOKING,
+        ribbon: `${MARTES_MONTAJES_PERCENT}% · Every Tuesday`,
+        price_rows: promoPriceRows("martes-montajes", "en", {
+          "polygel-sculpted": "Sculpted polygel",
+          "acrylic-sculpted": "Sculpted acrylic",
+          "polygel-dual": "Dual-system polygel",
+          "builder-gel-dual": "Dual-system builder gel",
+        }),
+        accent: "gold",
+        featured: true,
+        terms_label: "Terms",
+        terms: [
+          `The ${MARTES_MONTAJES_PERCENT}% applies to full sets done on a Tuesday: sculpted polygel or acrylic and dual-system polygel or builder gel.`,
+          "Does not apply to Press On (it has its own Saturday promo), refills, overlays or simple services.",
+          "Cannot be combined with other promotions, including the 10% first-visit discount.",
+          "Book online for a Tuesday and you already see the promo price; you pay at the studio.",
+          "System removal, single nails and designs are charged separately, per the price list.",
+        ],
+      },
+    ],
+  },
+
   "sabado-press": {
     slug: "sabado-press",
     label: "Press On Saturday",

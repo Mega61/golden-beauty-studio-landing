@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseEaLocalDate } from "@/lib/ea/datetime";
 import { bestPromo, dayPromosFor, weekdayOf, type PromoLineInput } from "./promos";
 
+const TUE = parseEaLocalDate("2026-10-13");
 const WED = parseEaLocalDate("2026-10-14");
 const SAT = parseEaLocalDate("2026-10-17");
 const FRI = parseEaLocalDate("2026-10-16");
@@ -16,6 +17,7 @@ const line = (pricingId: string | null, listPrice: number, kind: PromoLineInput[
 
 describe("weekdayOf", () => {
   it("lee el día calendario", () => {
+    expect(weekdayOf(TUE)).toBe(2);
     expect(weekdayOf(WED)).toBe(3);
     expect(weekdayOf(SAT)).toBe(6);
     expect(weekdayOf(FRI)).toBe(5);
@@ -29,6 +31,30 @@ describe("bestPromo", () => {
       discount: 20000,
     });
     expect(bestPromo({ lines: [line("press-on", 100000)], date: FRI, isFirstVisit: false })).toBeNull();
+  });
+
+  it("Martes de montajes rebaja 15% cada montaje, y nada más", () => {
+    const quote = bestPromo({
+      lines: [line("acrylic-sculpted", 115000), line("polygel-refill", 90000), line("design-per-nail", 10000, "adicional")],
+      date: TUE,
+      isFirstVisit: false,
+    });
+    // $115.000 → $97.000: el 15% redondeado al mil, a favor de la clienta.
+    expect(quote).toMatchObject({ slug: "martes-montajes", label: "Martes de montajes", discount: 18000 });
+    expect(quote?.perLine).toEqual([{ key: "acrylic-sculpted-servicio", discount: 18000 }]);
+    expect(bestPromo({ lines: [line("acrylic-sculpted", 115000)], date: WED, isFirstVisit: false })).toBeNull();
+  });
+
+  it("un martes, el 15% le gana al 10% de primera visita en un montaje", () => {
+    expect(bestPromo({ lines: [line("polygel-sculpted", 120000)], date: TUE, isFirstVisit: true })).toMatchObject({
+      slug: "martes-montajes",
+      discount: 18000,
+    });
+  });
+
+  it("Press On no entra en Martes de montajes: ya tiene su sábado", () => {
+    expect(bestPromo({ lines: [line("press-on", 100000)], date: TUE, isFirstVisit: false })).toBeNull();
+    expect(dayPromosFor("press-on").map((p) => p.slug)).toEqual(["sabado-press"]);
   });
 
   it("Miércoles de pies rebaja cada servicio de pies", () => {
