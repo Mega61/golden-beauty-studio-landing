@@ -14,18 +14,18 @@
 // - Las promos **no se acumulan**: si aplican varias, gana el descuento mayor.
 
 export const PROMO_RULES = {
-  // 15% sobre los montajes, con el precio de promo redondeado hacia abajo al
-  // mil para que quede redondo y nunca sea menos del 15% (97.750 → 97.000).
-  // Press On no entra: ya tiene Sábado de Press. Un test en `promos.test.ts`
-  // lo recalcula contra `pricing.ts`: si sube un precio de lista, falla hasta
-  // que se actualice acá.
+  // ~15% sobre los montajes, con precios redondos al mil elegidos por la dueña
+  // (builder gel queda en $90.000, un 14,3%). Press On no entra: ya tiene
+  // Sábado de Press. Un test en `promos.test.ts` comprueba contra `pricing.ts`
+  // que cada precio esté a menos de $1.000 del 15% exacto: si sube un precio de
+  // lista, falla hasta que se actualice acá.
   "martes-montajes": {
     weekday: 2,
     items: [
       { key: "polygel-sculpted", regularId: "polygel-sculpted", promoCOP: 102000 },
       { key: "acrylic-sculpted", regularId: "acrylic-sculpted", promoCOP: 97000 },
       { key: "polygel-dual", regularId: "polygel-dual", promoCOP: 93000 },
-      { key: "builder-gel-dual", regularId: "builder-gel-dual", promoCOP: 89000 },
+      { key: "builder-gel-dual", regularId: "builder-gel-dual", promoCOP: 90000 },
     ],
   },
   "sabado-press": {

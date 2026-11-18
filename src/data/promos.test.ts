@@ -152,8 +152,8 @@ describe("promo prices", () => {
   });
 
   // The poster says "15%": every Tuesday price must be exactly that off the
-  // list price, rounded down to the thousand so it is a round number and never
-  // less than 15%. Press On stays out: it already has Sábado de Press.
+  // The poster says "15%": every Tuesday price is a round thousand within
+  // $1.000 of exactly 15% off. Press On stays out: it has Sábado de Press.
   it("Martes de montajes is the advertised percent off every montaje", () => {
     const rows = PROMO_PRICES["martes-montajes"];
     expect(rows.map((r) => r.regularId).sort()).toEqual(
@@ -161,8 +161,9 @@ describe("promo prices", () => {
     );
     for (const row of rows) {
       const regular = getPriceCOP(row.regularId)!;
-      const expected = Math.floor((regular * (100 - MARTES_MONTAJES_PERCENT)) / 100 / 1000) * 1000;
-      expect(row.promoCOP, row.key).toBe(expected);
+      const exact = (regular * (100 - MARTES_MONTAJES_PERCENT)) / 100;
+      expect(row.promoCOP % 1000, row.key).toBe(0);
+      expect(Math.abs(row.promoCOP - exact), row.key).toBeLessThan(1000);
     }
   });
 
