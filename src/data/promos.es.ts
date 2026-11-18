@@ -187,6 +187,9 @@ export const PROMOS_DATA: PromosBySlug = {
         cta_label: "Reservar un martes",
         cta_href: BOOKING,
         ribbon: `${MARTES_MONTAJES_PERCENT}% · Todos los martes`,
+        image_url: "/promos/martes-montajes.webp",
+        image_orientation: "portrait",
+        image_alt: `Afiche Martes de montajes: -${MARTES_MONTAJES_PERCENT}% en el montaje, todos los martes en Golden Beauty Studio.`,
         price_rows: promoPriceRows("martes-montajes", "es", {
           "polygel-sculpted": "Esculpidas en polygel",
           "acrylic-sculpted": "Esculpidas en acrílico",
