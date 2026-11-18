@@ -39,17 +39,22 @@ describe("bestPromo", () => {
       date: TUE,
       isFirstVisit: false,
     });
-    // $115.000 → $97.700: el 15% redondeado a favor de la clienta.
-    expect(quote).toMatchObject({ slug: "martes-montajes", label: "Martes de montajes", discount: 17300 });
-    expect(quote?.perLine).toEqual([{ key: "acrylic-sculpted-servicio", discount: 17300 }]);
+    // $115.000 → $97.000: el 15% redondeado al mil, a favor de la clienta.
+    expect(quote).toMatchObject({ slug: "martes-montajes", label: "Martes de montajes", discount: 18000 });
+    expect(quote?.perLine).toEqual([{ key: "acrylic-sculpted-servicio", discount: 18000 }]);
     expect(bestPromo({ lines: [line("acrylic-sculpted", 115000)], date: WED, isFirstVisit: false })).toBeNull();
   });
 
   it("un martes, el 15% le gana al 10% de primera visita en un montaje", () => {
-    expect(bestPromo({ lines: [line("press-on", 100000)], date: TUE, isFirstVisit: true })).toMatchObject({
+    expect(bestPromo({ lines: [line("polygel-sculpted", 120000)], date: TUE, isFirstVisit: true })).toMatchObject({
       slug: "martes-montajes",
-      discount: 15000,
+      discount: 18000,
     });
+  });
+
+  it("Press On no entra en Martes de montajes: ya tiene su sábado", () => {
+    expect(bestPromo({ lines: [line("press-on", 100000)], date: TUE, isFirstVisit: false })).toBeNull();
+    expect(dayPromosFor("press-on").map((p) => p.slug)).toEqual(["sabado-press"]);
   });
 
   it("Miércoles de pies rebaja cada servicio de pies", () => {
@@ -145,7 +150,6 @@ describe("dayPromosFor", () => {
 
   it("un combo trae el precio de sus mitades con la promo, para la pista del paso 1", () => {
     expect(dayPromosFor("press-on-hands-semi-feet")).toEqual([
-      { slug: "martes-montajes", label: "Martes de montajes", weekday: 2, promoCOP: 85000 + 55000 },
       { slug: "sabado-press", label: "Sábado de Press", weekday: 6, promoCOP: 80000 + 55000 },
       { slug: "miercoles-pies", label: "Miércoles de pies", weekday: 3, promoCOP: 100000 + 40000 },
     ]);

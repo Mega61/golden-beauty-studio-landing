@@ -152,15 +152,16 @@ describe("promo prices", () => {
   });
 
   // The poster says "15%": every Tuesday price must be exactly that off the
-  // list price, rounded down to the hundred so it is never less than 15%.
+  // list price, rounded down to the thousand so it is a round number and never
+  // less than 15%. Press On stays out: it already has Sábado de Press.
   it("Martes de montajes is the advertised percent off every montaje", () => {
     const rows = PROMO_PRICES["martes-montajes"];
     expect(rows.map((r) => r.regularId).sort()).toEqual(
-      ["acrylic-sculpted", "builder-gel-dual", "polygel-dual", "polygel-sculpted", "press-on"],
+      ["acrylic-sculpted", "builder-gel-dual", "polygel-dual", "polygel-sculpted"],
     );
     for (const row of rows) {
       const regular = getPriceCOP(row.regularId)!;
-      const expected = Math.floor((regular * (100 - MARTES_MONTAJES_PERCENT)) / 100 / 100) * 100;
+      const expected = Math.floor((regular * (100 - MARTES_MONTAJES_PERCENT)) / 100 / 1000) * 1000;
       expect(row.promoCOP, row.key).toBe(expected);
     }
   });
