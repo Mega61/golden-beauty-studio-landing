@@ -29,7 +29,7 @@
       "reviews": "Reviews",
       "contacto": "Contact",
       "regalar": "Gift cards",
-      "trabaja": "Careers"
+      "tarjeta": "My card"
     },
     "cta": "Book a visit",
     "ctaShort": "Book"
@@ -768,8 +768,9 @@
     "copy": "Copy link",
     "copied": "Copied!",
     "save": "Bookmark it or add it to your phone's home screen.",
-    "notFound": "We couldn't find a card with that phone and name. Check the number and type your first name as you registered, or ask us on WhatsApp.",
+    "notFound": "We couldn't find a card with that phone and name. Check the number and type your first name as you registered, or ask us on WhatsApp. Not a client yet? Book your first visit.",
     "askWhatsapp": "Ask on WhatsApp",
+    "notFoundBook": "Book a visit",
     "whatsappText": "Hola Golden, quiero el link de mi tarjeta de sellos",
     "invalidPhone": "Type your 10-digit phone number.",
     "invalidName": "Type your first name.",

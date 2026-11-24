@@ -14,8 +14,8 @@ import { EyebrowLabel } from "./atoms";
  *   pidió Juan): una cuenta regresiva visible y cancelable, porque un dígito
  *   mal puesto también cae aquí y no queremos sacar de la página a quien sí es
  *   clienta.
- * - **Nombre que no coincide** → "no encontrada" genérico, con WhatsApp: el
- *   nombre no se puede adivinar por descarte.
+ * - **Nombre que no coincide** → "no encontrada" genérico, con WhatsApp y un
+ *   botón a reservar: el nombre no se puede adivinar por descarte.
  *
  * En temporada (`season`) la acompaña el muñeco dorado y una línea del
  * calendario de adviento: es a donde lleva el botón de la banda de adviento.
@@ -42,6 +42,7 @@ export type MiTarjetaDict = {
   save: string;
   notFound: string;
   askWhatsapp: string;
+  notFoundBook: string;
   whatsappText: string;
   invalidPhone: string;
   invalidName: string;
@@ -67,7 +68,7 @@ type State =
   | { kind: "searching" }
   | { kind: "found"; card: Found }
   | { kind: "new"; seconds: number | null }
-  | { kind: "error"; message: string; offerWhatsapp: boolean };
+  | { kind: "error"; message: string; offerWhatsapp: boolean; offerBooking?: boolean };
 
 const fill = (template: string, values: Record<string, string | number>) =>
   template.replace(/\{(\w+)\}/g, (_, k: string) => String(values[k] ?? ""));
@@ -140,7 +141,7 @@ export default function MiTarjeta({
         const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         setState({ kind: "new", seconds: still ? null : REDIRECT_SECONDS });
       } else {
-        setState({ kind: "error", message: dict.notFound, offerWhatsapp: true });
+        setState({ kind: "error", message: dict.notFound, offerWhatsapp: true, offerBooking: true });
       }
     } catch {
       setState({ kind: "error", message: dict.unavailable, offerWhatsapp: true });
@@ -248,6 +249,15 @@ export default function MiTarjeta({
                   {state.kind === "error" && (
                     <div className="mt-5 border-l-2 border-gold pl-4">
                       <p className="m-0 font-sans text-[14px] leading-[1.55] text-ink-soft">{state.message}</p>
+                      {state.offerBooking && bookingHref && (
+                        <a
+                          href={bookingHref}
+                          className="bg-gold-grad mt-4 flex w-full items-center justify-between px-6 py-4 font-sans text-[12px] font-semibold uppercase tracking-[0.24em] text-white no-underline"
+                        >
+                          {dict.notFoundBook}
+                          <span aria-hidden className="font-display text-[22px] italic leading-none">→</span>
+                        </a>
+                      )}
                       {state.offerWhatsapp && whatsappUrl && (
                         <a
                           href={whatsappUrl}
