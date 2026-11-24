@@ -170,6 +170,7 @@ describe("summarizeDayTotals", () => {
       otro: 0,
       sinMetodo: 0,
       bono: 0,
+      abono: 0,
       tips: 0,
       count: 0,
       ingreso: 0,

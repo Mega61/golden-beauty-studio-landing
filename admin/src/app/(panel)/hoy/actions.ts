@@ -41,7 +41,7 @@ import type {
   CloseTicketResult,
   GiftCardLookupResult,
 } from "@/components/ticket/types";
-import type { AccountPaymentMethod } from "@/db/types";
+import type { AccountPaymentMethod, PaymentMethod } from "@/db/types";
 import { canOpenAccount } from "@/lib/attendance";
 import { formatCOP } from "@/components/ui/format";
 import {
@@ -53,7 +53,8 @@ import {
   type GiftCardCheck,
   type GiftCardQuote,
 } from "@/lib/gift-cards";
-import { moneyPaymentsOf, pushableAmountOf } from "@/lib/ingest-payload";
+import { availableDeposit, depositExcess } from "@/lib/deposits";
+import { isPrepaidMethod, moneyPaymentsOf, pushableAmountOf } from "@/lib/ingest-payload";
 import {
   getGiftCardByCode,
   redeemGiftCard,
@@ -167,6 +168,16 @@ import { detectFirstVisit, type FirstVisitStatus } from "./first-visit";
  * deshace. Si la cuenta tenía otra tarjeta —o se le quitó—, la anterior se
  * libera (`unredeem`) también antes, y vuelve a redimirse si la escritura
  * falla. La cuenta guarda el código en `gift_card_code` para poder hacerlo.
+ *
+ * ## Adelanto
+ *
+ * Lo que la clienta pagó antes de la cita (`appointment_deposit`, migración
+ * `034`) se lee **acá**, de la base: la hoja lo muestra pero no lo manda. Es
+ * un pago `abono` por lo que alcance después de la tarjeta; el resto va con
+ * los métodos de la hoja. Esa plata viajó a Actual el día en que entró, así
+ * que no viaja otra vez. Un adelanto mayor que lo que queda por cobrar no se
+ * trunca: se rechaza hasta que alguien registre la devolución de la
+ * diferencia, porque esa plata ya está en Actual.
  */
 
 const REASONS = ["cambio_servicio", "adicionales", "cortesia", "correccion", "otro"] as const;
@@ -306,11 +317,14 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // corrección tiene que decir con qué se había cobrado, y eso ya no vive en la
   // fila del encabezado.
   let existingPayments: { method: AccountPaymentMethod; amount: number }[] = [];
+  // Lo que la clienta ya pagó por adelantado, sin lo devuelto.
+  let deposit = 0;
   try {
     const outcome = await upsertAppointmentFinance({ db, ea }, appointment, "reconcile");
     financeId = outcome.financeId;
     existing = await repos.appointmentFinance.findById(financeId);
     existingPayments = await repos.appointmentPayments.listByFinanceId(financeId);
+    deposit = availableDeposit(await repos.appointmentDeposits.listByAppointment(data.eaAppointmentId));
   } catch (error) {
     unstable_rethrow(error);
     console.error("[hoy] no se pudo asegurar la fila de plata", error);
@@ -459,12 +473,41 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
   // método el monto es **todo lo cobrado**, y el total definitivo lo acaba de
   // calcular esta función. Con dos, los montos vienen escritos y solo se
   // verifican.
-  const payments = houseCourtesy ? [] : draftToPayments(draft, totals.amountCharged, giftQuote);
+  if (houseCourtesy && deposit > 0) {
+    return rechazo(
+      `Esta cita tiene un adelanto de ${formatCOP(deposit)}. Una cortesía no cobra nada: ` +
+        "devuelve el adelanto primero (Caja → Adelantos) o cierra la cuenta cobrada.",
+    );
+  }
+  let payments = houseCourtesy
+    ? []
+    : draftToPayments(draft, totals.amountCharged, giftQuote, deposit);
 
   // La tarjeta que de verdad se usa: una pagada, si cubrió algo; una
   // promocional, si su descuento fue el que ganó. Una que no se usa (la promo
   // descontaba más, un total escrito a mano) no se redime: queda para otra visita.
   const bonoPaid = payments.find((payment) => payment.method === "bono")?.amount ?? 0;
+
+  // Un adelanto mayor que lo que queda por cobrar: la diferencia es plata de la
+  // clienta que ya está en Actual. No se trunca callado: se devuelve y se anota.
+  const excess = houseCourtesy ? 0 : depositExcess(deposit, totals.amountCharged - bonoPaid);
+  if (excess > 0) {
+    return rechazo(
+      `El adelanto (${formatCOP(deposit)}) es más que lo que queda por cobrar ` +
+        `(${formatCOP(Math.max(totals.amountCharged - bonoPaid, 0))}). Registra la devolución de ` +
+        `${formatCOP(excess)} en Caja → Adelantos y vuelve a guardar.`,
+    );
+  }
+
+  // Quien no registra métodos (la técnica sin `TICKET_STAFF_COBRA`) no deja la
+  // cuenta medio pagada con el adelanto: queda sin cobrar entera, y el
+  // adelanto se aplica cuando recepción la cobra.
+  const prepaidPaid = payments
+    .filter((payment) => isPrepaidMethod(payment.method))
+    .reduce((sum, payment) => sum + payment.amount, 0);
+  if (!puedeCobrar && moneyPaymentsOf(payments).length === 0 && prepaidPaid < totals.amountCharged) {
+    payments = [];
+  }
   const usedGift =
     giftQuote === null
       ? null
@@ -487,10 +530,21 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     );
   }
 
-  if (bonoPaid > 0 && bonoPaid < totals.amountCharged && payments.length === 1) {
+  if (
+    prepaidPaid > 0 &&
+    prepaidPaid < totals.amountCharged &&
+    payments.length > 0 &&
+    moneyPaymentsOf(payments).length === 0
+  ) {
+    const what =
+      bonoPaid > 0 && prepaidPaid > bonoPaid
+        ? "La tarjeta regalo y el adelanto cubren"
+        : bonoPaid > 0
+          ? "La tarjeta regalo cubre"
+          : "El adelanto cubre";
     return rechazo(
-      `La tarjeta regalo cubre ${formatCOP(bonoPaid)}. Elige cómo pagó la clienta el resto ` +
-        `(${formatCOP(totals.amountCharged - bonoPaid)}).`,
+      `${what} ${formatCOP(prepaidPaid)}. Elige cómo pagó la clienta el resto ` +
+        `(${formatCOP(totals.amountCharged - prepaidPaid)}).`,
     );
   }
 
@@ -572,7 +626,9 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
     // `bono` no existe en la columna vieja: una cuenta pagada con tarjeta
     // queda como "sin método" para la imagen anterior, que es lo honesto.
     payment_method:
-      payments.length === 1 && payments[0].method !== "bono" ? payments[0].method : null,
+      payments.length === 1 && !isPrepaidMethod(payments[0].method)
+        ? (payments[0].method as PaymentMethod)
+        : null,
     paid_at: paidAt,
     service_notes: data.notes.trim() === "" ? null : data.notes,
     variance_reason_code: varianceReasonCode,
@@ -730,6 +786,8 @@ export async function cerrarCuenta(input: CloseTicketInput): Promise<CloseTicket
         after: {
           ...patch,
           giftCard: usedGift,
+          // Lo disponible en adelantos al cerrar; el pago `abono` va en `payments`.
+          deposit,
           clientRequestId: data.clientRequestId,
           // Las comisiones en borrador que se soltaron al reescribir los
           // renglones: "Recalcular" las vuelve a crear.

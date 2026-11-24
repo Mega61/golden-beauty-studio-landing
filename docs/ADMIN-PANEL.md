@@ -886,10 +886,20 @@ Se implementa como una compuerta, no como un supuesto: **el cierre diario no se 
 una cita completada del día sin cuenta cerrada.** La lista de pendientes es la pantalla de Caja, y
 cerrar el día es el acto que la vacía.
 
+**Excepción: los adelantos (2026-11, migración `034`).** En temporada el estudio pide un adelanto
+para separar el cupo, y esa plata sí entra otro día. No rompe la regla de arriba porque **el adelanto
+es su propia venta**: se registra en la cita (Agenda → detalle → Adelanto), viaja a Actual la noche
+del día en que entró como `abono:<id>`, y al cobrar la cita es un pago `abono` que no viaja otra vez:
+del cobro sale solo el resto (`ea-appt:<id>`). Cada movimiento cae en su día de caja, y el bot de
+finanzas enlaza cada transferencia con su venta exacta. Un adelanto mayor que la cuenta no se trunca:
+se registra la devolución de la diferencia (`abono:<id>:adj1`, negativo) y se vuelve a guardar. La
+lista de los que siguen por usar —plata de las clientas— está en Caja → Adelantos.
+
 ### Fuera de alcance en la v1 (decidido el 2026-08-31)
 
 No se construyen, y el modelo tampoco los prepara "por si acaso" — cada uno se agrega el día que exista
-el caso real, no antes: abonos y depósitos, pago dividido entre dos métodos, comisión de datáfono,
+el caso real, no antes: ~~abonos y depósitos~~ (hechos en 2026-11 como adelantos, ver arriba),
+~~pago dividido entre dos métodos~~ (hecho en 2026-09), comisión de datáfono,
 devoluciones, venta de producto sin cita, arqueo de caja con base y conteo, facturación electrónica
 DIAN, y política de propinas más allá del campo `tip`.
 

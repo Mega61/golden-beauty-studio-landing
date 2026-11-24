@@ -13,6 +13,7 @@ import {
   type SkippedAccount,
   type SyncDayResult,
 } from "./day-close";
+import { summarizeDepositSync, syncDeposits, type DepositSyncOutcome } from "./deposits";
 import { summarizeGiftSaleSync, syncGiftCardSales, type GiftSaleSyncOutcome } from "./gift-card-sales";
 
 /**
@@ -34,6 +35,8 @@ import { summarizeGiftSaleSync, syncGiftCardSales, type GiftSaleSyncOutcome } fr
  *    ajustes cuyo push falló.
  * 4. **Las tarjetas regalo vendidas** que no viajaron, y las anulaciones de
  *    las que ya viajaron (`jobs/gift-card-sales.ts`).
+ * 5. **Los adelantos** que no viajaron, y las devoluciones de los que ya
+ *    viajaron (`jobs/deposits.ts`).
  *
  * Hoy no se toca: el día no terminó, y hasta que la noche llegue una cuenta se
  * corrige sin que nada haya salido todavía.
@@ -48,6 +51,8 @@ export type NightlySyncReport = {
   skipped: (SkippedAccount & { date: EaLocalDate })[];
   /** Las tarjetas regalo vendidas. `null` = no se corrió (nada que hacer). */
   giftSales?: GiftSaleSyncOutcome | null;
+  /** Los adelantos. `null` = no se corrió (nada que hacer). */
+  deposits?: DepositSyncOutcome | null;
 };
 
 const startOf = (date: EaLocalDate): Date =>
@@ -112,6 +117,17 @@ export async function runNightlySync(
     };
   }
 
+  // Los adelantos: tampoco dependen de los días de citas, y tampoco tumban lo demás.
+  try {
+    report.deposits = await syncDeposits(deps, { from: startOf(from), to: startOf(today), now });
+  } catch (error) {
+    report.deposits = {
+      state: "fallo",
+      message: error instanceof Error ? error.message : String(error),
+      retryable: true,
+    };
+  }
+
   return report;
 }
 
@@ -147,6 +163,8 @@ export function summarizeNightlySync(report: NightlySyncReport): string {
   }
   const gift = report.giftSales ? summarizeGiftSaleSync(report.giftSales) : null;
   if (gift !== null) parts.push(gift);
+  const deposits = report.deposits ? summarizeDepositSync(report.deposits) : null;
+  if (deposits !== null) parts.push(deposits);
   if (report.skipped.length > 0) {
     parts.push(`sin poder viajar: ${report.skipped.map((s) => `#${s.eaAppointmentId} (${s.message})`).join(", ")}`);
   }
@@ -158,7 +176,8 @@ export function nightlySyncFailed(report: NightlySyncReport): boolean {
   return (
     report.days.some((day) => day.result.state === "sincronizado" && day.result.push.state === "fallo") ||
     report.adjustments.some((a) => a.outcome.state === "fallo") ||
-    report.giftSales?.state === "fallo"
+    report.giftSales?.state === "fallo" ||
+    report.deposits?.state === "fallo"
   );
 }
 

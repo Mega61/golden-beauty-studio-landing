@@ -298,6 +298,7 @@ export function TodayList({
             bookedServiceId: current.bookedServiceId,
             bookedSnapshot: current.finance.snapshot,
             promoDate: promoDateOf(current.start),
+            deposit: current.deposit ?? 0,
           }}
           combos={combos}
           firstVisitStatus={firstVisit?.id === current.eaAppointmentId ? firstVisit.status : null}
@@ -378,6 +379,15 @@ function AppointmentCard({
           <WaSentLabels labels={appointment.waSent} />
           {appointment.loyalty ? <LoyaltyChip loyalty={appointment.loyalty} /> : null}
           {appointment.advent ? <AdventChip advent={appointment.advent} /> : null}
+          {appointment.deposit ? (
+            <p className={styles.loyalty}>
+              <span className={`${styles.chip} ${styles.chipInfo}`}>
+                <Icon name="caja" size={14} />
+                Adelanto {formatCOP(appointment.deposit)}
+              </span>
+              <span className={styles.loyaltyReward}>ya pagado: se descuenta al cobrar</span>
+            </p>
+          ) : null}
           {appointment.cardShare?.state === "manana" ? (
             <p className={styles.loyalty}>
               <span className={styles.loyaltyReward}>

@@ -84,6 +84,9 @@ export default defineConfig({
           functions: 100,
           lines: 100,
         },
+        // Cuánto cubre un adelanto y qué se le puede hacer: decide plata de
+        // la clienta que ya está en Actual.
+        "src/lib/deposits.ts": { branches: 100, functions: 100, lines: 100 },
         "src/lib/metrics.ts": { branches: 100, functions: 100, lines: 100 },
         "src/lib/conflict.ts": { branches: 100, functions: 100, lines: 100 },
         // Decide **qué servicio** queda agendado cuando se compone un combo, y

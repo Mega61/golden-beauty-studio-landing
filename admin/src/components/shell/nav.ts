@@ -94,6 +94,16 @@ export const DESTINATIONS: readonly Destination[] = [
     roles: NO_STAFF,
   },
   {
+    id: "adelantos",
+    label: "Adelantos",
+    // También bajo Caja: un adelanto es plata que entró antes de la cita. Se
+    // registra desde el detalle de la cita en la agenda; acá se ven todos,
+    // los que siguen por usar y las devoluciones.
+    href: "/caja/adelantos",
+    icon: "caja",
+    roles: NO_STAFF,
+  },
+  {
     id: "recordatorios",
     label: "Recordatorios",
     href: "/recordatorios",

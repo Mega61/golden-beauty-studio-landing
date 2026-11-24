@@ -75,8 +75,12 @@ export type PaymentMethod = "efectivo" | "transferencia" | "otro";
  * es un método de Strapi y **nunca viaja**: esa plata ya entró a Actual el día
  * en que se vendió la tarjeta (`gift_card_sale`). `lib/ingest-payload.ts` lo
  * saca del lote.
+ *
+ * `abono` (migración `034`) es lo mismo para un **adelanto**: la plata entró
+ * a Actual el día en que la clienta lo pagó (`appointment_deposit`), y al
+ * cobrar la cita no viaja otra vez.
  */
-export type AccountPaymentMethod = PaymentMethod | "bono";
+export type AccountPaymentMethod = PaymentMethod | "bono" | "abono";
 
 /**
  * De dónde salió el snapshot de precio.
@@ -332,7 +336,10 @@ export interface AppointmentFinanceItemTable {
 export interface AppointmentPaymentTable {
   id: Generated<number>;
   appointment_finance_id: number;
-  /** `bono` = tarjeta regalo pagada (migración `033`). No viaja a Strapi. */
+  /**
+   * `bono` = tarjeta regalo pagada (migración `033`); `abono` = adelanto
+   * (migración `034`). Ninguno de los dos viaja a Strapi.
+   */
   method: AccountPaymentMethod;
   /** Siempre > 0. Una devolución sería un ajuste con id propio, no un negativo. */
   amount: Cop;
@@ -914,6 +921,38 @@ export interface GiftCardSaleTable {
   void_pushed_at: Date | null;
 }
 
+/**
+ * Un adelanto de una cita (migración `034`). Es **ingreso del día en que
+ * entró**, y viaja al CRM como `abono:<id>` en la sincronización nocturna.
+ */
+export interface AppointmentDepositTable {
+  id: Generated<number>;
+  ea_appointment_id: number;
+  /** Copia de la hora de la cita al registrar (o pasar) el adelanto. Solo un rótulo. */
+  appointment_start_at: Date | null;
+  amount: Cop;
+  method: PaymentMethod;
+  /** Instante del pago; el día de caja es su fecha en Bogotá. */
+  paid_at: Date;
+  paid_ref: string | null;
+  customer_name: string | null;
+  /** E.164. Es lo que deja pasar un adelanto a otra cita de la misma clienta. */
+  customer_phone: string | null;
+  created_by: AuthId | null;
+  created_at: CreatedAt;
+  /** Lo devuelto, parcial o total. `null` = nada. */
+  refunded_amount: Cop | null;
+  refund_method: PaymentMethod | null;
+  /** Instante de la devolución; su día de caja es el del ajuste negativo. */
+  refunded_at: Date | null;
+  refunded_by: AuthId | null;
+  refund_reason: string | null;
+  /** `null` = todavía no viajó al CRM. */
+  pushed_to_ingest_at: Date | null;
+  /** El ajuste negativo de la devolución (`:adj1`). */
+  refund_pushed_at: Date | null;
+}
+
 export interface Database {
   // Better Auth
   user: UserTable;
@@ -950,6 +989,7 @@ export interface Database {
   winback_config: WinbackConfigTable;
   winback_offer: WinbackOfferTable;
   gift_card_sale: GiftCardSaleTable;
+  appointment_deposit: AppointmentDepositTable;
 
   // Infraestructura
   schema_migration: SchemaMigrationTable;
@@ -974,6 +1014,8 @@ export type NewAppointmentFinanceItem = Insertable<AppointmentFinanceItemTable>;
 export type AppointmentPayment = Selectable<AppointmentPaymentTable>;
 export type GiftCardSale = Selectable<GiftCardSaleTable>;
 export type NewGiftCardSale = Insertable<GiftCardSaleTable>;
+export type AppointmentDeposit = Selectable<AppointmentDepositTable>;
+export type NewAppointmentDeposit = Insertable<AppointmentDepositTable>;
 export type NewAppointmentPayment = Insertable<AppointmentPaymentTable>;
 
 export type WaMessage = Selectable<WaMessageTable>;

@@ -31,6 +31,7 @@ import { loadComboCompositions } from "@/lib/combo-source";
 import type { ComboComposition } from "@/lib/combos";
 import { loadPlannedServices } from "@/lib/planned-services";
 import { waSentLabelsByAppointment } from "@/lib/whatsapp/sent-labels";
+import { depositRemaining } from "@/lib/deposits";
 import { legacyStartToWallClock } from "../clientes/history";
 import { buildLegacyAgendaItems, type LegacyAgendaItem, type LegacyAgendaRow } from "./legacy";
 
@@ -266,6 +267,23 @@ async function fetchFromEa(
     }
   } catch (error) {
     console.error("[agenda] no se pudieron leer los mensajes de WhatsApp", error);
+  }
+
+  // Los adelantos, para que la lista y el detalle digan quién ya pagó. Igual:
+  // si falla, salen sin la marca.
+  try {
+    const deposits = await repositories(getDb()).appointmentDeposits.listByAppointments(
+      withRelations.appointments.map((a) => a.id),
+    );
+    for (const row of deposits) {
+      const info = meta[row.ea_appointment_id];
+      const remaining = depositRemaining(row);
+      if (info && remaining > 0) {
+        meta[row.ea_appointment_id] = { ...info, deposit: (info.deposit ?? 0) + remaining };
+      }
+    }
+  } catch (error) {
+    console.error("[agenda] no se pudieron leer los adelantos", error);
   }
 
   const visibleProviderIds = new Set(providers.map((p) => p.id));

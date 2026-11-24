@@ -24,6 +24,8 @@
  * | `agendapro-tx:` | las transacciones históricas scrapeadas de Agenda Pro | ya está en Actual, **congelado para siempre** |
  * | `ea-appt:<id>` | la fila `Payment` de una cita cerrada en el panel | el push del cierre diario |
  * | `ea-appt:<id>:adj<n>` | la fila `Payment` de una corrección posterior al cierre | el push del ajuste |
+ * | `bono:<código>` | la venta de una tarjeta regalo | la sincronización nocturna |
+ * | `abono:<id>` | un adelanto de una cita, el día en que entró | la sincronización nocturna |
  * | `ea-tx:…` | nada, hoy | nadie — ver la nota de abajo |
  *
  * El histórico no se re-llavea nunca: cambiarle el prefijo a filas que Actual ya
@@ -261,6 +263,48 @@ export function buildGiftSaleAdjustmentSourceTxId(code: string, sequence: number
 export function giftSaleKeyOfTx(txId: string): string | null {
   const match = /^bono:(TR-[0-9A-Z]{4}-[0-9A-Z]{4})(?::adj\d+)?$/.exec(txId);
   return match === null ? null : `${GIFT_SALE_PREFIX}${match[1]}`;
+}
+
+// ── Adelantos ───────────────────────────────────────────────────────────────
+
+/**
+ * Prefijo de la fila `Payment` de **un adelanto** (migración `034`).
+ *
+ * Es plata que entra antes de la cita, el día en que la clienta la paga. No
+ * puede llevar `ea-appt:<id>`: esa llave es la del cobro de la cita, y el
+ * cobro viaja aparte (sin el adelanto adentro) el día de la cita. En Actual
+ * queda `agendapro-tx:abono:<id>`: el prefijo congelado envolviendo nuestra
+ * llave, que es lo que el bot de finanzas reconoce como venta de la Caja.
+ *
+ * El id es el de la fila `appointment_deposit`, no el de la cita: una cita
+ * puede tener dos adelantos, y un adelanto puede pasar a otra cita sin que su
+ * llave —ya en Actual— cambie.
+ *
+ * El **pago** de la cuenta con el adelanto (método `abono`) no usa esta llave
+ * ni ninguna otra: no viaja, porque esa plata ya es este movimiento.
+ */
+export const DEPOSIT_PREFIX = "abono:";
+
+/** La llave de un adelanto: `abono:<id>`. */
+export function buildDepositSourceTxId(depositId: number): string {
+  assertEaId(depositId, "El id del adelanto");
+  return `${DEPOSIT_PREFIX}${depositId}`;
+}
+
+/**
+ * La llave del ajuste `n` de un adelanto: hoy solo la devolución posterior al
+ * envío (`abono:<id>:adj1`, en negativo). Mismo separador que las citas.
+ */
+export function buildDepositAdjustmentSourceTxId(depositId: number, sequence: number): string {
+  assertEaId(depositId, "El id del adelanto");
+  assertEaId(sequence, "El número de ajuste");
+  return `${DEPOSIT_PREFIX}${depositId}${ADJUSTMENT_SEPARATOR}${sequence}`;
+}
+
+/** La llave base del adelanto dentro de un `tx_id` (`abono:7[:adjN]` → `abono:7`), o `null`. */
+export function depositKeyOfTx(txId: string): string | null {
+  const match = /^abono:([1-9]\d*)(?::adj[1-9]\d*)?$/.exec(txId);
+  return match === null ? null : `${DEPOSIT_PREFIX}${match[1]}`;
 }
 
 /** Lo que un `imported_id` significa, una vez leído de vuelta. */
