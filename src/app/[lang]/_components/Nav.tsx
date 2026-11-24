@@ -14,7 +14,7 @@ type NavItemKey =
   | "reviews"
   | "contacto"
   | "regalar"
-  | "trabaja";
+  | "tarjeta";
 
 type NavDict = {
   items: Record<NavItemKey, string>;
@@ -31,12 +31,10 @@ const NAV_SECTION_MAP: Record<NavItemKey, SectionKey> = {
   reviews: "reviews",
   contacto: "contacto",
   regalar: "regalar",
-  trabaja: "trabaja",
+  tarjeta: "tarjeta",
 };
 
-/** Careers lives on its own route, not a section of the landing. */
-const CAREERS_PATH = "trabaja-con-nosotros";
-/** So do gift cards. */
+/** Gift cards live on their own route, not a section of the landing. */
 const GIFT_PATH = "regalar";
 
 export default function Nav({
@@ -86,7 +84,9 @@ export default function Nav({
     { key: "reviews", hash: "#reviews" },
     { key: "contacto", hash: "#contacto" },
     { key: "regalar", hash: `/${lang}/${GIFT_PATH}`, route: true, wideOnly: true },
-    { key: "trabaja", hash: `/${lang}/${CAREERS_PATH}`, route: true },
+    // Buscar la tarjeta de sellos pesa más que la página de vacantes, que
+    // sigue enlazada desde la banda "Estamos contratando" y el /bio.
+    { key: "tarjeta", hash: "#mi-tarjeta" },
   ];
   const anchors = allAnchors
     .filter((a) => sections[NAV_SECTION_MAP[a.key]])

@@ -29,7 +29,7 @@
       "reviews": "Reseñas",
       "contacto": "Contacto",
       "regalar": "Regalar",
-      "trabaja": "Postúlate"
+      "tarjeta": "Mi tarjeta"
     },
     "cta": "Agendar cita",
     "ctaShort": "Agendar"
@@ -768,8 +768,9 @@
     "copy": "Copiar link",
     "copied": "¡Copiado!",
     "save": "Guárdala en favoritos o en la pantalla de inicio de tu celular.",
-    "notFound": "No encontramos una tarjeta con ese celular y ese nombre. Revisa el número y escribe tu primer nombre como te registraste, o pídela por WhatsApp.",
+    "notFound": "No encontramos una tarjeta con ese celular y ese nombre. Revisa el número y escribe tu primer nombre como te registraste, o pídela por WhatsApp. ¿Aún no eres clienta? Agenda tu primera cita.",
     "askWhatsapp": "Pedirla por WhatsApp",
+    "notFoundBook": "Agendar una cita",
     "whatsappText": "Hola Golden, quiero el link de mi tarjeta de sellos",
     "invalidPhone": "Escribe tu celular de 10 dígitos.",
     "invalidName": "Escribe tu primer nombre.",
