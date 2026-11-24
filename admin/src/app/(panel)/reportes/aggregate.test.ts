@@ -102,6 +102,7 @@ describe("dailyClose", () => {
       { method: "transferencia", label: "Transferencia", amount: 95_000, count: 1 },
       { method: "otro", label: "Otro", amount: 0, count: 0 },
       { method: "bono", label: "Tarjeta regalo", amount: 0, count: 0 },
+      { method: "abono", label: "Adelanto", amount: 0, count: 0 },
     ]);
   });
 

@@ -35,6 +35,9 @@
  *   `bono:<código>` ({@link buildGiftSalePayment}); mandarla otra vez al
  *   redimirla la contaría dos veces. Del lote sale solo lo que la clienta pagó
  *   aparte, con las mismas reglas de llave de siempre.
+ * - **Un pago con adelanto (`abono`) tampoco.** Esa plata entró a Actual el
+ *   día en que la clienta la pagó, como `abono:<id>`
+ *   ({@link buildDepositPayment}). Del cobro de la cita viaja solo el resto.
  * - **Una cortesía de la casa no produce ningún movimiento.** No entró plata,
  *   así que no hay fila `Payment` ni transacción en Actual: ni de `$0` —que
  *   sería ruido en la conciliación— ni con un método inventado. Su llave
@@ -54,6 +57,8 @@
  */
 
 import {
+  buildDepositAdjustmentSourceTxId,
+  buildDepositSourceTxId,
   buildGiftSaleAdjustmentSourceTxId,
   buildGiftSaleSourceTxId,
   buildPaymentAdjustmentSourceTxId,
@@ -248,24 +253,33 @@ function adjustmentMethodOf(payments: readonly MoneyPayment[]): PaymentMethod {
   return best.method;
 }
 
-/** Un pago que sí movió plata ese día: todo menos la tarjeta regalo. */
+/** Un pago que sí movió plata ese día: todo menos la tarjeta regalo y el adelanto. */
 type MoneyPayment = TicketPayment & { method: PaymentMethod };
 
-/** Los pagos que viajan: sin los de tarjeta regalo (`bono`). */
+/**
+ * ¿El pago es plata que entró **otro día**? La tarjeta regalo (`bono`) entró
+ * el día de su venta; el adelanto (`abono`), el día en que la clienta lo pagó.
+ * Ninguno de los dos viaja con la cuenta.
+ */
+export function isPrepaidMethod(method: TicketPayment["method"]): boolean {
+  return method === "bono" || method === "abono";
+}
+
+/** Los pagos que viajan: sin los de tarjeta regalo (`bono`) ni adelanto (`abono`). */
 export function moneyPaymentsOf(payments: readonly TicketPayment[]): MoneyPayment[] {
-  return payments.filter((payment): payment is MoneyPayment => payment.method !== "bono");
+  return payments.filter((payment): payment is MoneyPayment => !isPrepaidMethod(payment.method));
 }
 
 /**
  * Lo cobrado de una cuenta que **sí** es plata del día: lo cobrado menos lo
- * que cubrió una tarjeta regalo pagada. Es lo que viajó a Actual, y por eso es
- * la base de un ajuste por corrección.
+ * que cubrieron una tarjeta regalo pagada y un adelanto. Es lo que viajó a
+ * Actual, y por eso es la base de un ajuste por corrección.
  */
 export function pushableAmountOf(amountCharged: Cop | null, payments: readonly TicketPayment[]): Cop {
-  const bono = payments
-    .filter((payment) => payment.method === "bono")
+  const prepaid = payments
+    .filter((payment) => isPrepaidMethod(payment.method))
     .reduce((sum, payment) => sum + payment.amount, 0);
-  return (amountCharged ?? 0) - bono;
+  return (amountCharged ?? 0) - prepaid;
 }
 
 /**
@@ -315,12 +329,12 @@ export function buildIngestPayment(finance: FinanceForIngest): IngestPayment[] {
   const payments = moneyPaymentsOf(paymentsOf(finance, finance.amountCharged));
 
   if (payments.length === 0) {
-    // Todo lo pagó la tarjeta. La propina, si la hubo, sí es plata del día:
+    // Todo lo pagó la tarjeta o el adelanto. La propina, si la hubo, sí es plata del día:
     // viaja sola, monto 0 + propina, con la llave de la cuenta.
     if (finance.tip === 0) return [];
     if (finance.tipMethod == null) {
       throw new IngestPayloadError(
-        `La cita ${finance.eaAppointmentId} se pagó con tarjeta regalo y dejó propina sin decir el método`,
+        `La cita ${finance.eaAppointmentId} se pagó con tarjeta regalo o adelanto y dejó propina sin decir el método`,
       );
     }
     return [
@@ -398,7 +412,7 @@ export function buildIngestAdjustment(
     throw new IngestPayloadError(
       finance.payments.length === 0
         ? `La cita ${finance.eaAppointmentId} no tiene método de pago y no se puede empujar`
-        : `La cita ${finance.eaAppointmentId} se pagó solo con tarjeta regalo: el ajuste no tiene método con el que viajar`,
+        : `La cita ${finance.eaAppointmentId} se pagó solo con tarjeta regalo o adelanto: el ajuste no tiene método con el que viajar`,
     );
   }
 
@@ -510,4 +524,73 @@ export function buildGiftSaleVoidAdjustment(sale: GiftSaleForIngest): IngestPaym
     throw new IngestPayloadError(`La tarjeta ${sale.code} tiene un monto de ${sale.amount}`);
   }
   return giftSaleBase(sale, -sale.amount, buildGiftSaleAdjustmentSourceTxId(sale.code, 1));
+}
+
+// ── Adelantos ───────────────────────────────────────────────────────────────
+
+/** Lo que hace falta de una fila `appointment_deposit` para mandarla. */
+export type DepositForIngest = {
+  id: number;
+  amount: Cop;
+  method: PaymentMethod;
+  /** Fecha de caja `YYYY-MM-DD`: el día en que entró, en Bogotá. */
+  paidOn: string;
+};
+
+/** Lo que hace falta de una devolución para mandarla. */
+export type DepositRefundForIngest = {
+  id: number;
+  refundedAmount: Cop;
+  refundMethod: PaymentMethod;
+  /** Fecha de caja `YYYY-MM-DD`: el día en que salió la plata, en Bogotá. */
+  refundedOn: string;
+};
+
+function depositBase(id: number, amount: Cop, txId: string, method: PaymentMethod, day: string): IngestPayment {
+  if (!isPaymentMethod(method)) {
+    throw new IngestPayloadError(`Método de pago desconocido en el adelanto ${id}: ${JSON.stringify(method)}`);
+  }
+  if (!DATE_RE.test(day)) {
+    throw new IngestPayloadError(`El adelanto ${id} no tiene fecha de caja válida: ${JSON.stringify(day)}`);
+  }
+  assertPesos(amount, `El monto del adelanto ${id}`);
+  return { source_tx_id: txId, amount, tip: 0, method, paid_on: day };
+}
+
+/**
+ * Un adelanto, como movimiento: ingreso del día en que entró, con llave
+ * `abono:<id>` y sin propina. Es el que el bot de finanzas enlaza con la
+ * transferencia de ese día.
+ */
+export function buildDepositPayment(deposit: DepositForIngest): IngestPayment {
+  if (!(deposit.amount > 0)) {
+    throw new IngestPayloadError(`El adelanto ${deposit.id} tiene un monto de ${deposit.amount}`);
+  }
+  return depositBase(
+    deposit.id,
+    deposit.amount,
+    buildDepositSourceTxId(deposit.id),
+    deposit.method,
+    deposit.paidOn,
+  );
+}
+
+/**
+ * La devolución de un adelanto que **ya viajó**: lo devuelto en negativo, con
+ * llave propia (`abono:<id>:adj1`), con el método y el día por donde salió la
+ * plata. Actual no cambia un movimiento ya importado: se resta con otro.
+ */
+export function buildDepositRefundAdjustment(refund: DepositRefundForIngest): IngestPayment {
+  if (!(refund.refundedAmount > 0)) {
+    throw new IngestPayloadError(
+      `La devolución del adelanto ${refund.id} tiene un monto de ${refund.refundedAmount}`,
+    );
+  }
+  return depositBase(
+    refund.id,
+    -refund.refundedAmount,
+    buildDepositAdjustmentSourceTxId(refund.id, 1),
+    refund.refundMethod,
+    refund.refundedOn,
+  );
 }

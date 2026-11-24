@@ -11,6 +11,7 @@ import { adSpendRepository } from "./ad-spend";
 import { allowedUserRepository } from "./allowed-user";
 import { appointmentFinanceRepository } from "./appointment-finance";
 import { appointmentFinanceItemRepository } from "./appointment-finance-item";
+import { appointmentDepositRepository } from "./appointment-deposit";
 import { appointmentPaymentRepository } from "./appointment-payment";
 import { appointmentPlannedServiceRepository } from "./appointment-planned-service";
 import { auditLogRepository } from "./audit-log";
@@ -41,6 +42,7 @@ export function repositories(db: Db) {
     allowedUsers: allowedUserRepository(db),
     appointmentFinance: appointmentFinanceRepository(db),
     appointmentFinanceItems: appointmentFinanceItemRepository(db),
+    appointmentDeposits: appointmentDepositRepository(db),
     appointmentPayments: appointmentPaymentRepository(db),
     appointmentPlannedServices: appointmentPlannedServiceRepository(db),
     auditLog: auditLogRepository(db),
@@ -75,6 +77,7 @@ export { appointmentPlannedServiceRepository } from "./appointment-planned-servi
 export { appointmentFinanceRepository } from "./appointment-finance";
 export type { EnsureResult } from "./appointment-finance";
 export { appointmentFinanceItemRepository } from "./appointment-finance-item";
+export { appointmentDepositRepository } from "./appointment-deposit";
 export { appointmentPaymentRepository } from "./appointment-payment";
 export { auditLogRepository } from "./audit-log";
 export { giftCardSaleRepository } from "./gift-card-sale";

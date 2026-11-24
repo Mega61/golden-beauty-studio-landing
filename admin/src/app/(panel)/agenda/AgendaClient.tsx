@@ -29,6 +29,7 @@ import { unmappedStatuses } from "@/components/calendar/status-map";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { formatCOP } from "@/components/ui/format";
 import { Panel, PanelInline } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { formatDateLong, formatTimeRange } from "@/components/ui/format";
@@ -45,6 +46,7 @@ import { enviarConfirmacion } from "../recordatorios/actions";
 import { openWhatsappAfter } from "../recordatorios/open-whatsapp";
 import { AttendanceControl } from "../hoy/AttendanceControl";
 import { mapEaStatus } from "@/components/calendar/status-map";
+import { AdelantosCita } from "../caja/adelantos/DepositForms";
 import { AppointmentForm, type AppointmentDraft } from "./AppointmentForm";
 import { BlockForm } from "./BlockForm";
 import type { BlockForm as BlockFormValues } from "./block-resource";
@@ -102,6 +104,8 @@ export type AgendaClientProps = {
    * confirmación por WhatsApp" en el detalle de la cita.
    */
   canConfirmByHand: boolean;
+  /** `cuenta:cobrar`: registrar, devolver y pasar adelantos desde el detalle. */
+  canTakeDeposits?: boolean;
   /** Cita a abrir al entrar (`?cita=`, desde el enlace de un aviso push). */
   openAppointmentId?: number | null;
 };
@@ -131,6 +135,7 @@ export function AgendaClient({
   canWrite,
   whatsappConfirmation,
   canConfirmByHand,
+  canTakeDeposits = false,
   openAppointmentId = null,
 }: AgendaClientProps) {
   const { toast } = useToast();
@@ -691,6 +696,7 @@ export function AgendaClient({
           });
         }}
         onCancelAppointment={() => doCancel(panel.appointment)}
+        depositsToday={canTakeDeposits ? today : null}
         onConfirmByWhatsapp={
           canConfirmByHand && !readOnly
             ? () => confirmByWhatsapp(panel.appointment.id)
@@ -1013,6 +1019,7 @@ function AppointmentDetail({
   onCancelAppointment,
   onAttendance,
   onConfirmByWhatsapp,
+  depositsToday,
 }: {
   appointment: Appointment;
   meta: AgendaData["meta"];
@@ -1024,6 +1031,8 @@ function AppointmentDetail({
   onAttendance: (eaStatus: string) => void;
   /** `null` = quien mira no manda mensajes por WhatsApp. */
   onConfirmByWhatsapp: (() => void) | null;
+  /** El día de hoy si quien mira registra adelantos (`cuenta:cobrar`); `null` si no. */
+  depositsToday: string | null;
 }) {
   const info = meta[appointment.id];
 
@@ -1050,6 +1059,13 @@ function AppointmentDetail({
             <span className={styles.detailValue}>
               <WaSentLabels labels={info.waSent} />
             </span>
+          </>
+        ) : null}
+
+        {info?.deposit && depositsToday === null ? (
+          <>
+            <span className={styles.detailKey}>Adelanto</span>
+            <span className={styles.detailValue}>{formatCOP(info.deposit)} ya pagado</span>
           </>
         ) : null}
 
@@ -1084,6 +1100,15 @@ function AppointmentDetail({
         readOnly={readOnly}
         onMarked={({ eaStatus }) => onAttendance(eaStatus)}
       />
+
+      {depositsToday !== null ? (
+        <AdelantosCita
+          key={appointment.id}
+          eaAppointmentId={appointment.id}
+          today={depositsToday}
+          readOnly={readOnly}
+        />
+      ) : null}
 
       {onConfirmByWhatsapp ? (
         <Button icon="mensaje" onClick={onConfirmByWhatsapp} block>

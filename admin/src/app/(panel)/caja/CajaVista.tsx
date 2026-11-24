@@ -20,6 +20,7 @@ import { GIFT_PAYMENT_LABEL, summarizeGiftSales } from "@/lib/gift-cards";
 
 import { SincronizarAhora } from "./CajaAcciones";
 import type { CajaView } from "./data";
+import { METHOD_LABEL as DEPOSIT_METHOD_LABEL, type DepositView } from "./adelantos/view";
 import type { GiftSaleRow } from "./regalos/data";
 
 /**
@@ -84,6 +85,10 @@ export function CajaVista({ view }: { view: CajaView }) {
 
       {view.giftSales === undefined || view.giftSales.length === 0 ? null : (
         <TarjetasVendidas sales={view.giftSales} />
+      )}
+
+      {view.deposits === undefined || view.deposits.length === 0 ? null : (
+        <AdelantosDelDia date={date} deposits={view.deposits} />
       )}
 
       <Sincronizacion view={view} />
@@ -346,6 +351,11 @@ function Totales({ totals }: { totals: DayTotals }) {
           {totals.bono === 0 ? null : (
             <Tile label="Con tarjeta regalo (fuera de caja)" value={formatCOP(totals.bono)} />
           )}
+          {/* Lo que cubrieron adelantos: esa plata entró el día en que la
+              clienta los pagó, y está en esa caja. */}
+          {totals.abono === 0 ? null : (
+            <Tile label="Con adelanto (fuera de caja)" value={formatCOP(totals.abono)} />
+          )}
         </div>
       </div>
     </Card>
@@ -380,6 +390,7 @@ const METHOD_LABEL: Record<string, string> = {
   transferencia: "Transferencia",
   otro: "Otro",
   bono: "Tarjeta regalo",
+  abono: "Adelanto",
 };
 
 /**
@@ -553,6 +564,73 @@ function TarjetasVendidas({ sales }: { sales: readonly GiftSaleRow[] }) {
   );
 }
 
+/**
+ * Los adelantos que entraron ese día, y las devoluciones que salieron. Igual
+ * que las tarjetas: plata del cajón o del banco que no es de ninguna cuenta del
+ * día, en su propio renglón para que el cuadre cierre. Viajan a Actual cada uno
+ * con su llave (`abono:<id>`, y `abono:<id>:adj1` la devolución).
+ */
+function AdelantosDelDia({ date, deposits }: { date: string; deposits: readonly DepositView[] }) {
+  const por = { efectivo: 0, transferencia: 0, otro: 0 };
+  let entraron = 0;
+  let salieron = 0;
+  for (const deposit of deposits) {
+    if (deposit.paidOn === date) {
+      por[deposit.method] += deposit.amount;
+      entraron += deposit.amount;
+    }
+    if (deposit.refund !== null && deposit.refund.on === date) {
+      por[deposit.refund.method] -= deposit.refund.amount;
+      salieron += deposit.refund.amount;
+    }
+  }
+  return (
+    <Card padded={false}>
+      <CardHead title="Adelantos" actions={<Link href="/caja/adelantos">Ver todos</Link>} />
+      <div style={{ padding: "0 1rem 1rem", display: "grid", gap: "0.75rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gap: "0.75rem",
+            gridTemplateColumns: "repeat(auto-fit, minmax(6.25rem, 1fr))",
+          }}
+        >
+          <Tile label="Entraron" value={formatCOP(entraron)} />
+          {salieron === 0 ? null : <Tile label="Devueltos" value={formatCOP(salieron)} />}
+          <Tile label="Efectivo" value={formatCOP(por.efectivo)} />
+          <Tile label="Transferencia" value={formatCOP(por.transferencia)} />
+          {por.otro === 0 ? null : <Tile label="Otro" value={formatCOP(por.otro)} />}
+        </div>
+        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
+          Plata de citas de otro día: suma aparte del ingreso de las cuentas. Para cuadrar el cajón, súmala al
+          efectivo de arriba.
+        </p>
+        <ul style={{ margin: 0, paddingLeft: "1.125rem", fontSize: "var(--text-sm)", display: "grid", gap: "0.25rem" }}>
+          {deposits.map((deposit) => (
+            <li key={deposit.id}>
+              {deposit.customerName ?? `Cita #${deposit.eaAppointmentId}`}
+              {deposit.appointmentStart ? ` · cita ${deposit.appointmentStart.slice(0, 10)}` : ""} ·{" "}
+              {deposit.paidOn === date ? (
+                <>
+                  {DEPOSIT_METHOD_LABEL[deposit.method]} <span className="ui-num">{formatPesos(deposit.amount)}</span>
+                  {deposit.pushed ? " · en Actual" : " · esta noche"}
+                </>
+              ) : null}
+              {deposit.refund !== null && deposit.refund.on === date ? (
+                <>
+                  {deposit.paidOn === date ? " · " : ""}devolución {DEPOSIT_METHOD_LABEL[deposit.refund.method]}{" "}
+                  <span className="ui-num">−{formatPesos(deposit.refund.amount)}</span>
+                  {deposit.refund.pushed ? " · en Actual" : " · esta noche"}
+                </>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Card>
+  );
+}
+
 // ── Sincronización ──────────────────────────────────────────────────────────
 
 /**
@@ -571,7 +649,13 @@ function Sincronizacion({ view }: { view: CajaView }) {
   const cuentasListas = unsynced.filter((account) => account.payments.length > 0).length;
   // Una venta de tarjeta regalo sin viajar también sale con el botón.
   const tarjetasListas = (view.giftSales ?? []).filter((sale) => !sale.pushed && !sale.voided).length;
-  const listas = cuentasListas + tarjetasListas;
+  // Y los adelantos (o devoluciones) de ese día que no han viajado.
+  const adelantosListos = (view.deposits ?? []).filter(
+    (deposit) =>
+      (deposit.paidOn === date && !deposit.pushed) ||
+      (deposit.refund !== null && deposit.refund.on === date && !deposit.refund.pushed),
+  ).length;
+  const listas = cuentasListas + tarjetasListas + adelantosListos;
 
   return (
     <Card padded={false}>
@@ -580,7 +664,7 @@ function Sincronizacion({ view }: { view: CajaView }) {
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-carbon)" }}>
           {antesDelCorte
             ? "Este día es anterior al corte de Agenda Pro: esa plata entró a Actual por allá y no se manda."
-            : review.closed.length === 0 && tarjetasListas === 0
+            : review.closed.length === 0 && tarjetasListas === 0 && adelantosListos === 0
               ? "Todavía no hay nada cobrado en este día."
               : listas === 0
                 ? enviadas === 0
@@ -588,7 +672,9 @@ function Sincronizacion({ view }: { view: CajaView }) {
                   : "Todo lo cobrado de este día ya está en Actual."
                 : `${enviadas === 0 ? "" : `${enviadas} ${enviadas === 1 ? "cuenta ya está" : "cuentas ya están"} en Actual. `}${
                     listas === 1 ? "1 movimiento sale" : `${listas} movimientos salen`
-                  } solos esta noche${tarjetasListas === 0 ? "" : ` (${tarjetasListas === 1 ? "1 tarjeta regalo" : `${tarjetasListas} tarjetas regalo`})`}.`}
+                  } solos esta noche${tarjetasListas === 0 ? "" : ` (${tarjetasListas === 1 ? "1 tarjeta regalo" : `${tarjetasListas} tarjetas regalo`})`}${
+                    adelantosListos === 0 ? "" : ` (${adelantosListos === 1 ? "1 adelanto" : `${adelantosListos} adelantos`})`
+                  }.`}
         </p>
         <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--color-ink-soft)" }}>
           No hay que cerrar el día. Si corriges una cuenta que ya está en Actual, la diferencia viaja

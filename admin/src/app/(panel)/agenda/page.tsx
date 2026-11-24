@@ -63,6 +63,7 @@ export default async function AgendaPage({
   // tocar EA.
   const result = await loadAgenda(dates);
   const canConfirmByHand = await sessionCan("recordatorios:enviar");
+  const canTakeDeposits = await sessionCan("cuenta:cobrar");
 
   const role = navRole(result.session.role);
 
@@ -112,6 +113,8 @@ export default async function AgendaPage({
         canWrite={result.session.role !== "staff" || result.session.eaProviderId !== null}
         whatsappConfirmation={whatsappConfigured()}
         canConfirmByHand={canConfirmByHand}
+        // Registrar un adelanto es registrar plata que entró: `cuenta:cobrar`.
+        canTakeDeposits={canTakeDeposits}
         // `?cita=` lo pone el enlace de un aviso push: abre el detalle de esa
         // cita apenas aparece en los datos.
         openAppointmentId={parseAppointmentParam(params.cita)}

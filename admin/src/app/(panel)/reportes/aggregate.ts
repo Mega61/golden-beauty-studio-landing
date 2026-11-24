@@ -208,12 +208,14 @@ export const PAYMENT_METHODS: readonly PaymentMethod[] = [
 
 /**
  * Los métodos de **una cuenta** del panel: los tres de Strapi más la tarjeta
- * regalo pagada (`bono`, migración `033`), que se ve como su propio renglón.
+ * regalo pagada (`bono`, migración `033`) y el adelanto (`abono`, migración
+ * `034`), que se ven cada uno como su propio renglón.
  * El historial de Agenda Pro sigue con {@link PAYMENT_METHODS}: ahí no existía.
  */
 export const ACCOUNT_PAYMENT_METHODS: readonly AccountPaymentMethod[] = [
   ...PAYMENT_METHODS,
   "bono",
+  "abono",
 ];
 
 export const PAYMENT_LABEL: Record<AccountPaymentMethod, string> = {
@@ -221,6 +223,7 @@ export const PAYMENT_LABEL: Record<AccountPaymentMethod, string> = {
   transferencia: "Transferencia",
   otro: "Otro",
   bono: "Tarjeta regalo",
+  abono: "Adelanto",
 };
 
 export type DailyClose = {

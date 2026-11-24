@@ -58,6 +58,9 @@ function fakeRepos() {
         writes.push({ what: "appointmentFinance.update", args });
       },
     },
+    appointmentDeposits: {
+      listByAppointment: async () => [],
+    },
     appointmentPayments: {
       listByFinanceId: async () => existingPayments,
       replaceForFinance: record("appointmentPayments.replaceForFinance"),

@@ -130,6 +130,12 @@ export type TodayAppointment = {
    * Ausente = ninguno, o Stampee no respondió a tiempo.
    */
   advent?: { count: number; href: string | null };
+  /**
+   * Lo que la clienta pagó por adelantado y no se le ha devuelto (migración
+   * `034`). La hoja lo descuenta de lo que falta pagar; el servidor lo vuelve
+   * a leer al guardar. Ausente = sin adelanto, o no se pudo leer.
+   */
+  deposit?: number;
   finance: TicketFinanceView;
 };
 

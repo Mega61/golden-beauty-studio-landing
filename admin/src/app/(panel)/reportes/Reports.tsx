@@ -515,9 +515,11 @@ function LegacyPaymentsFrame({ data }: { data: Data }) {
 export function DailyReports({ data }: { data: Data }) {
   const close = dailyClose(data.finance, data.appointments, data.providers);
   const previous = dailyClose(data.previousFinance, [], data.providers);
-  // La tarjeta regalo solo se dibuja el día que hubo alguna: un tramo vacío en
-  // la leyenda haría pensar que falta un dato.
-  const methods = close.byMethod.filter((row) => row.method !== "bono" || row.count > 0);
+  // La tarjeta regalo y el adelanto solo se dibujan el día que hubo alguno: un
+  // tramo vacío en la leyenda haría pensar que falta un dato.
+  const methods = close.byMethod.filter(
+    (row) => (row.method !== "bono" && row.method !== "abono") || row.count > 0,
+  );
 
   return (
     <>

@@ -43,7 +43,8 @@
  * (`booking_attribution`, de dónde llegó cada reserva hecha desde la página) y `032`
  * (`winback_config` + `winback_offer`, el regalo "Te extrañamos" para las
  * clientas que no vuelven) y `033` (tarjetas regalo: `gift_card_sale`, el
- * método de pago `bono` y el código de la tarjeta en la cuenta).
+ * método de pago `bono` y el código de la tarjeta en la cuenta) y `034`
+ * (adelantos: `appointment_deposit` y el método de pago `abono`).
  * El mecanismo sigue siendo el mismo — el número lo reparte quien coordina, no
  * el paquete— y el libro `schema_migration` con checksum sigue siendo el que
  * detecta que alguien editó una migración ya aplicada.
@@ -84,6 +85,7 @@ import { migration as m030 } from "./030-day-close-system";
 import { migration as m031 } from "./031-booking-attribution";
 import { migration as m032 } from "./032-winback";
 import { migration as m033 } from "./033-gift-cards";
+import { migration as m034 } from "./034-appointment-deposits";
 
 export const MIGRATIONS: readonly Migration[] = [
   m001,
@@ -119,6 +121,7 @@ export const MIGRATIONS: readonly Migration[] = [
   m031,
   m032,
   m033,
+  m034,
 ];
 
 /**
@@ -160,6 +163,7 @@ export const EXPECTED_TABLES: readonly string[] = [
   "winback_config",
   "winback_offer",
   "gift_card_sale",
+  "appointment_deposit",
   // Infraestructura
   "schema_migration",
 ];

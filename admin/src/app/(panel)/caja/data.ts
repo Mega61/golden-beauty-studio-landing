@@ -17,6 +17,7 @@ import {
   type PaymentLabels,
 } from "@/lib/ingest-client";
 import type { DayRangeSource } from "@/jobs/pending-charges";
+import { depositViewOf, type DepositView } from "./adelantos/view";
 import { saleRowOf, type GiftSaleRow } from "./regalos/data";
 import {
   dayBounds,
@@ -210,6 +211,12 @@ export type CajaView = {
    * cuadre cierre. Ausente = no se pudo leer.
    */
   giftSales?: GiftSaleRow[];
+  /**
+   * Los adelantos que entraron —o se devolvieron— ese día
+   * (`appointment_deposit`): plata del cajón o del banco por citas de otro día.
+   * Ausente = no se pudo leer.
+   */
+  deposits?: DepositView[];
 };
 
 /**
@@ -235,7 +242,7 @@ export async function loadCajaView(
   const pushEnabled = config !== null;
 
   const [from, to] = dayBounds(date);
-  const [review, dayClose, pendingPush, giftSales] = await Promise.all([
+  const [review, dayClose, pendingPush, giftSales, deposits] = await Promise.all([
     loadReview({ db, loadAppointments: loadDayAppointments() }, date, now),
     repos.dayCloses.findByDate(date),
     repos.dayCloses.listPendingPush(config?.since),
@@ -243,7 +250,17 @@ export async function loadCajaView(
       console.error("[caja] no se pudieron leer las tarjetas regalo del día", error);
       return null;
     }),
+    repos.appointmentDeposits.listMovedBetween(from, to).catch((error: unknown) => {
+      console.error("[caja] no se pudieron leer los adelantos del día", error);
+      return null;
+    }),
   ]);
+  const depositClosed =
+    deposits === null
+      ? new Set<number>()
+      : await repos.appointmentFinance
+          .findClosedEaIds([...new Set(deposits.map((row) => row.ea_appointment_id))])
+          .catch(() => new Set<number>());
 
   return {
     date,
@@ -255,6 +272,10 @@ export async function loadCajaView(
     pushEnabled,
     cutover: config?.since ?? null,
     giftSales: giftSales === null ? undefined : giftSales.map(saleRowOf),
+    deposits:
+      deposits === null
+        ? undefined
+        : deposits.map((row) => depositViewOf(row, depositClosed.has(row.ea_appointment_id))),
   };
 }
 

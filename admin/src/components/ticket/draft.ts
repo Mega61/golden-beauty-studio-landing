@@ -36,6 +36,7 @@ import {
   type TicketTotals,
 } from "@/lib/ticket";
 import type { Cop, PaymentMethod, VarianceReasonCode } from "@/db/types";
+import { depositPayment } from "@/lib/deposits";
 import { isEaLocalDate, type EaLocalDate } from "@/lib/ea/datetime";
 import { bestPromo, type PromoQuote } from "@/lib/promos";
 import {
@@ -165,7 +166,19 @@ export type TicketPricing = {
    * de otro código no se aplica.
    */
   giftCard?: GiftCardQuote | null;
+  /**
+   * Lo que la cita tiene en **adelantos** sin devolver (migración `034`), ya
+   * leído de la base. Paga lo que alcance después de la tarjeta, como pago
+   * `abono`. Ausente = sin adelanto. La hoja lo muestra; el servidor lo vuelve
+   * a leer y no le cree a la pantalla.
+   */
+  deposit?: Cop;
 };
+
+/** ¿Pago con plata que entró otro día (tarjeta regalo o adelanto)? No viaja con la cuenta. */
+function isPrepaid(payment: TicketPayment): boolean {
+  return payment.method === "bono" || payment.method === "abono";
+}
 
 /** La tarjeta del borrador, si la lectura que hay es la de su código. */
 export function giftCardOf(draft: TicketDraft, pricing: TicketPricing): GiftCardQuote | null {
@@ -326,15 +339,15 @@ export function draftFromFinance(
 }
 
 /**
- * Los pagos de una cuenta guardada, como los edita la hoja: sin el `bono` (lo
- * vuelve a poner `draftToPayments()` con la tarjeta) y, si la tarjeta pagó
+ * Los pagos de una cuenta guardada, como los edita la hoja: sin el `bono` ni
+ * el `abono` (los vuelve a poner `draftToPayments()` con la tarjeta y el adelanto) y, si la tarjeta pagó
  * todo, con el método de la propina como el elegido.
  */
 function reopenPayments(
   payments: readonly TicketPayment[],
   tipMethod: PaymentMethod | null,
 ): TicketPayment[] {
-  const money = payments.filter((payment) => payment.method !== "bono");
+  const money = payments.filter((payment) => !isPrepaid(payment));
   if (money.length === 0 && tipMethod !== null) return [{ method: tipMethod, amount: 0 }];
   return money;
 }
@@ -361,22 +374,31 @@ export function draftToPayments(
    * existe. Una promocional no paga nada: ya es el descuento.
    */
   giftCard: GiftCardQuote | null = null,
+  /**
+   * Lo disponible en adelantos (`TicketPricing.deposit`). Paga, como pago
+   * `abono`, lo que alcance de lo que la tarjeta no cubrió.
+   */
+  deposit: Cop = 0,
 ): TicketPayment[] {
   const card =
     giftCard !== null && giftCard.code === (draft.giftCardCode ?? null) && !draft.houseCourtesy
       ? giftCard
       : null;
   const bono = giftCardPayment(card, amountCharged);
-  const rest = amountCharged - bono;
-  const bonoPayment: TicketPayment[] = bono > 0 ? [{ method: "bono", amount: bono }] : [];
+  const abono = draft.houseCourtesy ? 0 : depositPayment(deposit, amountCharged - bono);
+  const rest = amountCharged - bono - abono;
+  const prepaid: TicketPayment[] = [
+    ...(bono > 0 ? [{ method: "bono" as const, amount: bono }] : []),
+    ...(abono > 0 ? [{ method: "abono" as const, amount: abono }] : []),
+  ];
 
-  if (draft.payments.length === 0 || (bono > 0 && rest <= 0)) return bonoPayment;
+  if (draft.payments.length === 0 || (prepaid.length > 0 && rest <= 0)) return prepaid;
 
   if (draft.payments.length === 1) {
-    return [...bonoPayment, { method: draft.payments[0].method, amount: rest }];
+    return [...prepaid, { method: draft.payments[0].method, amount: rest }];
   }
 
-  return [...bonoPayment, ...draft.payments.map((payment) => ({ ...payment }))];
+  return [...prepaid, ...draft.payments.map((payment) => ({ ...payment }))];
 }
 
 /**
@@ -390,8 +412,8 @@ export function tipMethodFor(
   payments: readonly TicketPayment[],
 ): PaymentMethod | null {
   if (draft.tip <= 0 || draft.houseCourtesy) return null;
-  if (payments.some((payment) => payment.method !== "bono")) return null;
-  const chosen = draft.payments.find((payment) => payment.method !== "bono");
+  if (payments.some((payment) => !isPrepaid(payment))) return null;
+  const chosen = draft.payments.find((payment) => !isPrepaid(payment));
   return chosen === undefined ? null : (chosen.method as PaymentMethod);
 }
 
@@ -401,19 +423,25 @@ export function tipNeedsMethod(draft: TicketDraft, payments: readonly TicketPaym
     draft.tip > 0 &&
     !draft.houseCourtesy &&
     payments.length > 0 &&
-    payments.every((payment) => payment.method === "bono") &&
+    payments.every(isPrepaid) &&
     tipMethodFor(draft, payments) === null
   );
 }
 
-/** Lo que falta pagar con los métodos de la hoja, después de la tarjeta regalo pagada. */
+/**
+ * Lo que falta pagar con los métodos de la hoja, después de la tarjeta regalo
+ * pagada y del adelanto.
+ */
 export function amountAfterGiftCard(
   draft: TicketDraft,
   amountCharged: Cop,
   giftCard: GiftCardQuote | null,
+  deposit: Cop = 0,
 ): Cop {
   const card = giftCard !== null && giftCard.code === (draft.giftCardCode ?? null) ? giftCard : null;
-  return amountCharged - giftCardPayment(draft.houseCourtesy ? null : card, amountCharged);
+  const bono = giftCardPayment(draft.houseCourtesy ? null : card, amountCharged);
+  const abono = draft.houseCourtesy ? 0 : depositPayment(deposit, amountCharged - bono);
+  return amountCharged - bono - abono;
 }
 
 /** ¿Hay algo escrito que se pueda perder? Decide si el panel se cierra al tocar afuera. */

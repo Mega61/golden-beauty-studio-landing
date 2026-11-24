@@ -19,6 +19,7 @@ import {
 import type { Cop, PaymentMethod } from "@/db/types";
 import { composeFrom, findCombo, pairedServiceId, partnersFor, roleOf, type ComboComposition } from "@/lib/combos";
 import type { PromoQuote } from "@/lib/promos";
+import { depositExcess, depositPayment } from "@/lib/deposits";
 import { giftCardPayment, normalizeGiftCode, type GiftCardQuote } from "@/lib/gift-cards";
 import type { TicketPayment } from "@/lib/ticket";
 import { ExtrasChips } from "./ExtrasChips";
@@ -205,17 +206,27 @@ export function TicketSheet({
   // Lo que cubre una tarjeta regalo **pagada**; los métodos de la hoja pagan
   // el resto. Una promocional ya está en el descuento.
   const bono = giftCardPayment(cortesia ? null : giftQuote, amountCharged ?? 0);
-  const resto = amountAfterGiftCard(draft, amountCharged ?? 0, cortesia ? null : giftQuote);
-  // La tarjeta pagó todo y hay propina: la propina sí es plata del día y
-  // necesita su método, aunque la cuenta no lo pida.
-  const soloPropina = bono > 0 && resto <= 0 && draft.tip > 0;
+  // Lo que la clienta pagó por adelantado cubre lo que alcance después de la
+  // tarjeta. El servidor lo vuelve a leer al guardar; esto es para verlo.
+  const adelanto = cortesia ? 0 : (pricing.deposit ?? 0);
+  const abono = depositPayment(adelanto, (amountCharged ?? 0) - bono);
+  const sobraAdelanto = amountCharged === null ? 0 : depositExcess(adelanto, amountCharged - bono);
+  const resto = amountAfterGiftCard(draft, amountCharged ?? 0, cortesia ? null : giftQuote, adelanto);
+  const prepagado = bono + abono;
+  // La tarjeta o el adelanto pagaron todo y hay propina: la propina sí es
+  // plata del día y necesita su método, aunque la cuenta no lo pida.
+  const soloPropina = prepagado > 0 && resto <= 0 && draft.tip > 0;
   const faltaMetodo =
     canCharge && !cortesia && (resto > 0 || soloPropina) && draft.payments.length === 0;
   // Un código sin revisar, o que Stampee rechazó, no se guarda: el servidor lo
   // rechazaría igual, y es mejor decirlo antes.
   const tarjetaPendiente = giftCode !== null && !cortesia && (giftPendiente || giftResult?.ok === false);
   const puedeGuardar =
-    !bloqueado && pricingResult.errors.length === 0 && !faltaMetodo && !tarjetaPendiente;
+    !bloqueado &&
+    pricingResult.errors.length === 0 &&
+    !faltaMetodo &&
+    !tarjetaPendiente &&
+    sobraAdelanto === 0;
 
   function patch(next: Partial<TicketDraft>): void {
     onDraftChange({ ...draft, ...next, updatedAt: Date.now() });
@@ -242,6 +253,8 @@ export function TicketSheet({
           >
             {cortesia
               ? "Guardar · cortesía"
+              : sobraAdelanto > 0 && !bloqueado
+                ? "El adelanto es más que la cuenta"
               : tarjetaPendiente && !bloqueado
                 ? giftPendiente
                   ? "Revisando la tarjeta…"
@@ -537,7 +550,11 @@ export function TicketSheet({
                 <BonoResumen quote={giftQuote} bono={bono} resto={resto} />
               ) : null}
 
-              {canCharge && bono > 0 && resto <= 0 ? (
+              {adelanto > 0 ? (
+                <AdelantoResumen adelanto={adelanto} abono={abono} resto={resto} sobra={sobraAdelanto} />
+              ) : null}
+
+              {canCharge && prepagado > 0 && resto <= 0 ? (
                 soloPropina ? (
                   <MetodoPropina
                     value={draft.payments[0]?.method ?? null}
@@ -1568,6 +1585,42 @@ function MetodoPropina({
         </p>
       ) : null}
     </fieldset>
+  );
+}
+
+/** Lo que cubre el adelanto, y lo que queda por pagar (o lo que sobra). */
+function AdelantoResumen({
+  adelanto,
+  abono,
+  resto,
+  sobra,
+}: {
+  adelanto: Cop;
+  abono: Cop;
+  resto: Cop;
+  sobra: Cop;
+}) {
+  return (
+    <div style={{ display: "grid", gap: "0.25rem" }}>
+      <p style={{ margin: 0, display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
+        <span>Adelanto ya pagado</span>
+        <span className="ui-num" style={{ fontWeight: 600 }}>{formatCOP(abono)}</span>
+      </p>
+      <p
+        style={{
+          margin: 0,
+          fontSize: "var(--text-2xs)",
+          color: sobra > 0 ? "var(--color-warn-ink)" : "var(--color-ink-soft)",
+        }}
+      >
+        {sobra > 0
+          ? `Pagó ${formatCOP(adelanto)} de adelanto y la cuenta es menor: sobran ${formatCOP(sobra)}. ` +
+            "Registra la devolución en Caja → Adelantos para poder guardar."
+          : resto > 0
+            ? `Ya entró a la caja el día que lo pagó. Queda ${formatCOP(resto)} por pagar.`
+            : "Ya entró a la caja el día que lo pagó, y cubre toda la cuenta."}
+      </p>
+    </div>
   );
 }
 

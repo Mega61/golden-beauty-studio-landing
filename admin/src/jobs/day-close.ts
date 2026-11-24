@@ -175,6 +175,11 @@ export type DayTotals = {
    * que se vendió la tarjeta, y ese día es donde se cuenta.
    */
   bono: Cop;
+  /**
+   * Lo que cubrieron **adelantos** (método `abono`, migración `034`). Igual
+   * que la tarjeta: entró el día en que la clienta lo pagó, y ahí se cuenta.
+   */
+  abono: Cop;
   /** Aparte, siempre. Nunca entra al ingreso ni a la base de comisión. */
   tips: Cop;
   /** Cuentas cerradas contadas. **Sin las cortesías de la casa.** */
@@ -202,6 +207,7 @@ const CERO: DayTotals = {
   otro: 0,
   sinMetodo: 0,
   bono: 0,
+  abono: 0,
   tips: 0,
   count: 0,
   ingreso: 0,
@@ -260,6 +266,10 @@ export function summarizeDayTotals(accounts: readonly DayAccount[]): DayTotals {
           // Ni cajón ni banco: la tarjeta se pagó el día de su venta.
           totals.bono += payment.amount;
           continue;
+        case "abono":
+          // Tampoco: el adelanto entró el día en que la clienta lo pagó.
+          totals.abono += payment.amount;
+          continue;
         default:
           totals.otro += payment.amount;
           break;
@@ -279,6 +289,7 @@ export function totalsOf(row: DayClose): DayTotals {
     otro: row.total_otro,
     sinMetodo: 0,
     bono: 0,
+    abono: 0,
     tips: row.total_tips,
     count: row.appointment_count,
     ingreso: row.total_efectivo + row.total_transferencia + row.total_otro,
@@ -496,7 +507,7 @@ function missingOf(account: DayAccount): string | null {
   if (
     account.tip > 0 &&
     account.tipMethod == null &&
-    account.payments.every((payment) => payment.method === "bono")
+    account.payments.every((payment) => payment.method === "bono" || payment.method === "abono")
   ) {
     return "Falta el método de la propina";
   }

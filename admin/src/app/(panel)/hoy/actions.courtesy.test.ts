@@ -54,6 +54,9 @@ function fakeRepos() {
       findById: async () => existing,
       update: record("appointmentFinance.update"),
     },
+    appointmentDeposits: {
+      listByAppointment: async () => [],
+    },
     appointmentPayments: {
       listByFinanceId: async () => [],
       replaceForFinance: record("appointmentPayments.replaceForFinance"),

@@ -31,6 +31,11 @@ export type AppointmentMeta = {
    * muestra: no es el estado de la cita. Ausente = nada, o no se pudo leer.
    */
   waSent?: readonly WaSentLabel[];
+  /**
+   * Lo que pagó por adelantado y no se le ha devuelto, en pesos (migración
+   * `034`). Ausente = nada, o no se pudo leer.
+   */
+  deposit?: number;
 };
 
 /** Metadatos por id de cita. Un objeto plano: cruza el borde servidor→cliente. */

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ForbiddenError, requireCapability } from "@/lib/dal";
 import { isEaLocalDate, type EaLocalDate } from "@/lib/ea";
 import { dayBounds, syncDay, type PushOutcome, type SyncDayResult } from "@/jobs/day-close";
+import { summarizeDepositSync, syncDeposits } from "@/jobs/deposits";
 import { summarizeGiftSaleSync, syncGiftCardSales } from "@/jobs/gift-card-sales";
 
 import { dayCloseDeps } from "./data";
@@ -94,14 +95,25 @@ export async function sincronizarAhora(fecha: string): Promise<SyncResult> {
       console.error("[caja] no se pudieron sincronizar las tarjetas regalo", error);
       return { state: "fallo", message: "no se pudieron enviar", retryable: true } as const;
     });
+    // Y los adelantos que entraron (o se devolvieron) ese día.
+    const deposits = await syncDeposits(deps, { from, to }).catch((error: unknown) => {
+      console.error("[caja] no se pudieron sincronizar los adelantos", error);
+      return { state: "fallo", message: "no se pudieron enviar", retryable: true } as const;
+    });
     revalidatePath("/caja");
     revalidatePath("/hoy");
     revalidatePath("/caja/regalos");
+    revalidatePath("/caja/adelantos");
     const base = syncMessage(result);
-    const giftLine = summarizeGiftSaleSync(gifts);
-    return giftLine === null
+    const extra = [summarizeGiftSaleSync(gifts), summarizeDepositSync(deposits)].filter(
+      (line): line is string => line !== null,
+    );
+    return extra.length === 0
       ? base
-      : { ok: base.ok && gifts.state !== "fallo", message: `${base.message} ${giftLine[0].toUpperCase()}${giftLine.slice(1)}.` };
+      : {
+          ok: base.ok && gifts.state !== "fallo" && deposits.state !== "fallo",
+          message: [base.message, ...extra.map((line) => `${line[0].toUpperCase()}${line.slice(1)}.`)].join(" "),
+        };
   } catch (error) {
     unstable_rethrow(error);
     console.error("[caja] no se pudo sincronizar", error);

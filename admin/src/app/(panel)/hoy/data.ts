@@ -2,6 +2,7 @@ import "server-only";
 
 import { getDb } from "@/db/client";
 import { repositories } from "@/db/repositories";
+import { depositRemaining } from "@/lib/deposits";
 import type {
   AppointmentFinance,
   AppointmentFinanceItem,
@@ -270,6 +271,24 @@ export async function loadToday(
       }
     }
 
+    // Los adelantos de las citas del día: la tarjeta lo dice y la hoja lo
+    // descuenta. Si falla, la hoja abre sin adelanto y el servidor lo aplica
+    // igual al guardar (lo lee él, no se lo cree a la pantalla).
+    let deposits = new Map<number, number>();
+    if (db !== null) {
+      try {
+        const rows = await repositories(db).appointmentDeposits.listByAppointments(
+          citas.map(({ appointment }) => appointment.id),
+        );
+        for (const row of rows) {
+          deposits.set(row.ea_appointment_id, (deposits.get(row.ea_appointment_id) ?? 0) + depositRemaining(row));
+        }
+      } catch (error) {
+        console.error("[hoy] no se pudieron leer los adelantos", error);
+        deposits = new Map();
+      }
+    }
+
     const appointments = citas
       .map(({ appointment, service, provider, customer }): TodayAppointment => {
         const finance = financeByEaId.get(appointment.id);
@@ -294,6 +313,7 @@ export async function loadToday(
           ].join(" + "),
           plannedServiceIds: planned.get(appointment.id) ?? [],
           waSent: waSent.get(appointment.id),
+          deposit: deposits.get(appointment.id) || undefined,
           finance: viewFor(finance),
         };
       })

@@ -169,6 +169,18 @@ export function appointmentFinanceRepository(db: Db) {
       return new Set(rows.map((r) => r.ea_appointment_id));
     },
 
+    /** De estas citas, cuáles tienen la cuenta cerrada. Para los adelantos. */
+    async findClosedEaIds(eaAppointmentIds: readonly number[]): Promise<Set<number>> {
+      if (eaAppointmentIds.length === 0) return new Set();
+      const rows = await db
+        .selectFrom("appointment_finance")
+        .select("ea_appointment_id")
+        .where("ea_appointment_id", "in", [...eaAppointmentIds])
+        .where("closed_at", "is not", null)
+        .execute();
+      return new Set(rows.map((r) => r.ea_appointment_id));
+    },
+
     async update(id: number, patch: AppointmentFinanceUpdate): Promise<void> {
       await db
         .updateTable("appointment_finance")
